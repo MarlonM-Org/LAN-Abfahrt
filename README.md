@@ -170,3 +170,5 @@ Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – k
 - [ ] Weitere Minispiele: Sonnencreme-Kartoffel, Grill-Duell, Badezimmer-Rennen, Koffer packen
 - [ ] Items auf dem Spielbrett (z. B. „Doppelt würfeln“, „Cocktail klauen“)
 - [ ] Sounds & Musik
+
+Ausführliche Spiele-Ideen (Arena, Bewegungssensor, geheime Rollen, Physik …) nach Aufwand sortiert: **[ROADMAP.md](ROADMAP.md)**
