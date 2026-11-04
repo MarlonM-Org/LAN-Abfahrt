@@ -52,7 +52,7 @@ export class ResultsScene extends Phaser.Scene {
     else if (r.hearts !== undefined) this.renderHearts(s);
     else this.renderList(s);
 
-    const footer = s.drinkActive ? 'VIP: Nächste Runde oder Beenden am Handy' : s.date ? 'Am Handy auf „Weiter“ tippen' : r.final || !s.partyActive ? 'VIP: Am Handy zurück zur Lobby' : 'VIP: Am Handy weiter zum Spielbrett';
+    const footer = s.arcadeActive && !s.partyActive ? 'VIP: Nächstes Spiel, Nochmal oder Menü am Handy' : s.drinkActive ? 'VIP: Nächste Runde oder Beenden am Handy' : s.date ? 'Am Handy auf „Weiter“ tippen' : r.final || !s.partyActive ? 'VIP: Am Handy zurück zur Lobby' : 'VIP: Am Handy weiter zum Spielbrett';
     this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
   }
 

@@ -23,6 +23,9 @@ import {
 } from '../art/rhine';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
+import { duckMusic, playRhythmSong } from './music';
+import { toLocalPerf } from '../timesync';
+import { RHYTHM } from '../../shared/dategames';
 import { RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
 
 const PINK_INK = '#b0306a';
@@ -241,6 +244,7 @@ export class RhythmScene extends StateScene {
   private lastHits = new Map<string, number>();
   private phraseIdx = -1;
   private latest: GameState | null = null;
+  private stopSong?: () => void;
 
   constructor() {
     super('rhythm');
@@ -262,6 +266,10 @@ export class RhythmScene extends StateScene {
     this.info = txt(this, WORLD.W / 2, 254, '').setDepth(1001);
     panel(this, 130, 36, 220, 30).setDepth(1000);
     ink(this, WORLD.W / 2, 42, 'Sympathie', { color: PINK_INK }).setDepth(1001);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.stopSong?.();
+      duckMusic(false);
+    });
     this.listen();
   }
 
@@ -315,9 +323,13 @@ export class RhythmScene extends StateScene {
     }
     if (r.sub === 'play' && r.playSeq !== this.playSeq) {
       this.playSeq = r.playSeq;
-      this.playStart = performance.now();
+      // Song-Start aus der synchronisierten Serverzeit – passt zu den Noten auf den Handys
+      this.playStart = toLocalPerf(r.startAt);
+      duckMusic(true);
+      this.stopSong = playRhythmSong(this.playStart, r.bpm, RHYTHM.BEATS, r.leadIn);
     }
     if (r.sub === 'over') {
+      duckMusic(false);
       this.bubble.removeAll(true);
       this.info.setText(r.sympathy > 70 ? 'Da hat es gefunkt!' : 'Schön war’s trotzdem.');
     }

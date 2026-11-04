@@ -46,6 +46,7 @@ export class RhythmGame implements MiniGame {
 
     this.state = {
       sub: 'ready',
+      startAt: 0,
       ready: [],
       playSeq: 0,
       bpm: RHYTHM.BPM,
@@ -105,8 +106,10 @@ export class RhythmGame implements MiniGame {
     this.timers.clear();
     s.sub = 'play';
     s.playSeq += 1;
+    // Kleiner Puffer, damit alle Geräte den Startzeitpunkt rechtzeitig kennen
+    s.startAt = Date.now() + 1500;
     this.ctx.onChange();
-    this.timers.later(s.duration + 1500, () => this.end());
+    this.timers.later(s.duration + 3000, () => this.end());
   }
 
   private end() {

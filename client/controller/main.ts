@@ -1,6 +1,7 @@
 import '@fontsource/press-start-2p/400.css';
 import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
 import { type Screen, LS, app, el, me, message, socket, store, toast } from './core';
+import { startTimeSync } from '../timesync';
 import { buildEdit, buildLobby } from './screens/lobby';
 import { pickBoard } from './screens/board';
 import { pickResults } from './screens/results';
@@ -47,6 +48,8 @@ function join() {
     render();
   });
 }
+
+startTimeSync(socket);
 
 socket.on('connect', () => {
   if (store.name && !store.editing) join();

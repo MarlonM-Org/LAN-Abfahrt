@@ -472,11 +472,14 @@ export function turmCellOffsets(shape: number, angle: number): { x: number; y: n
 /** Punkte nach Platzierung im Arcade-Modus */
 export const ARCADE_POINTS = [10, 6, 3, 1];
 
+/** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist'];
+
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
-  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours'] },
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'enten', 'igel', 'turm'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger'] },
-  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken'] },
-  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb'] },
+  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'stillepost'] },
 ];

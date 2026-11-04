@@ -223,6 +223,8 @@ export interface RhythmNote {
 
 export interface RhythmState {
   sub: 'ready' | 'play' | 'over';
+  /** Server-Zeit (ms), zu der der Song startet – TV und Handys gleichen ihre Uhr ab */
+  startAt: number;
   /** Wer schon bereit ist (Audio entsperrt) */
   ready: string[];
   playSeq: number;
@@ -1341,7 +1343,7 @@ export interface JoinResponse {
 }
 
 export interface StartRequest {
-  mode: 'party' | 'date' | 'drink' | MiniKind;
+  mode: 'party' | 'date' | 'drink' | 'random' | MiniKind;
   rounds?: number;
   version?: string;
 }

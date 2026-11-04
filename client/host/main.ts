@@ -12,6 +12,8 @@ import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
 import { setState } from './store';
+import { startTimeSync } from '../timesync';
+import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -59,6 +61,24 @@ async function start() {
 
   let currentKey = '';
   const socket = io();
+  startTimeSync(socket);
+
+  // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
+  const overlay = document.getElementById('sound');
+  const unlock = () => {
+    unlockMusic();
+    overlay?.remove();
+  };
+  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'm' || e.key === 'M') {
+      const muted = toggleMute();
+      const n = document.getElementById('mute');
+      if (n) n.textContent = muted ? 'Ton aus (M)' : '';
+      return;
+    }
+    unlock();
+  });
   socket.on('connect', () => socket.emit('host:hello'));
   socket.on('state', (s: GameState) => {
     const key = sceneKey(s);
@@ -67,6 +87,7 @@ async function start() {
       currentKey = key;
       for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
       game.scene.start(key);
+      setTrack(trackForScene(key));
     }
   });
 }

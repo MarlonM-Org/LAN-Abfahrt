@@ -7,7 +7,7 @@ Aktueller Stand (v0.3):
 
 **Vier Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Arcade**, **Trinkspiel** und **Date Night**.
 
-**Arcade:** Alle Spiele einzeln auswählbar. Jede Runde bringt Punkte nach Platzierung (10/6/3/1, bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
+**Arcade:** Alle Spiele einzeln auswählbar – oder „Zufälliges Spiel“. Nach jeder Runde: „Nächstes Spiel (zufällig)“, „Nochmal“ oder „Spiel auswählen“. Jede Runde bringt Punkte nach Platzierung (10/6/3/1, bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
 
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 8 Spieler, Pixel-Avatar-Editor auf dem Handy
@@ -58,6 +58,11 @@ PUBLIC_HOST=192.168.178.23 npm run dev
 ```
 
 Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start`.
+
+## Sound
+
+Der TV/Laptop spielt durchgehend 8-Bit-Musik (komplett per WebAudio erzeugt, je nach Szene ein anderer Loop). Browser erlauben Ton erst nach einer Aktion: **einmal in die TV-Ansicht klicken oder eine Taste drücken**. **M** schaltet stumm.
+Beim Rhythmusspiel kommt der Song ebenfalls vom TV/Laptop – TV und Handys gleichen dafür ihre Uhr mit dem Server ab, damit Noten und Musik synchron sind. (Bei Bluetooth-Boxen kann es wegen deren Verzögerung minimal versetzt wirken – dann lieber Laptop-Lautsprecher oder Kabel.)
 
 ## Auf den Fernseher bringen
 
