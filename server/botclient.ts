@@ -563,6 +563,22 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'bowling' && m.state.sub === 'aim' && m.state.turn === this.id) {
+      const bw = m.state;
+      this.once(`bowl-${bw.aimSeq}`, async () => {
+        // Startposition einstellen (sieht man auf dem TV), dann werfen
+        const start = rand(-0.5, 0.5);
+        await sleep(rand(500, 900));
+        this.send('aim', { start: start / 2 });
+        await sleep(rand(300, 600));
+        this.send('aim', { start });
+        await sleep(rand(500, 1200));
+        // Haken grob Richtung Mitte, Richtung leicht korrigieren – mit Streuung
+        const spin = -start * rand(0.4, 1.1) + rand(-0.2, 0.2);
+        this.send('throw', { seq: bw.aimSeq, start, speed: rand(0.35, 1), angle: rand(-0.3, 0.3), spin });
+      });
+    }
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;

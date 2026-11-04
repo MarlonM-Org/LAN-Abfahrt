@@ -17,15 +17,16 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   flieger: { title: 'Urlaubsflieger', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2 },
   kurve: { title: 'Kurven-Duell', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2 },
   arena: { title: 'Bomben-Arena', tagline: 'Kokosnüsse legen, Sandburgen sprengen – wer bleibt trocken?', minPlayers: 2 },
+  bowling: { title: 'Strand-Bowling', tagline: 'Handy schwingen wie eine Bowlingkugel – Strike!', minPlayers: 2 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'murder'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'murder'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
