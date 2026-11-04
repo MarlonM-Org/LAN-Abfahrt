@@ -26,7 +26,7 @@ import { TurmGame } from './turm';
 import { IgelGame } from './igel';
 import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
-import { ARCADE_POINTS, ARCADE_RANDOM } from '../shared/games';
+import { ARCADE_POINTS, ARCADE_RANDOM, fitsPlayers } from '../shared/games';
 import { WasserGame } from './wasser';
 import { FangenGame } from './fangen';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
@@ -48,8 +48,8 @@ import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
 import { StillepostGame } from './stillepost';
 
-const MAX_PLAYERS = 8;
-const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
+const MAX_PLAYERS = 12;
+const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
 const MIN_PLAYERS = 2;
 const MINI_KINDS = Object.keys(MINI_INFO) as MiniKind[];
 
@@ -149,6 +149,8 @@ export class Room {
         const kind = req.mode as MiniKind;
         const min = MINI_INFO[kind].minPlayers;
         if (ids.length < min) return socket.emit('toast', `${MINI_INFO[kind].title}: mindestens ${min} Spieler.`);
+        const max = MINI_INFO[kind].maxPlayers;
+        if (max !== undefined && ids.length > max) return socket.emit('toast', `${MINI_INFO[kind].title}: höchstens ${max} Spieler.`);
         this.arcadeActive = this.mode === 'arcade';
         this.startMini(kind);
       }
@@ -280,7 +282,7 @@ export class Room {
   /** Zufälliges Spiel, das zur Spielerzahl passt und nicht gerade dran war */
   private startRandom() {
     const n = this.connectedIds().length;
-    const pool = ARCADE_RANDOM.filter((k) => MINI_INFO[k].minPlayers <= n && k !== this.lastKind);
+    const pool = ARCADE_RANDOM.filter((k) => fitsPlayers(k, n) && k !== this.lastKind);
     const kind = pool[Math.floor(Math.random() * pool.length)] ?? 'sprint';
     this.startMini(kind);
   }
