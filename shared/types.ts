@@ -44,7 +44,8 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'wasser'
   | 'stillepost'
   | 'sup' | 'tidy' | 'fangen'
-  | 'geist';
+  | 'geist'
+  | 'sumo';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1174,6 +1175,40 @@ export interface GeistState {
   points: Record<string, number>;
 }
 
+// ------------------------------------------------------------------ Sumo-Steg
+
+export interface SumoPlayer {
+  x: number;
+  y: number;
+  /** Blickrichtung für das Sprite */
+  f: 1 | -1;
+  alive: boolean;
+  /** Rempelt gerade */
+  dash: boolean;
+  /** Restliche Abklingzeit des Remplers (ms) */
+  cd: number;
+  /** Gerade weggeschubst (rutscht, kann kurz nicht steuern) */
+  stun: boolean;
+  /** Zählt hoch bei jedem Treffer (Handy vibriert) */
+  hits: number;
+  wins: number;
+  /** Wie oft man jemanden ins Wasser geschubst hat (alle Runden) */
+  pushes: number;
+}
+
+export interface SumoState {
+  sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  endsIn: number;
+  round: number;
+  winRounds: number;
+  /** COLS × ROWS Zeichen, siehe SumoTile in shared/sumo.ts */
+  tiles: string;
+  /** Die letzte Insel bricht (Sudden Death) */
+  sudden: boolean;
+  players: Record<string, SumoPlayer>;
+  roundWinner: string | null;
+}
+
 /** Nur an den jeweiligen Spieler */
 export type GeistPrivate =
   | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number }
@@ -1285,7 +1320,8 @@ export type MiniSnapshot =
   | { kind: 'wasser'; state: WasserState }
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
-  | { kind: 'geist'; state: GeistState };
+  | { kind: 'geist'; state: GeistState }
+  | { kind: 'sumo'; state: SumoState };
 
 export interface GameState {
   phase: Phase;

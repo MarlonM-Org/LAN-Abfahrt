@@ -22,6 +22,8 @@ import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
 import type { FangenState } from '../shared/types';
+import type { SumoState } from '../shared/types';
+import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
 
 export interface BotOptions {
   url: string;
@@ -939,6 +941,8 @@ export class Bot {
         else if (st.hunters[this.id] && st.sub === 'chase') fangenHunter(this, st, this.fg);
       });
     }
+
+    if (m.kind === 'sumo') sumoBot(this, m.state);
 
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
@@ -1879,3 +1883,108 @@ export function solveConstellation(name: string, stars: { id: number; x: number;
   return [];
 }
 
+
+// ------------------------------------------------------------------ Sumo-Steg
+
+interface SumoBotMemory {
+  nextAt: number;
+  moving: boolean;
+  /** Eigene Ungenauigkeit, damit nicht alle Bots gleich spielen */
+  slop: number;
+  wobble: number;
+}
+
+const sumoBotMem = new WeakMap<Bot, SumoBotMemory>();
+
+/** Sicherer Boden für den Bot: nur heile Planken ('!' knackt gleich weg) */
+function sumoBotSafe(tiles: string, x: number, y: number) {
+  const cell = sumoCellAt(x, y);
+  return !!cell && tiles[sumoIdx(cell[0], cell[1])] === '#';
+}
+
+/**
+ * Sumo-Bot: läuft zum nächsten Gegner – möglichst von der Steg-Mitte aus, damit der Schubs
+ * nach außen geht –, rempelt, wenn er nah und ausgerichtet ist, und hält sich vom Rand fern.
+ */
+function sumoBot(bot: Bot, st: SumoState) {
+  let mem = sumoBotMem.get(bot);
+  if (!mem) sumoBotMem.set(bot, (mem = { nextAt: 0, moving: false, slop: rand(0.05, 0.3), wobble: rand(0, 6) }));
+  const me = st.players[bot.id];
+  if (st.sub !== 'play' || !me?.alive) {
+    if (mem.moving) {
+      mem.moving = false;
+      bot.send('stick', { x: 0, y: 0 });
+    }
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 140);
+
+  // Mitte der heilen Planken
+  let cx = 0;
+  let cy = 0;
+  let n = 0;
+  for (let i = 0; i < st.tiles.length; i++) {
+    if (st.tiles[i] !== '#') continue;
+    cx += SUMO.OX + (i % SUMO.COLS) * SUMO.TILE + SUMO.TILE / 2;
+    cy += SUMO.OY + Math.floor(i / SUMO.COLS) * SUMO.TILE + SUMO.TILE / 2;
+    n++;
+  }
+  if (!n) {
+    cx = me.x;
+    cy = me.y;
+  } else {
+    cx /= n;
+    cy /= n;
+  }
+  const norm = (x: number, y: number) => {
+    const l = Math.hypot(x, y) || 1;
+    return { x: x / l, y: y / l, l: Math.hypot(x, y) };
+  };
+
+  const foes = Object.entries(st.players).filter(([id, p]) => id !== bot.id && p.alive);
+  const target = foes.sort((a, b) => Math.hypot(a[1].x - me.x, a[1].y - me.y) - Math.hypot(b[1].x - me.x, b[1].y - me.y))[0]?.[1];
+
+  let want = { x: 0, y: 0 };
+  let dashOk = false;
+  if (target) {
+    // Von innen anlaufen: Punkt zwischen Gegner und Steg-Mitte
+    const out = norm(target.x - cx, target.y - cy);
+    const behind = { x: target.x - out.x * 14, y: target.y - out.y * 14 };
+    const toBehind = norm(behind.x - me.x, behind.y - me.y);
+    const toT = norm(target.x - me.x, target.y - me.y);
+    const goal = toBehind.l > 10 && toT.l > 16 ? toBehind : toT;
+    want = { x: goal.x, y: goal.y };
+    // Rempeln: nah dran, Stoß zeigt grob nach außen, und man landet selbst nicht im Wasser
+    const aligned = toT.x * out.x + toT.y * out.y > 0.2 || out.l < 10;
+    const land = sumoBotSafe(st.tiles, me.x + toT.x * 30, me.y + toT.y * 30);
+    dashOk = toT.l < 34 && aligned && land && me.cd <= 0;
+    if (dashOk) want = { x: toT.x, y: toT.y };
+  }
+
+  // Randvermeidung: voraus schauen und Umgebung abtasten
+  const home = norm(cx - me.x, cy - me.y);
+  let danger = 0;
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    if (!sumoBotSafe(st.tiles, me.x + Math.cos(a) * 12, me.y + Math.sin(a) * 12)) danger++;
+  }
+  const aheadBad = !sumoBotSafe(st.tiles, me.x + want.x * 16, me.y + want.y * 16) || !sumoBotSafe(st.tiles, me.x + want.x * 28, me.y + want.y * 28);
+  if (aheadBad || danger >= 3 || !sumoBotSafe(st.tiles, me.x, me.y)) {
+    const k = aheadBad ? 1.4 : danger / 4;
+    want = { x: want.x + home.x * k, y: want.y + home.y * k };
+    dashOk = dashOk && !aheadBad;
+  }
+  // etwas menschliche Unschärfe
+  const wob = Math.sin(now / 700 + mem.wobble) * mem.slop;
+  const w = norm(want.x + wob * -want.y, want.y + wob * want.x);
+  if (w.l < 0.05) {
+    if (mem.moving) bot.send('stick', { x: 0, y: 0 });
+    mem.moving = false;
+    return;
+  }
+  mem.moving = true;
+  bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
+  if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
