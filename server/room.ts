@@ -24,6 +24,7 @@ import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
 import { TurmGame } from './turm';
 import { IgelGame } from './igel';
+import { SmashGame } from './smash';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -330,6 +331,9 @@ export class Room {
         break;
       case 'igel':
         this.mini = new IgelGame(ids, ctx);
+        break;
+      case 'smash':
+        this.mini = new SmashGame(ids, ctx);
         break;
     }
     this.results = null;

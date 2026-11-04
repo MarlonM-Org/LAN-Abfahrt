@@ -595,3 +595,66 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .ig-hp { width: 28px; text-align: right; color: var(--ink); }
 .ig-sd { font-size: 8px; }
 .ig-map { width: 100%; aspect-ratio: 480 / 270; image-rendering: pixelated; border: 3px solid var(--wood-darker); }
+
+/* ---------------------------------------------------------------- Smash-Arena */
+#app:has(.smash) { padding: 8px; gap: 6px; }
+.smash { flex: 1; display: flex; flex-direction: column; gap: 6px; touch-action: none; min-height: 0; }
+.sm-top { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.sm-av canvas { display: block; height: 30px; width: auto; }
+.sm-pct { font-size: 18px; color: var(--paper-light); background: var(--outline); padding: 5px 8px 3px; min-width: 92px; text-align: right; border: 2px solid var(--wood-darker); }
+.sm-stocks { color: var(--red); font-size: 14px; letter-spacing: 2px; flex: 1; }
+.sm-timer { color: var(--ink-soft); font-size: 10px; }
+.sm-info { display: flex; flex-direction: column; gap: 2px; font-size: 9px; line-height: 1.5; color: var(--ink-soft); background: var(--paper-light); border: 3px solid var(--wood-dark); padding: 5px 8px; }
+.sm-info b { color: var(--red); font-weight: normal; font-size: 10px; }
+.sm-pad { flex: 1; display: grid; grid-template-columns: 1fr 1.2fr; gap: 8px; min-height: 52vh; }
+.sm-zone {
+  position: relative; touch-action: none; overflow: hidden;
+  background: repeating-linear-gradient(45deg, rgba(141, 86, 41, 0.08) 0 8px, transparent 8px 16px), var(--paper-dark);
+  border: 3px dashed var(--wood-dark);
+}
+.sm-zone-label { position: absolute; left: 6px; right: 6px; bottom: 6px; font-size: 7px; line-height: 1.5; color: var(--ink-soft); text-align: center; pointer-events: none; }
+.sm-ring {
+  position: absolute; left: 50%; top: 50%; width: 104px; height: 104px; margin: -52px 0 0 -52px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 246, 220, 0.9) 0 55%, rgba(230, 200, 138, 0.9) 56%);
+  border: 4px solid var(--wood-dark); opacity: 0.55; pointer-events: none;
+}
+.sm-ring.on { opacity: 1; }
+.sm-knob {
+  position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%;
+  background: var(--wood); border: 4px solid var(--wood-darker); box-shadow: inset 0 4px 0 var(--wood-light);
+}
+.sm-btns { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; align-content: end; gap: 10px 8px; padding-bottom: 6px; }
+.sm-btn {
+  position: relative; overflow: hidden; touch-action: none; padding: 4px; font-size: 10px;
+  width: 100%; aspect-ratio: 1 / 1; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+}
+.sm-btn.jump, .sm-btn.a { transform: translateY(-14px); }
+.sm-btn.jump.pressed, .sm-btn.a.pressed { transform: translateY(-12px) scale(0.97); }
+.sm-btn.pressed { transform: translateY(2px) scale(0.97); filter: brightness(1.15); }
+.sm-btn.a { background: #e0503f; box-shadow: inset 0 4px 0 #f08a7e, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); font-size: 11px; }
+.sm-btn.b { background: #9b5fc0; box-shadow: inset 0 4px 0 #c495e0, inset 0 -6px 0 #6c3a8f, 0 3px 0 var(--outline); }
+.sm-btn.jump { background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
+.sm-btn.shield {
+  background: linear-gradient(to top, #2fb5a5 var(--shield, 100%), #8a9a96 var(--shield, 100%));
+  box-shadow: inset 0 4px 0 #6fdccd, inset 0 -6px 0 #1f7f73, 0 3px 0 var(--outline);
+}
+.sm-btn .cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(45, 27, 18, 0.55); pointer-events: none; }
+.sm-btn.b.cooling { color: #d8c8e8; }
+
+@media (orientation: landscape) and (max-height: 520px) {
+  body { padding: 4px; }
+  #app:has(.smash) { padding: 6px 10px; gap: 4px; min-height: calc(100dvh - 8px); }
+  #app:has(.smash) .abort { position: fixed; top: 6px; right: 8px; padding: 4px 8px; font-size: 8px; z-index: 5; }
+  .smash { gap: 4px; }
+  .sm-top { gap: 8px; }
+  .sm-av canvas { height: 22px; }
+  .sm-pct { font-size: 16px; min-width: 70px; }
+  .sm-info { flex-direction: row; align-items: baseline; gap: 10px; padding: 2px 8px; font-size: 7px; }
+  .sm-info b { font-size: 8px; white-space: nowrap; }
+  .sm-pad { grid-template-columns: 1.15fr 1fr; min-height: 0; }
+  .sm-timer { margin-right: 120px; }
+  .sm-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+  .sm-btn { width: auto; height: 100%; max-height: 150px; }
+  .sm-btn.jump, .sm-btn.a { transform: none; }
+  .sm-btn.jump.pressed, .sm-btn.a.pressed { transform: translateY(2px) scale(0.97); }
+}

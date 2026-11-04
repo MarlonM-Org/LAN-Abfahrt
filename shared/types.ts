@@ -37,7 +37,8 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'parcours'
   | 'sup' | 'tidy' | 'kart'
   | 'sup' | 'tidy' | 'turm'
-  | 'sup' | 'tidy' | 'igel';
+  | 'sup' | 'tidy' | 'igel'
+  | 'smash';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -938,6 +939,74 @@ export interface IgelState {
   out: string[];
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Smash-Arena
+
+export type SmashAnim =
+  | 'idle' | 'run' | 'air' | 'crouch' | 'shield' | 'hurt' | 'stun' | 'dizzy'
+  | 'jab' | 'side' | 'up' | 'down' | 'nair' | 'dair' | 'spec' | 'throw';
+
+export interface SmashFighter {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  face: 1 | -1;
+  anim: SmashAnim;
+  /** Zählt bei jedem neuen Angriff/Spezial hoch (für Effekte am TV) */
+  atkSeq: number;
+  pct: number;
+  stocks: number;
+  /** Schild-Energie 0–100 */
+  shield: number;
+  /** Übrige Luftsprünge */
+  jumps: number;
+  ground: boolean;
+  special: import('./smash').SpecialId;
+  /** Restliche Abklingzeit des Spezialmoves in ms */
+  cd: number;
+  hold: import('./smash').ItemKind | null;
+  /** Kurz unverwundbar nach dem Wiedereinstieg */
+  inv: boolean;
+  state: 'fight' | 'respawn' | 'out';
+  kos: number;
+  /** Endplatzierung (erst wenn ausgeschieden bzw. am Ende) */
+  place: number | null;
+}
+
+export interface SmashProjectile {
+  id: number;
+  type: 'flipflop' | 'kokos' | 'bombe';
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+}
+
+export interface SmashFx {
+  seq: number;
+  type: 'hit' | 'shield' | 'ko' | 'boom' | 'heal' | 'spawn' | 'break' | 'wave' | 'stun';
+  x: number;
+  y: number;
+  /** Stärke 0…1 */
+  p: number;
+  id?: string;
+}
+
+export interface SmashState {
+  sub: 'countdown' | 'fight' | 'over';
+  endsIn: number;
+  stage: 'beach' | 'pool';
+  /** ms seit Kampfbeginn (für bewegliche Plattformen) */
+  t: number;
+  fighters: Record<string, SmashFighter>;
+  /** Kurze Strahl-/Spritz-Angriffe (für die Darstellung) */
+  beams: { id: string; type: 'wasser' | 'cocktail'; x: number; y: number; w: number; face: 1 | -1 }[];
+  projectiles: SmashProjectile[];
+  items: { id: number; type: import('./smash').ItemKind; x: number; y: number }[];
+  fx: SmashFx[];
+  winner: string | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -1037,7 +1106,8 @@ export type MiniSnapshot =
   | { kind: 'parcours'; state: ParcoursState }
   | { kind: 'kart'; state: KartState }
   | { kind: 'turm'; state: TurmState }
-  | { kind: 'igel'; state: IgelState };
+  | { kind: 'igel'; state: IgelState }
+  | { kind: 'smash'; state: SmashState };
 
 export interface GameState {
   phase: Phase;

@@ -21,6 +21,7 @@ import { pickParcours } from './screens/parcours';
 import { onKartRerender, pickKart } from './screens/kart';
 import { pickTurm } from './screens/turm';
 import { pickIgel } from './screens/igel';
+import { pickSmash } from './screens/smash';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -160,6 +161,8 @@ function pickScreen(): Screen {
           return pickTurm(m.state);
         case 'igel':
           return pickIgel(m.state);
+        case 'smash':
+          return pickSmash(m.state);
       }
     }
   }
