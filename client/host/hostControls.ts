@@ -1,4 +1,5 @@
 import type { Socket } from 'socket.io-client';
+import { isMusicMenuOpen } from './musicMenu';
 import type { GameState } from '../../shared/types';
 import { bus, getState } from './store';
 
@@ -112,6 +113,8 @@ export function installHostControls(socket: Socket) {
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
+    // Offenes Musik-Menü (oder Eingabefeld darin) hat Vorrang: Esc schließt nur das Menü
+    if (document.querySelector('#musik-menu-root .open, #musik-menu-root [data-open="1"]') || isMusicMenuOpen()) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       abort();

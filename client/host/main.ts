@@ -14,8 +14,9 @@ import { TttScene } from './TttScene';
 import { setState } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
+import { connectMusic, setScene, unlockMusic } from './music';
+import { isMusicMenuOpen, musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
 import { watchServerVersion } from '../version';
-import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -67,6 +68,8 @@ async function start() {
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
+  connectMusic(socket);
+  setupMusicMenu();
   watchServerVersion(socket);
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
@@ -77,10 +80,18 @@ async function start() {
   };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'm' || e.key === 'M') {
-      const muted = toggleMute();
-      const n = document.getElementById('mute');
-      if (n) n.textContent = muted ? 'Ton aus (M)' : '';
+      // M öffnet das Musik-Menü (Lautstärke, Stumm, Bibliothek, Zuordnung)
+      unlock();
+      toggleMusicMenu();
+      return;
+    }
+    if (e.key === 'Escape' && isMusicMenuOpen()) {
+      // Nur das Menü schließen – nicht zusätzlich „Spiel abbrechen“ (Laptop-Steuerung) auslösen
+      toggleMusicMenu(false);
+      e.stopImmediatePropagation();
       return;
     }
     unlock();
@@ -101,7 +112,8 @@ async function start() {
       currentKey = key;
       for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
       game.scene.start(key);
-      setTrack(trackForScene(key));
+      setScene(key);
+      musicMenuScene(key);
     }
   });
 }
