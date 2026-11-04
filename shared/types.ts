@@ -1,3 +1,5 @@
+import type { WasserState } from './wasser';
+
 export interface Look {
   skin: number;
   hair: number;
@@ -26,7 +28,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'wasser';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -398,7 +400,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'wasser'; state: WasserState };
 
 export interface GameState {
   phase: Phase;

@@ -100,7 +100,9 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+- 💦 **Wasserbomben-Schlacht** – Team Sonne gegen Team Meer im Garten (bei 3 Spielern jeder gegen jeden). Linker Stick am Handy läuft, rechter Stick zielt (Vorschau-Bogen auf dem TV) – loslassen wirft. Volltreffer machen richtig nass, Spritzer nur ein bisschen; hinter Hecken und Liegen ist man sicher. Max. 3 Wasserbomben, Nachschub am eigenen Eimer oder (schneller) am Gartenschlauch in der Mitte. Wer klatschnass ist, muss zum Handtuch – das andere Team bekommt einen Punkt. Ab und zu liegt eine Wasserpistole in der Mitte.
+
+Alle laufen auch im Party-Modus auf dem Spielbrett.
 
 ## Trinkspiel
 
