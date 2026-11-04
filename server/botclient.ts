@@ -3,7 +3,8 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { GameState, KurveState, PrivateState } from '../shared/types';
+import type { ArenaState, GameState, KurveState, PrivateState } from '../shared/types';
+import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { KURVE, ROOMS } from '../shared/games';
@@ -131,6 +132,165 @@ export class Bot {
         this.send('turn', { dir });
       }
     });
+  }
+
+  private arenaStick = false;
+
+  /**
+   * Bomben-Arena-KI: Gefahr erkennen (Explosionslinien inkl. Kettenreaktion, Flut),
+   * bei Gefahr zur nächsten sicheren Kachel fliehen, sonst Kisten/Gegner/Power-ups ansteuern
+   * und nur dann eine Bombe legen, wenn danach ein Fluchtweg frei ist.
+   */
+  private arenaThink(st: ArenaState) {
+    const me = st.players[this.id];
+    if (!me?.alive) return;
+    const W = ARENA.COLS;
+    const cellAt = (x: number, y: number): ArenaCell => (x < 0 || y < 0 || x >= W || y >= ARENA.ROWS ? '#' : (st.grid[cellIdx(x, y)] as ArenaCell));
+    const bombCells = new Set(st.bombs.map((b) => cellIdx(b.x, b.y)));
+    const bombAt = (x: number, y: number) => bombCells.has(cellIdx(x, y));
+    const mx = Math.round(me.x);
+    const my = Math.round(me.y);
+    const myIdx = cellIdx(mx, my);
+    const msPerTile = 1000 / (ARENA.SPEED + me.speed * ARENA.SPEED_STEP);
+
+    // Gefahrenkarte: Zelle → ms bis zum Treffer
+    const danger = new Map<number, number>();
+    const mark = (i: number, t: number) => danger.set(i, Math.min(danger.get(i) ?? Infinity, t));
+    for (const f of st.flames) mark(cellIdx(f.x, f.y), 0);
+    const bombs = st.bombs.map((b) => ({ ...b, t: b.fuse }));
+    for (let k = 0; k < 3; k++) {
+      for (const b of bombs) {
+        for (const c of blastCells(cellAt, bombAt, b.x, b.y, b.range)) {
+          const o = bombs.find((ob) => ob.x === c.x && ob.y === c.y);
+          if (o && o.t > b.t) o.t = b.t;
+        }
+      }
+    }
+    for (const b of bombs) for (const c of blastCells(cellAt, bombAt, b.x, b.y, b.range)) mark(cellIdx(c.x, c.y), b.t);
+    const floodIn = st.floodActive ? 0 : st.endsIn;
+    if (floodIn < 6000) {
+      for (let j = st.flood; j < Math.min(FLOOD_ORDER.length, st.flood + 40); j++) mark(FLOOD_ORDER[j], floodIn + (j - st.flood) * ARENA.FLOOD_STEP_MS);
+    }
+
+    const walk = (x: number, y: number) => cellAt(x, y) === '.' && (!bombAt(x, y) || cellIdx(x, y) === myIdx);
+    /** Breitensuche ab der eigenen Kachel; meidet Zellen, die beim Durchlaufen gerade explodieren */
+    const bfs = (extra?: Map<number, number>, strict = false) => {
+      const prev = new Map<number, number>([[myIdx, -1]]);
+      const dist = new Map<number, number>([[myIdx, 0]]);
+      const queue = [myIdx];
+      while (queue.length) {
+        const i = queue.shift()!;
+        const x = i % W;
+        const y = Math.floor(i / W);
+        const d = dist.get(i)!;
+        for (const [dx, dy] of DIRS) {
+          const nx = x + dx;
+          const ny = y + dy;
+          const ni = cellIdx(nx, ny);
+          if (prev.has(ni) || !walk(nx, ny)) continue;
+          const arrive = (d + 1) * msPerTile;
+          const t = Math.min(danger.get(ni) ?? Infinity, extra?.get(ni) ?? Infinity);
+          if (t <= arrive + 600 && t > arrive - 900) continue;
+          if (t === 0 || (strict && t < Infinity)) continue;
+          prev.set(ni, i);
+          dist.set(ni, d + 1);
+          queue.push(ni);
+        }
+      }
+      return { prev, dist };
+    };
+    const firstStep = (prev: Map<number, number>, target: number) => {
+      let cur = target;
+      while (prev.get(cur) !== myIdx && prev.get(cur) !== -1 && prev.has(cur)) cur = prev.get(cur)!;
+      return cur;
+    };
+    /** final = Zielkachel (dort anhalten). Wegen der Verzögerung früh bremsen, sonst rutscht man drüber. */
+    const goTo = (i: number, final: boolean) => {
+      const dx = (i % W) - me.x;
+      const dy = Math.floor(i / W) - me.y;
+      const len = Math.hypot(dx, dy);
+      if (len < (final ? 0.4 : 0.05)) return this.stop2();
+      this.arenaStick = true;
+      this.send('stick', { x: Math.round((dx / len) * 100) / 100, y: Math.round((dy / len) * 100) / 100 });
+    };
+    const isSafe = (i: number, extra?: Map<number, number>) => !danger.has(i) && !extra?.has(i);
+
+    // 1) In Gefahr → fliehen
+    if (danger.has(myIdx)) {
+      const { prev, dist } = bfs();
+      let best = -1;
+      let bestD = Infinity;
+      for (const [i, d] of dist) if (isSafe(i) && d < bestD) ((best = i), (bestD = d));
+      if (best < 0) for (const [i] of dist) if ((danger.get(i) ?? 0) > (danger.get(best) ?? -1)) best = i;
+      if (best >= 0 && best !== myIdx) {
+        const step = firstStep(prev, best);
+        goTo(step, step === best);
+      } else goTo(myIdx, true);
+      return;
+    }
+
+    // 2) Bombe legen, wenn sie etwas trifft und ein Fluchtweg frei ist
+    const enemies = Object.entries(st.players).filter(([id, p]) => id !== this.id && p.alive);
+    const hits = (x: number, y: number) => {
+      let boxes = 0;
+      let foes = 0;
+      for (const c of blastCells(cellAt, bombAt, x, y, me.range)) {
+        if (cellAt(c.x, c.y) === 'b') boxes++;
+        if (enemies.some(([, p]) => Math.round(p.x) === c.x && Math.round(p.y) === c.y)) foes++;
+      }
+      return { boxes, foes };
+    };
+    const mine = st.bombs.filter((b) => b.owner === this.id).length;
+    const centered = Math.abs(me.x - mx) < 0.4 && Math.abs(me.y - my) < 0.4;
+    if (mine < me.bombs && centered && !bombAt(mx, my)) {
+      const h = hits(mx, my);
+      const foeNear = enemies.some(([, p]) => Math.abs(p.x - mx) + Math.abs(p.y - my) <= 2.2);
+      if (h.boxes > 0 || h.foes > 0 || (foeNear && Math.random() < 0.5)) {
+        const extra = new Map<number, number>();
+        for (const c of blastCells(cellAt, bombAt, mx, my, me.range)) extra.set(cellIdx(c.x, c.y), ARENA.FUSE_MS);
+        const { dist } = bfs(extra);
+        const escape = [...dist].some(([i, d]) => d <= 6 && d * msPerTile < ARENA.FUSE_MS - 700 && isSafe(i, extra));
+        if (escape && Math.random() < 0.85) {
+          // Erst anhalten – sonst landet die Bombe (Netzwerk-Verzögerung) eine Kachel weiter
+          if (me.moving || this.arenaStick) this.stop2();
+          else this.send('bomb');
+          return;
+        }
+      }
+    }
+
+    // 3) Ziel suchen: Power-ups, Kisten, Gegner (nur über sichere Zellen)
+    const { prev, dist } = bfs(undefined, true);
+    const itemCells = new Set(st.items.map((it) => cellIdx(it.x, it.y)));
+    const boxesLeft = [...st.grid].filter((c) => c === 'b').length;
+    let best = -1;
+    let bestScore = Infinity;
+    for (const [i, d] of dist) {
+      if (!isSafe(i)) continue;
+      const x = i % W;
+      const y = Math.floor(i / W);
+      let score = d + Math.random() * 0.8;
+      const near = Math.min(...enemies.map(([, p]) => Math.abs(p.x - x) + Math.abs(p.y - y)), 99);
+      if (itemCells.has(i)) score -= 8;
+      else {
+        const h = hits(x, y);
+        if (h.foes) score -= 6;
+        else if (h.boxes) score -= 3 + h.boxes;
+        // Gegner jagen – je weniger Kisten übrig sind, desto stärker
+        score += near * (boxesLeft < 25 ? 0.9 : 0.35);
+      }
+      if (score < bestScore) ((bestScore = score), (best = i));
+    }
+    if (best >= 0 && best !== myIdx) {
+      const step = firstStep(prev, best);
+      goTo(step, step === best);
+    } else goTo(myIdx, true);
+  }
+
+  private stop2() {
+    if (!this.arenaStick) return;
+    this.arenaStick = false;
+    this.send('stick', { x: 0, y: 0 });
   }
 
   stop() {
@@ -389,6 +549,19 @@ export class Bot {
       }
     }
     if (m.kind === 'kurve') this.playKurve(m.state);
+    if (m.kind === 'arena') {
+      const me2 = m.state.players[this.id];
+      if (m.state.sub === 'play' && me2?.alive) {
+        this.once('arena', async () => {
+          await sleep(rand(15, 35));
+          const cur = this.state?.mini?.kind === 'arena' ? this.state.mini.state : null;
+          if (cur?.sub === 'play') this.arenaThink(cur);
+        });
+      } else if (this.arenaStick) {
+        this.arenaStick = false;
+        this.send('stick', { x: 0, y: 0 });
+      }
+    }
 
     if (m.kind === 'murder') {
       const ms = m.state;

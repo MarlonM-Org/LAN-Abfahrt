@@ -17,6 +17,7 @@ import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
 import { KurveGame } from './kurve';
+import { ArenaGame } from './arena';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -293,6 +294,9 @@ export class Room {
         break;
       case 'kurve':
         this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.look.shirt));
+        break;
+      case 'arena':
+        this.mini = new ArenaGame(ids, ctx);
         break;
     }
     this.results = null;

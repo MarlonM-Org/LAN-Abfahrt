@@ -326,3 +326,17 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .big-btn.kv-left { background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
 .big-btn.kv-right { background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
 .big-btn.kv-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+/* ---------------------------------------------------------------- Bomben-Arena */
+.arena-head { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border: 4px solid; background: var(--paper-light); color: var(--ink); }
+.arena-head canvas { display: block; }
+.arena-round { font-size: 10px; margin-bottom: 6px; }
+.arena-stats { font-size: 8px; color: var(--ink-soft); line-height: 1.5; }
+.arena-hint { text-align: center; min-height: 1.4em; }
+.arena-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; flex: 1; }
+.arena-controls .stick-area { min-height: 0; }
+.arena-controls .stick-pad { width: 150px; height: 150px; }
+.big-btn.arena-bomb {
+  min-height: 34vh; font-size: 18px; background: #8a5a2b;
+  box-shadow: inset 0 4px 0 #b47a42, inset 0 -6px 0 #5a3418, 0 3px 0 var(--outline);
+}
+.big-btn.arena-bomb:disabled { opacity: 0.5; }

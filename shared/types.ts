@@ -27,7 +27,7 @@ export type MiniKind =
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
   | 'sup' | 'tidy'
-  | 'flieger' | 'kurve';
+  | 'flieger' | 'kurve' | 'arena';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -397,6 +397,42 @@ export interface KurveState {
   roundWinner: string | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Bomben-Arena
+
+export interface ArenaPlayer {
+  /** Position in Kacheln (Mitte einer Kachel = ganze Zahl) */
+  x: number;
+  y: number;
+  alive: boolean;
+  dir: 'u' | 'd' | 'l' | 'r';
+  moving: boolean;
+  /** Power-ups: max. gleichzeitige Bomben, Reichweite, Tempo-Stufe */
+  bombs: number;
+  range: number;
+  speed: number;
+  wins: number;
+  kills: number;
+}
+
+export interface ArenaState {
+  sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  /** countdown: bis zum Start · play: bis zur Flut (0 = Flut läuft) · roundOver: bis zur nächsten Runde */
+  endsIn: number;
+  round: number;
+  winRounds: number;
+  /** COLS × ROWS Zeichen, siehe ArenaCell in shared/arena.ts */
+  grid: string;
+  /** Anzahl bereits gefluteter Zellen (Index in FLOOD_ORDER) */
+  flood: number;
+  floodActive: boolean;
+  bombs: { id: number; x: number; y: number; fuse: number; owner: string; range: number }[];
+  flames: { x: number; y: number; k: 'c' | 'h' | 'v' }[];
+  items: { x: number; y: number; t: 'bomb' | 'range' | 'speed' }[];
+  players: Record<string, ArenaPlayer>;
+  /** Nur in roundOver/over: Rundensieger (null = Unentschieden) */
+  roundWinner: string | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -487,7 +523,8 @@ export type MiniSnapshot =
   | { kind: 'sup'; state: SupState }
   | { kind: 'tidy'; state: TidyState }
   | { kind: 'flieger'; state: FliegerState }
-  | { kind: 'kurve'; state: KurveState };
+  | { kind: 'kurve'; state: KurveState }
+  | { kind: 'arena'; state: ArenaState };
 
 export interface GameState {
   phase: Phase;
