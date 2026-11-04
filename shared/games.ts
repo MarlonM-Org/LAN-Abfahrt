@@ -14,15 +14,16 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
   sup: { title: 'SUP-Rennen', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
   tidy: { title: 'Aufräumen!', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
+  flieger: { title: 'Urlaubsflieger', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'murder'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -178,3 +179,66 @@ export const TIDY = {
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
 };
+
+// ------------------------------------------------------------------ Urlaubsflieger
+
+export const FLIEGER = {
+  /** Zwischenstopps: Etappe i fliegt von ROUTE[i] nach ROUTE[i + 1] */
+  ROUTE: ['Düsseldorf', 'Mallorca', 'Kreta', 'Malediven', 'Bali'],
+  /** Zeit pro Anweisung je Etappe (wird später knapper) */
+  ORDER_MS: [14000, 12500, 11000, 10000],
+  /** Erste Etappe: länger zum Reinkommen */
+  FIRST_INTRO_MS: 7000,
+  INTRO_MS: 4500,
+  CLEARED_MS: 4500,
+  END_MS: 5500,
+  /** Pause, bevor jemand nach einer Anweisung die nächste bekommt */
+  NEXT_ORDER_MS: 900,
+  /** Wahrscheinlichkeit, dass sich die Anweisung aufs eigene Cockpit bezieht */
+  OWN_CHANCE: 0.25,
+  REFUEL: 20,
+};
+
+/** Benötigte erledigte Anweisungen pro Etappe (mehr Spieler → mehr Anweisungen gleichzeitig) */
+export const fliegerTarget = (stage: number, players: number) => Math.round(3 + 2 * stage + players * (1.2 + 0.4 * stage));
+
+/** Treibstoff-Verlust pro verpasster Anweisung */
+export const fliegerMissCost = (players: number) => Math.max(6, Math.min(15, Math.round(36 / players)));
+
+/** Bedienelemente pro Handy */
+export const fliegerPanelSize = (players: number) => (players <= 3 ? 6 : players <= 6 ? 5 : 4);
+
+/** Namen der Bedienelemente – 12 Spieler × 6 Elemente dürfen sich nie wiederholen */
+export const FLIEGER_NAMES = [
+  'Sonnenschirm-Klappe', 'Cocktail-Druck', 'Flamingo-Ventil', 'Sonnencreme-Düse', 'Gepäck-Rutsche', 'Ballermann-Modus',
+  'Strandtuch-Reservierer', 'Sangria-Pumpe', 'Badelatschen-Bremse', 'Luftmatratzen-Gebläse', 'Kokosnuss-Kanone', 'Schlager-Regler',
+  'Aperol-Spritzer', 'Liegestuhl-Hebel', 'Bräunungs-Turbo', 'Animateur-Alarm', 'Muschel-Radar', 'Sandburg-Stabilisator',
+  'Eiswürfel-Spender', 'Palmen-Wedler', 'Schnorchel-Sensor', 'Hawaiihemd-Heizung', 'Wasserball-Werfer', 'Souvenir-Schleuder',
+  'Pool-Nudel-Propeller', 'Buffet-Beschleuniger', 'Cabrio-Klappe', 'Sonnenbrand-Warner', 'All-inclusive-Knopf', 'Schwimmflügel-Pumpe',
+  'Selfie-Stab-Antenne', 'Möwen-Abwehr', 'Strandbar-Kompass', 'Piña-Colada-Mixer', 'Quallen-Detektor', 'Urlaubsgeld-Zähler',
+  'Ansichtskarten-Drucker', 'Fön-Turbine', 'Handtuch-Katapult', 'Sonnenhut-Lift', 'Kofferband-Kurbel', 'Duty-free-Schalter',
+  'Kreuzfahrt-Hupe', 'Bananenboot-Bremse', 'Wellen-Simulator', 'Mallorca-Melder', 'Grill-Zünder', 'Sonnendeck-Dimmer',
+  'Flip-Flop-Flattermann', 'Limbo-Stange', 'Ukulele-Verstärker', 'Tropen-Thermostat', 'Mückenspray-Nebler', 'Siesta-Sicherung',
+  'Hängematten-Schaukel', 'Schaumparty-Regler', 'Frühstücks-Wecker', 'Strandkorb-Drehteller', 'Fischbrötchen-Fach', 'Kurtaxe-Klappe',
+  'Tauchermasken-Wischer', 'Paddelboot-Pedal', 'Sonnenuntergangs-Zoom', 'Bordkarten-Stempel', 'Rettungsring-Rolle', 'Wasserrutschen-Wachs',
+  'Lavalampen-Lüfter', 'Margarita-Mühle', 'Partyhut-Presse', 'Klimaanlagen-Knüppel', 'Sandalen-Socken-Sperre', 'Ananas-Antrieb',
+  'Luftkissen-Lüfter', 'Kaktus-Kühler', 'Disco-Kugel-Drehzahl', 'Delfin-Dolmetscher',
+];
+
+/** Beschriftungen für Mehrfach-Schalter */
+export const FLIEGER_SWITCHES = [
+  ['Aus', 'Mild', 'Tropisch'],
+  ['0', '1', '2', '3'],
+  ['Lau', 'Warm', 'Heiß'],
+  ['Ebbe', 'Flut'],
+  ['Piano', 'Forte', 'Ballermann'],
+  ['S', 'M', 'L', 'XL'],
+  ['Nord', 'Ost', 'Süd', 'West'],
+  ['Bier', 'Wein', 'Sekt'],
+  ['Schatten', 'Sonne', 'Grill'],
+  ['LSF 15', 'LSF 30', 'LSF 50'],
+  ['Chillig', 'Party', 'Eskalation'],
+  ['Mo', 'Mi', 'Fr', 'So'],
+  ['Pommes', 'Paella', 'Gyros'],
+  ['Leise', 'Laut', 'Nachbarn'],
+];

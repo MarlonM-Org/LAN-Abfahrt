@@ -29,6 +29,7 @@ import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
 import { WweGame } from './wwe';
+import { FliegerGame } from './flieger';
 
 const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
@@ -38,6 +39,7 @@ const MINI_KINDS = Object.keys(MINI_INFO) as MiniKind[];
 interface Player extends PlayerPublic {
   socketId: string | null;
   joinedAt: number;
+  isBot?: boolean;
 }
 
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
@@ -94,6 +96,7 @@ export class Room {
       p.look = sanitizeLook(msg.look);
       p.socketId = socket.id;
       p.connected = true;
+      p.isBot = msg.bot === true;
       playerId = p.id;
       socket.join('players');
       this.ensureVip();
@@ -241,6 +244,7 @@ export class Room {
       finish: (r) => this.finishMini(kind, r),
       isConnected: (id) => !!this.players.get(id)?.connected,
       nameOf: (id) => this.nameOf(id),
+      isBot: (id) => !!this.players.get(id)?.isBot,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
@@ -282,6 +286,9 @@ export class Room {
         break;
       case 'tidy':
         this.mini = new TidyGame(ids, ctx);
+        break;
+      case 'flieger':
+        this.mini = new FliegerGame(ids, ctx);
         break;
     }
     this.results = null;

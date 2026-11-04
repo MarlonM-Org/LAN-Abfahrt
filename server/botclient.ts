@@ -47,7 +47,7 @@ export class Bot {
     // Regelmäßig "nachdenken" – der Zustand kommt nicht immer, wenn der Bot dran ist
     this.timer = setInterval(() => this.state && this.react(this.state), 200);
     this.socket.on('connect', () => {
-      this.socket.emit('player:join', { name, look: randomLook() }, (r: { ok: boolean; playerId?: string; error?: string }) => {
+      this.socket.emit('player:join', { name, look: randomLook(), bot: true }, (r: { ok: boolean; playerId?: string; error?: string }) => {
         if (r.ok) this.id = r.playerId!;
         else opts.log?.(`${name}: ${r.error}`);
       });
@@ -285,6 +285,32 @@ export class Bot {
           if (dl > 5) this.send('stick', { x: dx / dl, y: dy / dl });
           else this.send('stick', { x: ux / ul, y: uy / ul });
           if (Math.random() < 0.02) this.send('dash');
+        });
+      }
+    }
+
+    if (m.kind === 'flieger' && m.state.sub === 'fly') {
+      const p = this.priv?.kind === 'flieger' ? this.priv.state : null;
+      for (const h of p?.botHints ?? []) {
+        const c = p!.panel.find((x) => x.id === h.c);
+        if (!c) continue;
+        this.once(`fl-${h.c}`, async () => {
+          // "Zuhören" dauert – und manchmal greift man daneben
+          await sleep(rand(1200, 4000));
+          if (Math.random() < 0.15) {
+            const wrong = p!.panel[Math.floor(Math.random() * p!.panel.length)];
+            this.send('act', { c: wrong.id, v: Math.floor(Math.random() * Math.max(1, wrong.labels.length)) });
+            return;
+          }
+          if (c.type === 'tap') {
+            for (let i = 0; i < h.taps; i++) {
+              this.send('act', { c: c.id });
+              await sleep(rand(90, 180));
+            }
+          } else {
+            this.send('act', { c: c.id, v: h.v });
+          }
+          await sleep(300);
         });
       }
     }

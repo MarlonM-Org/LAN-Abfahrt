@@ -268,3 +268,52 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
 @keyframes shake { 50% { transform: translateX(3px); } }
 .partner { color: var(--ink); }
+
+/* ---------------------------------------------------------------- Urlaubsflieger */
+.fl-order {
+  background: var(--paper-light); border: 3px solid var(--wood-darker); padding: 10px 10px 8px;
+  box-shadow: inset 0 0 0 2px var(--gold); display: flex; flex-direction: column; gap: 8px;
+}
+.fl-order-text { color: var(--ink); font-size: 13px; line-height: 1.6; min-height: 3.2em; text-align: left; }
+.fl-order.idle .fl-order-text { color: var(--ink-soft); font-size: 10px; }
+.fl-order.urgent { box-shadow: inset 0 0 0 2px #e04a3f; animation: shake 0.25s infinite; }
+.fl-order.fresh { animation: fl-pop 0.35s ease-out; }
+@keyframes fl-pop { 0% { transform: scale(0.94); background: #fff0a8; } 100% { transform: scale(1); } }
+.fl-bar { height: 10px; background: var(--paper-dark); border: 2px solid var(--wood-darker); }
+.fl-fill { height: 100%; width: 100%; background: var(--green); transition: width 0.25s linear; }
+.fl-order.urgent .fl-fill { background: #e04a3f; }
+.fl-flash { position: fixed; left: 12%; right: 12%; top: 38%; z-index: 20; pointer-events: none; text-align: center; padding: 10px 6px; border: 3px solid var(--outline); color: #fff4d6; font-size: 10px; }
+.fl-flash.ok { background: var(--green); }
+.fl-flash.bad { background: #c0392b; }
+.fl-panel { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: dense; grid-auto-rows: minmax(110px, 1fr); gap: 8px; flex: 1; }
+.fl-ctl {
+  background: #dfe7ee; border: 3px solid #4b5563; box-shadow: inset 0 0 0 2px #f4f8fb, 0 3px 0 var(--outline);
+  padding: 6px; display: flex; flex-direction: column; gap: 6px; align-items: stretch; justify-content: space-evenly;
+}
+.fl-ctl.fl-t-switch, .fl-ctl.wide { grid-column: span 2; }
+.fl-ctl.wide .fl-toggle, .fl-ctl.wide .fl-push.tap { align-self: center; min-width: 50%; }
+.fl-name { font-size: 8px; color: #1f2937; text-align: center; line-height: 1.5; min-height: 3em; display: flex; align-items: center; justify-content: center; word-break: break-word; hyphens: auto; }
+.fl-push {
+  align-self: center; width: 76px; height: 76px; border-radius: 50%; padding: 0; touch-action: none;
+  background: #e04a3f; border: 4px solid #6b1d16; box-shadow: inset 0 5px 0 #f28a7f, inset 0 -6px 0 #a3271d, 0 4px 0 var(--outline);
+  font-size: 9px;
+}
+.fl-push.tap { background: #f0b13a; border-color: #7a520e; box-shadow: inset 0 5px 0 #ffd27a, inset 0 -6px 0 #c08316, 0 4px 0 var(--outline); border-radius: 12px; width: 100%; }
+.fl-push.pulse { animation: fl-pulse 0.18s ease-out; }
+@keyframes fl-pulse { 50% { transform: scale(0.9); } }
+.fl-toggle {
+  display: flex; align-items: center; gap: 8px; justify-content: center; padding: 12px 6px; touch-action: none;
+  background: #6b7280; box-shadow: inset 0 3px 0 #9ca3af, inset 0 -4px 0 #374151, 0 3px 0 var(--outline); border-color: #1f2937;
+}
+.fl-toggle.on { background: var(--green); box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
+.fl-knob { width: 14px; height: 14px; background: #fff4d6; border: 2px solid var(--outline); }
+.fl-toggle.on .fl-knob { order: 2; }
+.fl-seg { display: flex; gap: 4px; }
+.fl-seg button {
+  flex: 1; padding: 12px 2px; font-size: 8px; touch-action: none;
+  background: #cbd5e1; color: #1f2937; text-shadow: none; border-color: #4b5563;
+  box-shadow: inset 0 3px 0 #f1f5f9, inset 0 -3px 0 #94a3b8, 0 3px 0 var(--outline);
+}
+.fl-seg button.active { background: #3f8fe0; color: #fff4d6; text-shadow: 1px 1px 0 #1d4f8a; box-shadow: inset 0 3px 0 #7fbcf0, inset 0 -3px 0 #2d64a8, 0 1px 0 var(--outline); transform: translateY(2px); }
+.fl-status { font-size: 9px; }
+.fl-fuel.low { color: #c0392b; animation: shake 0.3s infinite; }

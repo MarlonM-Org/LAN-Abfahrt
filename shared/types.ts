@@ -26,7 +26,8 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy'
+  | 'flieger';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +311,49 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Urlaubsflieger
+
+export type FliegerControlType = 'button' | 'toggle' | 'switch' | 'tap';
+
+/** Ein Bedienelement im Cockpit eines Spielers */
+export interface FliegerControl {
+  id: string;
+  name: string;
+  type: FliegerControlType;
+  /** Beschriftung der Stellungen (Schalter: z. B. Aus / Mild / Tropisch, Kippschalter: AUS / AN) */
+  labels: string[];
+  /** Aktuelle Stellung (Kippschalter 0/1, Schalter Index) */
+  value: number;
+}
+
+export interface FliegerState {
+  /** intro = neues Cockpit ansehen, fly = Anweisungen, cleared = Zwischenlandung */
+  sub: 'intro' | 'fly' | 'cleared' | 'crash' | 'arrived';
+  endsIn: number;
+  /** Aktuelle Etappe (0-basiert): von route[stage] nach route[stage + 1] */
+  stage: number;
+  route: string[];
+  progress: number;
+  target: number;
+  /** Treibstoff 0–100 */
+  fuel: number;
+  /** Ausgeführte Anweisungen pro Spieler */
+  done: Record<string, number>;
+  /** Laufschrift auf dem TV (nur erledigte Aktionen, nie offene Anweisungen) */
+  ticker: { text: string; ok: boolean; seq: number } | null;
+  okCount: number;
+  missCount: number;
+}
+
+/** Nur an den jeweiligen Spieler geschickt */
+export interface FliegerPrivate {
+  panel: FliegerControl[];
+  order: { text: string; endsIn: number; totalMs: number; seq: number; taps: string | null } | null;
+  feedback: { ok: boolean; text: string; seq: number } | null;
+  /** Nur für Bots: was auf dem eigenen Panel gerade gebraucht wird */
+  botHints?: { c: string; v: number; taps: number }[];
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +442,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'flieger'; state: FliegerState };
 
 export interface GameState {
   phase: Phase;
@@ -418,12 +463,14 @@ export interface GameState {
   customQuestionCount: number;
 }
 
-export type PrivateState = { kind: 'murder'; state: MurderPrivate } | null;
+export type PrivateState = { kind: 'murder'; state: MurderPrivate } | { kind: 'flieger'; state: FliegerPrivate } | null;
 
 export interface JoinRequest {
   name: string;
   look: Look;
   playerId?: string;
+  /** Testspieler (Bots) melden sich so an – manche Spiele geben ihnen Hinweise */
+  bot?: boolean;
 }
 
 export interface JoinResponse {
