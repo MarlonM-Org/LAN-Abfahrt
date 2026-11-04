@@ -100,7 +100,9 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+- 🦔 **Igel-Krieg** (ab 2 Spielern) – rundenbasiert wie Worms auf einer zufälligen, zerstörbaren Urlaubsinsel. Bis 4 Spieler hat jeder 2 Igel, ab 5 Spielern einen (jeder gegen jeden). Wer dran ist, läuft/springt mit den Tasten, wählt eine Waffe und **zieht im Zielfeld**: Richtung = Winkel, Länge = Kraft, loslassen = Feuer. Waffen: Kokosnuss-Bazooka (Wind!), Wasserbomben-Granate (hüpft, 3 s Zünder, 3×), Muschel-Teleport (2×) und Igel-Schlag. Wasser = raus (Schwimmring), K.o.-Igel werden zu Sandburgen. Nach 5 Minuten kommt die Flut und steigt jede Runde. Wer nicht dran ist, sieht am Handy eine Mini-Karte und die Lebenspunkte aller Teams.
+
+Alle laufen auch im Party-Modus auf dem Spielbrett.
 
 ## Trinkspiel
 

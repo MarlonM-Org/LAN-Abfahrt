@@ -26,7 +26,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'igel';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +310,64 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Igel-Krieg
+
+export type IgelWeapon = 'bazooka' | 'grenade' | 'teleport' | 'punch';
+
+export interface IgelHog {
+  id: number;
+  owner: string;
+  x: number;
+  y: number;
+  hp: number;
+  dir: 1 | -1;
+  /** ok = im Spiel, dead = Sandburg-Grabstein, drowned = treibt auf dem Schwimmring davon */
+  state: 'ok' | 'dead' | 'drowned';
+  flying: boolean;
+  walking: boolean;
+}
+
+export interface IgelFx {
+  seq: number;
+  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water';
+  x: number;
+  y: number;
+  r?: number;
+  text?: string;
+}
+
+export interface IgelState {
+  /** countdown → aim (Zug) → flight (Geschoss unterwegs) → retreat (Rückzug) → settle → aim … → over */
+  sub: 'countdown' | 'aim' | 'flight' | 'retreat' | 'settle' | 'over';
+  endsIn: number;
+  /** Terrain = genTerrain(seed) + alle Krater in Reihenfolge */
+  seed: number;
+  craters: [number, number, number][];
+  water: number;
+  /** −1 … 1, positiv = nach rechts */
+  wind: number;
+  /** Spieler-IDs in Zugreihenfolge (jeder Spieler = ein Team) */
+  teams: string[];
+  hogs: IgelHog[];
+  turn: number;
+  active: string | null;
+  activeHog: number | null;
+  next: string | null;
+  weapon: IgelWeapon;
+  /** Restmunition pro Spieler, −1 = unbegrenzt */
+  ammo: Record<string, Record<IgelWeapon, number>>;
+  /** Live-Zielvorschau des aktiven Spielers (für die Ziellinie am TV) */
+  aim: { angle: number; power: number } | null;
+  projs: { id: number; type: 'bazooka' | 'grenade'; x: number; y: number }[];
+  fx: IgelFx[];
+  suddenDeath: boolean;
+  /** ms bis Sudden Death (0 = läuft schon) */
+  suddenIn: number;
+  damage: Record<string, number>;
+  /** Ausgeschiedene Spieler in Reihenfolge */
+  out: string[];
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +456,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'igel'; state: IgelState };
 
 export interface GameState {
   phase: Phase;
