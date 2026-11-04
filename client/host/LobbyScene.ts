@@ -6,7 +6,7 @@ import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintGrass, paintPath } from '../art/ground';
 import { bus, getState } from './store';
-import { figure } from './textures';
+import { ensurePortrait, figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 
 const SLOTS = 8;
@@ -74,15 +74,16 @@ export class LobbyScene extends Phaser.Scene {
   private render(s: GameState) {
     if (s.joinUrl !== this.renderedUrl) this.renderQr(s.joinUrl);
 
-    this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
+    this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
     this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : 'Der VIP wählt am Handy ein Spiel!');
 
-    const key = s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}`).join('|');
+    const key = s.mode + s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}`).join('|') + (s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
     if (key === this.renderedPlayers) return;
     this.renderedPlayers = key;
 
     this.playerLayer.removeAll(true);
+    if (s.mode === 'arcade') return this.renderLeaderboard(s);
     for (let i = 0; i < SLOTS; i++) {
       const p = s.players[i];
       const col = i % 4;
@@ -102,6 +103,25 @@ export class LobbyScene extends Phaser.Scene {
       this.playerLayer.add(nameTag(this, x, y + 4, p.name.slice(0, 8)));
       if (p.isVip) this.playerLayer.add(this.crown(x, y - 59));
     }
+  }
+
+  private renderLeaderboard(s: GameState) {
+    const x = 160, y = 50, w = 306;
+    const rows = s.leaderboard.slice(0, 8);
+    this.playerLayer.add(panel(this, x, y, w, 30 + Math.max(1, rows.length) * 18));
+    this.playerLayer.add(ink(this, x + w / 2, y + 9, 'ARCADE-LEADERBOARD', { color: RED_INK }));
+    this.playerLayer.add(ink(this, x + w - 70, y + 20, 'Pkt', { color: '#7a5a3a' }));
+    this.playerLayer.add(ink(this, x + w - 30, y + 20, 'Siege', { color: '#7a5a3a' }));
+    if (!rows.length) this.playerLayer.add(ink(this, x + w / 2, y + 32, 'Noch keine Punkte – los geht’s!'));
+    rows.forEach((e, i) => {
+      const ry = y + 32 + i * 18;
+      const p = s.players.find((pl) => pl.name === e.name && pl.connected);
+      this.playerLayer.add(ink(this, x + 14, ry, `${i + 1}.`, { origin: [0, 0], color: i === 0 ? '#c98a10' : INK }));
+      if (p) this.playerLayer.add(this.add.image(x + 42, ry + 12, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
+      this.playerLayer.add(ink(this, x + 54, ry, e.name.slice(0, 12), { origin: [0, 0], color: p ? INK : '#7a5a3a' }));
+      this.playerLayer.add(ink(this, x + w - 70, ry, String(e.points)));
+      this.playerLayer.add(ink(this, x + w - 30, ry, String(e.wins)));
+    });
   }
 
   private crown(x: number, y: number) {

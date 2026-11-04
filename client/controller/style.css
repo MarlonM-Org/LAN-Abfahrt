@@ -268,3 +268,8 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
 @keyframes shake { 50% { transform: translateX(3px); } }
 .partner { color: var(--ink); }
+.mode-tabs.four { grid-template-columns: 1fr 1fr; }
+table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
+table.lb td { padding: 4px 2px; border-bottom: 1px dashed var(--paper-dark); color: var(--ink); }
+table.lb td:not(:nth-child(2)):not(:first-child) { text-align: right; }
+table.lb tr.me td { color: var(--red); }

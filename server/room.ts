@@ -16,6 +16,8 @@ import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OP
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
+import { Leaderboard } from './leaderboard';
+import { ARCADE_POINTS } from '../shared/games';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -56,6 +58,8 @@ export class Room {
   private flushTimer: NodeJS.Timeout | null = null;
 
   private bots: Bot[] = [];
+  private leaderboard = new Leaderboard();
+  private arcadeActive = false;
 
   constructor(
     private io: Server,
@@ -121,6 +125,7 @@ export class Room {
         const kind = req.mode as MiniKind;
         const min = MINI_INFO[kind].minPlayers;
         if (ids.length < min) return socket.emit('toast', `${MINI_INFO[kind].title}: mindestens ${min} Spieler.`);
+        this.arcadeActive = this.mode === 'arcade';
         this.startMini(kind);
       }
     });
@@ -136,6 +141,12 @@ export class Room {
       this.bots.push(new Bot(name, { url: this.localUrl }));
     });
 
+    socket.on('vip:resetLeaderboard', () => {
+      if (!isVip() || this.phase !== 'lobby') return;
+      this.leaderboard.reset();
+      this.changed();
+    });
+
     socket.on('vip:removeBots', () => {
       if (!isVip() || this.phase !== 'lobby') return;
       for (const b of this.bots) b.stop();
@@ -143,7 +154,7 @@ export class Room {
     });
 
     socket.on('vip:mode', (mode: string) => {
-      if (isVip() && this.phase === 'lobby' && (mode === 'party' || mode === 'date' || mode === 'drink')) {
+      if (isVip() && this.phase === 'lobby' && (mode === 'party' || mode === 'date' || mode === 'drink' || mode === 'arcade')) {
         this.mode = mode;
         this.changed();
       }
@@ -308,8 +319,35 @@ export class Room {
       Object.assign(hearts, { sips: r.sips });
     }
     this.results = { title: MINI_INFO[kind].title, subtitle: r.subtitle, rows, final: false, ...hearts };
+    if (this.arcadeActive) this.scoreArcade(kind, r);
     this.phase = 'results';
     this.changed();
+  }
+
+  /** Arcade: Punkte nach Platzierung verteilen und dauerhaft speichern */
+  private scoreArcade(kind: MiniKind, r: MiniResult) {
+    // Trinkspiele: wer am wenigsten trinken musste, gewinnt
+    const groups = r.sips ? [...r.groups].reverse() : r.groups;
+    // Gemeinsame Spiele (nur eine Gruppe): Herzen bzw. feste Punkte für alle
+    const coop = groups.length === 1;
+    const points: Record<string, number> = {};
+    groups.forEach((g, gi) => {
+      for (const id of g) points[id] = coop ? (r.hearts ?? ARCADE_POINTS[1]) : ARCADE_POINTS[Math.min(gi, ARCADE_POINTS.length - 1)];
+    });
+    for (const [id, pts] of Object.entries(points)) {
+      const won = !coop && groups[0].includes(id);
+      this.leaderboard.add(this.nameOf(id), kind, pts, won);
+    }
+    this.leaderboard.save();
+    if (this.results) {
+      this.results.arcade = points;
+      // Reihenfolge und Plätze nach Arcade-Punkten (wichtig bei Trinkspielen)
+      const place = new Map<string, number>();
+      groups.forEach((g, gi) => g.forEach((id) => place.set(id, gi + 1)));
+      this.results.rows = this.results.rows
+        .map((row) => ({ ...row, coins: 0, place: place.get(row.playerId) ?? row.place }))
+        .sort((x, y) => x.place - y.place);
+    }
   }
 
   private nextDrinkRound() {
@@ -377,6 +415,7 @@ export class Room {
     this.board = null;
     this.dateRun = null;
     this.drinkRun = null;
+    this.arcadeActive = false;
     this.results = null;
     this.phase = 'lobby';
     for (const [id, p] of this.players) if (!p.connected) this.players.delete(id);
@@ -415,6 +454,8 @@ export class Room {
       drinkActive: !!this.drinkRun,
       customNhieCount: this.nhie.all.length,
       botCount: this.bots.length,
+      leaderboard: this.leaderboard.list,
+      arcadeActive: this.arcadeActive,
       board: this.board?.state ?? null,
       mini: this.mini?.snapshot() ?? null,
       results: this.results,

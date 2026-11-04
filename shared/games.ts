@@ -178,3 +178,15 @@ export const TIDY = {
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
 };
+
+// ------------------------------------------------------------------ Arcade
+
+/** Punkte nach Platzierung im Arcade-Modus */
+export const ARCADE_POINTS = [10, 6, 3, 1];
+
+/** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
+export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'] },
+  { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'murder'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb'] },
+];
