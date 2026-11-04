@@ -88,6 +88,10 @@ npm run bots -- 6 --game=murder   # Bot startet direkt ein Einzelspiel (flunky |
 
 Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiedene Profile/Inkognito, weil die Spieler-ID im `localStorage` liegt).
 
+## Grafik
+
+Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – keine Bilddateien. Eine Übersicht aller Sprites gibt es im Dev-Modus unter <http://localhost:3000/art.html>.
+
 ## Ideen / Roadmap
 
 - [x] Spielbrett im Mario-Party-Stil
