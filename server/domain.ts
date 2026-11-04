@@ -111,24 +111,39 @@ function certDaysLeft(cfg: DomainConfig): number | null {
 
 /** Wartet, bis der autoritative deSEC-Nameserver den TXT-Eintrag ausliefert. */
 async function waitForTxt(name: string, value: string): Promise<void> {
-  const resolver = new dns.Resolver();
-  try {
-    const ips = await Promise.all(['ns1.desec.io', 'ns2.desec.org'].map((h) => dns.lookup(h).then((r) => r.address)));
-    resolver.setServers(ips);
-  } catch {
-    /* Fallback: System-Resolver */
-  }
-  const until = Date.now() + 180_000;
-  while (Date.now() < until) {
+  // Jeden deSEC-Nameserver einzeln fragen: Let's Encrypt prüft von mehreren
+  // Standorten aus und erwischt sonst einen Server, der den Eintrag noch nicht hat.
+  const servers: string[] = [];
+  for (const host of ['ns1.desec.io', 'ns2.desec.org']) {
     try {
-      const txt = await resolver.resolveTxt(name);
-      if (txt.some((parts) => parts.join('') === value)) return;
+      servers.push((await dns.lookup(host, { family: 4 })).address);
     } catch {
-      /* noch nicht da */
+      /* nicht auflösbar – überspringen */
+    }
+  }
+  const has = async (server?: string) => {
+    const r = new dns.Resolver();
+    if (server) r.setServers([server]);
+    try {
+      return (await r.resolveTxt(name)).some((parts) => parts.join('') === value);
+    } catch {
+      return false;
+    }
+  };
+  const until = Date.now() + 240_000;
+  let ok = false;
+  while (Date.now() < until) {
+    const results = servers.length ? await Promise.all(servers.map((s) => has(s))) : [await has()];
+    if (results.every(Boolean)) {
+      ok = true;
+      break;
     }
     await new Promise((r) => setTimeout(r, 5000));
   }
-  console.warn('  TXT-Eintrag nach 3 Minuten noch nicht sichtbar – versuche es trotzdem.');
+  if (!ok) console.warn('  TXT-Eintrag nach 4 Minuten nicht überall sichtbar – versuche es trotzdem.');
+  // deSEC verteilt Einträge an viele Standorte weltweit – kurz Puffer geben
+  console.log('  … warte 30 s, bis der Eintrag überall angekommen ist');
+  await new Promise((r) => setTimeout(r, 30_000));
 }
 
 export async function ensureCertificate(cfg: DomainConfig, force = false): Promise<'ok' | 'issued'> {
