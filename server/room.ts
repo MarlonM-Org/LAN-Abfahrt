@@ -44,6 +44,7 @@ import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
+import { StillepostGame } from './stillepost';
 
 const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
@@ -69,6 +70,7 @@ export class Room {
   private nhie = new QuestionStore('nhie.json', 'nhie');
   private results: ResultsState | null = null;
   private questions = new QuestionStore();
+  private posts = new QuestionStore('stillepost.json', 'post');
   private flushTimer: NodeJS.Timeout | null = null;
 
   private bots: Bot[] = [];
@@ -201,7 +203,7 @@ export class Room {
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
-      const store = kind === 'nhie' ? this.nhie : this.questions;
+      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : this.questions;
       const q = store.add(String(text ?? ''));
       if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
       this.changed();
@@ -349,6 +351,9 @@ export class Room {
         break;
       case 'wasser':
         this.mini = new WasserGame(ids, ctx);
+        break;
+      case 'stillepost':
+        this.mini = new StillepostGame(ids, ctx, this.posts.all);
         break;
     }
     this.results = null;
@@ -516,6 +521,7 @@ export class Room {
       mini: this.mini?.snapshot() ?? null,
       results: this.results,
       customQuestionCount: this.questions.all.length,
+      customPostCount: this.posts.all.length,
     };
   }
 

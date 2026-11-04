@@ -17,6 +17,8 @@ import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
+import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
+import type { PostDrawing } from '../shared/types';
 
 export interface BotOptions {
   url: string;
@@ -45,6 +47,8 @@ export class Bot {
   private resultCount = 0;
   private resultsEntered = 0;
   private lastPhase = '';
+  /** Stille Post: bereits erledigte Schritte/Abstimmungen */
+  private postDone = new Set<string>();
   private timer: NodeJS.Timeout;
   /** Kurven-Duell: eigene Kopie aller Spuren (der Snapshot enthält nur die letzten Punkte) */
   private kv = {
@@ -884,6 +888,41 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'stillepost') {
+      const sp = m.state;
+      const p = this.priv?.kind === 'stillepost' && this.priv.state.round === sp.round ? this.priv.state : null;
+      const key = `${sp.sub}-${sp.round}-${sp.chain}`;
+      if (p && !p.done && (p.task === 'write' || p.task === 'describe' || p.task === 'draw') && !this.postDone.has(key)) {
+        this.postDone.add(key);
+        this.once(`sp-${key}`, async () => {
+          await sleep(rand(1500, 5000));
+          if (p.task === 'draw') this.send('drawing', { round: sp.round, drawing: randomDrawing(), done: true });
+          else {
+            const text = POST_PROMPTS[Math.floor(Math.random() * POST_PROMPTS.length)];
+            this.send('text', { round: sp.round, text: p.task === 'describe' ? `${text}?` : text, done: true });
+          }
+        });
+      }
+      if (p?.task === 'vote' && p.myVote === null && !this.postDone.has(key)) {
+        const options = sp.entries.map((_, i) => i).filter((i) => !p.own.includes(i));
+        if (options.length) {
+          this.postDone.add(key);
+          this.once(`sp-${key}`, async () => {
+            await sleep(rand(800, 3000));
+            this.send('vote', { entry: options[Math.floor(Math.random() * options.length)] });
+          });
+        }
+      }
+      // Bot-VIP führt die Vorführung weiter (sonst bleibt sie hängen)
+      if (me?.isVip && (sp.sub === 'reveal' || sp.sub === 'tally')) {
+        this.once(`sp-next-${sp.sub}-${sp.chain}-${sp.shown}`, async () => {
+          await sleep(sp.sub === 'tally' ? 2500 : 1200);
+          const s2 = this.state?.mini?.kind === 'stillepost' ? this.state.mini.state : null;
+          if (s2 && s2.sub === sp.sub && s2.chain === sp.chain && s2.shown === sp.shown) this.socket.emit('vip:mini', 'next');
+        });
+      }
+    }
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;
@@ -1467,6 +1506,24 @@ function steer(from: BotPoint, goal: BotPoint): BotPoint {
   }
   const slow = d < 12 ? Math.max(0.3, d / 12) : 1;
   return { x: Math.round(best.x * slow * 100) / 100, y: Math.round(best.y * slow * 100) / 100 };
+}
+
+/** Ein paar zufällige Kritzel-Striche für Stille Post */
+export function randomDrawing(): PostDrawing {
+  const strokes = Array.from({ length: 3 + Math.floor(Math.random() * 6) }, () => {
+    let x = rand(30, 225);
+    let y = rand(30, 225);
+    let a = rand(0, Math.PI * 2);
+    const p: number[] = [];
+    for (let i = 0, n = 6 + Math.floor(Math.random() * 20); i < n; i++) {
+      p.push(Math.round(x), Math.round(y));
+      a += rand(-0.6, 0.6);
+      x = Math.max(0, Math.min(POST.GRID, x + Math.cos(a) * 9));
+      y = Math.max(0, Math.min(POST.GRID, y + Math.sin(a) * 9));
+    }
+    return { c: Math.floor(Math.random() * POST_COLORS.length), w: Math.floor(Math.random() * 3), p };
+  });
+  return { s: strokes };
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */

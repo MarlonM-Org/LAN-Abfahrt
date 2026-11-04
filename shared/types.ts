@@ -41,7 +41,8 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'turm'
   | 'sup' | 'tidy' | 'igel'
   | 'smash'
-  | 'sup' | 'tidy' | 'wasser';
+  | 'sup' | 'tidy' | 'wasser'
+  | 'stillepost';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1010,6 +1011,66 @@ export interface SmashState {
   winner: string | null;
 }
 
+// ------------------------------------------------------------------ Stille Post mit Bildern
+
+/** Ein Pinselstrich: Farbe (Index, 8 = Radierer), Dicke (0–2), Punkte flach [x0, y0, x1, y1, …] im Raster 0–255 */
+export interface PostStroke {
+  c: number;
+  w: number;
+  p: number[];
+}
+
+export interface PostDrawing {
+  s: PostStroke[];
+}
+
+export interface PostEntry {
+  by: string;
+  kind: 'text' | 'drawing';
+  text?: string;
+  drawing?: PostDrawing;
+}
+
+export interface StillepostState {
+  /** write/draw/describe = Spielrunde, reveal/vote/tally = Vorführung */
+  sub: 'write' | 'draw' | 'describe' | 'reveal' | 'vote' | 'tally' | 'over';
+  /** Spielrunde: Schritt 1 … steps · Vorführung: Kette 1 … chains */
+  round: number;
+  steps: number;
+  endsIn: number;
+  /** Spieler in Ketten-Reihenfolge (Kette i gehört order[i]) */
+  order: string[];
+  /** Wer im aktuellen Schritt fertig ist (Inhalt bleibt geheim) */
+  done: string[];
+  // --- Vorführung (Inhalte sind ab hier öffentlich)
+  chain: number;
+  chains: number;
+  /** Wie viele Einträge der aktuellen Kette schon gezeigt werden */
+  shown: number;
+  entries: PostEntry[];
+  voted: string[];
+  /** Likes pro Eintrag der aktuellen Kette (nur in "tally") */
+  chainLikes: number[] | null;
+  /** Gesamt-Likes pro Spieler */
+  likes: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler: was er in diesem Schritt bekommt */
+export interface StillepostPrivate {
+  round: number;
+  task: 'write' | 'draw' | 'describe' | 'vote' | 'none';
+  /** Satz zum Malen */
+  text: string | null;
+  /** "Zufällig"-Vorschlag für den Startsatz (seq zählt hoch) */
+  suggest: { text: string; seq: number } | null;
+  /** Bild zum Beschreiben */
+  drawing: PostDrawing | null;
+  done: boolean;
+  /** Abstimmung: eigene Einträge der aktuellen Kette (dafür darf man nicht stimmen) */
+  own: number[];
+  myVote: number | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -1113,7 +1174,8 @@ export type MiniSnapshot =
   | { kind: 'turm'; state: TurmState }
   | { kind: 'igel'; state: IgelState }
   | { kind: 'smash'; state: SmashState }
-  | { kind: 'wasser'; state: WasserState };
+  | { kind: 'wasser'; state: WasserState }
+  | { kind: 'stillepost'; state: StillepostState };
 
 export interface GameState {
   phase: Phase;
@@ -1134,6 +1196,8 @@ export interface GameState {
   mini: MiniSnapshot | null;
   results: ResultsState | null;
   customQuestionCount: number;
+  /** Eigene Startsätze für Stille Post */
+  customPostCount: number;
 }
 
 export interface LeaderEntry {
@@ -1149,6 +1213,7 @@ export type PrivateState =
   | { kind: 'flieger'; state: FliegerPrivate }
   | { kind: 'ttt'; state: TttPrivate }
   | { kind: 'verstecken'; state: VerstPrivate }
+  | { kind: 'stillepost'; state: StillepostPrivate }
   | null;
 
 export interface JoinRequest {
