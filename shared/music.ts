@@ -160,7 +160,7 @@ export function defaultSongForScene(scene: string): string {
       return 'action';
     case 'murder': case 'ttt': case 'verstecken': case 'geist': case 'fangen':
       return 'spooky';
-    case 'stillepost': case 'wwe': case 'nhie': case 'hilo': case 'bomb':
+    case 'stillepost': case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'tourist': case 'sprueche':
       return 'bar';
     default:
       return 'action';

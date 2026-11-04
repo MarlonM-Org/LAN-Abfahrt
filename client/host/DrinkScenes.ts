@@ -77,14 +77,18 @@ abstract class DrinkScene extends Phaser.Scene {
   protected row(ids: string[], label: (id: string) => { text: string; color?: string } | null, y = 222) {
     const n = ids.length;
     const spacing = Math.min(60, 440 / Math.max(1, n));
+    // Viele Spieler (ab 10): Namensschilder abwechselnd versetzt und kurze Labels, damit nichts überlappt
+    const crowded = spacing < 48;
     ids.forEach((id, i) => {
       const p = playerById(id);
       if (!p) return;
       const x = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
       this.layer.add(figure(this, p.look, x, y, 2));
-      this.layer.add(nameTag(this, x, y + 4, p.name.slice(0, Math.max(4, Math.floor(spacing / 8) - 1))));
+      const name = crowded ? p.name.replace(/^Bot\s+/, '').slice(0, Math.floor((2 * spacing) / 8) - 1) : p.name.slice(0, Math.max(4, Math.floor(spacing / 8) - 1));
+      this.layer.add(nameTag(this, x, y + 4 + (crowded && i % 2 ? 11 : 0), name));
       const l = label(id);
-      if (l) this.layer.add(ink(this, x, y - 66, l.text, { color: l.color }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
+      const text = l && crowded ? l.text.replace(/ Schlucke?$/, '') : l?.text;
+      if (l && text) this.layer.add(ink(this, x, y - 66, text, { color: l.color }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
     });
   }
 
