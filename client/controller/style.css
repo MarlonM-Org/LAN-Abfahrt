@@ -561,3 +561,37 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .big-btn.turm-btn.drop { grid-column: 1 / -1; min-height: 15vh; font-size: 14px; background: #2fb5a5; box-shadow: inset 0 4px 0 #6fdccd, inset 0 -6px 0 #1f7f73, 0 3px 0 var(--outline); }
 .big-btn.turm-btn.held { transform: translateY(2px); filter: brightness(0.92); }
 .big-btn.turm-btn svg { filter: drop-shadow(2px 2px 0 rgba(45, 27, 18, 0.6)); }
+
+/* ---------------------------------------------------------------- Igel-Krieg */
+.ig-head { color: var(--red); }
+.ig-weapons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ig-weapon { padding: 8px 4px; font-size: 9px; display: flex; justify-content: space-between; align-items: center; gap: 4px; background: var(--paper-dark); color: var(--ink); text-shadow: none; box-shadow: inset 0 3px 0 #f3dcaa, inset 0 -3px 0 #cfae6f, 0 3px 0 var(--wood-darker); }
+.ig-weapon small { font-size: 8px; color: var(--ink-soft); }
+.ig-weapon.sel { background: var(--gold); border-color: var(--red); box-shadow: inset 0 3px 0 #ffd98a, inset 0 -3px 0 #c08316, 0 3px 0 var(--outline); }
+.ig-pad {
+  position: relative; flex: 1; min-height: 34vh; touch-action: none;
+  border: 3px dashed var(--wood-dark);
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.35) 0 30%, transparent 31%), repeating-linear-gradient(0deg, #bfe3f5 0 14px, #aad8ef 14px 28px);
+}
+.ig-pad canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ig-pad .pad-text { position: absolute; left: 8px; right: 8px; bottom: 8px; white-space: pre-line; color: var(--ink); font-size: 9px; pointer-events: none; }
+.ig-pad.off { filter: grayscale(0.7); opacity: 0.6; }
+.ig-move { display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 8px; }
+.ig-move button { min-height: 13vh; font-size: 18px; touch-action: none; }
+.ig-move .ig-jump { font-size: 11px; background: #6b8fd6; box-shadow: inset 0 3px 0 #9db8ee, inset 0 -4px 0 #3f62a8, 0 3px 0 var(--outline); }
+.ig-done { background: var(--green); box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
+.ig-turn { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--paper-light); border: 3px solid var(--wood-dark); }
+.ig-next { min-height: 1.7em; }
+.ig-next.ig-soon { color: var(--paper-light); background: var(--red); padding: 6px; border: 3px solid var(--wood-darker); animation: shake 0.4s infinite; }
+.ig-teams { display: flex; flex-direction: column; gap: 6px; }
+.ig-team { display: flex; align-items: center; gap: 6px; padding: 4px 6px; background: var(--paper-light); border: 2px solid var(--paper-dark); font-size: 9px; }
+.ig-team.me { border-color: var(--red); }
+.ig-team.out { opacity: 0.45; }
+.ig-team b { width: 12px; height: 12px; border: 2px solid var(--outline); flex: none; }
+.ig-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.ig-bar { width: 44px; height: 10px; border: 2px solid var(--wood-darker); background: var(--paper-dark); flex: none; }
+.ig-bar i { display: block; height: 100%; background: var(--green); }
+.ig-bar.gone { background: #8a8a8a; }
+.ig-hp { width: 28px; text-align: right; color: var(--ink); }
+.ig-sd { font-size: 8px; }
+.ig-map { width: 100%; aspect-ratio: 480 / 270; image-rendering: pixelated; border: 3px solid var(--wood-darker); }

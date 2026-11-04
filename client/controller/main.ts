@@ -20,6 +20,7 @@ import { pickVerstecken } from './screens/verstecken';
 import { pickParcours } from './screens/parcours';
 import { onKartRerender, pickKart } from './screens/kart';
 import { pickTurm } from './screens/turm';
+import { pickIgel } from './screens/igel';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -157,6 +158,8 @@ function pickScreen(): Screen {
           return pickKart(m.state);
         case 'turm':
           return pickTurm(m.state);
+        case 'igel':
+          return pickIgel(m.state);
       }
     }
   }
