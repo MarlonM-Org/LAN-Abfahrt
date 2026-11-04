@@ -9,6 +9,7 @@ import type {
   Phase,
   PlayerPublic,
   ResultsState,
+  ServerHello,
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
@@ -56,6 +57,8 @@ const MAX_PLAYERS = 12;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
 const MIN_PLAYERS = 2;
 const MINI_KINDS = Object.keys(MINI_INFO) as MiniKind[];
+/** Ändert sich bei jedem Serverstart – Handys/TV laden dann neu (sonst läuft dort evtl. noch alter Code) */
+const BOOT_ID = randomUUID();
 /** So lange bleibt ein weggegangenes Handy (App gewechselt, Bildschirm aus) Spieler + VIP. */
 const VIP_GRACE_MS = Number(process.env.VIP_GRACE_MS ?? 60_000);
 /** Wartet ein Schritt auf den VIP, aber kein Mensch kann ihn auslösen → automatisch weiter. */
@@ -115,6 +118,8 @@ export class Room {
     const me = () => (playerId ? this.players.get(playerId) : undefined);
     const isVip = () => !!me()?.isVip;
     const inCouple = () => !!playerId && !!this.dateRun?.state.couple.includes(playerId);
+
+    socket.emit('server:hello', { boot: BOOT_ID, kinds: MINI_KINDS } satisfies ServerHello);
 
     // Steuerung am Laptop (TV-Seite): nur von Verbindungen, die vom Laptop selbst kommen
     const local = isLoopback(socket.handshake.address);

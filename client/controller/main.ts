@@ -2,6 +2,7 @@ import '@fontsource/press-start-2p/400.css';
 import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
 import { type Screen, LS, app, el, me, message, socket, store, toast } from './core';
 import { startTimeSync } from '../timesync';
+import { knownKind, watchServerVersion } from '../version';
 import { buildEdit, buildLobby } from './screens/lobby';
 import { pickBoard } from './screens/board';
 import { pickResults } from './screens/results';
@@ -61,6 +62,7 @@ function join() {
 }
 
 startTimeSync(socket);
+watchServerVersion(socket, () => toast('Handy-Code ist älter als der Server – am Laptop „npm run build“ ausführen.'));
 
 socket.on('connect', () => {
   if (store.name && !store.editing) join();
@@ -137,14 +139,37 @@ function timerKey(s: GameState | null) {
 /** Baut den Screen nur neu, wenn sich der Screen-Key ändert – sonst nur Werte aktualisieren.
  *  So gehen keine Taps oder Wischgesten verloren, während Updates reinkommen. */
 function render() {
-  const [key, build] = pickScreen();
+  let screen: Screen;
+  try {
+    screen = pickScreen();
+  } catch (e) {
+    // Ohne Fallback bliebe bei einem Fehler einfach der alte Screen (z. B. das Lobby-Menü) stehen
+    console.error(e);
+    screen = ['error', message('Hoppla!', 'Anzeigefehler – lade die Seite neu.')];
+  }
+  const [key, build] = screen;
   if (key !== screenKey) {
     screenKey = key;
     app.innerHTML = '';
-    updater = build();
+    try {
+      updater = build();
+    } catch (e) {
+      console.error(e);
+      updater = null;
+      message('Hoppla!', 'Anzeigefehler – lade die Seite neu.')();
+    }
   }
   syncVipAbort();
-  updater?.();
+  try {
+    updater?.();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/** Spiel, das dieser (veraltete) Handy-Code nicht kennt */
+function outdatedScreen(): Screen {
+  return ['outdated', message('Handy-Code veraltet', 'Seite neu laden. Hilft das nicht: am Laptop „npm run build“ ausführen und den Server neu starten.')];
 }
 
 function pickScreen(): Screen {
@@ -166,6 +191,7 @@ function pickScreen(): Screen {
     case 'mini': {
       const m = s.mini;
       if (!m) return ['wait', message('Warte ...')];
+      if (!knownKind(m.kind)) return outdatedScreen();
       if (!(store.playerId && s.players.some((p) => p.id === store.playerId))) return ['wait', message('Warte ...')];
       switch (m.kind) {
         case 'flunky':
@@ -233,8 +259,10 @@ function pickScreen(): Screen {
         case 'sprueche':
           return pickSprueche(m.state, vip);
       }
+      return outdatedScreen();
     }
   }
+  return outdatedScreen();
 }
 
 function inCouple() {

@@ -14,6 +14,7 @@ import { TttScene } from './TttScene';
 import { setState } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
+import { watchServerVersion } from '../version';
 import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
@@ -66,6 +67,7 @@ async function start() {
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
+  watchServerVersion(socket);
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
   const overlay = document.getElementById('sound');
