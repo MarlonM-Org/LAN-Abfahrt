@@ -121,3 +121,40 @@ button:disabled { opacity: 0.4; }
   z-index: 10;
 }
 .hidden { display: none; }
+
+/* ---------------------------------------------------------------- v0.2 */
+.yellow { color: var(--yellow); }
+.pink { color: #ff77a8; }
+.label-left { text-align: left; margin-bottom: 8px; }
+.row-center { display: flex; justify-content: center; }
+.menu { display: flex; flex-direction: column; gap: 10px; }
+.btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.btn-row button { padding: 14px 4px; font-size: 10px; }
+.panel { display: flex; flex-direction: column; gap: 8px; }
+
+.stats { display: flex; justify-content: space-between; padding: 8px 12px; background: var(--panel); border: 2px solid var(--yellow); }
+
+.big-btn.roll { background: #ff77a8; }
+.big-btn.night { background: #111d35; color: var(--muted); box-shadow: 0 4px 0 #000; }
+.big-btn.sun { background: #ffa300; min-height: 70vh; }
+.big-btn.task { background: #00e436; min-height: 22vh; font-size: 16px; }
+.big-btn.fail { background: var(--red); color: #fff; }
+
+.player-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.player-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--panel); color: var(--text); border: 2px solid var(--muted); box-shadow: none; }
+.player-btn:active { border-color: var(--yellow); }
+
+.top-row { display: flex; justify-content: space-between; color: var(--muted); }
+.rooms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.room-btn { padding: 12px 2px; font-size: 9px; background: var(--panel); color: var(--text); border: 2px solid var(--muted); box-shadow: none; }
+.room-btn.active { border-color: var(--yellow); color: var(--yellow); }
+.room-btn.done::after { content: ' ✓'; color: #00e436; }
+.task-panel { text-align: center; }
+.task-panel .task-text { color: var(--text); }
+
+button.danger, .role-btn.danger { background: var(--red); color: #fff; box-shadow: 0 4px 0 #7e2553; }
+button.report { background: #ffa300; }
+.role-btn { min-height: 64px; width: 100%; }
+.dead-banner { background: #5f574f; padding: 8px; text-align: center; }
+
+.abort { margin-top: auto; align-self: center; padding: 6px 10px; font-size: 9px; background: transparent; color: var(--muted); border: 1px solid var(--muted); box-shadow: none; }

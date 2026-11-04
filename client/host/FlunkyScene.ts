@@ -35,7 +35,8 @@ export class FlunkyScene extends Phaser.Scene {
     this.actors.clear();
     this.bottleDown = false;
     this.flying = false;
-    this.lastSeq = getState()?.flunky?.lastThrow?.seq ?? 0;
+    const st = getState();
+    this.lastSeq = st?.mini?.kind === 'flunky' ? (st.mini.state.lastThrow?.seq ?? 0) : 0;
 
     this.drawBeach();
     this.bottle = this.add.image(BOTTLE.x, BOTTLE.y, ensureBottle(this)).setOrigin(0.5, 1).setScale(2);
@@ -141,8 +142,8 @@ export class FlunkyScene extends Phaser.Scene {
   }
 
   private render(s: GameState) {
-    const f = s.flunky;
-    if (!f) return;
+    if (s.mini?.kind !== 'flunky') return;
+    const f = s.mini.state;
 
     for (const team of ['A', 'B'] as Team[]) {
       const ids = f.teams[team];
@@ -226,7 +227,7 @@ export class FlunkyScene extends Phaser.Scene {
       this.add.text(WORLD.W / 2, 140, names, {
         fontFamily: FONT, fontSize: '8px', color: '#fff1e8', align: 'center', wordWrap: { width: 400 },
       }).setOrigin(0.5, 0),
-      this.add.text(WORLD.W / 2, 220, 'VIP: Am Handy zurück zur Lobby', {
+      this.add.text(WORLD.W / 2, 220, 'Gleich kommen die Ergebnisse ...', {
         fontFamily: FONT, fontSize: '8px', color: '#c2c3c7',
       }).setOrigin(0.5),
     ]);

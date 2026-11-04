@@ -12,5 +12,5 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["server", "shared", "client", "vite.config.ts"]
+  "include": ["server", "shared", "client", "scripts", "vite.config.ts"]
 }

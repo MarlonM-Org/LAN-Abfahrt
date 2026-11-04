@@ -3,15 +3,20 @@
 Party-Spiel für unsere Freundesgruppe – im Stil von Mario Party / Jackbox:
 **Der Fernseher zeigt das Spiel, jedes Handy ist ein Controller.** Kein Controller, keine App nötig – QR-Code scannen und mitspielen.
 
-Aktueller Stand (Prototyp v0.1):
+Aktueller Stand (v0.2):
 
-- Lobby auf dem TV mit QR-Code, bis zu 8 Spieler
-- Pixel-Avatar-Editor auf dem Handy (Haut, Frisur, Haare, Shirt)
-- Der erste Spieler ist **VIP** und startet die Spiele vom Handy aus
-- Minispiel **Flunkyball** am Strand:
-  - Werfer wischt am Handy nach oben (Länge = Kraft, Richtung = Ziel, Wind beachten)
-  - Treffer → das werfende Team tippt auf **TRINKEN**, ein Läufer des anderen Teams tippt auf **LAUFEN**, um die Flasche wieder aufzustellen
-  - Wer als Team zuerst ausgetrunken hat, gewinnt
+- **Lobby** auf dem TV mit QR-Code, bis zu 8 Spieler, Pixel-Avatar-Editor auf dem Handy
+- Der erste Spieler ist **VIP** und wählt am Handy, was gespielt wird (und kann jederzeit abbrechen)
+- **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
+  - Alle würfeln am Handy, Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus
+  - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los
+  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung – **Finale: Mord im Ferienhaus**
+  - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
+- **Minispiele** (auch einzeln spielbar):
+  - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
+  - 🗳️ **Wer würde eher …?** – geheim abstimmen, Punkte für die Mehrheit. **Eigene Fragen** können in der Lobby am Handy hinzugefügt werden (gespeichert in `data/questions.json`)
+  - 🏖️ **Liegestuhl-Sprint** – Reaktionstest bei Sonnenaufgang, wer zu früh tippt, hat einen Fehlstart
+  - 🔪 **Mord im Ferienhaus** (ab 4 Spielern, ab 7 mit zwei Mördern) – geheime Rollen auf dem Handy, Aufgaben in den Räumen, Morde wenn man allein mit jemandem ist, Leichen melden, diskutieren, abstimmen
 
 ## Starten
 
@@ -61,22 +66,33 @@ Tipp: PC und Apple TV per LAN-Kabel anschließen – dann ist die Verzögerung k
 | Gemeinsam | `shared/` – Typen, Avatar-Zeichnung, Flunkyball-Geometrie |
 
 ```
-server/   index.ts (HTTP + Vite-Middleware), room.ts (Lobby/VIP), flunky.ts (Spiellogik)
-shared/   types.ts, avatar.ts, flunky.ts
-client/   tv.html + host/  (Phaser-Szenen)
-          index.html + controller/ (Handy-UI)
+server/   index.ts (HTTP + Vite), room.ts (Lobby/VIP/Ablauf), board.ts (Spielbrett),
+          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, questions.ts
+shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), avatar.ts, flunky.ts
+client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel)
+          index.html + controller/ (Handy-UI, ein Modul pro Spiel in screens/)
+scripts/  bots.ts                (Testspieler)
 ```
 
-Der Server ist die einzige Quelle der Wahrheit: Handys schicken nur Eingaben (`flunky:throw`, `flunky:tap`), der Server berechnet alles und verteilt den Zustand (`state`) an TV und Handys.
+Der Server ist die einzige Quelle der Wahrheit: Handys schicken nur Eingaben (`board:roll`, `mini:input`), der Server berechnet alles und verteilt den Zustand (`state`) an TV und Handys. Geheimes (z. B. die Rolle im Mörderspiel) geht per `private` nur an den jeweiligen Spieler.
 
 ## Testen ohne Freunde
 
-Mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (am besten in verschiedenen Profilen/Inkognito, weil die Spieler-ID im `localStorage` liegt) – jeder Tab ist ein Spieler.
+**Bots:** In einem zweiten Terminal `npm run bots` starten – dann treten 3 Testspieler bei und spielen alles automatisch mit. Du bleibst VIP und steuerst mit deinem Handy.
+
+```bash
+npm run bots -- 5                 # 5 Bots
+npm run bots -- 4 --party         # Bot startet selbst eine Party (zum Zuschauen am TV)
+npm run bots -- 6 --game=murder   # Bot startet direkt ein Einzelspiel (flunky | wwe | sprint | murder)
+```
+
+Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiedene Profile/Inkognito, weil die Spieler-ID im `localStorage` liegt).
 
 ## Ideen / Roadmap
 
-- [ ] Spielbrett im Mario-Party-Stil (Urlaubshaus, Würfeln, Felder lösen Minispiele aus)
-- [ ] Minispiel „Mord im Ferienhaus“ (Among-Us-artig, geheime Rollen auf dem Handy, Abstimmung)
+- [x] Spielbrett im Mario-Party-Stil
+- [x] Mord im Ferienhaus, Wer würde eher …?, Liegestuhl-Sprint
 - [ ] Echte Pixel-Avatare aus Fotos der Freunde
-- [ ] Weitere Minispiele: Grill-Duell, Urlaubs-Quiz, Badezimmer-Wettrennen
+- [ ] Weitere Minispiele: Sonnencreme-Kartoffel, Grill-Duell, Badezimmer-Rennen, Koffer packen
+- [ ] Items auf dem Spielbrett (z. B. „Doppelt würfeln“, „Cocktail klauen“)
 - [ ] Sounds & Musik

@@ -99,7 +99,7 @@ export class LobbyScene extends Phaser.Scene {
 
     const n = s.players.filter((p) => p.connected).length;
     this.hintText.setText(
-      n < 2 ? 'Warte auf mindestens 2 Spieler ...' : 'Der VIP startet das Spiel am Handy!',
+      n < 2 ? 'Warte auf mindestens 2 Spieler ...' : 'Der VIP wählt am Handy ein Spiel!',
     );
   }
 

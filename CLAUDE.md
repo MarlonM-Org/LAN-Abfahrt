@@ -7,13 +7,16 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run dev` – Server + Vite-Middleware auf Port 3000 (TV: `/tv.html`, Handy: `/`)
 - `npm run typecheck` – TypeScript prüfen (vor jedem Commit)
 - `npm run build` / `npm start` – Produktiv-Build
+- `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
 
 ## Architektur-Regeln
 
 - **Server ist autoritativ.** Clients senden nur Eingaben; Spiellogik und Zufall leben in `server/`.
 - Gemeinsame Konstanten/Geometrie/Typen gehören nach `shared/` (wird von Server, TV und Handy importiert – keine Node- oder DOM-spezifischen Imports dort, außer Canvas-Zeichenfunktionen).
 - Zustand wird komplett als `GameState` gebroadcastet (gedrosselt auf ~25/s in `Room.changed()`).
-- Neues Minispiel = neue Klasse in `server/` (wie `FlunkyGame`), neuer `Phase`-Wert, eine Phaser-Szene in `client/host/` und Screens in `client/controller/main.ts`.
+- Neues Minispiel = Klasse in `server/` die `MiniGame` implementiert (siehe `server/minigame.ts`), neuer `MiniKind` + Eintrag in `MINI_INFO` (`shared/games.ts`), Zweig in `Room.startMini()`, Phaser-Szene in `client/host/` (in `main.ts` registrieren), Screen-Modul in `client/controller/screens/` (in `controller/main.ts` einhängen) und Bot-Verhalten in `scripts/bots.ts`.
+- Minispiele melden ihr Ende über `ctx.finish({ groups, details, subtitle })` – Münzen/Ergebnis-Screen macht der Raum.
+- Geheime Infos nur über `privateFor()` → Event `private`, nie in `GameState`.
 - Handy-UI: Screens nur neu bauen, wenn sich der Screen-Key ändert (`pickScreen()`), sonst nur Werte updaten – sonst gehen Taps/Wischgesten verloren.
 - Phaser-Szenen werden beim Neustart wiederverwendet: Instanzfelder in `create()` zurücksetzen.
 - UI-Texte auf Deutsch, Pixel-Look (Font „Press Start 2P“, Welt 480 × 270).

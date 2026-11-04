@@ -3,13 +3,21 @@ import { io } from 'socket.io-client';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { LobbyScene } from './LobbyScene';
+import { BoardScene } from './BoardScene';
+import { ResultsScene } from './ResultsScene';
 import { FlunkyScene } from './FlunkyScene';
-import { getState, setState } from './store';
+import { WweScene } from './WweScene';
+import { SprintScene } from './SprintScene';
+import { MurderScene } from './MurderScene';
+import { setState } from './store';
 
-const SCENE_FOR_PHASE: Record<GameState['phase'], string> = {
-  lobby: 'lobby',
-  flunky: 'flunky',
-};
+const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder'];
+
+/** Welche Phaser-Szene gehört zu welchem Zustand? */
+function sceneKey(s: GameState): string {
+  if (s.phase === 'mini' && s.mini) return s.mini.kind;
+  return s.phase === 'mini' ? 'lobby' : s.phase;
+}
 
 async function start() {
   // Pixel-Font laden, bevor Phaser Texte rendert (sonst Fallback-Font)
@@ -26,17 +34,19 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#1d2b53',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, FlunkyScene],
+    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene],
   });
 
+  let currentKey = '';
   const socket = io();
   socket.on('connect', () => socket.emit('host:hello'));
   socket.on('state', (s: GameState) => {
-    const prevPhase = getState()?.phase;
+    const key = sceneKey(s);
     setState(s);
-    if (prevPhase !== s.phase) {
-      for (const sc of game.scene.getScenes(true)) game.scene.stop(sc.scene.key);
-      game.scene.start(SCENE_FOR_PHASE[s.phase]);
+    if (key !== currentKey) {
+      currentKey = key;
+      for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
+      game.scene.start(key);
     }
   });
 }
