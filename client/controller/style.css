@@ -211,3 +211,35 @@ button.report { background: #f0973a; }
   background: transparent; color: var(--ink-soft); text-shadow: none;
   border: 2px solid var(--paper-dark); box-shadow: none;
 }
+
+/* ---------------------------------------------------------------- Date Night */
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode-tab { padding: 12px 4px; font-size: 9px; }
+.mode-tab.active { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, inset 0 -4px 0 #b0306a, 0 3px 0 var(--outline); }
+.date-btn { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, inset 0 -4px 0 #b0306a, 0 3px 0 var(--outline); line-height: 1.8; }
+.date-btn small { font-size: 8px; opacity: 0.9; }
+.btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btn-grid button { font-size: 8px; padding: 10px 4px; }
+.story { color: var(--ink); line-height: 2; }
+.big-btn.jump { background: #6b8fd6; min-height: 52vh; box-shadow: inset 0 4px 0 #9db8ee, inset 0 -6px 0 #3f62a8, 0 3px 0 var(--outline); }
+.talk { color: var(--pink); min-height: 2em; }
+canvas.lanes { width: 100%; max-width: 360px; align-self: center; image-rendering: pixelated; border: 3px solid var(--wood-darker); aspect-ratio: 240 / 300; }
+.lane-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lane { min-height: 16vh; font-size: 14px; touch-action: none; }
+.lane.l0 { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, inset 0 -5px 0 #b0306a, 0 3px 0 var(--outline); }
+.lane.l1 { background: #f0b13a; box-shadow: inset 0 3px 0 #ffd27a, inset 0 -5px 0 #c08316, 0 3px 0 var(--outline); }
+.fb { color: var(--red); }
+canvas.wheel { width: 100%; max-width: 320px; align-self: center; image-rendering: pixelated; }
+.recipe { display: flex; justify-content: center; gap: 4px; }
+.recipe canvas { width: 32px; height: 32px; image-rendering: pixelated; opacity: 0.35; border: 2px solid transparent; }
+.recipe canvas.got { opacity: 1; }
+.recipe canvas.cur { opacity: 1; border-color: var(--red); }
+.big-btn.grab { min-height: 16vh; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-darker); touch-action: none; aspect-ratio: 3 / 2; }
+.mode-tabs.three { grid-template-columns: 1fr 1fr 1fr; }
+.drink-btn { background: #f0973a; box-shadow: inset 0 3px 0 #ffb867, inset 0 -4px 0 #c06a1f, 0 3px 0 var(--outline); }
+.bot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.q-kind .mode-tab { font-size: 8px; padding: 8px 2px; }
+.card-big { font-size: 40px; text-align: center; color: var(--red); background: var(--paper-light); border: 3px solid var(--wood-darker); padding: 18px; margin: 0 auto; min-width: 120px; }
+.big-btn.boom { background: #c0392b; box-shadow: inset 0 4px 0 #e86a5c, inset 0 -6px 0 #8a2419, 0 3px 0 var(--outline); }
+.big-btn.half { min-height: 24vh; }

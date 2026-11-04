@@ -45,29 +45,47 @@ export class ResultsScene extends Phaser.Scene {
 
     this.layer.add(panel(this, 60, 2, 360, 64));
     this.layer.add(ink(this, WORLD.W / 2, 9, r.final ? '~ Endstand ~' : '~ Ergebnis ~', { color: '#7a5a3a' }));
-    this.layer.add(ink(this, WORLD.W / 2, 21, r.title, { size: 16, color: RED_INK }));
+    this.layer.add(ink(this, WORLD.W / 2, r.title.length > 20 ? 25 : 21, r.title, { size: r.title.length > 20 ? 8 : 16, color: RED_INK }));
     this.layer.add(ink(this, WORLD.W / 2, 40, r.subtitle, { wrap: 340 }));
 
     if (r.final) this.renderPodium(s);
+    else if (r.hearts !== undefined) this.renderHearts(s);
     else this.renderList(s);
 
-    const footer = r.final || !s.partyActive ? 'VIP: Am Handy zurück zur Lobby' : 'VIP: Am Handy weiter zum Spielbrett';
+    const footer = s.drinkActive ? 'VIP: Nächste Runde oder Beenden am Handy' : s.date ? 'Am Handy auf „Weiter“ tippen' : r.final || !s.partyActive ? 'VIP: Am Handy zurück zur Lobby' : 'VIP: Am Handy weiter zum Spielbrett';
     this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
   }
 
-  private renderList(s: GameState) {
+  private renderHearts(s: GameState) {
     const r = s.results!;
-    const x = 60, y = 72, w = 360;
-    const rowH = Math.min(22, Math.floor(164 / Math.max(1, r.rows.length)));
+    const max = r.maxHearts ?? 10;
+    const heart = ensureTex(this, 'heart', O.heart);
+    this.layer.add(panel(this, 80, 74, 320, 44));
+    for (let i = 0; i < max; i++) {
+      const img = this.add.image(WORLD.W / 2 + (i - (max - 1) / 2) * 26, 96, heart).setScale(2);
+      if (i >= (r.hearts ?? 0)) img.setTint(0x6e6a62).setAlpha(0.45);
+      else {
+        img.setScale(0);
+        this.tweens.add({ targets: img, scale: 2, duration: 300, delay: 200 + i * 120, ease: 'Back.out' });
+      }
+      this.layer.add(img);
+    }
+    this.renderList(s, 126);
+  }
+
+  private renderList(s: GameState, top = 72) {
+    const r = s.results!;
+    const x = 60, y = top, w = 360;
+    const rowH = Math.min(22, Math.floor((236 - top) / Math.max(1, r.rows.length)));
     this.layer.add(panel(this, x, y, w, rowH * r.rows.length + 16));
     r.rows.forEach((row, i) => {
       const p = playerById(row.playerId);
       const ry = y + 8 + i * rowH;
-      const color = PLACE_COLORS[Math.min(row.place - 1, PLACE_COLORS.length - 1)];
-      this.layer.add(ink(this, x + 14, ry + 6, `${row.place}.`, { origin: [0, 0], color }));
+      const color = r.hearts !== undefined ? '#3d2414' : PLACE_COLORS[Math.min(row.place - 1, PLACE_COLORS.length - 1)];
+      if (r.hearts === undefined) this.layer.add(ink(this, x + 14, ry + 6, `${row.place}.`, { origin: [0, 0], color }));
       if (p) this.layer.add(this.add.image(x + 44, ry + rowH - 3, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
       this.layer.add(ink(this, x + 58, ry + 6, p?.name ?? '?', { origin: [0, 0], color }));
-      this.layer.add(ink(this, x + 156, ry + 6, row.detail.slice(0, 16), { origin: [0, 0], color: '#7a5a3a' }));
+      this.layer.add(ink(this, x + 156, ry + 6, row.detail.slice(0, r.hearts !== undefined ? 24 : 16), { origin: [0, 0], color: '#7a5a3a' }));
       if (s.partyActive) {
         this.layer.add(this.add.image(x + w - 46, ry + 9, ensureTex(this, 'coin', O.coinIcon)));
         this.layer.add(ink(this, x + w - 14, ry + 6, `+${row.coins}`, { origin: [1, 0] }));

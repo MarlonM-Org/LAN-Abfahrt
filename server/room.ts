@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import { randomUUID } from 'node:crypto';
 import type {
+  GameMode,
   GameState,
   JoinRequest,
   JoinResponse,
@@ -11,7 +12,15 @@ import type {
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
-import { DEFAULT_QUESTIONS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
+import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
+import { BombGame, HiloGame, NhieGame } from './drinkgames';
+import { Bot } from './botclient';
+import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
+import { DateRun } from './date';
+import { DescentGame } from './descent';
+import { RhythmGame } from './rhythm';
+import { WrapGame } from './wrap';
+import { StarsGame } from './stars';
 import { Board } from './board';
 import { FlunkyGame } from './flunky';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
@@ -21,8 +30,9 @@ import { SprintGame } from './sprint';
 import { WweGame } from './wwe';
 
 const MAX_PLAYERS = 8;
+const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
 const MIN_PLAYERS = 2;
-const MINI_KINDS: MiniKind[] = ['flunky', 'wwe', 'sprint', 'murder'];
+const MINI_KINDS = Object.keys(MINI_INFO) as MiniKind[];
 
 interface Player extends PlayerPublic {
   socketId: string | null;
@@ -35,19 +45,28 @@ export class Room {
   private phase: Phase = 'lobby';
   private mini: MiniGame | null = null;
   private board: Board | null = null;
+  private dateRun: DateRun | null = null;
+  private mode: GameMode = 'party';
+  /** Trinkspiel: Gesamtschlücke + zuletzt gespieltes Spiel */
+  private drinkRun: { totals: Record<string, number>; last: MiniKind | null; rounds: number } | null = null;
+  private nhie = new QuestionStore('nhie.json', 'nhie');
   private results: ResultsState | null = null;
   private questions = new QuestionStore();
   private flushTimer: NodeJS.Timeout | null = null;
 
+  private bots: Bot[] = [];
+
   constructor(
     private io: Server,
     private joinUrl: string,
+    private localUrl: string,
   ) {}
 
   handle(socket: Socket) {
     let playerId: string | null = null;
     const me = () => (playerId ? this.players.get(playerId) : undefined);
     const isVip = () => !!me()?.isVip;
+    const inCouple = () => !!playerId && !!this.dateRun?.state.couple.includes(playerId);
 
     socket.on('host:hello', () => {
       socket.join('hosts');
@@ -85,7 +104,15 @@ export class Room {
       if (!isVip() || this.phase !== 'lobby') return;
       const req = asRecord(raw);
       const ids = this.connectedIds();
-      if (req.mode === 'party') {
+      if (req.mode === 'drink') {
+        if (ids.length < 2) return socket.emit('toast', 'Mindestens 2 Spieler nötig.');
+        this.drinkRun = { totals: Object.fromEntries(ids.map((id) => [id, 0])), last: null, rounds: 0 };
+        this.nextDrinkRound();
+      } else if (req.mode === 'date') {
+        const def = DATE_VERSIONS.find((v) => v.id === req.version) ?? DATE_VERSIONS[0];
+        if (ids.length !== 2) return socket.emit('toast', 'Date Night ist für genau 2 Spieler.');
+        this.startDate(def.id, [ids[0], ids[1]]);
+      } else if (req.mode === 'party') {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
         this.startParty(ids, rounds);
@@ -97,8 +124,36 @@ export class Room {
       }
     });
 
-    socket.on('vip:continue', () => {
-      if (isVip() && this.phase === 'results') this.continueAfterResults();
+    socket.on('vip:continue', (action?: string) => {
+      if ((isVip() || inCouple()) && this.phase === 'results') this.continueAfterResults(action === 'end');
+    });
+
+    socket.on('vip:addBot', () => {
+      if (!isVip() || this.phase !== 'lobby' || this.players.size >= MAX_PLAYERS) return;
+      const used = new Set([...this.players.values()].map((p) => p.name));
+      const name = BOT_NAMES.find((n) => !used.has(n)) ?? `Bot ${this.bots.length + 1}`;
+      this.bots.push(new Bot(name, { url: this.localUrl }));
+    });
+
+    socket.on('vip:removeBots', () => {
+      if (!isVip() || this.phase !== 'lobby') return;
+      for (const b of this.bots) b.stop();
+      this.bots = [];
+    });
+
+    socket.on('vip:mode', (mode: string) => {
+      if (isVip() && this.phase === 'lobby' && (mode === 'party' || mode === 'date' || mode === 'drink')) {
+        this.mode = mode;
+        this.changed();
+      }
+    });
+
+    socket.on('story:next', () => {
+      if (this.phase !== 'story' || !this.dateRun || !(isVip() || inCouple())) return;
+      const next = this.dateRun.next();
+      if (next === 'end') this.backToLobby();
+      else if (next) this.startMini(next);
+      else this.changed();
     });
 
     socket.on('vip:lobby', () => {
@@ -117,9 +172,10 @@ export class Room {
       if (playerId && this.phase === 'mini') this.mini?.input(playerId, String(asRecord(msg).action), asRecord(msg).payload);
     });
 
-    socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void) => {
+    socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
-      const q = this.questions.add(String(text ?? ''));
+      const store = kind === 'nhie' ? this.nhie : this.questions;
+      const q = store.add(String(text ?? ''));
       if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
       this.changed();
     });
@@ -168,14 +224,23 @@ export class Room {
     this.changed();
   }
 
+  private startDate(version: string, couple: [string, string]) {
+    const def = DATE_VERSIONS.find((v) => v.id === version) ?? DATE_VERSIONS[0];
+    this.dateRun = new DateRun(def, couple, [this.nameOf(couple[0]), this.nameOf(couple[1])]);
+    this.results = null;
+    this.phase = 'story';
+    this.changed();
+  }
+
   private startMini(kind: MiniKind) {
     this.mini?.dispose();
-    const ids = this.connectedIds();
+    const ids = this.dateRun ? this.dateRun.state.couple.filter((id) => this.players.has(id)) : this.connectedIds();
     const ctx: MiniCtx = {
       onChange: () => this.changed(),
       finish: (r) => this.finishMini(kind, r),
       isConnected: (id) => !!this.players.get(id)?.connected,
       nameOf: (id) => this.nameOf(id),
+      mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
       case 'flunky':
@@ -189,6 +254,27 @@ export class Room {
         break;
       case 'murder':
         this.mini = new MurderGame(ids, ctx);
+        break;
+      case 'descent':
+        this.mini = new DescentGame(ids, ctx);
+        break;
+      case 'rhythm':
+        this.mini = new RhythmGame(ids, ctx);
+        break;
+      case 'wrap':
+        this.mini = new WrapGame(ids, ctx);
+        break;
+      case 'stars':
+        this.mini = new StarsGame(ids, ctx);
+        break;
+      case 'nhie':
+        this.mini = new NhieGame(ids, ctx, this.nhie.all, DEFAULT_NHIE);
+        break;
+      case 'hilo':
+        this.mini = new HiloGame(ids, ctx);
+        break;
+      case 'bomb':
+        this.mini = new BombGame(ids, ctx);
         break;
     }
     this.results = null;
@@ -208,13 +294,48 @@ export class Room {
         coins: coinsPerGroup[Math.min(gi, coinsPerGroup.length - 1)],
       })),
     );
-    this.results = { title: MINI_INFO[kind].title, subtitle: r.subtitle, rows, final: false };
+    const hearts = r.hearts !== undefined ? { hearts: r.hearts, maxHearts: HEARTS_PER_CHAPTER } : {};
+    if (r.hearts !== undefined || r.sips) for (const row of rows) row.coins = 0;
+    if (r.sips && this.drinkRun) {
+      for (const [id, n] of Object.entries(r.sips)) this.drinkRun.totals[id] = (this.drinkRun.totals[id] ?? 0) + n;
+      Object.assign(hearts, { sips: r.sips });
+    }
+    this.results = { title: MINI_INFO[kind].title, subtitle: r.subtitle, rows, final: false, ...hearts };
     this.phase = 'results';
     this.changed();
   }
 
-  private continueAfterResults() {
+  private nextDrinkRound() {
+    const run = this.drinkRun!;
+    const pool = DRINK_KINDS.filter((k) => k !== run.last);
+    const kind = pool[Math.floor(Math.random() * pool.length)];
+    run.last = kind;
+    run.rounds += 1;
+    this.startMini(kind);
+  }
+
+  private continueAfterResults(end = false) {
     const res = this.results;
+    if (this.drinkRun && res) {
+      if (res.final) return this.backToLobby();
+      if (!end) return this.nextDrinkRound();
+      const t = this.drinkRun.totals;
+      const ids = Object.keys(t).sort((a, b) => t[b] - t[a]);
+      this.results = {
+        title: 'Schluck-Statistik',
+        subtitle: `${this.drinkRun.rounds} Runden gespielt – trinkt Wasser zwischendurch!`,
+        rows: ids.map((id, i) => ({ playerId: id, place: i + 1, detail: `${t[id]} Schlücke`, coins: 0 })),
+        final: true,
+        sips: t,
+      };
+      return this.changed();
+    }
+    if (this.dateRun && res && !res.final) {
+      this.dateRun.recordHearts(res.hearts ?? 0);
+      this.results = null;
+      this.phase = 'story';
+      return this.changed();
+    }
     if (!res || res.final || !this.board) return this.backToLobby();
     this.board.afterMini(Object.fromEntries(res.rows.map((row) => [row.playerId, row.coins])));
     if (this.board.finished) {
@@ -247,6 +368,8 @@ export class Room {
     this.mini = null;
     this.board?.dispose();
     this.board = null;
+    this.dateRun = null;
+    this.drinkRun = null;
     this.results = null;
     this.phase = 'lobby';
     for (const [id, p] of this.players) if (!p.connected) this.players.delete(id);
@@ -280,6 +403,11 @@ export class Room {
         .map(({ id, name, look, connected, isVip }) => ({ id, name, look, connected, isVip })),
       joinUrl: this.joinUrl,
       partyActive: !!this.board,
+      mode: this.mode,
+      date: this.dateRun?.state ?? null,
+      drinkActive: !!this.drinkRun,
+      customNhieCount: this.nhie.all.length,
+      botCount: this.bots.length,
       board: this.board?.state ?? null,
       mini: this.mini?.snapshot() ?? null,
       results: this.results,

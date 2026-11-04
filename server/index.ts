@@ -15,7 +15,7 @@ const joinUrl = `http://${PUBLIC_HOST}:${PORT}/`;
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer);
-const room = new Room(io, joinUrl);
+const room = new Room(io, joinUrl, `http://localhost:${PORT}`);
 io.on('connection', (socket) => room.handle(socket));
 
 if (PROD) {

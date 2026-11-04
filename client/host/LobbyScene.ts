@@ -18,6 +18,7 @@ export class LobbyScene extends Phaser.Scene {
   private hintText!: Phaser.GameObjects.Text;
   private renderedUrl = '';
   private renderedPlayers = '';
+  private subtitle!: Phaser.GameObjects.Text;
 
   constructor() {
     super('lobby');
@@ -49,7 +50,7 @@ export class LobbyScene extends Phaser.Scene {
     // Titelschild
     panel(this, 150, 2, 220, 40).setDepth(500);
     ink(this, 260, 10, 'LAN-ABFAHRT', { size: 16, color: RED_INK }).setDepth(501);
-    ink(this, 260, 28, '~ Urlaubs-Edition ~').setDepth(501);
+    this.subtitle = ink(this, 260, 28, '~ Urlaubs-Edition ~').setDepth(501);
 
     // QR-Code auf einem Brett
     const board = ensureTex(this, 'qrboard', () => O.noticeBoard(124, 122));
@@ -73,6 +74,7 @@ export class LobbyScene extends Phaser.Scene {
   private render(s: GameState) {
     if (s.joinUrl !== this.renderedUrl) this.renderQr(s.joinUrl);
 
+    this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
     this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : 'Der VIP wählt am Handy ein Spiel!');
 

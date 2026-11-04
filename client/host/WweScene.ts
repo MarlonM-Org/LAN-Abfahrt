@@ -142,6 +142,9 @@ export class WweScene extends Phaser.Scene {
       this.layer.add(ink(this, 362, 106 + i * 14, (playerById(id)?.name ?? '?').slice(0, 8), { origin: [0, 0], color: count === max ? RED_INK : undefined }));
       this.layer.add(ink(this, 464, 106 + i * 14, String(count), { origin: [1, 0] }));
     });
-    if (w.sub === 'over') this.layer.add(ink(this, WORLD.W / 2, 254, 'Gleich gibt’s die Punkte ...'));
+    if (w.drinking && w.sips) {
+      const drinkers = Object.entries(w.sips).map(([id, n]) => `${playerById(id)?.name ?? '?'} trinkt ${n}`);
+      if (drinkers.length) this.layer.add(ink(this, WORLD.W / 2, 254, drinkers.join(' · ')).setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
+    } else if (w.sub === 'over') this.layer.add(ink(this, WORLD.W / 2, 254, 'Gleich gibt’s die Punkte ...'));
   }
 }

@@ -5,7 +5,7 @@ import { ball, bottle } from '../art/objects';
 import { ensureTex } from './ui';
 
 export function ensureAvatar(scene: Phaser.Scene, look: Look): string {
-  const key = `av2_${look.skin}_${look.hair}_${look.hairStyle}_${look.shirt}`;
+  const key = `av2_${look.skin}_${look.hair}_${look.hairStyle}_${look.shirt}_${look.beard ?? 0}`;
   return ensureTex(scene, key, () => {
     const c = document.createElement('canvas');
     c.width = AV_W;
@@ -30,7 +30,7 @@ export const ensureBall = (scene: Phaser.Scene) => ensureTex(scene, 'ball2', bal
 
 /** Kopf-Porträt (16 × 15) für Listen und Anzeigetafeln */
 export function ensurePortrait(scene: Phaser.Scene, look: Look): string {
-  const key = `pt_${look.skin}_${look.hair}_${look.hairStyle}_${look.shirt}`;
+  const key = `pt_${look.skin}_${look.hair}_${look.hairStyle}_${look.shirt}_${look.beard ?? 0}`;
   return ensureTex(scene, key, () => {
     const full = document.createElement('canvas');
     full.width = AV_W;

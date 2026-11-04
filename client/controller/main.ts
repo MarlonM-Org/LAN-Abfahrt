@@ -8,6 +8,8 @@ import { pickFlunky } from './screens/flunky';
 import { pickWwe } from './screens/wwe';
 import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
+import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
+import { pickBomb, pickHilo, pickNhie } from './screens/drink';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -87,11 +89,13 @@ function pickScreen(): Screen {
 
   switch (s.phase) {
     case 'lobby':
-      return [`lobby-${vip}`, () => buildLobby(vip, () => ((store.editing = true), render()))];
+      return [`lobby-${vip}-${s.mode}`, () => buildLobby(vip, () => ((store.editing = true), render()))];
     case 'board':
       return s.board ? withPrefix('b', pickBoard(s.board)) : ['wait', message('Warte ...')];
     case 'results':
-      return s.results ? pickResults(s.results, vip) : ['wait', message('Warte ...')];
+      return s.results ? pickResults(s.results, vip || inCouple()) : ['wait', message('Warte ...')];
+    case 'story':
+      return s.date ? pickStory(s.date, vip || inCouple()) : ['wait', message('Warte ...')];
     case 'mini': {
       const m = s.mini;
       if (!m) return ['wait', message('Warte ...')];
@@ -105,9 +109,27 @@ function pickScreen(): Screen {
           return pickSprint(m.state);
         case 'murder':
           return pickMurder(m.state, vip);
+        case 'descent':
+          return pickDescent(m.state);
+        case 'rhythm':
+          return pickRhythm(m.state);
+        case 'wrap':
+          return pickWrap(m.state);
+        case 'stars':
+          return pickStars(m.state);
+        case 'nhie':
+          return pickNhie(m.state);
+        case 'hilo':
+          return pickHilo(m.state);
+        case 'bomb':
+          return pickBomb(m.state);
       }
     }
   }
+}
+
+function inCouple() {
+  return !!store.playerId && !!store.state?.date?.couple.includes(store.playerId);
 }
 
 function withPrefix(prefix: string, [key, build]: Screen): Screen {

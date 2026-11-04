@@ -1,5 +1,5 @@
 import type { BoardState, MiniKind } from '../shared/types';
-import { BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, MINI_INFO } from '../shared/games';
+import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, MINI_INFO } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
 const STEP_MS = 280;
@@ -174,7 +174,7 @@ export class Board {
   private intro() {
     const s = this.state;
     const isFinale = s.round === s.maxRounds && this.ctx.connectedCount() >= MINI_INFO.murder.minPlayers;
-    const pool: MiniKind[] = ['flunky', 'wwe', 'sprint'].filter((k) => k !== this.lastMini) as MiniKind[];
+    const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini);
     const kind: MiniKind = isFinale ? 'murder' : pool[Math.floor(Math.random() * pool.length)];
     this.lastMini = kind;
     s.sub = 'intro';

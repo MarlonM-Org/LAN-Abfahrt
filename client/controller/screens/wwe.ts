@@ -64,8 +64,11 @@ function buildReveal(w: WweState) {
         <p>Wer würde eher ${escapeHtml(w.question.replace(/^\.\.\.\s*/, ''))}</p>
         <h1>${escapeHtml(winners.map(nameOf).join(' & ') || 'Niemand')}</h1>
         ${aboutMe ? '<h2 class="pink">Das bist DU!</h2>' : ''}
-        <h2 class="${gotPoint ? 'yellow' : ''}">${gotPoint ? '+1 Punkt – mit der Mehrheit!' : 'Kein Punkt diesmal'}</h2>
-        <p>Deine Punkte: ${w.points[id] ?? 0}</p>
+        ${
+          w.drinking
+            ? `<h2 class="${w.sips?.[id] ? 'pink' : ''}">${w.sips?.[id] ? `Trink ${w.sips[id]} Schl${w.sips[id] === 1 ? 'uck' : 'ücke'}!` : 'Kein Schluck für dich.'}</h2>`
+            : `<h2 class="${gotPoint ? 'yellow' : ''}">${gotPoint ? '+1 Punkt – mit der Mehrheit!' : 'Kein Punkt diesmal'}</h2><p>Deine Punkte: ${w.points[id] ?? 0}</p>`
+        }
       </div>
     `),
   );

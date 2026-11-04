@@ -13,6 +13,7 @@ export class WweGame implements MiniGame {
   private votes = new Map<string, string>();
   private deadline = 0;
   private timers = new Timers();
+  private totalSips: Record<string, number> = {};
 
   constructor(
     private ids: string[],
@@ -36,7 +37,10 @@ export class WweGame implements MiniGame {
       votes: null,
       tally: null,
       points,
+      drinking: ctx.mode === 'drink',
+      sips: null,
     };
+    this.totalSips = Object.fromEntries(ids.map((id) => [id, 0]));
     this.nextRound();
   }
 
@@ -75,6 +79,7 @@ export class WweGame implements MiniGame {
     s.voted = [];
     s.votes = null;
     s.tally = null;
+    s.sips = null;
     this.votes.clear();
     this.deadline = Date.now() + WWE.QUESTION_MS;
     this.timers.later(WWE.QUESTION_MS, () => this.reveal());
@@ -89,6 +94,12 @@ export class WweGame implements MiniGame {
     if (max > 0) {
       for (const [voter, target] of this.votes) if (tally[target] === max) s.points[voter] += 1;
     }
+    // Trinkspiel: Meistgewählte trinken so viele Schlücke wie sie Stimmen haben
+    s.sips = {};
+    if (s.drinking && max > 0) {
+      for (const [id, n] of Object.entries(tally)) if (n === max) s.sips[id] = n;
+      for (const [id, n] of Object.entries(s.sips)) this.totalSips[id] = (this.totalSips[id] ?? 0) + n;
+    }
     s.sub = 'reveal';
     s.votes = Object.fromEntries(this.votes);
     s.tally = tally;
@@ -102,11 +113,20 @@ export class WweGame implements MiniGame {
     s.sub = 'over';
     this.ctx.onChange();
     this.timers.later(500, () =>
-      this.ctx.finish({
-        groups: groupByScore(this.ids, (id) => s.points[id]),
-        details: Object.fromEntries(this.ids.map((id) => [id, `${s.points[id]} Punkte`])),
-        subtitle: 'Punkte gab’s fürs Stimmen mit der Mehrheit.',
-      }),
+      this.ctx.finish(
+        s.drinking
+          ? {
+              groups: groupByScore(this.ids, (id) => this.totalSips[id]),
+              details: Object.fromEntries(this.ids.map((id) => [id, `${this.totalSips[id]} Schlücke`])),
+              subtitle: 'Wer am häufigsten gewählt wurde, hat getrunken.',
+              sips: this.totalSips,
+            }
+          : {
+              groups: groupByScore(this.ids, (id) => s.points[id]),
+              details: Object.fromEntries(this.ids.map((id) => [id, `${s.points[id]} Punkte`])),
+              subtitle: 'Punkte gab’s fürs Stimmen mit der Mehrheit.',
+            },
+      ),
     );
   }
 }

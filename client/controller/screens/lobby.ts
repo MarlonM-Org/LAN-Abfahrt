@@ -1,6 +1,7 @@
 import type { Look, MiniKind } from '../../../shared/types';
-import { HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
-import { MINI_INFO, PARTY_ROUND_OPTIONS } from '../../../shared/games';
+import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
+import { DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS } from '../../../shared/games';
+import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, paintAvatar, q, socket, store, toast } from '../core';
 
 /** Avatar-Editor. `onDone` tritt dem Spiel bei bzw. aktualisiert den Charakter. */
@@ -24,6 +25,7 @@ export function buildEdit(onDone: () => void) {
     { key: 'skin', label: 'Haut', n: SKINS.length, text: (i) => `${i + 1}/${SKINS.length}` },
     { key: 'hairStyle', label: 'Frisur', n: HAIR_STYLES.length, text: (i) => HAIR_STYLES[i] },
     { key: 'hair', label: 'Haare', n: HAIRS.length, text: (i) => `${i + 1}/${HAIRS.length}` },
+    { key: 'beard', label: 'Bart', n: BEARDS.length, text: (i) => BEARDS[i] },
     { key: 'shirt', label: 'Shirt', n: SHIRTS.length, text: (i) => `${i + 1}/${SHIRTS.length}` },
   ];
   const valueEls: HTMLElement[] = [];
@@ -65,26 +67,70 @@ export function buildEdit(onDone: () => void) {
 }
 
 export function buildLobby(vip: boolean, onEdit: () => void) {
+  const mode = store.state?.mode ?? 'party';
   const root = el(`
     <h1>LAN-ABFAHRT</h1>
     <div class="row-center"></div>
     <h2 class="hello"></h2>
     <p class="count"></p>
     <div class="menu"></div>
-    <div class="panel">
-      <p class="label-left">Eigene „Wer würde eher ...?“-Frage</p>
-      <input type="text" maxlength="120" class="q-input" placeholder="... den Flug verpassen?" />
-      <button class="small" data-act="addq">Frage hinzufügen</button>
+    <div class="panel q-panel">
+      <p class="label-left">Eigene Frage / Aussage</p>
+      <div class="mode-tabs q-kind"></div>
+      <input type="text" maxlength="120" class="q-input" />
+      <button class="small" data-act="addq">Hinzufügen</button>
       <p class="q-count"></p>
     </div>
+    <div class="bot-row"></div>
     <button class="secondary small" data-act="edit">Charakter ändern</button>
   `);
   q(root, '.row-center').append(avatarCanvas(6, store.look));
   const menu = q(root, '.menu');
-  const gated: { btn: HTMLButtonElement; min: number }[] = [];
+  const gated: { btn: HTMLButtonElement; min: number; max?: number }[] = [];
+  if (mode !== 'drink') q(root, '.q-panel').classList.add('hidden');
 
   if (vip) {
     menu.append(el(`<p>Du bist der VIP – du wählst, was gespielt wird.</p>`));
+    const tabs = el(`<div class="mode-tabs three"></div>`);
+    for (const [m, label] of [['party', 'Party'], ['drink', 'Trinkspiel'], ['date', 'Date ♥']] as const) {
+      const b = el(`<button class="mode-tab ${m === mode ? 'active' : 'secondary'}">${label}</button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:mode', m));
+      q(tabs, '.mode-tabs').append(b);
+    }
+    menu.append(tabs);
+  }
+
+  const singles = (kinds: MiniKind[], title = 'Einzelspiel') => {
+    menu.append(el(`<h2>${title}</h2>`));
+    const row = el(`<div class="btn-grid"></div>`);
+    for (const kind of kinds) {
+      const info = MINI_INFO[kind];
+      const b = el(`<button class="secondary small">${info.title}</button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:start', { mode: kind }));
+      q(row, '.btn-grid').append(b);
+      gated.push({ btn: b, min: info.minPlayers });
+    }
+    menu.append(row);
+  };
+
+  if (vip && mode === 'date') {
+    menu.append(el(`<h2>Date Night</h2><p>Für genau 2 Spieler – ihr spielt zusammen und sammelt Herzen.</p>`));
+    for (const v of DATE_VERSIONS) {
+      const b = el(`<button class="date-btn">${v.title}<br/><small>${v.subtitle}</small></button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:start', { mode: 'date', version: v.id }));
+      menu.append(b);
+      gated.push({ btn: b, min: 2, max: 2 });
+    }
+    for (const t of DATE_COMING_SOON) menu.append(el(`<button class="secondary" disabled>${t} – kommt bald</button>`));
+    singles(DATE_KINDS, 'Einzelnes Kapitel');
+  } else if (vip && mode === 'drink') {
+    menu.append(el(`<h2>Trinkspiel</h2><p>Partyklassiker reihum: Wer würde eher, Ich hab noch nie, Höher oder Tiefer, Tick-Tack-Bumm. Wasser zählt auch!</p>`));
+    const b = el(`<button class="drink-btn">Los geht’s!</button>`).firstElementChild as HTMLButtonElement;
+    b.addEventListener('click', () => socket.emit('vip:start', { mode: 'drink' }));
+    menu.append(b);
+    gated.push({ btn: b, min: 2 });
+    singles(DRINK_KINDS);
+  } else if (vip) {
     menu.append(el(`<h2>Party-Modus</h2><p>Spielbrett + Minispiele, Finale: Mord im Ferienhaus</p>`));
     const roundRow = el(`<div class="btn-row"></div>`);
     for (const r of PARTY_ROUND_OPTIONS) {
@@ -94,39 +140,66 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       gated.push({ btn: b, min: 2 });
     }
     menu.append(roundRow);
-    menu.append(el(`<h2>Einzelspiel</h2>`));
-    for (const kind of Object.keys(MINI_INFO) as MiniKind[]) {
-      const info = MINI_INFO[kind];
-      const b = el(`<button class="secondary">${info.title}</button>`).firstElementChild as HTMLButtonElement;
-      b.addEventListener('click', () => socket.emit('vip:start', { mode: kind }));
-      menu.append(b);
-      gated.push({ btn: b, min: info.minPlayers });
-    }
+    singles(PARTY_KINDS);
   } else {
-    menu.append(el(`<div class="center"><p>Warte, bis der VIP ein Spiel startet ...</p></div>`));
+    const label = mode === 'date' ? 'Date Night ♥' : mode === 'drink' ? 'Trinkspiel' : 'Party-Abfahrt';
+    menu.append(el(`<div class="center"><h2>${label}</h2><p>Warte, bis der VIP ein Spiel startet ...</p></div>`));
   }
 
+  // Bots zum Testen
+  if (vip) {
+    const row = q(root, '.bot-row');
+    const add = el(`<button class="secondary small">+ Bot</button>`).firstElementChild as HTMLButtonElement;
+    add.addEventListener('click', () => socket.emit('vip:addBot'));
+    const rm = el(`<button class="secondary small">Bots entfernen</button>`).firstElementChild as HTMLButtonElement;
+    rm.addEventListener('click', () => socket.emit('vip:removeBots'));
+    row.append(add, rm);
+  }
+
+  // Eigene Fragen (Wer würde eher / Ich hab noch nie)
+  let qKind: 'wwe' | 'nhie' = 'nhie';
   const qInput = q<HTMLInputElement>(root, '.q-input');
+  const kindTabs = q(root, '.q-kind');
+  const kindBtns: HTMLButtonElement[] = [];
+  const setKind = (k: 'wwe' | 'nhie') => {
+    qKind = k;
+    kindBtns.forEach((b) => b.classList.toggle('active', b.dataset.k === k));
+    kindBtns.forEach((b) => b.classList.toggle('secondary', b.dataset.k !== k));
+    qInput.placeholder = k === 'wwe' ? 'Wer würde eher ... den Flug verpassen?' : 'Ich hab noch nie ... im Zelt geschlafen.';
+  };
+  for (const [k, label] of [['nhie', 'Ich hab noch nie'], ['wwe', 'Wer würde eher']] as const) {
+    const b = el(`<button class="mode-tab small" data-k="${k}">${label}</button>`).firstElementChild as HTMLButtonElement;
+    b.addEventListener('click', () => setKind(k));
+    kindBtns.push(b);
+    kindTabs.append(b);
+  }
+  setKind('nhie');
   q(root, '[data-act=addq]').addEventListener('click', () => {
     const text = qInput.value.trim();
-    if (text.length < 4) return toast('Frage ist zu kurz.');
-    socket.emit('question:add', text, (r: { ok: boolean; question?: string }) => {
-      if (r.ok) {
-        qInput.value = '';
-        toast(`Gespeichert: Wer würde eher ${r.question}`);
-      } else {
-        toast('Hat nicht geklappt.');
-      }
-    });
+    if (text.length < 4) return toast('Zu kurz.');
+    socket.emit(
+      'question:add',
+      text,
+      (r: { ok: boolean; question?: string }) => {
+        if (r.ok) {
+          qInput.value = '';
+          toast(`Gespeichert: ${qKind === 'wwe' ? 'Wer würde eher' : 'Ich hab noch nie'} ${r.question}`);
+        } else {
+          toast('Hat nicht geklappt.');
+        }
+      },
+      qKind,
+    );
   });
   q(root, '[data-act=edit]').addEventListener('click', onEdit);
   app.append(root);
 
   return () => {
-    const n = store.state?.players.filter((p) => p.connected).length ?? 0;
+    const st = store.state;
+    const n = st?.players.filter((p) => p.connected).length ?? 0;
     q(root, '.hello').textContent = `Hi ${store.name}!`;
-    q(root, '.count').textContent = `${n} Spieler in der Lobby`;
-    q(root, '.q-count').textContent = `${store.state?.customQuestionCount ?? 0} eigene Fragen gespeichert`;
-    for (const g of gated) g.btn.disabled = n < g.min;
+    q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}`;
+    q(root, '.q-count').textContent = `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`;
+    for (const g of gated) g.btn.disabled = n < g.min || (g.max !== undefined && n > g.max);
   };
 }

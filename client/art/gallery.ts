@@ -38,7 +38,7 @@ sheet.draw(O.panelPix(90, 40), 210, 210);
 for (let i = 0; i < 16; i++) {
   const c = document.createElement('canvas');
   c.width = AV_W; c.height = AV_H;
-  drawAvatar(c.getContext('2d')!, { skin: i % 6, hair: i % 10, hairStyle: i % HAIR_STYLES.length, shirt: (i * 3) % 10 });
+  drawAvatar(c.getContext('2d')!, { skin: i % 6, hair: i % 10, hairStyle: i % HAIR_STYLES.length, shirt: (i * 3) % 10, beard: i % 5 });
   sheet.draw(c, 4 + (i % 8) * 18, 44 + Math.floor(i / 8) * 30);
 }
 

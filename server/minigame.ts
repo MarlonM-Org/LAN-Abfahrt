@@ -8,6 +8,10 @@ export interface MiniResult {
   subtitle: string;
   /** Optional: Münzen pro Gruppe (sonst Standard-Staffel) */
   coins?: number[];
+  /** Date Night: gemeinsam verdiente Herzen (0–10) */
+  hearts?: number;
+  /** Trinkspiel: Schlücke pro Spieler */
+  sips?: Record<string, number>;
 }
 
 export interface MiniCtx {
@@ -15,6 +19,7 @@ export interface MiniCtx {
   finish(result: MiniResult): void;
   isConnected(id: string): boolean;
   nameOf(id: string): string;
+  mode: import('../shared/types').GameMode;
 }
 
 export interface MiniGame {
@@ -40,9 +45,18 @@ export class Timers {
     this.set.add(t);
   }
 
+  private intervals = new Set<NodeJS.Timeout>();
+
+  every(ms: number, fn: () => void) {
+    const t = setInterval(fn, ms);
+    this.intervals.add(t);
+  }
+
   clear() {
     for (const t of this.set) clearTimeout(t);
     this.set.clear();
+    for (const t of this.intervals) clearInterval(t);
+    this.intervals.clear();
   }
 }
 

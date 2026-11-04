@@ -5,7 +5,24 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   wwe: { title: 'Wer würde eher ...?', tagline: 'Stimmt ab – wer ist gemeint?', minPlayers: 2 },
   sprint: { title: 'Liegestuhl-Sprint', tagline: 'Handtuch drauf, sobald die Sonne aufgeht!', minPlayers: 2 },
   murder: { title: 'Mord im Ferienhaus', tagline: 'Einer von euch ist nicht zum Entspannen hier ...', minPlayers: 4 },
+  descent: { title: 'Der Abstieg', tagline: 'Den Abhang runter zum Rhein – springen!', minPlayers: 1 },
+  rhythm: { title: 'Das erste Gespräch', tagline: 'Bleibt im Takt – dann funkt es!', minPlayers: 1 },
+  wrap: { title: 'Wraps mit Sriracha-Mayo', tagline: 'Zutaten in der richtigen Reihenfolge greifen!', minPlayers: 1 },
+  stars: { title: 'Tanz unter den Sternen', tagline: 'Verbindet die Sterne zu Sternbildern!', minPlayers: 1 },
+  nhie: { title: 'Ich hab noch nie ...', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2 },
+  hilo: { title: 'Höher oder Tiefer', tagline: 'Falsch geraten? Schluck!', minPlayers: 2 },
+  bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
 };
+
+/** Minispiele im Trinkspiel-Modus */
+export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
+
+/** Minispiele, die im Party-Modus vorkommen */
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'murder'];
+/** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap'];
+/** Minispiele der Date Night */
+export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
 // ------------------------------------------------------------------ Spielbrett
 
@@ -90,3 +107,41 @@ export const DEFAULT_QUESTIONS = [
 
 export const SPRINT = { ROUNDS: 3, MIN_WAIT_MS: 2000, MAX_WAIT_MS: 6000, GO_MS: 3000, REVEAL_MS: 4000 };
 export const SPRINT_POINTS = [3, 2, 1];
+
+// ------------------------------------------------------------------ Trinkspiel
+
+export const NHIE = { ROUNDS: 6, QUESTION_MS: 20000, REVEAL_MS: 6000 };
+export const HILO = { ROUNDS: 7, GUESS_MS: 12000, REVEAL_MS: 4000 };
+export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 4500, SIPS: 3, MIN_HOLD_MS: 900 };
+
+export const DEFAULT_NHIE = [
+  '... einen Flug oder Zug verpasst.',
+  '... im Urlaub einen heftigen Sonnenbrand bekommen.',
+  '... beim Karaoke gesungen.',
+  '... eine Nachricht an die falsche Person geschickt.',
+  '... nachts heimlich den Kühlschrank geplündert.',
+  '... auf einem Festival gezeltet.',
+  '... eine komplette Staffel an einem Tag geschaut.',
+  '... beim Flunkyball geschummelt.',
+  '... mich selbst ausgesperrt.',
+  '... einen Strafzettel bekommen.',
+  '... auf einem Tisch getanzt.',
+  '... im Kino eingeschlafen.',
+  '... so getan, als hätte ich jemanden nicht gesehen.',
+  '... ein Geschenk weiterverschenkt.',
+  '... den Namen von jemandem mitten im Gespräch vergessen.',
+  '... bei einer Hochzeit geweint.',
+  '... einen Kater mit Pizza bekämpft.',
+  '... mein Handy in die Toilette fallen lassen.',
+  '... vergessen, wo ich geparkt habe.',
+  '... einen Liebesbrief geschrieben.',
+];
+
+export const BOMB_CATEGORIES = [
+  'Automarken', 'Biersorten', 'Länder in Europa', 'Pizza-Beläge', 'Fußballvereine', 'Dinge im Kühlschrank',
+  'Städte in NRW', 'Tiere mit vier Beinen', 'Cocktails', 'Dinge am Strand', 'Berufe', 'Obst & Gemüse',
+  'Marken von Turnschuhen', 'Dinge im Badezimmer', 'Urlaubsziele', 'Brettspiele',
+];
+
+export const CARD_LABELS: Record<number, string> = { 11: 'B', 12: 'D', 13: 'K', 14: 'A' };
+export const cardLabel = (v: number) => CARD_LABELS[v] ?? String(v);

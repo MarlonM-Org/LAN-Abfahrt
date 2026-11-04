@@ -12,6 +12,7 @@ export const SKINS = ['#f9d8bd', '#efbf98', '#d79b6a', '#a8693f', '#7a4a2b', '#5
 export const HAIRS = ['#3a2418', '#6e4426', '#a8642e', '#e2b65a', '#c0442e', '#ece6dc', '#2d2d3a', '#4c7ad8', '#d65a9c', '#4fa36a'];
 export const SHIRTS = ['#e0503f', '#3f8fe0', '#46b04a', '#f2c33a', '#9b5fc0', '#f0973a', '#2fb5a5', '#f4efe2', '#3b3b4f', '#f07aa8'];
 export const HAIR_STYLES = ['Kurz', 'Lang', 'Stachelig', 'Cap', 'Dutt', 'Zopf', 'Locken', 'Glatze'];
+export const BEARDS = ['Kein Bart', '3-Tage', 'Vollbart', 'Schnauzer', 'Kinnbart'];
 
 const OUTLINE = '#2d1b12';
 const EYE = '#2d1b12';
@@ -20,7 +21,7 @@ const SHOES = '#5b3a24';
 
 export function randomLook(): Look {
   const r = (n: number) => Math.floor(Math.random() * n);
-  return { skin: r(SKINS.length), hair: r(HAIRS.length), hairStyle: r(HAIR_STYLES.length), shirt: r(SHIRTS.length) };
+  return { skin: r(SKINS.length), hair: r(HAIRS.length), hairStyle: r(HAIR_STYLES.length), shirt: r(SHIRTS.length), beard: Math.random() < 0.3 ? 1 + r(BEARDS.length - 1) : 0 };
 }
 
 export function sanitizeLook(look: Partial<Look> | undefined): Look {
@@ -33,6 +34,7 @@ export function sanitizeLook(look: Partial<Look> | undefined): Look {
     hair: fix(look?.hair, HAIRS.length),
     hairStyle: fix(look?.hairStyle, HAIR_STYLES.length),
     shirt: fix(look?.shirt, SHIRTS.length),
+    beard: fix(look?.beard, BEARDS.length),
   };
 }
 
@@ -57,6 +59,7 @@ export function avatarGrid(look: Look): (string | null)[][] {
 
   const skin = SKINS[look.skin] ?? SKINS[0];
   const skinS = shade(skin, 0.82);
+  const skinSoft = shade(skin, 0.92);
   const shirt = SHIRTS[look.shirt] ?? SHIRTS[0];
   const shirtS = shade(shirt, 0.78);
   const shirtL = shade(shirt, 1.18);
@@ -93,14 +96,14 @@ export function avatarGrid(look: Look): (string | null)[][] {
   rect(4, Y + 3, 8, 8, skin);
   rect(3, Y + 5, 1, 4, skin);
   rect(12, Y + 5, 1, 4, skinS);
-  rect(4, Y + 10, 8, 1, skinS);
-  rect(11, Y + 4, 1, 6, skinS);
+  rect(5, Y + 10, 6, 1, skinSoft);
+  rect(11, Y + 4, 1, 6, skinSoft);
   g[Y + 3][4] = null;
   g[Y + 3][11] = null;
   g[Y + 10][4] = null;
   g[Y + 10][11] = null;
   // Hals
-  rect(6, Y + 11, 4, 1, skinS);
+  rect(6, Y + 11, 4, 1, skinSoft);
 
   // Gesicht
   set(6, Y + 7, EYE);
@@ -109,8 +112,33 @@ export function avatarGrid(look: Look): (string | null)[][] {
   set(9, Y + 8, EYE);
   set(5, Y + 9, '#f0928a');
   set(10, Y + 9, '#f0928a');
-  set(7, Y + 9, skinS);
-  set(8, Y + 9, skinS);
+  set(7, Y + 9, shade(skin, 0.7));
+  set(8, Y + 9, shade(skin, 0.7));
+
+  // Bart (in Haarfarbe)
+  const bc = look.beard === 1 ? shade(hair, 1.15) : hair;
+  switch (look.beard) {
+    case 1: // 3-Tage
+      for (const [x, y] of [[4, 9], [5, 10], [7, 10], [9, 10], [11, 9], [6, 10], [10, 10], [8, 10]]) set(x, Y + y, bc);
+      break;
+    case 2: // Vollbart
+      rect(4, Y + 8, 1, 3, hair);
+      rect(11, Y + 8, 1, 3, hairS);
+      rect(5, Y + 10, 6, 2, hair);
+      rect(6, Y + 9, 1, 1, hair);
+      rect(9, Y + 9, 1, 1, hair);
+      set(7, Y + 9, shade(skin, 0.7));
+      set(8, Y + 9, shade(skin, 0.7));
+      break;
+    case 3: // Schnauzer
+      rect(6, Y + 9, 4, 1, hair);
+      set(5, Y + 9, hairS);
+      set(10, Y + 9, hairS);
+      break;
+    case 4: // Kinnbart
+      rect(7, Y + 10, 2, 2, hair);
+      break;
+  }
 
   // Frisuren
   const cap = () => {

@@ -3,6 +3,8 @@ export interface Look {
   hair: number;
   hairStyle: number;
   shirt: number;
+  /** 0 = kein Bart */
+  beard: number;
 }
 
 export interface PlayerPublic {
@@ -20,7 +22,12 @@ export interface Point {
   y: number;
 }
 
-export type MiniKind = 'flunky' | 'wwe' | 'sprint' | 'murder';
+export type MiniKind =
+  | 'flunky' | 'wwe' | 'sprint' | 'murder'
+  | 'descent' | 'rhythm' | 'wrap' | 'stars'
+  | 'nhie' | 'hilo' | 'bomb';
+
+export type GameMode = 'party' | 'date' | 'drink';
 
 // ------------------------------------------------------------------ Flunkyball
 
@@ -66,6 +73,52 @@ export interface WweState {
   votes: Record<string, string> | null;
   tally: Record<string, number> | null;
   points: Record<string, number>;
+  /** Trinkspiel-Variante: wer meistgewählt ist, trinkt */
+  drinking: boolean;
+  /** Schlücke dieser Runde (nur in "reveal") */
+  sips: Record<string, number> | null;
+}
+
+// ------------------------------------------------------------------ Trinkspiel: Ich hab noch nie
+
+export interface NhieState {
+  round: number;
+  rounds: number;
+  statement: string;
+  sub: 'question' | 'reveal' | 'over';
+  endsIn: number;
+  answered: string[];
+  /** Wer es schon getan hat (nur in "reveal") */
+  have: string[] | null;
+  sips: Record<string, number>;
+}
+
+// ------------------------------------------------------------------ Trinkspiel: Höher oder Tiefer
+
+export interface HiloState {
+  round: number;
+  rounds: number;
+  sub: 'guess' | 'reveal' | 'over';
+  endsIn: number;
+  card: number;
+  nextCard: number | null;
+  guessed: string[];
+  guesses: Record<string, 'higher' | 'lower'> | null;
+  roundSips: Record<string, number> | null;
+  sips: Record<string, number>;
+}
+
+// ------------------------------------------------------------------ Trinkspiel: Tick-Tack-Bumm
+
+export interface BombState {
+  round: number;
+  rounds: number;
+  sub: 'pass' | 'boom' | 'over';
+  category: string;
+  holder: string;
+  passes: number;
+  passSeq: number;
+  sips: Record<string, number>;
 }
 
 // ------------------------------------------------------------------ Liegestuhl-Sprint
@@ -122,6 +175,113 @@ export interface MurderPrivate {
   myVote: string | null;
 }
 
+// ------------------------------------------------------------------ Date Night: Abstieg
+
+export interface DescentRunner {
+  s: number;
+  /** Restliche Sprungzeit in ms (0 = am Boden) */
+  jumpLeft: number;
+  stunned: boolean;
+  hits: number;
+  finished: boolean;
+}
+
+export interface DescentState {
+  sub: 'countdown' | 'run' | 'over';
+  endsIn: number;
+  length: number;
+  runners: Record<string, DescentRunner>;
+  stones: { id: number; s: number }[];
+  obstacles: { s: number; type: 'bottle' | 'pigeon' | 'puddle' }[];
+}
+
+// ------------------------------------------------------------------ Date Night: Gespräch (Rhythmus)
+
+export interface RhythmNote {
+  t: number;
+  lane: 0 | 1;
+}
+
+export interface RhythmState {
+  sub: 'ready' | 'play' | 'over';
+  /** Wer schon bereit ist (Audio entsperrt) */
+  ready: string[];
+  playSeq: number;
+  bpm: number;
+  leadIn: number;
+  duration: number;
+  charts: Record<string, RhythmNote[]>;
+  /** Abschnitte: wer gerade "redet" */
+  phrases: { from: number; to: number; speaker: string; topic: string }[];
+  score: Record<string, number>;
+  combo: Record<string, number>;
+  lastHit: Record<string, { q: 0 | 1 | 2; seq: number }>;
+  sympathy: number;
+}
+
+// ------------------------------------------------------------------ Date Night: Wrap
+
+export interface WrapPlayer {
+  step: number;
+  mistakes: number;
+  done: boolean;
+  doneMs: number | null;
+  /** Reihenfolge der Zutaten auf dem Rad */
+  wheel: string[];
+  speed: number;
+  lastGrab: { item: string; ok: boolean; seq: number } | null;
+}
+
+export interface WrapState {
+  sub: 'build' | 'over';
+  endsIn: number;
+  recipe: string[];
+  players: Record<string, WrapPlayer>;
+  /** Für wen baut wer? */
+  forWhom: Record<string, string>;
+}
+
+// ------------------------------------------------------------------ Date Night: Sternbilder
+
+export interface StarsState {
+  sub: 'draw' | 'done' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  name: string;
+  hint: string;
+  stars: { id: number; x: number; y: number; big: boolean }[];
+  edges: [number, number][];
+  found: [number, number][];
+  /** Anzahl Linien im aktuellen Sternbild */
+  edgeTotal: number;
+  wrong: number;
+  completed: number;
+  lastWrong: { a: number; b: number; seq: number } | null;
+}
+
+// ------------------------------------------------------------------ Date Night: Ablauf
+
+export interface DateCard {
+  title: string;
+  text: string;
+  kicker: string;
+  final: boolean;
+}
+
+export interface DateRunState {
+  version: string;
+  versionTitle: string;
+  chapter: number;
+  chapters: { title: string; kind: MiniKind }[];
+  hearts: (number | null)[];
+  totalHearts: number;
+  maxHearts: number;
+  card: DateCard | null;
+  /** A und B: die beiden Date-Spieler */
+  couple: [string, string];
+}
+
 // ------------------------------------------------------------------ Spielbrett
 
 export type FieldType = 'start' | 'blue' | 'red' | 'event';
@@ -164,23 +324,42 @@ export interface ResultsState {
   subtitle: string;
   rows: ResultRow[];
   final: boolean;
+  /** Nur im Trinkspiel: Schlücke dieser Runde */
+  sips?: Record<string, number>;
+  /** Nur bei Date Night: gemeinsam verdiente Herzen */
+  hearts?: number;
+  maxHearts?: number;
 }
 
 // ------------------------------------------------------------------ Gesamtzustand
 
-export type Phase = 'lobby' | 'board' | 'mini' | 'results';
+export type Phase = 'lobby' | 'board' | 'mini' | 'results' | 'story';
 
 export type MiniSnapshot =
   | { kind: 'flunky'; state: FlunkyState }
   | { kind: 'wwe'; state: WweState }
   | { kind: 'sprint'; state: SprintState }
-  | { kind: 'murder'; state: MurderState };
+  | { kind: 'murder'; state: MurderState }
+  | { kind: 'descent'; state: DescentState }
+  | { kind: 'rhythm'; state: RhythmState }
+  | { kind: 'wrap'; state: WrapState }
+  | { kind: 'stars'; state: StarsState }
+  | { kind: 'nhie'; state: NhieState }
+  | { kind: 'hilo'; state: HiloState }
+  | { kind: 'bomb'; state: BombState };
 
 export interface GameState {
   phase: Phase;
   players: PlayerPublic[];
   joinUrl: string;
   partyActive: boolean;
+  /** Im Lobby-Menü gewählter Spielmodus */
+  mode: GameMode;
+  date: DateRunState | null;
+  /** Trinkspiel läuft */
+  drinkActive: boolean;
+  customNhieCount: number;
+  botCount: number;
   board: BoardState | null;
   mini: MiniSnapshot | null;
   results: ResultsState | null;
@@ -202,6 +381,7 @@ export interface JoinResponse {
 }
 
 export interface StartRequest {
-  mode: 'party' | MiniKind;
+  mode: 'party' | 'date' | 'drink' | MiniKind;
   rounds?: number;
+  version?: string;
 }

@@ -3,7 +3,10 @@
 Party-Spiel für unsere Freundesgruppe – im Stil von Mario Party / Jackbox:
 **Der Fernseher zeigt das Spiel, jedes Handy ist ein Controller.** Kein Controller, keine App nötig – QR-Code scannen und mitspielen.
 
-Aktueller Stand (v0.2):
+Aktueller Stand (v0.3):
+
+**Drei Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Trinkspiel** und **Date Night**.
+
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 8 Spieler, Pixel-Avatar-Editor auf dem Handy
 - Der erste Spieler ist **VIP** und wählt am Handy, was gespielt wird (und kann jederzeit abbrechen)
@@ -78,15 +81,30 @@ Der Server ist die einzige Quelle der Wahrheit: Handys schicken nur Eingaben (`b
 
 ## Testen ohne Freunde
 
-**Bots:** In einem zweiten Terminal `npm run bots` starten – dann treten 3 Testspieler bei und spielen alles automatisch mit. Du bleibst VIP und steuerst mit deinem Handy.
+**Bots direkt am Handy:** Als VIP in der Lobby auf „+ Bot“ tippen – die Bots spielen alles automatisch mit (auch Date Night, Trinkspiel usw.). „Bots entfernen“ wirft sie wieder raus.
+
+**Bots per Terminal:** In einem zweiten Terminal `npm run bots` starten – dann treten 3 Testspieler bei und spielen alles automatisch mit. Du bleibst VIP und steuerst mit deinem Handy.
 
 ```bash
 npm run bots -- 5                 # 5 Bots
 npm run bots -- 4 --party         # Bot startet selbst eine Party (zum Zuschauen am TV)
-npm run bots -- 6 --game=murder   # Bot startet direkt ein Einzelspiel (flunky | wwe | sprint | murder)
+npm run bots -- 6 --game=murder   # Bot startet direkt ein Einzelspiel
+npm run bots -- 2 --date          # komplette Date Night
+npm run bots -- 4 --drink         # ein paar Runden Trinkspiel
 ```
 
 Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiedene Profile/Inkognito, weil die Spieler-ID im `localStorage` liegt).
+
+## Trinkspiel
+
+Partyklassiker reihum, ohne Punkte – gezählt werden nur Schlücke (Wasser zählt auch!):
+**Wer würde eher …?** (Meistgewählte trinken), **Ich hab noch nie …** (wer es schon getan hat, trinkt – als Einziger doppelt), **Höher oder Tiefer** (falsch geraten = Schluck), **Tick-Tack-Bumm** (Begriff zur Kategorie sagen, Bombe weitergeben – wer sie beim Knall hält, trinkt 3).
+Eigene Fragen/Aussagen lassen sich in der Lobby hinzufügen (`data/`).
+
+## Date Night
+
+Für genau 2 Spieler, gemeinsam Herzen sammeln. Version 1: **Unser erstes Date** – Der Abstieg (Jump & Run den Abhang runter), Das erste Gespräch (Rhythmusspiel mit Ton am Handy), Wraps mit Sriracha-Mayo (Zutatenrad), Tanz unter den Sternen (Sternbilder zeichnen).
+Alle Texte stehen in `shared/dates.ts` und können frei angepasst werden; neue Versionen kommen dort in `DATE_VERSIONS`.
 
 ## Grafik
 
