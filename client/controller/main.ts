@@ -10,7 +10,7 @@ import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
 import { pickBomb, pickHilo, pickNhie } from './screens/drink';
-import { pickSup, pickTidy } from './screens/controller';
+import { pickArena, pickSup, pickTidy } from './screens/controller';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -128,6 +128,8 @@ function pickScreen(): Screen {
           return pickSup(m.state);
         case 'tidy':
           return pickTidy(m.state);
+        case 'arena':
+          return pickArena(m.state);
       }
     }
   }
