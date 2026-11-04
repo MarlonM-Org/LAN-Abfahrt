@@ -20,6 +20,7 @@ import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
 import { EntenGame } from './enten';
+import { ParcoursGame } from './parcours';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -314,6 +315,9 @@ export class Room {
         break;
       case 'verstecken':
         this.mini = new VersteckGame(ids, ctx);
+        break;
+      case 'parcours':
+        this.mini = new ParcoursGame(ids, ctx);
         break;
     }
     this.results = null;

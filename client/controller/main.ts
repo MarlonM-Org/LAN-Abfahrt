@@ -17,6 +17,7 @@ import { pickBowling } from './screens/bowling';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
 import { pickVerstecken } from './screens/verstecken';
+import { pickParcours } from './screens/parcours';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -148,6 +149,8 @@ function pickScreen(): Screen {
           return pickTtt(m.state);
         case 'verstecken':
           return pickVerstecken(m.state);
+        case 'parcours':
+          return pickParcours(m.state);
       }
     }
   }

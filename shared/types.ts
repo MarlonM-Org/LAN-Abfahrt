@@ -33,7 +33,8 @@ export type MiniKind =
   | 'bowling'
   | 'sup' | 'tidy' | 'enten'
   | 'sup' | 'tidy' | 'ttt'
-  | 'verstecken';
+  | 'verstecken'
+  | 'sup' | 'tidy' | 'parcours';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -726,6 +727,60 @@ export interface VerstPrivate {
   note: { text: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Fallen-Parcours
+
+export interface ParcoursRunner {
+  x: number;
+  y: number;
+  face: 1 | -1;
+  /** run = läuft, dead = raus, goal = im Ziel */
+  st: 'run' | 'dead' | 'goal';
+  ground: boolean;
+  /** Wer hat mich erwischt? (Besitzer des Teils) */
+  by: string | null;
+  /** Ziel-Platz (1 = Erster) */
+  place: number | null;
+}
+
+export interface ParcoursBuilder {
+  stage: 'pick' | 'place' | 'done';
+  choice: import('./parcours').PartType[];
+  pick: import('./parcours').PartType | null;
+  gx: number;
+  gy: number;
+  rot: number;
+  ok: boolean;
+}
+
+export interface ParcoursGain {
+  goal: number;
+  first: number;
+  traps: number;
+}
+
+export interface ParcoursState {
+  sub: 'intro' | 'build' | 'countdown' | 'run' | 'score' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  target: number;
+  /** Teile ändern sich selten – rev zählt hoch, damit das TV nur dann neu baut */
+  parts: import('./parcours').ParcoursPart[];
+  partsRev: number;
+  /** Laufzeit (ms) für Schwebeplattformen */
+  t: number;
+  nuts: { id: number; x: number; y: number }[];
+  runners: Record<string, ParcoursRunner>;
+  builders: Record<string, ParcoursBuilder>;
+  /** Farbindex pro Spieler */
+  colors: Record<string, number>;
+  points: Record<string, number>;
+  /** Ergebnis der letzten Runde */
+  last: { verdict: 'ok' | 'easy' | 'hard'; gains: Record<string, ParcoursGain> } | null;
+  /** Effekte fürs TV (Explosion, KO, Ziel) */
+  fx: { seq: number; kind: 'boom' | 'ko' | 'goal' | 'place'; x: number; y: number; who: string | null }[];
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -821,7 +876,8 @@ export type MiniSnapshot =
   | { kind: 'bowling'; state: BowlingState }
   | { kind: 'enten'; state: EntenState }
   | { kind: 'ttt'; state: TttState }
-  | { kind: 'verstecken'; state: VerstState };
+  | { kind: 'verstecken'; state: VerstState }
+  | { kind: 'parcours'; state: ParcoursState };
 
 export interface GameState {
   phase: Phase;

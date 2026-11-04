@@ -22,6 +22,7 @@ Aktueller Stand (v0.3):
   - ✈️ **Urlaubsflieger** (ab 2 Spielern, kooperativ à la Spaceteam) – jedes Handy ist ein Cockpit mit albernen Knöpfen und Schaltern; die geheime Anweisung oben betrifft meist ein *anderes* Handy, also laut rufen! Erledigte Anweisungen bringen den Flieger von Düsseldorf über Mallorca, Kreta und die Malediven nach Bali, verpasste kosten Treibstoff
   - 🌀 **Kurven-Duell** (2–12 Spieler) – à la „Achtung, die Kurve!“: Am Handy nur LINKS/RECHTS halten, jeder zieht eine Spur – wer Rand oder Spur rammt, ist raus, alle anderen bekommen einen Punkt. Lücken in den Spuren, Power-ups: Turbo, Schnecke (alle anderen langsam), Durch Wände
   - 🪴 **Versteckspiel mit Möbeln** (ab 3 Spielern, à la Prop Hunt) – Verstecker verwandeln sich per Handy in Kühlbox, Topfpflanze, Flamingo-Ring & Co. und rasten ein, die Sucher (1 pro ~4 Spieler, wechselt jede Runde) prüfen verdächtige Möbel. Falsch geprüft = schwindelig, Pfeifen gibt Punkte, verrät aber die Ecke
+  - 🏁 **Fallen-Parcours** (ab 2 Spielern, à la Ultimate Chicken Horse) – jede Runde baut jeder am Handy ein Teil (Plattform, Planke, Trampolin, Seeigel, Kokosnuss-Kanone, Ventilator, Eisfläche, Schwebeplattform, Bombe) per Joystick in die Strecke, dann rennen alle gleichzeitig vom Handtuch zur Cocktailbar (Joystick + SPRINGEN, länger drücken = höher, Wandsprung möglich). Ziel 4 P., Erster +2, eigene Falle erwischt jemanden +1 (max. 2) – aber nur, wenn nicht alle und nicht keiner ankommen. Wer zuerst 15 Punkte hat (max. 6 Runden), gewinnt
   - 🔪 **Mord im Ferienhaus** (ab 4 Spielern, ab 7 mit zwei Mördern) – geheime Rollen auf dem Handy, Aufgaben in den Räumen, Morde wenn man allein mit jemandem ist, Leichen melden, diskutieren, abstimmen
   - 🏊 **Verräter im Ferienhaus** (ab 4 Spielern, à la „Trouble in Terrorist Town“) – alle laufen per Joystick durchs Ferienhaus. Geheime Verräter (≈ 1 pro 4 Spieler) knocken mit Poolnudel, Wasserpistole und Kokosnuss aus; ab 6 Spielern gibt es einen bekannten Detektiv mit Hut, der an Ausgeknockten die Shirt-Farbe des Täters findet. Verräter haben am Handy einen Shop im Geheimfach (Bananenschale, Tarnumhang, Fake-Funkspruch). 2–3 Runden mit neuen Rollen, Punkte für Sieg, richtige und falsche Knockouts
 
@@ -74,8 +75,9 @@ Tipp: PC und Apple TV per LAN-Kabel anschließen – dann ist die Verzögerung k
 
 ```
 server/   index.ts (HTTP + Vite), room.ts (Lobby/VIP/Ablauf), board.ts (Spielbrett),
-          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, ttt.ts, questions.ts
-shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), house.ts (Ferienhaus-Grundriss), avatar.ts, flunky.ts
+          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, ttt.ts, questions.ts, …
+          (pro Minispiel eine Datei, z. B. kurve.ts, arena.ts, bowling.ts, parcours.ts)
+shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), house.ts (Ferienhaus-Grundriss), avatar.ts, flunky.ts, …
 client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel)
           index.html + controller/ (Handy-UI, ein Modul pro Spiel in screens/)
 scripts/  bots.ts                (Testspieler)
