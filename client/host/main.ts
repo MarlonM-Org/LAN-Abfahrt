@@ -13,7 +13,8 @@ import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
 import { setState } from './store';
 import { startTimeSync } from '../timesync';
-import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
+import { connectMusic, setScene, unlockMusic } from './music';
+import { musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -62,6 +63,8 @@ async function start() {
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
+  connectMusic(socket);
+  setupMusicMenu();
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
   const overlay = document.getElementById('sound');
@@ -71,12 +74,15 @@ async function start() {
   };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'm' || e.key === 'M') {
-      const muted = toggleMute();
-      const n = document.getElementById('mute');
-      if (n) n.textContent = muted ? 'Ton aus (M)' : '';
+      // M öffnet das Musik-Menü (Lautstärke, Stumm, Bibliothek, Zuordnung)
+      unlock();
+      toggleMusicMenu();
       return;
     }
+    if (e.key === 'Escape') toggleMusicMenu(false);
     unlock();
   });
   socket.on('connect', () => socket.emit('host:hello'));
@@ -87,7 +93,8 @@ async function start() {
       currentKey = key;
       for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
       game.scene.start(key);
-      setTrack(trackForScene(key));
+      setScene(key);
+      musicMenuScene(key);
     }
   });
 }
