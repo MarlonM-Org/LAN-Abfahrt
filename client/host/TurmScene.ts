@@ -245,17 +245,20 @@ export class TurmScene extends Phaser.Scene {
     for (const h of view.hearts) h.destroy();
     view.hearts = [];
     const small = lay.laneW < 90;
+    // Sehr schmale Bahnen (ab 11 Spielern): Herzen enger, Höhe ohne Nachkommastelle rechtsbündig
+    const tiny = lay.laneW < 60;
     const hk = ensureTex(this, 'heart9', heart);
     for (let k = 0; k < TURM.LIVES; k++) {
       const img = this.add
-        .image(lay.cx - lay.laneW / 2 + 9 + k * (small ? 6 : 10), lay.labelY + 15, hk)
+        .image(lay.cx - lay.laneW / 2 + (tiny ? 5 + k * 5 : 9 + k * (small ? 6 : 10)), lay.labelY + 15, hk)
         .setScale(small ? 0.67 : 1)
         .setAlpha(k < lane.lives ? 1 : 0.25)
         .setDepth(20);
       view.hearts.push(img);
     }
     const heartsW = small ? 20 : 30;
-    view.info.setText(lane.place ? `${lane.place}. Platz` : meters(lane.height)).setX(lay.cx - lay.laneW / 2 + 6 + heartsW + (lay.laneW - heartsW - 6) / 2);
+    if (tiny) view.info.setText(lane.place ? `${lane.place}.` : String(Math.round(lane.height / B))).setOrigin(1, 0).setX(lay.cx + lay.laneW / 2 - 2);
+    else view.info.setText(lane.place ? `${lane.place}. Platz` : meters(lane.height)).setX(lay.cx - lay.laneW / 2 + 6 + heartsW + (lay.laneW - heartsW - 6) / 2);
     view.badge.setText(lane.place ? `${lane.place}.` : lane.frozen ? 'AUS' : '').setColor(lane.place ? GOLD : '#d6dde6');
     if (lane.frozen) for (const sp of view.sprites.values()) sp.img.setTint(0xb8c4d0);
     void s;

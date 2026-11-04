@@ -128,13 +128,18 @@ export class SupScene extends Phaser.Scene {
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
-    this.hud.add(panel(this, 60, 0, 360, 22 + st.boards.length * 0));
     const parts = st.boards.map((b) => {
       const short = (id: string) => (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, 4);
       const names = b.left === b.right ? short(b.left) : `${short(b.left)}+${short(b.right)}`;
       return `${names} ${b.finished ? 'Ziel' : b.fallen ? 'PLATSCH' : `${Math.round((b.x / st.length) * 100)}%`}`;
     });
-    this.hud.add(ink(this, WORLD.W / 2, 7, `${Math.ceil(st.endsIn / 1000)}s  ${parts.join('  ')}`.slice(0, 44)));
+    // Ab 3 Boards (bis zu 12 Spieler) auf mehrere Zeilen à 3 Boards verteilen, statt abzuschneiden
+    const lines: string[] = [];
+    for (let i = 0; i < parts.length; i += 3) lines.push(parts.slice(i, i + 3).join('  '));
+    lines[0] = `${Math.ceil(st.endsIn / 1000)}s  ${lines[0] ?? ''}`;
+    const wide = parts.length > 2;
+    this.hud.add(panel(this, wide ? 10 : 60, 0, wide ? 460 : 360, 22 + (lines.length - 1) * 12));
+    this.hud.add(ink(this, WORLD.W / 2, 7, lines.map((l) => l.slice(0, wide ? 56 : 44)).join('\n')));
   }
 }
 

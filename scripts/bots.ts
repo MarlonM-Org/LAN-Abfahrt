@@ -5,7 +5,7 @@
  *   npm run bots              → 3 Bots treten bei
  *   npm run bots -- 5         → 5 Bots
  *   npm run bots -- 3 --party → Bot wird VIP und startet direkt eine Party (3 Runden)
- *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist …)
+ *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist, sumo, tourist, sprueche …)
  *   npm run bots -- 2 --date        → zwei Bots spielen die komplette Date Night
  *   npm run bots -- 4 --drink       → Bots spielen ein paar Runden Trinkspiel
  */
@@ -18,7 +18,7 @@ const DATE = args.includes('--date');
 const DRINK = args.includes('--drink');
 const LEAD = args.includes('--party') || !!GAME || DATE || DRINK;
 const URL = process.env.URL ?? 'http://localhost:3000';
-const NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
+const NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {

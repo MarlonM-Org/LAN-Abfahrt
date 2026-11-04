@@ -263,6 +263,8 @@ export function trackForScene(scene: string): TrackName {
     case 'fangen':
       return 'spooky';
     case 'stillepost':
+    case 'tourist':
+    case 'sprueche':
       return 'bar';
     case 'wwe':
     case 'nhie':

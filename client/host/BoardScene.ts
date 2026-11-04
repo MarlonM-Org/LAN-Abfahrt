@@ -148,21 +148,29 @@ export class BoardScene extends Phaser.Scene {
     if (key === this.scoreKey) return;
     this.scoreKey = key;
     this.scoreLayer.removeAll(true);
-    const x = 214, y = 92, w = 200;
     const sorted = [...b.order].sort((a, c) => b.cocktails[c] - b.cocktails[a] || b.coins[c] - b.coins[a]);
-    const h = 26 + sorted.length * 15;
+    // Ab 9 Spielern: zwei Spalten, sonst ragt die Tafel über den Rundweg
+    const cols = sorted.length > 8 ? 2 : 1;
+    const perCol = Math.ceil(sorted.length / cols);
+    const colW = cols === 2 ? 128 : 200;
+    const x = cols === 2 ? 168 : 214, y = 92, w = cols === 2 ? colW * 2 + 4 : 200;
+    const coinX = cols === 2 ? 104 : 136, cocktailX = cols === 2 ? 120 : 172;
+    const h = 26 + perCol * 15;
     this.scoreLayer.add(panel(this, x, y, w, h));
-    this.scoreLayer.add(this.add.image(x + 136, y + 13, ensureTex(this, 'coin', O.coinIcon)));
-    this.scoreLayer.add(this.add.image(x + 172, y + 16, ensureTex(this, 'cocktail', O.cocktail)).setScale(0.8));
+    for (let c = 0; c < cols; c++) {
+      this.scoreLayer.add(this.add.image(x + c * colW + coinX, y + 13, ensureTex(this, 'coin', O.coinIcon)));
+      this.scoreLayer.add(this.add.image(x + c * colW + cocktailX, y + 16, ensureTex(this, 'cocktail', O.cocktail)).setScale(0.8));
+    }
     sorted.forEach((id, i) => {
       const p = playerById(id);
       if (!p) return;
-      const ry = y + 22 + i * 15;
+      const cx = x + Math.floor(i / perCol) * colW;
+      const ry = y + 22 + (i % perCol) * 15;
       const isTurn = b.sub === 'roll' && b.order[b.turnIdx] === id;
-      this.scoreLayer.add(this.add.image(x + 16, ry + 13, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
-      this.scoreLayer.add(ink(this, x + 26, ry + 3, p.name.slice(0, 11), { origin: [0, 0], color: isTurn ? RED_INK : INK }));
-      this.scoreLayer.add(ink(this, x + 136, ry + 3, String(b.coins[id])));
-      this.scoreLayer.add(ink(this, x + 172, ry + 3, String(b.cocktails[id]), { color: '#b0306a' }));
+      this.scoreLayer.add(this.add.image(cx + 16, ry + 13, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
+      this.scoreLayer.add(ink(this, cx + 26, ry + 3, p.name.slice(0, cols === 2 ? 8 : 11), { origin: [0, 0], color: isTurn ? RED_INK : INK }));
+      this.scoreLayer.add(ink(this, cx + coinX, ry + 3, String(b.coins[id])));
+      this.scoreLayer.add(ink(this, cx + cocktailX, ry + 3, String(b.cocktails[id]), { color: '#b0306a' }));
     });
   }
 
