@@ -15,7 +15,7 @@ export class QuestionStore {
 
   constructor(
     file = 'questions.json',
-    private kind: 'wwe' | 'nhie' | 'post' = 'wwe',
+    private kind: 'wwe' | 'nhie' | 'post' | 'quip' = 'wwe',
   ) {
     this.file = path.resolve(dir, '../data', file);
     try {
@@ -33,7 +33,11 @@ export class QuestionStore {
   add(question: string): string | null {
     let q = question.trim().replace(/\s+/g, ' ').slice(0, 120);
     if (q.length < 4) return null;
-    if (this.kind === 'post') {
+    if (this.kind === 'quip') {
+      // Sprüche-Duell: Lücken vereinheitlichen, erster Buchstabe groß
+      q = q.replace(/_{2,}/g, '___');
+      q = q.charAt(0).toUpperCase() + q.slice(1);
+    } else if (this.kind === 'post') {
       // Stille Post: Startsatz ohne Satzzeichen-Zwang, erster Buchstabe groß
       q = q.slice(0, 90).replace(/[.!]+$/, '');
       q = q.charAt(0).toUpperCase() + q.slice(1);

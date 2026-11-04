@@ -106,7 +106,7 @@ export class MurderScene extends Phaser.Scene {
       const r = roomRect(i);
       const n = m.roomCounts[i] ?? 0;
       for (let k = 0; k < n; k++) {
-        const sx = r.x + r.w / 2 + (k - (n - 1) / 2) * 16;
+        const sx = r.x + r.w / 2 + (k - (n - 1) / 2) * Math.min(16, (r.w - 20) / n);
         this.layer.add(this.add.image(sx, r.y + r.h - 22, ensureTex(this, 'silhouette', O.silhouette)).setOrigin(0.5, 1));
       }
       if (n > 0) this.layer.add(txt(this, r.x + r.w / 2, r.y + r.h - 18, n === 1 ? '1 Person' : `${n} Personen`));
@@ -144,13 +144,19 @@ export class MurderScene extends Phaser.Scene {
   private renderVote(s: GameState, m: MurderState) {
     this.card('Abstimmung', 'Stimmt am Handy ab, wen ihr rauswerft.', 200);
     const alive = s.players.filter((p) => m.alive[p.id]);
-    const n = alive.length;
-    const spacing = Math.min(48, 300 / Math.max(1, n));
+    // Ab 9 Spielern zwei Reihen (versetzt), sonst überlappen Figuren und Namensschilder
+    const rows = alive.length > 8 ? 2 : 1;
+    const perRow = Math.ceil(alive.length / rows);
+    const spacing = Math.min(48, 300 / Math.max(1, perRow));
     alive.forEach((p, i) => {
-      const x = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
+      const row = Math.floor(i / perRow);
+      const n = row === rows - 1 ? alive.length - row * perRow : perRow;
+      const shift = row === 1 && n === perRow ? spacing / 2 : 0;
+      const x = WORLD.W / 2 + (i - row * perRow - (n - 1) / 2) * spacing + shift;
+      const y = rows === 2 ? 146 + row * 64 : 190;
       const voted = m.voted.includes(p.id);
-      this.layer.add(figure(this, p.look, x, 190, 2));
-      this.layer.add(nameTag(this, x, 194, p.name.slice(0, 5), voted ? GREEN_INK : undefined));
+      this.layer.add(figure(this, p.look, x, y, 2));
+      this.layer.add(nameTag(this, x, y + 4, p.name.slice(0, 5), voted ? GREEN_INK : undefined));
     });
   }
 

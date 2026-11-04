@@ -194,7 +194,8 @@ export class DescentScene extends StateScene {
       const p = playerById(id);
       if (!p) continue;
       const f = figure(this, p.look, 0, 0);
-      const tag = this.add.container(0, 0, [txt(this, 0, this.runners.size * -9, p.name.slice(0, 8))]);
+      // Namen gestaffelt (max. 4 Höhen), damit sie bei vielen Läufern nicht in die Anzeige ragen
+      const tag = this.add.container(0, 0, [txt(this, 0, (this.runners.size % 4) * -9, p.name.slice(0, 8))]);
       this.runners.set(id, { f, s: r.s, tag });
     }
     // Steine
@@ -223,10 +224,14 @@ export class DescentScene extends StateScene {
     if (key !== this.hudKey) {
       this.hudKey = key;
       this.hud.removeAll(true);
-      const parts = Object.entries(d.runners).map(([id, r]) => `${playerById(id)?.name.slice(0, 6) ?? '?'} ${r.finished ? 'unten' : `${r.hits}x`}`);
-      const text = `${Math.ceil(d.endsIn / 1000)}s  ${parts.join('  ')}`;
-      const w = Math.min(470, text.length * 8 + 24);
-      this.hud.add(panel(this, Math.round((WORLD.W - w) / 2), 30, w, 26));
+      const parts = Object.entries(d.runners).map(([id, r]) => `${playerById(id)?.name.replace(/^Bot\s+/, '').slice(0, 6) ?? '?'} ${r.finished ? 'unten' : `${r.hits}x`}`);
+      // Viele Läufer (bis 12): auf mehrere Zeilen à 4 verteilen, statt aus dem Bild zu laufen
+      const lines: string[] = [];
+      for (let i = 0; i < parts.length; i += 4) lines.push(parts.slice(i, i + 4).join('  '));
+      lines[0] = `${Math.ceil(d.endsIn / 1000)}s  ${lines[0] ?? ''}`;
+      const text = lines.join('\n');
+      const w = Math.min(470, Math.max(...lines.map((l) => l.length)) * 8 + 24);
+      this.hud.add(panel(this, Math.round((WORLD.W - w) / 2), 30, w, 26 + (lines.length - 1) * 12));
       this.hud.add(ink(this, WORLD.W / 2, 39, text));
     }
   }
@@ -385,10 +390,13 @@ export class WrapScene extends StateScene {
       const forName = playerById(w.forWhom[id])?.name ?? '?';
       const steps = WRAP_RECIPE.slice(0, p.step);
       const stackKey = ensureTex(this, `wrap_${steps.join('-') || 'empty'}`, () => wrapStack(steps));
-      this.layer.add(this.add.image(cx, 236, stackKey).setOrigin(0.5, 1).setScale(small ? 2 : 3));
-      const pw = small ? Math.max(90, Math.floor(spacing) - 6) : 160;
+      // Ab 5 Spielern werden Karten und Teller schmaler, damit sie sich nicht überlappen (bis 12 Spieler)
+      const narrow = spacing < 96;
+      this.layer.add(this.add.image(cx, 236, stackKey).setOrigin(0.5, 1).setScale(small ? (spacing < 60 ? 1 : 2) : 3));
+      const pw = small ? Math.max(narrow ? 30 : 90, Math.floor(spacing) - (narrow ? 3 : 6)) : 160;
       this.layer.add(panel(this, Math.round(cx - pw / 2), 70, pw, 52));
-      this.layer.add(ink(this, cx, 78, small ? name.slice(0, Math.floor(pw / 8) - 1) : `${name.slice(0, 8)} → ${forName.slice(0, 8)}`));
+      const shortName = narrow ? name.replace(/^Bot\s+/, '') : name;
+      this.layer.add(ink(this, cx, 78, small ? shortName.slice(0, Math.max(2, Math.floor(pw / 8) - 1)) : `${name.slice(0, 8)} → ${forName.slice(0, 8)}`));
       const next = WRAP_RECIPE[p.step];
       if (next) {
         if (small) this.layer.add(this.add.image(cx, 104, ensureTex(this, `ing_${next}`, () => ingredient(next))).setScale(1.5));
@@ -397,9 +405,9 @@ export class WrapScene extends StateScene {
           this.layer.add(ink(this, cx + 8, 100, INGREDIENT_NAMES[next].slice(0, 12)));
         }
       } else {
-        this.layer.add(ink(this, cx, 100, 'Fertig!', { color: '#2f7d32' }));
+        this.layer.add(ink(this, cx, 100, narrow ? 'OK' : 'Fertig!', { color: '#2f7d32' }));
       }
-      if (p.mistakes) this.layer.add(txt(this, cx, 244, small ? `${p.mistakes}x daneben` : `${p.mistakes}x daneben gegriffen`, { color: '#ffb0a8' }));
+      if (p.mistakes) this.layer.add(txt(this, cx, 244, narrow ? `${p.mistakes}x` : small ? `${p.mistakes}x daneben` : `${p.mistakes}x daneben gegriffen`, { color: '#ffb0a8' }));
       if (p.lastGrab && !p.lastGrab.ok) {
         const ic = this.add.image(cx + 30, 150, ensureTex(this, `ing_${p.lastGrab.item}`, () => ingredient(p.lastGrab!.item))).setScale(2);
         this.layer.add(ic);

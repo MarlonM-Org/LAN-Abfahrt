@@ -219,11 +219,14 @@ export class TidyGame implements MiniGame {
       { team: 'A', x: A.x + 24, y: A.y + A.h / 2, r: 16 },
       ...(solo ? [] : [{ team: 'B' as Team, x: A.x + A.w - 24, y: A.y + A.h / 2, r: 16 }]),
     ];
+    // Ab 5 Spielern pro Team (bis 12 Spieler) enger stapeln, damit niemand auf demselben Startplatz steht
+    const perTeam = Math.ceil(ids.length / 2);
+    const gap = perTeam > 4 ? (A.h - 40) / (perTeam - 1) : 45;
     shuffle(ids).forEach((id, i) => {
       const team: Team = solo || i % 2 === 0 ? 'A' : 'B';
       this.players.set(id, {
         x: team === 'A' ? A.x + 60 : A.x + A.w - 60,
-        y: A.y + 30 + ((i >> 1) % 4) * 45,
+        y: A.y + (perTeam > 4 ? 20 : 30) + ((i >> 1) % Math.max(4, perTeam)) * gap,
         team,
         dir: team === 'A' ? 1 : -1,
         moving: false,
