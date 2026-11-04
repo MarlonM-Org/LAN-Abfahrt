@@ -3,7 +3,8 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { GameState, PrivateState } from '../shared/types';
+import type { GameState, ParcoursState, PrivateState } from '../shared/types';
+import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { ROOMS } from '../shared/games';
@@ -37,6 +38,8 @@ export class Bot {
   private resultsEntered = 0;
   private lastPhase = '';
   private timer: NodeJS.Timeout;
+  /** Fallen-Parcours: Bauziel, gedrosselte Eingaben, Sprung-Halten */
+  private pc = { target: null as { round: number; x: number; y: number; rot: number } | null, stick: '', stickAt: 0, actAt: 0, jumping: false, sloppy: Math.random() * 0.25 };
 
   constructor(
     public name: string,
@@ -73,6 +76,92 @@ export class Bot {
     if (this.busy.has(key)) return;
     this.busy.add(key);
     Promise.resolve(fn()).finally(() => setTimeout(() => this.busy.delete(key), 50));
+  }
+
+  private stickTo(x: number, y: number) {
+    const key = `${x.toFixed(1)},${y.toFixed(1)}`;
+    const now = Date.now();
+    if (key === this.pc.stick && now - this.pc.stickAt < 400) return;
+    this.pc.stick = key;
+    this.pc.stickAt = now;
+    this.send('stick', { x, y });
+  }
+
+  /** Bauen: zufälliges Teil an eine freie Stelle; Laufen: rennen und über Lücken/Fallen springen */
+  private parcours(st: ParcoursState) {
+    const now = Date.now();
+    if (st.sub === 'build') {
+      const b = st.builders[this.id];
+      if (!b || b.stage === 'done') return;
+      if (b.stage === 'pick') {
+        this.pc.target = null;
+        this.once(`pc-pick-${st.round}`, async () => {
+          await sleep(rand(500, 1600));
+          const opts = b.choice.filter((t) => t !== 'bomb' || st.parts.length > 3);
+          const pool = opts.length ? opts : b.choice;
+          this.send('pick', { type: pool[Math.floor(Math.random() * pool.length)] });
+        });
+        return;
+      }
+      const type = b.pick!;
+      if (!this.pc.target || this.pc.target.round !== st.round) {
+        const rot = Math.floor(Math.random() * PART_DEFS[type].rots);
+        let spot: { x: number; y: number } | null = null;
+        if (type === 'bomb' && st.parts.length) {
+          const p = st.parts[Math.floor(Math.random() * st.parts.length)];
+          spot = { x: p.x, y: p.y };
+        }
+        for (let i = 0; i < 60 && !spot; i++) {
+          const x = snap(rand(100, 390));
+          // gemein, aber schaffbar: meist knapp über der Laufhöhe
+          const y = snap(Math.random() < 0.4 ? rand(165, 240) : rand(70, 165));
+          if (canPlace(type, x, y, rot, st.parts)) spot = { x, y };
+        }
+        this.pc.target = { round: st.round, x: spot?.x ?? b.gx, y: spot?.y ?? b.gy, rot };
+      }
+      const t = this.pc.target;
+      if (b.rot !== t.rot && now - this.pc.actAt > 250) {
+        this.pc.actAt = now;
+        this.send('rotate');
+      }
+      const dx = t.x - b.gx;
+      const dy = t.y - b.gy;
+      const d = Math.hypot(dx, dy);
+      if (d <= 3) {
+        this.stickTo(0, 0);
+        if (b.rot === t.rot && now - this.pc.actAt > 300) {
+          this.pc.actAt = now;
+          if (b.ok) this.send('place');
+          else this.pc.target = { ...t, x: snap(rand(100, 390)), y: snap(rand(70, 240)) };
+        }
+      } else {
+        const k = Math.min(1, d / 25);
+        this.stickTo((dx / d) * k, (dy / d) * k);
+      }
+      return;
+    }
+    if (st.sub !== 'run' && st.sub !== 'countdown') return;
+    const r = st.runners[this.id];
+    if (!r || r.st !== 'run') return;
+    if (st.sub === 'countdown') return this.stickTo(0, 0);
+    this.stickTo(1, 0);
+    if (this.pc.jumping || !r.ground) return;
+    const solids: Rect[] = [...BASE_SOLIDS];
+    for (const p of st.parts) if (PART_DEFS[p.type].kind !== 'hazard' && p.type !== 'bomb') solids.push(partRect(p, st.t));
+    const hit = (rc: Rect) => solids.some((s) => overlaps(rc, s));
+    const gapAhead = !hit({ x: r.x + 3, y: r.y + 1, w: 6, h: 40 });
+    const wallAhead = hit({ x: r.x + 4, y: r.y - PARCOURS.PH + 2, w: 10, h: PARCOURS.PH - 4 });
+    const danger =
+      st.parts.some((p) => p.type === 'urchin' && overlaps(partRect(p), { x: r.x + 2, y: r.y - 40, w: 26, h: 44 })) ||
+      st.nuts.some((n) => Math.abs(n.x - r.x) < 34 && Math.abs(n.y - (r.y - 6)) < 14);
+    if ((gapAhead || wallAhead || danger) && Math.random() > this.pc.sloppy) {
+      this.pc.jumping = true;
+      this.send('jump', { down: true });
+      setTimeout(() => {
+        this.send('jump', { down: false });
+        this.pc.jumping = false;
+      }, rand(200, 340));
+    }
   }
 
   react(s: GameState) {
@@ -288,6 +377,8 @@ export class Bot {
         });
       }
     }
+
+    if (m.kind === 'parcours') this.parcours(m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
