@@ -16,6 +16,7 @@ import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OP
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
+import { KurveGame } from './kurve';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -282,6 +283,9 @@ export class Room {
         break;
       case 'tidy':
         this.mini = new TidyGame(ids, ctx);
+        break;
+      case 'kurve':
+        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.look.shirt));
         break;
     }
     this.results = null;

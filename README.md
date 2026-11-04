@@ -19,6 +19,7 @@ Aktueller Stand (v0.3):
   - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
   - 🗳️ **Wer würde eher …?** – geheim abstimmen, Punkte für die Mehrheit. **Eigene Fragen** können in der Lobby am Handy hinzugefügt werden (gespeichert in `data/questions.json`)
   - 🏖️ **Liegestuhl-Sprint** – Reaktionstest bei Sonnenaufgang, wer zu früh tippt, hat einen Fehlstart
+  - 🌀 **Kurven-Duell** (2–12 Spieler) – à la „Achtung, die Kurve!“: Am Handy nur LINKS/RECHTS halten, jeder zieht eine Spur – wer Rand oder Spur rammt, ist raus, alle anderen bekommen einen Punkt. Lücken in den Spuren, Power-ups: Turbo, Schnecke (alle anderen langsam), Durch Wände
   - 🔪 **Mord im Ferienhaus** (ab 4 Spielern, ab 7 mit zwei Mördern) – geheime Rollen auf dem Handy, Aufgaben in den Räumen, Morde wenn man allein mit jemandem ist, Leichen melden, diskutieren, abstimmen
 
 ## Starten

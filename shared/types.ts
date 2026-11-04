@@ -26,7 +26,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'kurve';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +310,49 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Kurven-Duell
+
+export type KurvePower = 'turbo' | 'slow' | 'wrap';
+
+export interface KurveHead {
+  x: number;
+  y: number;
+  /** Fahrtrichtung in Radiant */
+  a: number;
+  /** aktuelle Geschwindigkeit (px/s) – zum Glätten auf dem TV */
+  v: number;
+  alive: boolean;
+  /** Index in KURVE.COLORS */
+  color: number;
+  score: number;
+  /** Gerade in einer Lücke (Kopf zieht keine Spur) */
+  gap: boolean;
+  /** Aktive Power-ups (bei 'slow': man wird gerade ausgebremst) */
+  fx: KurvePower[];
+  /**
+   * Nur das Ende der Spur (die letzten KURVE.TAIL Punkte), flach als [x, y, pen, x, y, pen, …].
+   * pen = 1: Linie vom vorigen Punkt bis hierher zeichnen, 0 = Lücke/Sprung.
+   * trailStart = Index des ersten Punkts im Gesamtverlauf dieser Runde – TV und Bots hängen daran an.
+   */
+  trailStart: number;
+  trail: number[];
+}
+
+export interface KurveState {
+  sub: 'countdown' | 'play' | 'roundEnd' | 'over';
+  round: number;
+  rounds: number;
+  endsIn: number;
+  /** Sturm: Runde dauert schon lange → alle werden schneller */
+  storm: boolean;
+  players: Record<string, KurveHead>;
+  powerups: { id: number; x: number; y: number; type: KurvePower }[];
+  /** Ausgeschiedene dieser Runde (für Effekte auf dem TV) */
+  deaths: { id: string; x: number; y: number; seq: number }[];
+  pickup: { id: string; type: KurvePower; x: number; y: number; seq: number } | null;
+  roundWinner: string | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +441,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'kurve'; state: KurveState };
 
 export interface GameState {
   phase: Phase;

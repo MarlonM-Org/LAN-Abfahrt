@@ -1,4 +1,4 @@
-import type { FieldType, MiniKind, Point } from './types';
+import type { FieldType, KurvePower, MiniKind, Point } from './types';
 
 export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPlayers: number }> = {
   flunky: { title: 'Flunkyball', tagline: 'Werfen, trinken, laufen!', minPlayers: 2 },
@@ -14,15 +14,16 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
   sup: { title: 'SUP-Rennen', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
   tidy: { title: 'Aufräumen!', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
+  kurve: { title: 'Kurven-Duell', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'murder'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -177,4 +178,51 @@ export const TIDY = {
   COUNTDOWN_MS: 3000,
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
+};
+
+// ------------------------------------------------------------------ Kurven-Duell
+
+export const KURVE = {
+  /** Spielfläche (darüber: Punktetafel) */
+  ARENA: { x: 6, y: 30, w: 468, h: 234 },
+  /** Grundtempo in px/s und Drehgeschwindigkeit in rad/s (→ Wenderadius ≈ 16 px) */
+  SPEED: 46,
+  TURN: 2.9,
+  /** Linienstärke (TV, Kollision) */
+  LINE: 3,
+  /** Lücken: alle 1,5–3 s, so lang (px), dass man durchpasst */
+  GAP_MIN_MS: 1500,
+  GAP_MAX_MS: 3000,
+  GAP_PX: 12,
+  /** Die letzten n px der eigenen Spur zählen nicht als Hindernis */
+  SELF_GRACE: 8,
+  /** Runden je nach Spielerzahl (viele Spieler = kurze Runden) → Spiel dauert ca. 2–4 Minuten */
+  roundsFor: (n: number) => (n <= 3 ? 5 : n <= 6 ? 6 : 7),
+  COUNTDOWN_MS: 3000,
+  ROUND_END_MS: 3500,
+  /** Nach STORM_MS werden alle langsam schneller, nach ROUND_MAX_MS ist die Runde vorbei */
+  STORM_MS: 25000,
+  STORM_ACCEL: 0.07,
+  ROUND_MAX_MS: 55000,
+  POWER_MIN_MS: 3500,
+  POWER_MAX_MS: 7000,
+  POWER_MAX: 3,
+  POWER_R: 7,
+  POWER_LIFE_MS: 14000,
+  TURBO_MS: 4000,
+  TURBO_F: 1.6,
+  SLOW_MS: 4000,
+  SLOW_F: 0.55,
+  WRAP_MS: 6000,
+  /** So viele Spurpunkte pro Spieler stehen im Snapshot */
+  TAIL: 32,
+  /** 12 gut unterscheidbare Farben – Index 0–9 passt zu den T-Shirt-Farben (SHIRTS) */
+  COLORS: ['#e0503f', '#3f8fe0', '#46b04a', '#f2c33a', '#b07ae0', '#f0973a', '#2fb5a5', '#f4efe2', '#8fd8ff', '#f07aa8', '#b6e05a', '#c98a5a'],
+  COLOR_NAMES: ['Rot', 'Blau', 'Grün', 'Gelb', 'Lila', 'Orange', 'Türkis', 'Weiß', 'Hellblau', 'Rosa', 'Limette', 'Kupfer'],
+};
+
+export const KURVE_POWER_INFO: Record<KurvePower, { label: string; desc: string; color: string }> = {
+  turbo: { label: 'TURBO!', desc: 'Du bist kurz schneller', color: '#f0973a' },
+  slow: { label: 'SCHNECKE!', desc: 'Alle anderen werden langsam', color: '#46b04a' },
+  wrap: { label: 'DURCH WÄNDE!', desc: 'Du fährst kurz durch den Rand', color: '#b07ae0' },
 };
