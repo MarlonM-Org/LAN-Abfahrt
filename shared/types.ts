@@ -26,7 +26,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'ttt';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +310,101 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Verräter im Ferienhaus
+
+export type TttRole = 'innocent' | 'traitor' | 'detective';
+export type TttWeapon = 'pistol' | 'coconut';
+export type TttItemKind = TttWeapon | 'medkit';
+export type TttShopItem = 'trap' | 'cloak' | 'radio';
+
+/** Öffentlich sichtbare Spielerinfo (unsichtbare Spieler fehlen ganz) */
+export interface TttPlayerPub {
+  x: number;
+  y: number;
+  /** Blickrichtung für die Figur */
+  dir: 1 | -1;
+  moving: boolean;
+  hp: number;
+  weapon: TttWeapon | null;
+  /** Kurz betäubt (z. B. nach der Falle) */
+  stunned: boolean;
+}
+
+export interface TttAttack {
+  seq: number;
+  /** null = unsichtbarer Angreifer */
+  by: string | null;
+  kind: 'noodle' | TttWeapon;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  target: string | null;
+  /** Ziel wurde dadurch ausgeknockt */
+  ko: boolean;
+}
+
+export interface TttBody {
+  id: string;
+  x: number;
+  y: number;
+  /** Rolle erst nach dem Untersuchen sichtbar */
+  role: TttRole | null;
+  inspectedBy: string | null;
+}
+
+export interface TttRoundResult {
+  round: number;
+  winner: 'innocent' | 'traitor';
+  reason: string;
+  traitors: string[];
+  /** Punkte dieser Runde */
+  points: Record<string, number>;
+}
+
+export interface TttState {
+  sub: 'roles' | 'play' | 'roundEnd' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  players: Record<string, TttPlayerPub>;
+  alive: Record<string, boolean>;
+  detective: string | null;
+  traitorCount: number;
+  bodies: TttBody[];
+  items: { id: number; kind: TttItemKind; x: number; y: number }[];
+  attacks: TttAttack[];
+  /** Laufschrift auf dem TV: Funksprüche, Untersuchungen, Spuren */
+  feed: { seq: number; text: string; tone: 'info' | 'radio' | 'clue' | 'alert' }[];
+  /** Ausgelöste Fallen (nur zur Animation) */
+  traps: { seq: number; x: number; y: number }[];
+  scores: Record<string, number>;
+  /** Erst am Rundenende gefüllt – während der Runde bleibt alles geheim */
+  last: TttRoundResult | null;
+  roles: Record<string, TttRole> | null;
+}
+
+/** Nur an den jeweiligen Spieler */
+export interface TttPrivate {
+  role: TttRole;
+  /** Eigene Position (auch wenn man gerade unsichtbar ist) */
+  x: number;
+  y: number;
+  partners: string[];
+  alive: boolean;
+  hp: number;
+  weapon: TttWeapon | null;
+  ammo: number;
+  credits: number;
+  /** Was liegt in Reichweite für "Benutzen"? */
+  near: string | null;
+  cloakLeft: number;
+  attackReady: boolean;
+  /** Steht in einer Tür (für die Falle) */
+  inDoor: boolean;
+  info: { seq: number; text: string } | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +493,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'ttt'; state: TttState };
 
 export interface GameState {
   phase: Phase;
@@ -418,7 +514,7 @@ export interface GameState {
   customQuestionCount: number;
 }
 
-export type PrivateState = { kind: 'murder'; state: MurderPrivate } | null;
+export type PrivateState = { kind: 'murder'; state: MurderPrivate } | { kind: 'ttt'; state: TttPrivate } | null;
 
 export interface JoinRequest {
   name: string;

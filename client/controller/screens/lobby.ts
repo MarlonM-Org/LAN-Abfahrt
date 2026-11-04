@@ -131,7 +131,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     gated.push({ btn: b, min: 2 });
     singles(DRINK_KINDS);
   } else if (vip) {
-    menu.append(el(`<h2>Party-Modus</h2><p>Spielbrett + Minispiele, Finale: Mord im Ferienhaus</p>`));
+    menu.append(el(`<h2>Party-Modus</h2><p>Spielbrett + Minispiele, Finale: Mord oder Verräter im Ferienhaus</p>`));
     const roundRow = el(`<div class="btn-row"></div>`);
     for (const r of PARTY_ROUND_OPTIONS) {
       const b = el(`<button>${r} Runden</button>`).firstElementChild as HTMLButtonElement;

@@ -268,3 +268,21 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
 @keyframes shake { 50% { transform: translateX(3px); } }
 .partner { color: var(--ink); }
+
+/* ---------------------------------------------------------------- Verräter im Ferienhaus */
+.ttt-top { color: var(--ink); font-size: 10px; align-items: center; }
+.ttt-top .hearts { color: #c0392b; font-size: 16px; letter-spacing: 2px; }
+.ttt-info { min-height: 3.4em; color: var(--ink); display: flex; align-items: center; justify-content: center; }
+.ttt-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ttt-btns .big-btn { min-height: 15vh; font-size: 13px; padding: 10px 4px; }
+.big-btn.ttt-attack { background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.big-btn.ttt-attack.cooldown { filter: saturate(0.4) brightness(0.9); }
+.big-btn.ttt-use { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.ttt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ttt-row .role-btn { min-height: 48px; font-size: 8px; padding: 6px 4px; }
+.ttt-row .stash-btn { font-size: 9px; padding: 6px 4px; }
+.role-btn.detective { background: #3f6fb8; color: #fff4d6; box-shadow: inset 0 3px 0 #7fa6e0, inset 0 -4px 0 #2d4f8a, 0 3px 0 var(--outline); }
+.ttt-stash { position: fixed; left: 14px; right: 14px; top: 64px; z-index: 20; box-shadow: 0 6px 0 2px rgba(0, 0, 0, 0.35), inset 0 0 0 2px var(--paper-dark); }
+.ttt-stash .shop-btn { line-height: 1.6; font-size: 10px; }
+.ttt-stash .shop-btn small { font-size: 7px; opacity: 0.9; }
+.ttt-stash .room-btn { font-size: 7px; }

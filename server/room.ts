@@ -28,6 +28,7 @@ import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './miniga
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
+import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 
 const MAX_PLAYERS = 8;
@@ -241,6 +242,7 @@ export class Room {
       finish: (r) => this.finishMini(kind, r),
       isConnected: (id) => !!this.players.get(id)?.connected,
       nameOf: (id) => this.nameOf(id),
+      lookOf: (id) => this.players.get(id)?.look,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
@@ -282,6 +284,9 @@ export class Room {
         break;
       case 'tidy':
         this.mini = new TidyGame(ids, ctx);
+        break;
+      case 'ttt':
+        this.mini = new TttGame(ids, ctx);
         break;
     }
     this.results = null;

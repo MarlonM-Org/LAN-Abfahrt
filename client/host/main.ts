@@ -10,12 +10,13 @@ import { FlunkyScene } from './FlunkyScene';
 import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
+import { TttScene } from './TttScene';
 import { setState } from './store';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
 
-const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy'];
+const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'ttt'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -38,7 +39,7 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES],
+    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, TttScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES],
   });
 
   let currentKey = '';

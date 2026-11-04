@@ -3,10 +3,11 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { GameState, PrivateState } from '../shared/types';
+import type { GameState, PrivateState, TttState } from '../shared/types';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { ROOMS } from '../shared/games';
+import { ROOMS, TTT } from '../shared/games';
+import { lineFree, nextWaypoint, roomInner } from '../shared/house';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 
 export interface BotOptions {
@@ -37,6 +38,8 @@ export class Bot {
   private resultsEntered = 0;
   private lastPhase = '';
   private timer: NodeJS.Timeout;
+  /** Gedächtnis für "Verräter im Ferienhaus" */
+  private ttt = { round: 0, grudges: new Set<string>(), lastAttack: 0, goal: null as { x: number; y: number } | null, stuckX: 0, stuckY: 0, stuckAt: 0 };
 
   constructor(
     public name: string,
@@ -289,6 +292,8 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'ttt') this.playTtt(m.state);
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;
@@ -331,6 +336,98 @@ export class Bot {
         });
       }
     }
+  }
+
+  /** Einfache KI: herumlaufen, Sachen aufheben, Verräter jagen Einzelgänger, Unschuldige wehren sich */
+  private playTtt(t: TttState) {
+    const p = this.priv?.kind === 'ttt' ? this.priv.state : null;
+    const mem = this.ttt;
+    if (t.round !== mem.round) {
+      mem.round = t.round;
+      mem.grudges.clear();
+      mem.goal = null;
+      mem.lastAttack = t.attacks.at(-1)?.seq ?? 0;
+    }
+    if (!p || t.sub !== 'play' || !p.alive) return;
+    // Was ist passiert? Wer hat mich (oder jemanden) angegriffen?
+    for (const a of t.attacks) {
+      if (a.seq <= mem.lastAttack) continue;
+      mem.lastAttack = a.seq;
+      if (!a.by || a.by === this.id || p.partners.includes(a.by)) continue;
+      if (a.target === this.id) mem.grudges.add(a.by);
+      else if (a.ko && p.role !== 'traitor' && Math.random() < 0.6) mem.grudges.add(a.by);
+    }
+    for (const g of mem.grudges) if (!t.alive[g]) mem.grudges.delete(g);
+
+    this.once('ttt', async () => {
+      await sleep(rand(70, 130));
+      const me = { x: p.x, y: p.y };
+      const dist = (o: { x: number; y: number }) => Math.hypot(o.x - me.x, o.y - me.y);
+      const visible = Object.entries(t.players).filter(([id]) => id !== this.id);
+
+      // Ziel wählen
+      let target: [string, { x: number; y: number }] | undefined;
+      const grudge = visible.filter(([id]) => mem.grudges.has(id)).sort((a, b) => dist(a[1]) - dist(b[1]))[0];
+      if (grudge) target = grudge;
+      else if (p.role === 'traitor') {
+        const victims = visible.filter(([id]) => !p.partners.includes(id));
+        const lonely = victims.filter(([, v]) => victims.filter(([, o]) => o !== v && Math.hypot(o.x - v.x, o.y - v.y) < 50).length === 0);
+        const late = t.endsIn < TTT.ROUND_MS - 45000;
+        const pool = (lonely.length ? lonely : late ? victims : []).sort((a, b) => dist(a[1]) - dist(b[1]));
+        if (pool[0] && (dist(pool[0][1]) < 120 || late)) target = pool[0];
+        if (p.credits > 0) {
+          if (p.inDoor && Math.random() < 0.3) this.send('buy', { item: 'trap' });
+          else if (target && p.cloakLeft === 0 && dist(target[1]) < 60 && Math.random() < 0.3) this.send('buy', { item: 'cloak' });
+          else if (Math.random() < 0.01) this.send('buy', { item: 'radio', room: Math.floor(Math.random() * ROOMS.length) });
+        }
+      }
+
+      if (target) {
+        const [tid, tp] = target;
+        const d = dist(tp);
+        const range = p.weapon === 'pistol' ? 110 : p.weapon === 'coconut' ? 80 : TTT.NOODLE_RANGE - 4;
+        const wp = nextWaypoint(me.x, me.y, tp.x, tp.y);
+        // In Reichweite: kaum noch laufen, nur zum Ziel drehen (sonst tanzt man umeinander herum)
+        if (d < range) this.steer(me, wp, 0.32, 0.32);
+        else this.steer(me, wp);
+        if (d < range && p.attackReady && lineFree(me.x, me.y, tp.x, tp.y)) this.send('attack');
+        void tid;
+        return;
+      }
+
+      // Nichts zu kämpfen: Sachen benutzen oder herumlaufen
+      if (p.near && (/untersuchen|Spur/.test(p.near) || (/aufheben/.test(p.near) && !p.weapon) || (/benutzen/.test(p.near) && p.hp < TTT.HP))) {
+        this.send('use');
+      }
+      const wanted = [
+        ...t.items.filter((i) => (i.kind === 'medkit' ? p.hp < TTT.HP : !p.weapon)),
+        ...t.bodies.filter((b) => !b.role || (p.role === 'detective' && Math.random() < 0.5)),
+      ].sort((a, b) => dist(a) - dist(b))[0];
+      if (wanted && dist(wanted) < 160) mem.goal = { x: wanted.x, y: wanted.y };
+      const now = Date.now();
+      if (now - mem.stuckAt > 1500) {
+        const moved = Math.hypot(me.x - mem.stuckX, me.y - mem.stuckY);
+        if (moved < 2) mem.goal = null;
+        mem.stuckX = me.x;
+        mem.stuckY = me.y;
+        mem.stuckAt = now;
+      }
+      if (!mem.goal || dist(mem.goal) < 5) {
+        const r = roomInner(Math.floor(Math.random() * ROOMS.length));
+        mem.goal = { x: r.x + 16 + Math.random() * (r.w - 32), y: r.y + 16 + Math.random() * (r.h - 32) };
+      }
+      // Gemütlich schlendern – wer jagt, ist schneller
+      this.steer(me, nextWaypoint(me.x, me.y, mem.goal.x, mem.goal.y), 0.6, 0.6);
+    });
+  }
+
+  private steer(from: { x: number; y: number }, to: { x: number; y: number }, scale = 1, max = 1) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1) return this.send('stick', { x: 0, y: 0 });
+    const k = Math.min(max, Math.max(scale, d / 12)) / d;
+    this.send('stick', { x: Math.round(dx * k * 100) / 100, y: Math.round(dy * k * 100) / 100 });
   }
 }
 

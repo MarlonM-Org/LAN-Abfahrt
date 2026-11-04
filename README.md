@@ -13,13 +13,14 @@ Aktueller Stand (v0.3):
 - **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
   - Alle würfeln am Handy, Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus
   - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los
-  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung – **Finale: Mord im Ferienhaus**
+  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern)
   - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
 - **Minispiele** (auch einzeln spielbar):
   - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
   - 🗳️ **Wer würde eher …?** – geheim abstimmen, Punkte für die Mehrheit. **Eigene Fragen** können in der Lobby am Handy hinzugefügt werden (gespeichert in `data/questions.json`)
   - 🏖️ **Liegestuhl-Sprint** – Reaktionstest bei Sonnenaufgang, wer zu früh tippt, hat einen Fehlstart
   - 🔪 **Mord im Ferienhaus** (ab 4 Spielern, ab 7 mit zwei Mördern) – geheime Rollen auf dem Handy, Aufgaben in den Räumen, Morde wenn man allein mit jemandem ist, Leichen melden, diskutieren, abstimmen
+  - 🏊 **Verräter im Ferienhaus** (ab 4 Spielern, à la „Trouble in Terrorist Town“) – alle laufen per Joystick durchs Ferienhaus. Geheime Verräter (≈ 1 pro 4 Spieler) knocken mit Poolnudel, Wasserpistole und Kokosnuss aus; ab 6 Spielern gibt es einen bekannten Detektiv mit Hut, der an Ausgeknockten die Shirt-Farbe des Täters findet. Verräter haben am Handy einen Shop im Geheimfach (Bananenschale, Tarnumhang, Fake-Funkspruch). 2–3 Runden mit neuen Rollen, Punkte für Sieg, richtige und falsche Knockouts
 
 ## Starten
 
@@ -70,8 +71,8 @@ Tipp: PC und Apple TV per LAN-Kabel anschließen – dann ist die Verzögerung k
 
 ```
 server/   index.ts (HTTP + Vite), room.ts (Lobby/VIP/Ablauf), board.ts (Spielbrett),
-          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, questions.ts
-shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), avatar.ts, flunky.ts
+          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, ttt.ts, questions.ts
+shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), house.ts (Ferienhaus-Grundriss), avatar.ts, flunky.ts
 client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel)
           index.html + controller/ (Handy-UI, ein Modul pro Spiel in screens/)
 scripts/  bots.ts                (Testspieler)

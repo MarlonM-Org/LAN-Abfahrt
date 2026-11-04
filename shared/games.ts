@@ -1,4 +1,4 @@
-import type { FieldType, MiniKind, Point } from './types';
+import type { FieldType, MiniKind, Point, TttItemKind, TttRole, TttShopItem } from './types';
 
 export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPlayers: number }> = {
   flunky: { title: 'Flunkyball', tagline: 'Werfen, trinken, laufen!', minPlayers: 2 },
@@ -14,14 +14,17 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
   sup: { title: 'SUP-Rennen', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
   tidy: { title: 'Aufräumen!', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
+  ttt: { title: 'Verräter im Ferienhaus', tagline: 'Poolnudeln raus – wer spielt falsch?', minPlayers: 4 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder'];
-/** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder', 'ttt'];
+/** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
+export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
+/** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
 export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
@@ -178,3 +181,52 @@ export const TIDY = {
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
 };
+
+// ------------------------------------------------------------------ Verräter im Ferienhaus
+
+export const TTT = {
+  ROLES_MS: 7000,
+  ROUND_MS: 180000,
+  ROUND_END_MS: 9000,
+  SPEED: 62,
+  PLAYER_R: 5,
+  HP: 3,
+  NOODLE_RANGE: 20,
+  NOODLE_COOLDOWN: 700,
+  PISTOL_RANGE: 140,
+  PISTOL_AMMO: 4,
+  PISTOL_COOLDOWN: 550,
+  COCONUT_RANGE: 100,
+  COCONUT_DAMAGE: 2,
+  USE_RANGE: 16,
+  STUN_MS: 1800,
+  CLOAK_MS: 9000,
+  TRACKER_MS: 5000,
+  TRAP_R: 8,
+  /** Punkte */
+  WIN_POINTS: 3,
+  SURVIVE_POINTS: 1,
+  GOOD_KO: 1,
+  TEAM_KO: -2,
+};
+
+export const TTT_SHOP: Record<TttShopItem, { title: string; cost: number; text: string }> = {
+  trap: { title: 'Bananenschale', cost: 1, text: 'Unsichtbare Falle in eine Tür legen: −1 Herz und ausgerutscht.' },
+  cloak: { title: 'Tarnumhang', cost: 1, text: 'Ein paar Sekunden unsichtbar auf dem Fernseher.' },
+  radio: { title: 'Fake-Funkspruch', cost: 1, text: 'Im Namen eines anderen etwas „gesehen“ haben ...' },
+};
+
+export const TTT_ITEMS: Record<TttItemKind, string> = {
+  pistol: 'Wasserpistole',
+  coconut: 'Kokosnuss',
+  medkit: 'Erste-Hilfe-Kasten',
+};
+
+export const TTT_ROLES: Record<TttRole, { name: string; color: string }> = {
+  innocent: { name: 'Unschuldig', color: '#2f7d32' },
+  traitor: { name: 'Verräter', color: '#a8342a' },
+  detective: { name: 'Detektiv', color: '#2d64a8' },
+};
+
+/** Farbnamen der Shirts (für den Spurensucher des Detektivs: „ein ___ Shirt“) */
+export const SHIRT_NAMES = ['rotes', 'blaues', 'grünes', 'gelbes', 'lila', 'oranges', 'türkises', 'weißes', 'schwarzes', 'rosa'];
