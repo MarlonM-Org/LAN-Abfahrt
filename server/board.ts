@@ -1,5 +1,5 @@
 import type { BoardState, MiniKind } from '../shared/types';
-import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, MINI_INFO } from '../shared/games';
+import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, MINI_INFO } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
 const STEP_MS = 280;
@@ -173,9 +173,12 @@ export class Board {
 
   private intro() {
     const s = this.state;
-    const isFinale = s.round === s.maxRounds && this.ctx.connectedCount() >= MINI_INFO.murder.minPlayers;
+    // Finale: eines der Versteckte-Rollen-Spiele (Mord oder Verräter)
+    const finales = FINALE_KINDS.filter((k) => this.ctx.connectedCount() >= MINI_INFO[k].minPlayers);
+    const isFinale = s.round === s.maxRounds && finales.length > 0;
     const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini);
-    const kind: MiniKind = isFinale ? 'murder' : pool[Math.floor(Math.random() * pool.length)];
+    const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+    const kind: MiniKind = isFinale ? pick(finales) : pick(pool);
     this.lastMini = kind;
     s.sub = 'intro';
     s.nextMini = kind;

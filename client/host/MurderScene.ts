@@ -2,60 +2,12 @@ import Phaser from 'phaser';
 import type { GameState, MurderState } from '../../shared/types';
 import { ROOMS } from '../../shared/games';
 import { WORLD } from '../../shared/flunky';
-import { C } from '../art/palette';
+import { roomRect } from '../../shared/house';
 import * as O from '../art/objects';
-import { paintGrass, paintTiles, paintWater, paintWoodFloor } from '../art/ground';
-import { Pix } from '../art/pix';
+import { addHouse } from './house';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { Countdown, GREEN_INK, RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
-
-// Raster der Räume (3 × 2) unterhalb des HUD
-const COLS = 3;
-const RW = 156;
-const RH = 114;
-const OX = 6;
-const OY = 36;
-const roomRect = (i: number) => ({ x: OX + (i % COLS) * RW, y: OY + Math.floor(i / COLS) * RH, w: RW, h: RH });
-
-function paintHouse(p: Pix) {
-  p.rect(0, 0, WORLD.W, WORLD.H, C.woodDarker);
-  ROOMS.forEach((_, i) => {
-    const r = roomRect(i);
-    const x = r.x + 3, y = r.y + 3, w = r.w - 6, h = r.h - 6;
-    switch (i) {
-      case 0: paintTiles(p, x, y, w, h, '#ece6d3', '#cfc6ad', 9); break; // Küche
-      case 1: paintWoodFloor(p, x, y, w, h, 51); break; // Wohnzimmer
-      case 2: paintTiles(p, x, y, w, h, '#a8d8ea', '#86c1d9', 8); break; // Bad
-      case 3: paintWoodFloor(p, x, y, w, h, 52, '#a96a3a'); break; // Schlafzimmer
-      case 4: // Pool
-        p.rect(x, y, w, h, C.stoneLight);
-        for (let yy = y; yy < y + h; yy += 8) for (let xx = x + ((yy / 8) % 2) * 4; xx < x + w; xx += 8) p.rect(xx, yy, 7, 7, '#d9d5cb');
-        paintWater(p, x + 16, y + 22, w - 32, h - 40, 53);
-        p.rect(x + 14, y + 20, w - 28, 2, C.white).rect(x + 14, y + h - 20, w - 28, 2, C.stoneDark);
-        break;
-      case 5: paintGrass(p, x, y, w, h, 54); break; // Garten
-    }
-    // Türöffnungen (hellere Lücke in der Wand)
-    if (i % COLS < COLS - 1) p.rect(r.x + r.w - 3, r.y + r.h / 2 - 10, 6, 20, '#6e4521');
-    if (i < COLS) p.rect(r.x + r.w / 2 - 12, r.y + r.h - 3, 24, 6, '#6e4521');
-  });
-}
-
-const FURNITURE: [number, string, () => Pix, number, number][] = [
-  [0, 'counter', O.counter, 60, 30],
-  [0, 'table', O.table, 100, 84],
-  [1, 'sofa', () => O.sofa(), 56, 34],
-  [1, 'rugL', () => O.rug(56, 30), 80, 92],
-  [1, 'plant', O.plant, 136, 34],
-  [2, 'bathtub', O.bathtub, 46, 34],
-  [2, 'plant', O.plant, 136, 104],
-  [3, 'bed', () => O.bed(), 36, 48],
-  [3, 'bed2', () => O.bed(C.red), 70, 48],
-  [5, 'grill', O.grill, 120, 42],
-  [5, 'bushB', () => O.bush(4, true), 30, 100],
-  [5, 'tree1s', () => O.tree(1), 40, 54],
-];
+import { Countdown, GREEN_INK, RED_INK, ensureTex, ink, nameTag, panel, txt } from './ui';
 
 export class MurderScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container;
@@ -77,15 +29,7 @@ export class MurderScene extends Phaser.Scene {
     const st = getState();
     this.lastScream = st?.mini?.kind === 'murder' ? st.mini.state.screamSeq : 0;
 
-    background(this, 'house', WORLD.W, WORLD.H, paintHouse);
-    for (const [room, key, make, dx, dy] of FURNITURE) {
-      const r = roomRect(room);
-      this.add.image(r.x + dx, r.y + dy, ensureTex(this, `m_${key}`, make)).setOrigin(0.5, 1).setDepth(10);
-    }
-    ROOMS.forEach((room, i) => {
-      const r = roomRect(i);
-      txt(this, r.x + r.w / 2, r.y + 6, room.name.toUpperCase()).setDepth(20);
-    });
+    addHouse(this);
     // Nacht-Stimmung
     this.night = this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x0b1030, 0.45).setOrigin(0).setDepth(30);
 

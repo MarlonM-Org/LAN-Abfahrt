@@ -32,6 +32,7 @@ import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './miniga
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
+import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
 
@@ -249,6 +250,7 @@ export class Room {
       isConnected: (id) => !!this.players.get(id)?.connected,
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
+      lookOf: (id) => this.players.get(id)?.look,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
@@ -305,6 +307,9 @@ export class Room {
         break;
       case 'enten':
         this.mini = new EntenGame(ids, ctx);
+        break;
+      case 'ttt':
+        this.mini = new TttGame(ids, ctx);
         break;
     }
     this.results = null;
