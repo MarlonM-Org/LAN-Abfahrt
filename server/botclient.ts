@@ -248,6 +248,47 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'sup' && m.state.sub === 'race') {
+      const b = m.state.boards.find((bb) => bb.left === this.id || bb.right === this.id);
+      if (b && !b.finished && !b.fallen) {
+        this.once('sup', async () => {
+          await sleep(rand(230, 380));
+          const ahead = m.state.obstacles.find((o) => o.x > b.x && o.x - b.x < 70 && Math.abs(o.y - b.y) < o.r + 14);
+          const targetY = ahead ? (ahead.y > b.y ? ahead.y - 34 : ahead.y + 34) : b.y;
+          const want = Math.max(-0.5, Math.min(0.5, (targetY - b.y) / 60));
+          const sides: ('left' | 'right')[] = b.left === b.right ? [b.strokes.left <= b.strokes.right ? 'left' : 'right'] : [b.left === this.id ? 'left' : 'right'];
+          for (const side of sides) {
+            const ok = side === 'left' ? b.heading <= want + 0.12 && b.balance < 0.55 : b.heading >= want - 0.12 && b.balance > -0.55;
+            if (ok) this.send('paddle', { side });
+          }
+        });
+      }
+    }
+
+    if (m.kind === 'tidy' && m.state.sub === 'play') {
+      const t = m.state;
+      const me2 = t.players[this.id];
+      const basket = t.baskets.find((bk) => bk.team === me2?.team) ?? t.baskets[0];
+      if (me2 && basket) {
+        this.once('tidy', async () => {
+          await sleep(90);
+          const item = [...t.items].sort((a, b) => Math.hypot(a.x - me2.x, a.y - me2.y) + Math.hypot(a.x - basket.x, a.y - basket.y) * 0.5 - (Math.hypot(b.x - me2.x, b.y - me2.y) + Math.hypot(b.x - basket.x, b.y - basket.y) * 0.5))[0];
+          if (!item) return this.send('stick', { x: 0, y: 0 });
+          const ux = basket.x - item.x;
+          const uy = basket.y - item.y;
+          const ul = Math.hypot(ux, uy) || 1;
+          const px = item.x - (ux / ul) * 13;
+          const py = item.y - (uy / ul) * 13;
+          const dx = px - me2.x;
+          const dy = py - me2.y;
+          const dl = Math.hypot(dx, dy);
+          if (dl > 5) this.send('stick', { x: dx / dl, y: dy / dl });
+          else this.send('stick', { x: ux / ul, y: uy / ul });
+          if (Math.random() < 0.02) this.send('dash');
+        });
+      }
+    }
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;

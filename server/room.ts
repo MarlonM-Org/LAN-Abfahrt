@@ -15,6 +15,7 @@ import { sanitizeLook } from '../shared/avatar';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { Bot } from './botclient';
+import { SupGame, TidyGame } from './controllergames';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -275,6 +276,12 @@ export class Room {
         break;
       case 'bomb':
         this.mini = new BombGame(ids, ctx);
+        break;
+      case 'sup':
+        this.mini = new SupGame(ids, ctx);
+        break;
+      case 'tidy':
+        this.mini = new TidyGame(ids, ctx);
         break;
     }
     this.results = null;

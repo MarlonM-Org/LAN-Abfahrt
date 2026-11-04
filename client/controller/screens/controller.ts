@@ -1,0 +1,133 @@
+import type { SupState, TidyState } from '../../../shared/types';
+import { TEAM_INFO } from '../../../shared/flunky';
+import { type Screen, app, el, message, nameOf, q, send, store, tapButton } from '../core';
+
+// ------------------------------------------------------------------ Joystick
+
+/** Virtueller Joystick: schickt die Richtung (−1…1) gedrosselt an den Server */
+export function joystick(container: HTMLElement, onMove: (x: number, y: number) => void) {
+  const pad = el(`<div class="stick-pad"><div class="stick-knob"></div></div>`).firstElementChild as HTMLElement;
+  const knob = pad.querySelector('.stick-knob') as HTMLElement;
+  container.append(pad);
+  let active: number | null = null;
+  let cx = 0;
+  let cy = 0;
+  let last = { x: 0, y: 0, t: 0 };
+  const R = 60;
+  const emit = (x: number, y: number, force = false) => {
+    const now = performance.now();
+    if (!force && now - last.t < 45 && Math.hypot(x - last.x, y - last.y) < 0.25) return;
+    last = { x, y, t: now };
+    onMove(Math.round(x * 100) / 100, Math.round(y * 100) / 100);
+  };
+  const move = (e: PointerEvent) => {
+    let dx = e.clientX - cx;
+    let dy = e.clientY - cy;
+    const d = Math.hypot(dx, dy);
+    if (d > R) {
+      dx = (dx / d) * R;
+      dy = (dy / d) * R;
+    }
+    knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    emit(dx / R, dy / R);
+  };
+  pad.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    pad.setPointerCapture(e.pointerId);
+    active = e.pointerId;
+    const r = pad.getBoundingClientRect();
+    cx = r.left + r.width / 2;
+    cy = r.top + r.height / 2;
+    move(e);
+  });
+  pad.addEventListener('pointermove', (e) => e.pointerId === active && move(e));
+  const up = (e: PointerEvent) => {
+    if (e.pointerId !== active) return;
+    active = null;
+    knob.style.transform = '';
+    emit(0, 0, true);
+  };
+  pad.addEventListener('pointerup', up);
+  pad.addEventListener('pointercancel', up);
+  // Wenn der Finger ruhig bleibt, trotzdem regelmäßig senden (falls ein Paket verloren ging)
+  const keepAlive = setInterval(() => {
+    if (!pad.isConnected) return clearInterval(keepAlive);
+    if (active !== null) emit(last.x, last.y, true);
+  }, 300);
+  return pad;
+}
+
+// ------------------------------------------------------------------ SUP
+
+export function pickSup(s: SupState): Screen {
+  const id = store.playerId!;
+  const b = s.boards.find((bb) => bb.left === id || bb.right === id);
+  if (!b) return ['spectate', message('Du schaust zu')];
+  if (s.sub === 'countdown') {
+    const role = b.left === b.right ? 'Du paddelst allein – beide Seiten!' : b.left === id ? `Du paddelst LINKS, ${nameOf(b.right)} rechts.` : `Du paddelst RECHTS, ${nameOf(b.left)} links.`;
+    return ['sup-count', message('Gleich geht’s los!', `${role}\nLinks paddeln dreht nach rechts – und umgekehrt. Gleichmäßig paddeln, sonst fallt ihr ins Wasser!`)];
+  }
+  if (s.sub === 'over') return ['sup-over', message(b.finished ? 'Im Ziel!' : 'Zeit ist um!', 'Schau auf den Fernseher!')];
+  const sides: ('left' | 'right')[] = b.left === b.right ? ['left', 'right'] : [b.left === id ? 'left' : 'right'];
+  return [`sup-race-${sides.join()}`, () => {
+    const root = el(`
+      <div class="top-row"><span class="timer"></span><span class="prog"></span></div>
+      <p class="partner"></p>
+      <div class="balance"><div class="needle"></div></div>
+      <div class="paddles ${sides.length === 2 ? 'two' : ''}"></div>
+    `);
+    const wrap = q(root, '.paddles');
+    for (const side of sides) {
+      const btn = el(`<button class="big-btn paddle ${side}">${side === 'left' ? '◀ LINKS' : 'RECHTS ▶'}<br/><small>paddeln</small></button>`).firstElementChild as HTMLButtonElement;
+      tapButton(btn, () => {
+        send('paddle', { side });
+        navigator.vibrate?.(10);
+      });
+      wrap.append(btn);
+    }
+    app.append(root);
+    return () => {
+      const st = store.state?.mini?.kind === 'sup' ? store.state.mini.state : null;
+      const bb = st?.boards.find((x) => x.id === b.id);
+      if (!st || !bb) return;
+      q(root, '.timer').textContent = `${Math.ceil(st.endsIn / 1000)}s`;
+      q(root, '.prog').textContent = `${Math.round((bb.x / st.length) * 100)}%`;
+      q(root, '.partner').textContent = bb.fallen ? 'PLATSCH! Wieder aufs Board ...' : bb.finished ? 'Im Ziel!' : bb.left === bb.right ? 'Abwechselnd paddeln!' : `Team mit ${nameOf(bb.left === id ? bb.right : bb.left)}`;
+      (q(root, '.needle') as HTMLElement).style.left = `${50 + Math.max(-1, Math.min(1, bb.balance)) * 46}%`;
+      q(root, '.balance').classList.toggle('danger', Math.abs(bb.balance) > 0.7);
+    };
+  }];
+}
+
+// ------------------------------------------------------------------ Aufräumen
+
+export function pickTidy(s: TidyState): Screen {
+  const me = s.players[store.playerId!];
+  if (!me) return ['spectate', message('Du schaust zu')];
+  if (s.sub === 'over') return ['td-over', message('Aufgeräumt!', 'Schau auf den Fernseher!')];
+  return [`td-${s.sub}`, () => {
+    const team = TEAM_INFO[me.team];
+    const root = el(`
+      <div class="team-badge team-${me.team}">${team.name} – euer Korb: ${me.team === 'A' ? 'links' : 'rechts'}</div>
+      <div class="top-row"><span class="timer"></span><span class="score"></span></div>
+      <p class="hint">${s.sub === 'countdown' ? 'Gleich geht’s los! Schiebt die Sachen in euren Korb.' : 'Lauf gegen die Sachen, um sie zu schieben!'}</p>
+      <div class="stick-area"></div>
+      <button class="big-btn dash">SPRINT</button>
+    `);
+    joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+    const dash = q<HTMLButtonElement>(root, '.dash');
+    tapButton(dash, () => {
+      send('dash');
+      navigator.vibrate?.(20);
+    });
+    app.append(root);
+    return () => {
+      const st = store.state?.mini?.kind === 'tidy' ? store.state.mini.state : null;
+      if (!st) return;
+      q(root, '.timer').textContent = `${Math.ceil(st.endsIn / 1000)}s`;
+      q(root, '.score').textContent = st.baskets.length > 1 ? `Sonne ${st.score.A} : ${st.score.B} Meer` : `${st.score.A} Teile`;
+      const pl = st.players[store.playerId!];
+      dash.disabled = !!pl && pl.dashLeft > 0;
+    };
+  }];
+}

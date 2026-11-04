@@ -12,15 +12,17 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   nhie: { title: 'Ich hab noch nie ...', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2 },
   hilo: { title: 'Höher oder Tiefer', tagline: 'Falsch geraten? Schluck!', minPlayers: 2 },
   bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
+  sup: { title: 'SUP-Rennen', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
+  tidy: { title: 'Aufräumen!', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'murder'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -145,3 +147,34 @@ export const BOMB_CATEGORIES = [
 
 export const CARD_LABELS: Record<number, string> = { 11: 'B', 12: 'D', 13: 'K', 14: 'A' };
 export const cardLabel = (v: number) => CARD_LABELS[v] ?? String(v);
+
+// ------------------------------------------------------------------ Controller-Spiele
+
+export const SUP = {
+  LENGTH: 1700,
+  TOP: 46,
+  BOTTOM: 252,
+  STROKE: 16,
+  TURN: 0.16,
+  WOBBLE: 0.3,
+  DRAG: 0.6,
+  FALL_MS: 1800,
+  TIME_MS: 80000,
+  COUNTDOWN_MS: 3000,
+  BOARD_R: 9,
+  COLORS: [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a],
+};
+
+export const TIDY = {
+  SPEED: 78,
+  DASH_SPEED: 150,
+  DASH_MS: 450,
+  DASH_COOLDOWN: 1800,
+  PLAYER_R: 7,
+  ITEM_R: 5,
+  ITEMS: 26,
+  TIME_MS: 60000,
+  COUNTDOWN_MS: 3000,
+  AREA: { x: 22, y: 44, w: 436, h: 210 },
+  ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
+};

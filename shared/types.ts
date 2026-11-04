@@ -25,7 +25,8 @@ export interface Point {
 export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
-  | 'nhie' | 'hilo' | 'bomb';
+  | 'nhie' | 'hilo' | 'bomb'
+  | 'sup' | 'tidy';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -260,6 +261,55 @@ export interface StarsState {
   lastWrong: { a: number; b: number; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: SUP
+
+export interface SupBoard {
+  id: number;
+  /** Mitglieder: [links, rechts] – bei Solo dieselbe ID zweimal */
+  left: string;
+  right: string;
+  x: number;
+  y: number;
+  heading: number;
+  balance: number;
+  fallen: boolean;
+  finished: boolean;
+  finishMs: number | null;
+  strokes: { left: number; right: number };
+  color: number;
+}
+
+export interface SupState {
+  sub: 'countdown' | 'race' | 'over';
+  endsIn: number;
+  length: number;
+  boards: SupBoard[];
+  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly' }[];
+}
+
+// ------------------------------------------------------------------ Controller-Spiele: Aufräumen
+
+export interface TidyPlayer {
+  x: number;
+  y: number;
+  team: Team;
+  /** Blickrichtung (für die Figur) */
+  dir: 1 | -1;
+  moving: boolean;
+  dashLeft: number;
+}
+
+export interface TidyState {
+  sub: 'countdown' | 'play' | 'over';
+  endsIn: number;
+  players: Record<string, TidyPlayer>;
+  items: { id: number; x: number; y: number; type: string }[];
+  baskets: { team: Team; x: number; y: number; r: number }[];
+  score: Record<Team, number>;
+  /** Kurzer Jubel, wenn ein Teil im Korb landet */
+  lastScore: { team: Team; type: string; seq: number } | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -346,7 +396,9 @@ export type MiniSnapshot =
   | { kind: 'stars'; state: StarsState }
   | { kind: 'nhie'; state: NhieState }
   | { kind: 'hilo'; state: HiloState }
-  | { kind: 'bomb'; state: BombState };
+  | { kind: 'bomb'; state: BombState }
+  | { kind: 'sup'; state: SupState }
+  | { kind: 'tidy'; state: TidyState };
 
 export interface GameState {
   phase: Phase;

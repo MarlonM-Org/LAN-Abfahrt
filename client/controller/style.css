@@ -243,3 +243,28 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .card-big { font-size: 40px; text-align: center; color: var(--red); background: var(--paper-light); border: 3px solid var(--wood-darker); padding: 18px; margin: 0 auto; min-width: 120px; }
 .big-btn.boom { background: #c0392b; box-shadow: inset 0 4px 0 #e86a5c, inset 0 -6px 0 #8a2419, 0 3px 0 var(--outline); }
 .big-btn.half { min-height: 24vh; }
+
+/* ---------------------------------------------------------------- Controller-Spiele */
+.stick-area { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 40vh; }
+.stick-pad {
+  width: 180px; height: 180px; border-radius: 50%; position: relative; touch-action: none;
+  background: radial-gradient(circle, var(--paper-light) 0 55%, var(--paper-dark) 56%);
+  border: 4px solid var(--wood-dark); box-shadow: inset 0 0 0 3px var(--wood-light), 0 3px 0 var(--outline);
+}
+.stick-knob {
+  position: absolute; left: 50%; top: 50%; width: 70px; height: 70px; margin: -35px 0 0 -35px; border-radius: 50%;
+  background: var(--wood); border: 4px solid var(--wood-darker); box-shadow: inset 0 4px 0 var(--wood-light);
+  pointer-events: none;
+}
+.big-btn.dash { min-height: 12vh; flex: none; background: #f0973a; }
+.paddles { display: grid; grid-template-columns: 1fr; gap: 10px; flex: 1; }
+.paddles.two { grid-template-columns: 1fr 1fr; }
+.big-btn.paddle { min-height: 50vh; font-size: 18px; }
+.big-btn.paddle small { font-size: 9px; }
+.big-btn.paddle.left { background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
+.big-btn.paddle.right { background: #2fb5a5; box-shadow: inset 0 4px 0 #6fdccd, inset 0 -6px 0 #1f7f73, 0 3px 0 var(--outline); }
+.balance { position: relative; height: 22px; border: 3px solid var(--wood-darker); background: linear-gradient(90deg, #f0928a, #f7e4b5 25%, #b9e39a 40%, #b9e39a 60%, #f7e4b5 75%, #f0928a); }
+.balance.danger { animation: shake 0.2s infinite; }
+.balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
+@keyframes shake { 50% { transform: translateX(3px); } }
+.partner { color: var(--ink); }
