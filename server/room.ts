@@ -20,6 +20,7 @@ import { SupGame, TidyGame } from './controllergames';
 import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
+import { BouleGame } from './boule';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
@@ -437,6 +438,9 @@ export class Room {
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);
+        break;
+      case 'boule':
+        this.mini = new BouleGame(ids, ctx);
         break;
       case 'sumo':
         this.mini = new SumoGame(ids, ctx);

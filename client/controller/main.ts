@@ -16,6 +16,7 @@ import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
 import { pickBowling } from './screens/bowling';
+import { pickBoule } from './screens/boule';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
 import { pickVerstecken } from './screens/verstecken';
@@ -252,6 +253,8 @@ function pickScreen(): Screen {
           return pickFangen(m.state);
         case 'geist':
           return pickGeist(m.state);
+        case 'boule':
+          return pickBoule(m.state);
         case 'sumo':
           return pickSumo(m.state);
         case 'tourist':

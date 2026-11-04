@@ -154,7 +154,7 @@ export function defaultSongForScene(scene: string): string {
   switch (scene) {
     case 'lobby': case 'board': case 'results':
       return 'party';
-    case 'story': case 'stars': case 'rhythm':
+    case 'story': case 'stars': case 'rhythm': case 'boule':
       return 'romantic';
     case 'wrap': case 'descent':
       return 'action';

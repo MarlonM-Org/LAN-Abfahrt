@@ -391,6 +391,29 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .bw-watch { flex: 0 0 auto; min-height: 22vh; }
 .bw-watch .sub { white-space: pre-line; }
 
+/* ---------------------------------------------------------------- Boule am Strand */
+.bo-head { display: flex; gap: 10px; align-items: stretch; }
+.bo-map { flex: none; width: 96px; height: 150px; image-rendering: pixelated; }
+.bo-info { flex: 1; display: flex; flex-direction: column; gap: 6px; font-size: 9px; color: var(--ink); }
+.bo-info p { margin: 0; }
+.bo-info b { color: var(--red); }
+.bo-lead { color: var(--red); }
+.bo-style { display: flex; gap: 6px; }
+.bo-style button { flex: 1; padding: 10px 4px; opacity: 0.55; }
+.bo-style button.on { opacity: 1; outline: 3px solid var(--outline); }
+.bo-schiessen { background: #d8473c; }
+.bo-style-hint { font-size: 8px; }
+.bo-area .bw-pad { min-height: 34vh; background: repeating-linear-gradient(0deg, #f1d49a 0 9px, #e6c47f 9px 10px); }
+.bo-area .big-btn.bw-swing { min-height: 34vh; }
+.bo-area .bw-ball { background: radial-gradient(circle at 35% 35%, #ffffff 0 4px, #b9bcc4 6px, #6c707a 18px); }
+.bo-board { gap: 4px; padding: 8px; }
+.bo-row { display: grid; grid-template-columns: 14px 1fr auto 30px; gap: 6px; align-items: center; font-size: 9px; padding: 3px 4px; }
+.bo-row b { text-align: right; color: var(--red); font-size: 12px; }
+.bo-row.me { background: #fff0c4; }
+.bo-row.turn .bw-name::before { content: '▶ '; color: var(--red); }
+.bo-sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--outline); }
+.bo-dots { font-size: 10px; letter-spacing: 1px; text-shadow: 0 0 1px #2d1b12; }
+
 /* ---------------------------------------------------------------- Ententeich */
 .en-status { display: flex; align-items: center; gap: 10px; min-height: 26px; }
 .en-swatch { width: 18px; height: 18px; border: 3px solid var(--outline); flex: none; }
