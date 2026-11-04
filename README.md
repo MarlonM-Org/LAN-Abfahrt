@@ -88,6 +88,28 @@ Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start
 Der TV/Laptop spielt durchgehend 8-Bit-Musik (komplett per WebAudio erzeugt, je nach Szene ein anderer Loop). Browser erlauben Ton erst nach einer Aktion: **einmal in die TV-Ansicht klicken oder eine Taste drücken**. **M** schaltet stumm.
 Beim Rhythmusspiel kommt der Song ebenfalls vom TV/Laptop – TV und Handys gleichen dafür ihre Uhr mit dem Server ab, damit Noten und Musik synchron sind. (Bei Bluetooth-Boxen kann es wegen deren Verzögerung minimal versetzt wirken – dann lieber Laptop-Lautsprecher oder Kabel.)
 
+## Steuerung am Laptop & Handy kurz weg
+
+**Laptop-Steuerung:** Läuft die TV-Ansicht direkt auf dem Laptop (<http://localhost:3000/tv.html>), erscheint bei Mausbewegung unten links ein dezentes Overlay (verschwindet nach ein paar Sekunden wieder):
+
+| Knopf | Taste | Wirkung |
+| --- | --- | --- |
+| Spiel abbrechen | `Esc` 2× | laufendes Spiel beenden → zurück in die Lobby |
+| Weiter | `Enter` / `Leertaste` | wie „Weiter“ des VIP (Ergebnis, Date-Night-Karte, Stille-Post-Vorführung, Diskussion im Mörderspiel) |
+| Bots entfernen | – | alle Bots rauswerfen (nur in der Lobby) |
+
+Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst kommen** (`127.0.0.1` / `::1`). Öffnet jemand `tv.html` am Handy oder über die LAN-IP bzw. die HTTPS-Domain, gibt es kein Overlay und keine Befehle – deshalb die TV-Ansicht am Laptop immer über `localhost` öffnen.
+
+**Handy kurz weg (App gewechselt, Bildschirm aus):** Das Handy verbindet sich beim Zurückkommen automatisch wieder als derselbe Spieler (die Spieler-ID liegt im `localStorage`), ohne den Namen neu einzugeben.
+
+- Der **VIP bleibt 60 Sekunden lang VIP**, auch wenn sein Handy weg ist – so lange wartet z. B. der Ergebnis-Bildschirm auf ihn.
+- Ist er länger weg, wird der am längsten verbundene **Mensch** VIP – ein Bot nur, wenn gar kein Mensch mehr verbunden ist.
+- Der **Gastgeber** (wer den Raum als Erster betreten hat) bekommt den VIP zurück, sobald er wieder da ist.
+- Kann nur noch ein Bot weiterdrücken, schaltet der Server nach ein paar Sekunden selbst weiter (Ergebnis nach 12 s, Date-Night-Karten nach 10 s, Stille-Post-Vorführung nach 5 s) – es bleibt nichts hängen.
+- In der Lobby bleiben Menschen ebenfalls 60 s (ausgegraut) im Raum, bevor sie entfernt werden.
+
+Zum Testen lassen sich die Zeiten verkürzen: `VIP_GRACE_MS=15000 AUTO_CONTINUE_MS=5000 npm run dev`.
+
 ## Auf den Fernseher bringen
 
 Der PC muss nicht am Fernseher stehen – das Bild wird ins Heimnetz gestreamt:

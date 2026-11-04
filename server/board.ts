@@ -105,6 +105,14 @@ export class Board {
     this.timers.later(900 + value * STEP_MS, () => this.land(playerId, path));
   }
 
+  /** Spieler ist mitten im eigenen Zug weg (Handy gesperrt, App gewechselt) → nach kurzer Zeit automatisch würfeln */
+  playerDisconnected(id: string) {
+    if (this.state.sub !== 'roll' || id !== this.currentPlayer) return;
+    this.timers.later(5000, () => {
+      if (!this.ctx.isConnected(id)) this.roll(id);
+    });
+  }
+
   /** Nach einem Minispiel: Münzen gutschreiben, nächste Runde. */
   afterMini(coins: Record<string, number>) {
     for (const [id, c] of Object.entries(coins)) if (id in this.state.coins) this.addCoins(id, c);

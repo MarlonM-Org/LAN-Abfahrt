@@ -12,6 +12,7 @@ import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
 import { setState } from './store';
+import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
 import { DATE_SCENES } from './DateScenes';
@@ -83,6 +84,14 @@ async function start() {
     unlock();
   });
   socket.on('connect', () => socket.emit('host:hello'));
+  // Steuer-Overlay nur, wenn die TV-Seite direkt am Laptop läuft (der Server prüft das)
+  let controls = false;
+  socket.on('host:info', (info: { local?: boolean }) => {
+    if (info?.local && !controls) {
+      controls = true;
+      installHostControls(socket);
+    }
+  });
   socket.on('state', (s: GameState) => {
     const key = sceneKey(s);
     setState(s);
