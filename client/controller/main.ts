@@ -29,6 +29,7 @@ import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
 import { pickSumo } from './screens/sumo';
 import { pickTourist } from './screens/tourist';
+import { pickSprueche } from './screens/sprueche';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -184,6 +185,8 @@ function pickScreen(): Screen {
           return pickSumo(m.state);
         case 'tourist':
           return pickTourist(m.state);
+        case 'sprueche':
+          return pickSprueche(m.state, vip);
       }
     }
   }

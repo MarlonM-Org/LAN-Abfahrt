@@ -26,6 +26,8 @@ import type { SumoState } from '../shared/types';
 import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
 import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
+import type { SpruecheState } from '../shared/types';
+import { SPRUECHE } from '../shared/sprueche';
 
 export interface BotOptions {
   url: string;
@@ -99,6 +101,8 @@ export class Bot {
   private ws = { nextThrow: 0, lastX: 0, lastY: 0, checkAt: 0, wanderUntil: 0, wx: 0, wy: 0, strafe: 1, strafeAt: 0 };
   /** Urlaubs-Fangen: Gedächtnis des Bots (nur, was auch auf dem TV zu sehen ist) */
   private fg: FangenMemory = { round: 0, seen: new Set(), goal: null, until: 0 };
+  /** Sprüche-Duell: bereits erledigte Antworten/Abstimmungen */
+  private quipDone = new Set<string>();
   /** Geisterjagd: Gedächtnis gegen Festhängen an Möbeln */
   private gj = { px: 0, py: 0, checkAt: 0, jitterUntil: 0, jx: 0, jy: 0 };
 
@@ -450,6 +454,51 @@ export class Bot {
         this.send('jump', { down: false });
         this.pc.jumping = false;
       }, rand(200, 340));
+    }
+  }
+
+  /** Sprüche-Duell: Antworten aus der Witzkiste, zufällig abstimmen */
+  private quipStep(st: SpruecheState, vip: boolean) {
+    const p = this.priv?.kind === 'sprueche' && this.priv.state.round === st.round && this.priv.state.sub === st.sub ? this.priv.state : null;
+    if (st.sub === 'answer' && p?.todo.length) {
+      const task = p.todo[0];
+      const key = `ans-${st.round}-${task.id}`;
+      if (!this.quipDone.has(key)) {
+        this.quipDone.add(key);
+        this.once(`quip-${key}`, async () => {
+          await sleep(rand(2000, 7000));
+          const text = QUIP_BOT_ANSWERS[Math.floor(Math.random() * QUIP_BOT_ANSWERS.length)];
+          this.send('answer', { round: st.round, prompt: task.id, text });
+        });
+      }
+    }
+    if (st.sub === 'vote' && p?.canVote) {
+      const key = `vote-${st.round}-${st.match}`;
+      if (!this.quipDone.has(key)) {
+        this.quipDone.add(key);
+        this.once(`quip-${key}`, async () => {
+          await sleep(rand(1200, 4500));
+          if (!st.final) return this.send('vote', { match: st.match, pick: Math.random() < 0.5 ? 0 : 1 });
+          const options = shuffleQuip((st.finalAnswers ?? []).map((_, i) => i).filter((i) => i !== p.mine));
+          const picks = options.slice(0, 1 + Math.floor(Math.random() * SPRUECHE.FINAL_PICKS));
+          for (const idx of picks) {
+            this.send('fvote', { idx, on: true });
+            await sleep(rand(200, 600));
+          }
+          if (picks.length) this.send('fdone');
+        });
+      }
+    }
+    // Bot-VIP blättert in der Auflösung etwas schneller weiter (Timer gibt es trotzdem)
+    if (vip && (st.sub === 'reveal' || st.sub === 'scores')) {
+      const key = `next-${st.sub}-${st.round}-${st.match}`;
+      this.once(`quip-${key}`, async () => {
+        if (this.quipDone.has(key)) return;
+        this.quipDone.add(key);
+        await sleep(st.sub === 'scores' ? 3500 : 4000);
+        const s2 = this.state?.mini?.kind === 'sprueche' ? this.state.mini.state : null;
+        if (s2 && s2.sub === st.sub && s2.round === st.round && s2.match === st.match) this.socket.emit('vip:mini', 'next');
+      });
     }
   }
 
@@ -933,6 +982,8 @@ export class Bot {
         });
       }
     }
+
+    if (m.kind === 'sprueche') this.quipStep(m.state, !!me?.isVip);
 
     if (m.kind === 'fangen' && (m.state.sub === 'chase' || m.state.sub === 'intro')) {
       const st = m.state;
@@ -2042,4 +2093,33 @@ function tourBot(bot: Bot, st: TourState) {
       if (cur()?.phaseNo === st.phaseNo) bot.send('vote', { yes: Math.random() < 0.6 });
     });
   }
+}
+
+/** Sprüche-Duell: Antworten der Bots (passen zu fast jeder Frage) */
+const QUIP_BOT_ANSWERS = [
+  'Ein Bot mit Sonnenbrand',
+  'Dosenbier im Handgepäck',
+  'Mein drittes Paar Badelatschen',
+  'Kevin vom Animationsteam',
+  'Zu viel Knoblauch',
+  'Die Oma von Tobi',
+  'Ein Flamingo namens Gerd',
+  'Sangria mit Strohhalm aus Nudeln',
+  'Ein sehr lauter Schlager',
+  'Leider ausverkauft',
+  '404: Witz nicht gefunden',
+  'Der Pool ist leer',
+  'Sand. Überall Sand.',
+  'Eine Möwe mit Sonnenbrille',
+  'Pommes rot-weiß',
+  'Ein USB-Stick voller Urlaubsfotos',
+];
+
+function shuffleQuip<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }

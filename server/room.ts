@@ -49,6 +49,7 @@ import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
 import { StillepostGame } from './stillepost';
 import { TouristGame } from './tourist';
+import { SpruecheGame } from './sprueche';
 
 const MAX_PLAYERS = 12;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -75,6 +76,7 @@ export class Room {
   private results: ResultsState | null = null;
   private questions = new QuestionStore();
   private posts = new QuestionStore('stillepost.json', 'post');
+  private quips = new QuestionStore('sprueche.json', 'quip');
   private flushTimer: NodeJS.Timeout | null = null;
 
   private bots: Bot[] = [];
@@ -223,7 +225,7 @@ export class Room {
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
-      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : this.questions;
+      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : this.questions;
       const q = store.add(String(text ?? ''));
       if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
       this.changed();
@@ -396,6 +398,9 @@ export class Room {
       case 'tourist':
         this.mini = new TouristGame(ids, ctx);
         break;
+      case 'sprueche':
+        this.mini = new SpruecheGame(ids, ctx, this.quips.all);
+        break;
     }
     this.results = null;
     this.phase = 'mini';
@@ -563,6 +568,7 @@ export class Room {
       results: this.results,
       customQuestionCount: this.questions.all.length,
       customPostCount: this.posts.all.length,
+      customQuipCount: this.quips.all.length,
     };
   }
 
