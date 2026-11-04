@@ -21,7 +21,15 @@ function build(r: ResultsState, vip: boolean) {
       ${r.final && first ? '<h2 class="yellow">Du bist Urlaubs-Champion!</h2>' : ''}
     </div>
   `);
-  if (vip && store.state?.drinkActive && !r.final) {
+  if (vip && store.state?.arcadeActive && !store.state.partyActive) {
+    const rnd = el(`<button class="drink-btn">Nächstes Spiel (zufällig)</button>`).firstElementChild as HTMLButtonElement;
+    rnd.addEventListener('click', () => socket.emit('vip:continue', 'random'));
+    const again = el(`<button>Nochmal ${escapeHtml(r.title)}</button>`).firstElementChild as HTMLButtonElement;
+    again.addEventListener('click', () => socket.emit('vip:continue', 'again'));
+    const menu = el(`<button class="secondary">Spiel auswählen</button>`).firstElementChild as HTMLButtonElement;
+    menu.addEventListener('click', () => socket.emit('vip:continue'));
+    root.append(rnd, again, menu);
+  } else if (vip && store.state?.drinkActive && !r.final) {
     const next = el(`<button class="drink-btn">Nächste Runde</button>`).firstElementChild as HTMLButtonElement;
     next.addEventListener('click', () => socket.emit('vip:continue'));
     const end = el(`<button class="secondary">Beenden & Statistik</button>`).firstElementChild as HTMLButtonElement;

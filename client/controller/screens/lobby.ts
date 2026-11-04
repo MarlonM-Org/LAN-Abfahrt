@@ -116,6 +116,10 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   if (mode === 'arcade') {
     if (vip) {
       menu.append(el(`<h2>Arcade</h2><p>Jedes Spiel einzeln – die Punkte landen im Leaderboard.</p>`));
+      const rnd = el(`<button class="drink-btn">Zufälliges Spiel</button>`).firstElementChild as HTMLButtonElement;
+      rnd.addEventListener('click', () => socket.emit('vip:start', { mode: 'random' }));
+      menu.append(rnd);
+      gated.push({ btn: rnd, min: 1 });
       for (const g of ARCADE_GROUPS) singles(g.kinds, g.title);
     }
     menu.append(leaderboardPanel());

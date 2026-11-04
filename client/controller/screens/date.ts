@@ -1,7 +1,8 @@
 import type { DescentState, DateRunState, RhythmState, StarsState, WrapState } from '../../../shared/types';
 import { INGREDIENT_NAMES, RHYTHM, WRAP_RECIPE } from '../../../shared/dategames';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, socket, store, tapButton } from '../core';
-import { PENTA, audio, pluck, scheduleSong, unlockAudio } from '../audio';
+import { PENTA, pluck, unlockAudio } from '../audio';
+import { toLocalPerf } from '../../timesync';
 import { ingredient } from '../../art/food';
 import { Pix } from '../../art/pix';
 
@@ -86,10 +87,10 @@ function buildReady() {
   const root = el(`
     <div class="center">
       <h2>Das erste Gespräch</h2>
-      <p>Ton an! Tippe im Takt auf LINKS und RECHTS, wenn die Noten unten ankommen.</p>
+      <p>Die Musik kommt vom Laptop/Fernseher – dreht auf! Tippe im Takt auf LINKS und RECHTS, wenn die Noten unten ankommen.</p>
       <p>Wer gerade redet, hat mehr zu tun – wer zuhört, nickt nur ab und zu.</p>
     </div>
-    <button>Bereit (Ton an)</button>
+    <button>Bereit!</button>
   `);
   root.querySelector('button')!.addEventListener('click', () => {
     unlockAudio();
@@ -104,9 +105,8 @@ function buildRhythm(s: RhythmState) {
   const notes = s.charts[id];
   const judged = new Array(notes.length).fill(false);
   const beatMs = 60000 / s.bpm;
-  const t0 = performance.now();
-  const ac = audio();
-  if (ac) scheduleSong(ac.currentTime + s.leadIn / 1000, beatMs / 1000, RHYTHM.BEATS);
+  // Die Musik kommt vom TV/Laptop; Start per synchronisierter Serverzeit
+  const t0 = toLocalPerf(s.startAt);
 
   const root = el(`
     <p class="talk"></p>

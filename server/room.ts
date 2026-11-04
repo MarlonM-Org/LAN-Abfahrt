@@ -17,7 +17,7 @@ import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
 import { Leaderboard } from './leaderboard';
-import { ARCADE_POINTS } from '../shared/games';
+import { ARCADE_POINTS, ARCADE_RANDOM } from '../shared/games';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -60,6 +60,7 @@ export class Room {
   private bots: Bot[] = [];
   private leaderboard = new Leaderboard();
   private arcadeActive = false;
+  private lastKind: MiniKind | null = null;
 
   constructor(
     private io: Server,
@@ -109,6 +110,10 @@ export class Room {
       if (!isVip() || this.phase !== 'lobby') return;
       const req = asRecord(raw);
       const ids = this.connectedIds();
+      if (req.mode === 'random') {
+        this.arcadeActive = this.mode === 'arcade';
+        return this.startRandom();
+      }
       if (req.mode === 'drink') {
         if (ids.length < 2) return socket.emit('toast', 'Mindestens 2 Spieler nötig.');
         this.drinkRun = { totals: Object.fromEntries(ids.map((id) => [id, 0])), last: null, rounds: 0 };
@@ -131,7 +136,16 @@ export class Room {
     });
 
     socket.on('vip:continue', (action?: string) => {
-      if ((isVip() || inCouple()) && this.phase === 'results') this.continueAfterResults(action === 'end');
+      if (!(isVip() || inCouple()) || this.phase !== 'results') return;
+      if (this.arcadeActive && !this.board && (action === 'random' || action === 'again')) {
+        if (action === 'again' && this.lastKind) return this.startMini(this.lastKind);
+        return this.startRandom();
+      }
+      this.continueAfterResults(action === 'end');
+    });
+
+    socket.on('time:ping', (t0: number, ack?: (r: { t0: number; server: number }) => void) => {
+      if (typeof ack === 'function') ack({ t0, server: Date.now() });
     });
 
     socket.on('vip:addBot', () => {
@@ -244,8 +258,17 @@ export class Room {
     this.changed();
   }
 
+  /** Zufälliges Spiel, das zur Spielerzahl passt und nicht gerade dran war */
+  private startRandom() {
+    const n = this.connectedIds().length;
+    const pool = ARCADE_RANDOM.filter((k) => MINI_INFO[k].minPlayers <= n && k !== this.lastKind);
+    const kind = pool[Math.floor(Math.random() * pool.length)] ?? 'sprint';
+    this.startMini(kind);
+  }
+
   private startMini(kind: MiniKind) {
     this.mini?.dispose();
+    this.lastKind = kind;
     const ids = this.dateRun ? this.dateRun.state.couple.filter((id) => this.players.has(id)) : this.connectedIds();
     const ctx: MiniCtx = {
       onChange: () => this.changed(),

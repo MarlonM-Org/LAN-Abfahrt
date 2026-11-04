@@ -5,13 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LAN-Abfahrt – TV</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #2d1b12; overflow: hidden; cursor: none; }
+      html, body { margin: 0; height: 100%; background: #2d1b12; overflow: hidden;  }
       #game { width: 100vw; height: 100vh; }
       canvas { image-rendering: pixelated; }
+      #sound { position: fixed; left: 50%; bottom: 3vh; transform: translateX(-50%); padding: 1.2vh 2vh; font: 1.6vh 'Press Start 2P', monospace; color: #3d2414; background: #f7e4b5; border: 0.5vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12; animation: pulse 1.2s infinite alternate; cursor: pointer; }
+      #mute { position: fixed; right: 2vh; top: 2vh; font: 1.4vh 'Press Start 2P', monospace; color: #fff4d6; text-shadow: 0.2vh 0.2vh #2d1b12; }
+      @keyframes pulse { to { opacity: 0.6; } }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="sound">Klicken oder Taste drücken für Musik &amp; Sound &nbsp;·&nbsp; M = stumm</div>
+    <div id="mute"></div>
     <script type="module" src="./host/main.ts"></script>
   </body>
 </html>
