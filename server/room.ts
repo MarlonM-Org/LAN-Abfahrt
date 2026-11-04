@@ -19,6 +19,7 @@ import { SupGame, TidyGame } from './controllergames';
 import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
+import { EntenGame } from './enten';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -301,6 +302,9 @@ export class Room {
         break;
       case 'bowling':
         this.mini = new BowlingGame(ids, ctx);
+        break;
+      case 'enten':
+        this.mini = new EntenGame(ids, ctx);
         break;
     }
     this.results = null;

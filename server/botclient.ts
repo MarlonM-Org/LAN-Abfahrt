@@ -51,6 +51,10 @@ export class Bot {
     wanderUntil: 0,
     horizon: 30,
   };
+  /** Ententeich: eigenes Fadenkreuz + aktuelles Ziel */
+  private aim = { x: 200, y: 135 };
+  private aimTarget: number | null = null;
+  private lastFire = 0;
 
   constructor(
     public name: string,
@@ -577,6 +581,44 @@ export class Bot {
         const spin = -start * rand(0.4, 1.1) + rand(-0.2, 0.2);
         this.send('throw', { seq: bw.aimSeq, start, speed: rand(0.35, 1), angle: rand(-0.3, 0.3), spin });
       });
+    }
+
+    if (m.kind === 'enten' && (m.state.sub === 'play' || m.state.sub === 'banner')) {
+      const en = m.state;
+      const me2 = en.players[this.id];
+      if (me2) {
+        this.once('enten', async () => {
+          await sleep(rand(55, 85));
+          if (me2.ammo === 0 && !me2.reloading) {
+            await sleep(rand(150, 450));
+            this.send('reload');
+            return;
+          }
+          const birds = en.targets.filter((t) => t.kind !== 'float' && (t.st === 'fly' || t.st === 'escape') && t.y < 200);
+          let target = birds.find((t) => t.id === this.aimTarget);
+          if (!target || Math.random() < 0.01) {
+            target = [...birds].sort((a, b) => Math.hypot(a.x - this.aim.x, a.y - this.aim.y) - Math.hypot(b.x - this.aim.x, b.y - this.aim.y))[0];
+            this.aimTarget = target?.id ?? null;
+          }
+          if (!target) {
+            this.aim.x += (200 - this.aim.x) * 0.05 + rand(-2, 2);
+            this.aim.y += (120 - this.aim.y) * 0.05 + rand(-2, 2);
+            this.send('aim', { x: this.aim.x, y: this.aim.y });
+            return;
+          }
+          // Mit Verzögerung + Zittern hinterherziehen, etwas vorhalten
+          const tx = target.x + target.vx * 0.12;
+          const ty = target.y + target.vy * 0.12;
+          this.aim.x += (tx - this.aim.x) * rand(0.25, 0.45) + rand(-3, 3);
+          this.aim.y += (ty - this.aim.y) * rand(0.25, 0.45) + rand(-3, 3);
+          this.send('aim', { x: Math.round(this.aim.x * 10) / 10, y: Math.round(this.aim.y * 10) / 10 });
+          const d = Math.hypot(tx - this.aim.x, ty - this.aim.y);
+          if (en.sub === 'play' && d < 12 && !me2.reloading && Date.now() - this.lastFire > 300 && Math.random() < 0.6) {
+            this.lastFire = Date.now();
+            this.send('shoot', { x: this.aim.x + rand(-2, 2), y: this.aim.y + rand(-2, 2) });
+          }
+        });
+      }
     }
 
     if (m.kind === 'murder') {

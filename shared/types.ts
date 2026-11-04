@@ -28,7 +28,8 @@ export type MiniKind =
   | 'nhie' | 'hilo' | 'bomb'
   | 'sup' | 'tidy'
   | 'flieger' | 'kurve' | 'arena'
-  | 'bowling';
+  | 'bowling'
+  | 'sup' | 'tidy' | 'enten';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -484,6 +485,65 @@ export interface BowlingState {
   last: BowlingRoll | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Ententeich
+
+/** duck/gull/flamingo = Vögel (Punkte), float = Badegast/Schwimmring (Strafe!) */
+export type EntenKind = 'duck' | 'gull' | 'flamingo' | 'float';
+
+export interface EntenTarget {
+  id: number;
+  kind: EntenKind;
+  /** Optik-Variante (z. B. Badegast auf Quietscheente vs. Schwimmring) */
+  look: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** fly = unterwegs, down = getroffen (fällt), escape = fliegt davon, hit = Badegast wurde getroffen (kurz) */
+  st: 'fly' | 'down' | 'escape' | 'hit';
+}
+
+export interface EntenPlayer {
+  /** Fadenkreuz in Weltkoordinaten */
+  x: number;
+  y: number;
+  ammo: number;
+  reloading: boolean;
+  score: number;
+  hits: number;
+  shots: number;
+  combo: number;
+  /** Farbe des Fadenkreuzes (0xRRGGBB) */
+  color: number;
+}
+
+export interface EntenShot {
+  seq: number;
+  pid: string;
+  x: number;
+  y: number;
+  /** Was getroffen wurde (null = daneben) */
+  kind: EntenKind | null;
+  tid: number | null;
+  pts: number;
+  combo: number;
+}
+
+export interface EntenState {
+  sub: 'intro' | 'banner' | 'play' | 'over';
+  /** 1-basiert; im Intro 0 */
+  wave: number;
+  waves: number;
+  waveName: string;
+  endsIn: number;
+  targets: EntenTarget[];
+  players: Record<string, EntenPlayer>;
+  /** Die letzten Schüsse (für Mündungsfeuer, Federn, Punkte-Popups) */
+  shots: EntenShot[];
+  /** Zählt hoch, wenn die Strandkrabbe lacht (Vogel entkommen / Badegast getroffen) */
+  laughSeq: number;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -576,7 +636,8 @@ export type MiniSnapshot =
   | { kind: 'flieger'; state: FliegerState }
   | { kind: 'kurve'; state: KurveState }
   | { kind: 'arena'; state: ArenaState }
-  | { kind: 'bowling'; state: BowlingState };
+  | { kind: 'bowling'; state: BowlingState }
+  | { kind: 'enten'; state: EntenState };
 
 export interface GameState {
   phase: Phase;
