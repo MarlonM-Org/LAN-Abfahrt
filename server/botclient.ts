@@ -3,10 +3,11 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { GameState, PrivateState } from '../shared/types';
+import type { GameState, KurveState, PrivateState } from '../shared/types';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { ROOMS } from '../shared/games';
+import { KURVE, ROOMS } from '../shared/games';
+import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 
 export interface BotOptions {
@@ -37,6 +38,18 @@ export class Bot {
   private resultsEntered = 0;
   private lastPhase = '';
   private timer: NodeJS.Timeout;
+  /** Kurven-Duell: eigene Kopie aller Spuren (der Snapshot enthält nur die letzten Punkte) */
+  private kv = {
+    round: -1,
+    others: new Uint8Array(480 * 270),
+    /** eigene Spur: Punktindex + 1 */
+    own: new Int32Array(480 * 270),
+    cursors: new Map<string, TrailCursor>(),
+    turn: 0,
+    sentAt: 0,
+    wanderUntil: 0,
+    horizon: 30,
+  };
 
   constructor(
     public name: string,
@@ -56,6 +69,67 @@ export class Bot {
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);
+    });
+  }
+
+  /** Kurven-Duell: Spuren mitschreiben und per Vorausschau lenken */
+  private playKurve(st: KurveState) {
+    const kv = this.kv;
+    if (st.round !== kv.round) {
+      kv.round = st.round;
+      kv.others.fill(0);
+      kv.own.fill(0);
+      kv.cursors.clear();
+      kv.horizon = Math.round(rand(22, 48));
+      kv.turn = 0;
+    }
+    for (const [id, h] of Object.entries(st.players)) {
+      let cur = kv.cursors.get(id);
+      if (!cur) kv.cursors.set(id, (cur = { idx: -1, x: 0, y: 0 }));
+      const mine = id === this.id;
+      const c = cur;
+      ingestTrail(h, cur, (x0, y0, x1, y1) =>
+        walkLine(x0, y0, x1, y1, (x, y) => {
+          const cx = Math.round(x);
+          const cy = Math.round(y);
+          for (let yy = cy - 1; yy <= cy + 1; yy++) {
+            for (let xx = cx - 1; xx <= cx + 1; xx++) {
+              if (xx < 0 || yy < 0 || xx >= 480 || yy >= 270) continue;
+              if (mine) kv.own[yy * 480 + xx] = c.idx + 2;
+              else kv.others[yy * 480 + xx] = 1;
+            }
+          }
+        }),
+      );
+    }
+    const me = st.players[this.id];
+    if (!me || !me.alive || st.sub !== 'play') {
+      if (kv.turn !== 0) {
+        kv.turn = 0;
+        this.send('turn', { dir: 0 });
+      }
+      return;
+    }
+    this.once('kurve', async () => {
+      await sleep(rand(40, 90));
+      const ownLatest = (kv.cursors.get(this.id)?.idx ?? 0) + 1;
+      const score = (d: number) => kurveLookAhead(st, this.id, kv, d, kv.horizon, ownLatest);
+      const now = Date.now();
+      const first = now < kv.wanderUntil ? kv.turn : 0;
+      const opts = [first, kv.turn, 0, -1, 1].filter((d, i, arr) => arr.indexOf(d) === i).map((d) => ({ d, s: score(d) }));
+      const best = Math.max(...opts.map((o) => o.s));
+      let dir = opts.find((o) => o.s === best)!.d;
+      // Alles frei? Ab und zu eine Kurve fahren – sieht lebendiger aus
+      if (best > kv.horizon && Math.random() < 0.05) {
+        const free = opts.filter((o) => o.s > kv.horizon);
+        dir = free[Math.floor(Math.random() * free.length)].d;
+        kv.wanderUntil = now + rand(250, 900);
+      }
+      if (dir !== kv.turn || now - kv.sentAt > 400) {
+        kv.turn = dir;
+        kv.sentAt = now;
+        this.send('turn', { dir });
+      }
     });
   }
 
@@ -314,6 +388,7 @@ export class Bot {
         });
       }
     }
+    if (m.kind === 'kurve') this.playKurve(m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -358,6 +433,50 @@ export class Bot {
       }
     }
   }
+}
+
+export interface KurveBrain {
+  others: Uint8Array;
+  own: Int32Array;
+}
+
+/** Wie viele Schritte (à 2 px) kommt man mit dieser Lenkrichtung, bevor es kracht? */
+export function kurveLookAhead(st: KurveState, myId: string, brain: KurveBrain, dir: number, horizon: number, ownLatest: number): number {
+  const me = st.players[myId];
+  const A = KURVE.ARENA;
+  const wrap = me.fx.includes('wrap');
+  const v = Math.max(20, me.v || KURVE.SPEED);
+  let { x, y, a } = me;
+  const da = (dir * KURVE.TURN * 2) / v;
+  // Andere Köpfe fahren (vermutlich) geradeaus weiter – nicht frontal reinrauschen
+  const heads = Object.entries(st.players)
+    .filter(([id, h]) => id !== myId && h.alive)
+    .map(([, h]) => ({ x: h.x, y: h.y, dx: Math.cos(h.a) * (2 * h.v) / v, dy: Math.sin(h.a) * (2 * h.v) / v }));
+  for (let k = 1; k <= horizon; k++) {
+    a += da;
+    x += Math.cos(a) * 2;
+    y += Math.sin(a) * 2;
+    // Ohne "Durch Wände" lieber etwas Abstand zum Rand halten
+    const m = wrap ? 2 : 6;
+    if (x < A.x + m || x > A.x + A.w - m || y < A.y + m || y > A.y + A.h - m) {
+      if (!wrap) return k;
+      if (x < A.x + m) x = A.x + A.w - 3;
+      else if (x > A.x + A.w - m) x = A.x + 3;
+      if (y < A.y + m) y = A.y + A.h - 3;
+      else if (y > A.y + A.h - m) y = A.y + 3;
+    }
+    if (heads.some((h) => Math.hypot(h.x + h.dx * k - x, h.y + h.dy * k - y) < 7)) return k;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    for (const [px, py] of [[x + c, y + s], [x - s * 1.5, y + c * 1.5], [x + s * 1.5, y - c * 1.5]]) {
+      const cell = Math.floor(py) * 480 + Math.floor(px);
+      if (cell < 0 || cell >= brain.others.length) continue;
+      if (brain.others[cell]) return k;
+      const o = brain.own[cell];
+      if (o && o < ownLatest - 6) return k;
+    }
+  }
+  return horizon + 1;
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */

@@ -317,3 +317,12 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .fl-seg button.active { background: #3f8fe0; color: #fff4d6; text-shadow: 1px 1px 0 #1d4f8a; box-shadow: inset 0 3px 0 #7fbcf0, inset 0 -3px 0 #2d64a8, 0 1px 0 var(--outline); transform: translateY(2px); }
 .fl-status { font-size: 9px; }
 .fl-fuel.low { color: #c0392b; animation: shake 0.3s infinite; }
+/* ---------------------------------------------------------------- Kurven-Duell */
+.kv-color { text-align: center; padding: 10px 6px; color: var(--outline); border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5); }
+.kv-status { color: var(--ink); min-height: 2.6em; text-align: center; }
+.kv-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
+.kv-btns.out { opacity: 0.35; }
+.big-btn.kv-btn { min-height: 58vh; font-size: 18px; line-height: 2; -webkit-touch-callout: none; }
+.big-btn.kv-left { background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
+.big-btn.kv-right { background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
+.big-btn.kv-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
