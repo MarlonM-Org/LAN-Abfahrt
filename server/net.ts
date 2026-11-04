@@ -15,3 +15,10 @@ export function getLanAddress(): string {
     candidates[0];
   return preferred ?? 'localhost';
 }
+
+/** Kommt die Verbindung vom Rechner selbst (localhost)? Nur dann gilt die TV-Seite als „Laptop“. */
+export function isLoopback(address: string | undefined): boolean {
+  if (!address) return false;
+  const a = address.startsWith('::ffff:') ? address.slice(7) : address;
+  return a === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(a);
+}

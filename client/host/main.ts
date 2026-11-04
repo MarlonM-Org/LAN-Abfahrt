@@ -12,9 +12,11 @@ import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
 import { setState } from './store';
+import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
-import { musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
+import { isMusicMenuOpen, musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
+import { watchServerVersion } from '../version';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -68,6 +70,7 @@ async function start() {
   startTimeSync(socket);
   connectMusic(socket);
   setupMusicMenu();
+  watchServerVersion(socket);
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
   const overlay = document.getElementById('sound');
@@ -85,10 +88,23 @@ async function start() {
       toggleMusicMenu();
       return;
     }
-    if (e.key === 'Escape') toggleMusicMenu(false);
+    if (e.key === 'Escape' && isMusicMenuOpen()) {
+      // Nur das Menü schließen – nicht zusätzlich „Spiel abbrechen“ (Laptop-Steuerung) auslösen
+      toggleMusicMenu(false);
+      e.stopImmediatePropagation();
+      return;
+    }
     unlock();
   });
   socket.on('connect', () => socket.emit('host:hello'));
+  // Steuer-Overlay nur, wenn die TV-Seite direkt am Laptop läuft (der Server prüft das)
+  let controls = false;
+  socket.on('host:info', (info: { local?: boolean }) => {
+    if (info?.local && !controls) {
+      controls = true;
+      installHostControls(socket);
+    }
+  });
   socket.on('state', (s: GameState) => {
     const key = sceneKey(s);
     setState(s);
