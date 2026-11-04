@@ -86,7 +86,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   `);
   q(root, '.row-center').append(avatarCanvas(6, store.look));
   const menu = q(root, '.menu');
-  const gated: { btn: HTMLButtonElement; min: number; max?: number }[] = [];
+  const gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[] = [];
   if (mode === 'date') q(root, '.q-panel').classList.add('hidden');
 
   if (vip) {
@@ -108,7 +108,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       const b = el(`<button class="secondary small">${info.title}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:start', { mode: kind }));
       q(row, '.btn-grid').append(b);
-      gated.push({ btn: b, min: info.minPlayers });
+      gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
     }
     menu.append(row);
   };
@@ -223,7 +223,16 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       mode === 'drink'
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`
         : `${st?.customPostCount ?? 0} eigene Startsätze`;
-    for (const g of gated) g.btn.disabled = n < g.min || (g.max !== undefined && n > g.max);
+    for (const g of gated) {
+      const tooMany = g.max !== undefined && n > g.max;
+      g.btn.disabled = n < g.min || tooMany;
+      // Kurzer Hinweis, warum ein Spiel ausgegraut ist (z. B. „max. 8 Spieler“)
+      if (g.hint) {
+        const small = g.btn.querySelector('small.max-hint');
+        if (tooMany && !small) g.btn.insertAdjacentHTML('beforeend', `<small class="max-hint"><br/>${g.hint}</small>`);
+        else if (!tooMany && small) small.remove();
+      }
+    }
   };
 }
 
