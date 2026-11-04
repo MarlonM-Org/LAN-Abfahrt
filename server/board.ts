@@ -174,9 +174,11 @@ export class Board {
   private intro() {
     const s = this.state;
     // Finale: eines der Versteckte-Rollen-Spiele (Mord oder Verräter)
-    const finales = FINALE_KINDS.filter((k) => this.ctx.connectedCount() >= MINI_INFO[k].minPlayers);
+    const players = this.ctx.connectedCount();
+    const finales = FINALE_KINDS.filter((k) => players >= MINI_INFO[k].minPlayers);
     const isFinale = s.round === s.maxRounds && finales.length > 0;
-    const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini);
+    // Nur Spiele, für die genug Leute da sind (z. B. Urlaubs-Fangen ab 3)
+    const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini && MINI_INFO[k].minPlayers <= players);
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
     const kind: MiniKind = isFinale ? pick(finales) : pick(pool);
     this.lastMini = kind;

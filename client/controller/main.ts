@@ -24,6 +24,7 @@ import { pickIgel } from './screens/igel';
 import { pickSmash } from './screens/smash';
 import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
+import { pickFangen } from './screens/fangen';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -169,6 +170,8 @@ function pickScreen(): Screen {
           return pickWasser(m.state);
         case 'stillepost':
           return pickStillepost(m.state, vip);
+        case 'fangen':
+          return pickFangen(m.state);
       }
     }
   }

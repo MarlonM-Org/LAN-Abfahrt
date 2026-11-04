@@ -19,6 +19,8 @@ import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
+import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
+import type { FangenState } from '../shared/types';
 
 export interface BotOptions {
   url: string;
@@ -90,6 +92,8 @@ export class Bot {
   private sm = { shieldUntil: 0, lastJump: 0, lastA: 0, lastB: 0, stick: '', stickAt: 0 };
   /** Wasserbomben-Schlacht: kleines Bot-Gedächtnis */
   private ws = { nextThrow: 0, lastX: 0, lastY: 0, checkAt: 0, wanderUntil: 0, wx: 0, wy: 0, strafe: 1, strafeAt: 0 };
+  /** Urlaubs-Fangen: Gedächtnis des Bots (nur, was auch auf dem TV zu sehen ist) */
+  private fg: FangenMemory = { round: 0, seen: new Set(), goal: null, until: 0 };
 
   constructor(
     public name: string,
@@ -923,6 +927,16 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'fangen' && (m.state.sub === 'chase' || m.state.sub === 'intro')) {
+      const st = m.state;
+      this.once('fangen', async () => {
+        await sleep(100);
+        if (st.round !== this.fg.round) this.fg = { round: st.round, seen: new Set(), goal: null, until: 0 };
+        if (st.runner === this.id) fangenRunner(this, st);
+        else if (st.hunters[this.id] && st.sub === 'chase') fangenHunter(this, st, this.fg);
+      });
+    }
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;
@@ -1524,6 +1538,103 @@ export function randomDrawing(): PostDrawing {
     return { c: Math.floor(Math.random() * POST_COLORS.length), w: Math.floor(Math.random() * 3), p };
   });
   return { s: strokes };
+}
+
+// ---------------------------------------------------------------- Urlaubs-Fangen
+
+interface FangenMemory {
+  round: number;
+  seen: Set<number>;
+  goal: { col: number; row: number } | null;
+  until: number;
+}
+
+/** Läuft zur Mitte der nächsten Kachel auf dem Weg zum Ziel */
+function steer(bot: Bot, me: { x: number; y: number }, goal: { col: number; row: number } | null) {
+  if (!goal) return bot.send('stick', { x: 0, y: 0 });
+  const next = nextStepTowards(me, goal);
+  const dx = next.x - me.x;
+  const dy = next.y - me.y;
+  const d = Math.hypot(dx, dy);
+  if (d < 1.5) return bot.send('stick', { x: 0, y: 0 });
+  bot.send('stick', { x: Math.round((dx / d) * 100) / 100, y: Math.round((dy / d) * 100) / 100 });
+}
+
+const randomTileNear = (col: number, row: number, radius: number) => {
+  const dist = bfsFrom([{ col, row }]);
+  const opts = WALK_TILES.filter((t) => distAt(dist, t.col, t.row) <= radius && distAt(dist, t.col, t.row) >= 1);
+  return opts[Math.floor(Math.random() * opts.length)] ?? { col, row };
+};
+
+/** Flüchtling: kennt alle Positionen (privat) und flieht per Breitensuche von den Fängern weg */
+function fangenRunner(bot: Bot, st: FangenState) {
+  const p = bot.priv?.kind === 'fangen' ? bot.priv.state : null;
+  if (!p) return;
+  const me = tileOf(p.x, p.y);
+  const hunters = Object.values(st.hunters).map((h) => tileOf(h.x, h.y));
+  const dh = hunters.length ? bfsFrom(hunters) : null;
+  const danger = dh ? distAt(dh, me.col, me.row) : Infinity;
+  if (st.sub === 'chase' && danger < 8 && p.decoyLeft <= 0 && !p.decoyActive && Math.random() < 0.05) bot.send('decoy');
+  // Weit genug weg → stehen bleiben und abwarten (bewegt sich nur, wenn es eng wird)
+  if (danger >= 11 && st.sub === 'chase') return steer(bot, p, null);
+  const dm = bfsFrom([me]);
+  let best: { col: number; row: number } | null = null;
+  let bestScore = -Infinity;
+  for (const t of WALK_TILES) {
+    const mine = distAt(dm, t.col, t.row);
+    if (mine > 10) continue;
+    const theirs = dh ? distAt(dh, t.col, t.row) : 20;
+    if (theirs <= mine) continue; // da wäre ein Fänger vor mir
+    const score = theirs - mine * 0.35 + Math.random() * 0.8;
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
+  }
+  if (!best && dh) {
+    // eingekesselt: wenigstens auf die sicherste Nachbarkachel
+    for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const c = { col: me.col + dc, row: me.row + dr };
+      if (!isWalkTile(c.col, c.row)) continue;
+      const sc = distAt(dh, c.col, c.row);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = c;
+      }
+    }
+  }
+  steer(bot, p, best);
+}
+
+/** Fänger: nur TV-Infos – Fußspuren, die eigene Fährte und wo die anderen Fänger "warm" sind */
+function fangenHunter(bot: Bot, st: FangenState, fg: FangenMemory) {
+  const meH = st.hunters[bot.id];
+  const me = tileOf(meH.x, meH.y);
+  const now = Date.now();
+  const fresh = st.prints.filter((pr) => !fg.seen.has(pr.id));
+  for (const pr of fresh) fg.seen.add(pr.id);
+  const others = Object.entries(st.hunters).filter(([id]) => id !== bot.id);
+  const hottest = others.sort((a, b) => b[1].heat - a[1].heat)[0]?.[1];
+  if (fresh.length) {
+    // Bei mehreren neuen Spuren: die nahe einem "warmen" Fänger ist wohl echt, sonst zufällig
+    const pick = hottest && hottest.heat > 0 ? [...fresh].sort((a, b) => Math.hypot(a.x - hottest.x, a.y - hottest.y) - Math.hypot(b.x - hottest.x, b.y - hottest.y))[0] : fresh[Math.floor(Math.random() * fresh.length)];
+    const t = tileOf(pick.x + (Math.random() - 0.5) * 20, pick.y + (Math.random() - 0.5) * 20);
+    fg.goal = isWalkTile(t.col, t.row) ? t : tileOf(pick.x, pick.y);
+    fg.until = now + 6000;
+  } else if (meH.heat >= 2 && now > fg.until - 4500) {
+    // Warm → in der Nähe absuchen
+    fg.goal = randomTileNear(me.col, me.row, 3);
+    fg.until = now + 1500 + 4500;
+  } else if (!fg.goal || now > fg.until || (fg.goal.col === me.col && fg.goal.row === me.row)) {
+    // Kein Hinweis → zum wärmsten Mitspieler oder irgendwohin
+    const base = hottest && hottest.heat > meH.heat ? tileOf(hottest.x, hottest.y) : WALK_TILES[Math.floor(Math.random() * WALK_TILES.length)];
+    fg.goal = randomTileNear(base.col, base.row, 2);
+    fg.until = now + 5000;
+  }
+  if (meH.heat >= 2 && meH.sprintLeft <= 0 && Math.random() < 0.15) bot.send('sprint');
+  const c = tileCenter(fg.goal!.col, fg.goal!.row);
+  if (Math.hypot(c.x - meH.x, c.y - meH.y) < 3) fg.until = 0;
+  steer(bot, meH, fg.goal);
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */
