@@ -26,7 +26,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'fangen';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +310,64 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Urlaubs-Fangen
+
+export interface FangenHunter {
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  moving: boolean;
+  /** Restliche Abklingzeit des Sprints in ms */
+  sprintLeft: number;
+  sprinting: boolean;
+  /** Fährte: 0 = kalt, 1 = lau, 2 = warm, 3 = heiß */
+  heat: 0 | 1 | 2 | 3;
+}
+
+/** Kurz sichtbare Fußspur – echte und falsche (Ablenkung) sehen gleich aus */
+export interface FangenPrint {
+  id: number;
+  x: number;
+  y: number;
+  angle: number;
+  /** Restliche Sichtbarkeit in ms */
+  ttl: number;
+}
+
+export interface FangenOutcome {
+  runner: string;
+  caught: boolean;
+  by: string | null;
+  survivedMs: number;
+  /** Wo der Flüchtling am Ende war (erst nach der Runde öffentlich) */
+  x: number;
+  y: number;
+}
+
+export interface FangenState {
+  sub: 'intro' | 'chase' | 'roundEnd' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  /** Wer gerade Flüchtling ist (die Position bleibt geheim!) */
+  runner: string;
+  hunters: Record<string, FangenHunter>;
+  prints: FangenPrint[];
+  points: Record<string, number>;
+  /** Nur in "roundEnd" / "over" */
+  outcome: FangenOutcome | null;
+}
+
+/** Nur an den Flüchtling: die eigene Position (die Fänger stehen öffentlich im GameState) */
+export interface FangenPrivate {
+  role: 'runner';
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  decoyLeft: number;
+  decoyActive: boolean;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +456,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'fangen'; state: FangenState };
 
 export interface GameState {
   phase: Phase;
@@ -418,7 +477,7 @@ export interface GameState {
   customQuestionCount: number;
 }
 
-export type PrivateState = { kind: 'murder'; state: MurderPrivate } | null;
+export type PrivateState = { kind: 'murder'; state: MurderPrivate } | { kind: 'fangen'; state: FangenPrivate } | null;
 
 export interface JoinRequest {
   name: string;

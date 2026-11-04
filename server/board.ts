@@ -174,7 +174,9 @@ export class Board {
   private intro() {
     const s = this.state;
     const isFinale = s.round === s.maxRounds && this.ctx.connectedCount() >= MINI_INFO.murder.minPlayers;
-    const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini);
+    // Nur Spiele, für die genug Leute da sind (z. B. Urlaubs-Fangen ab 3)
+    const players = this.ctx.connectedCount();
+    const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini && MINI_INFO[k].minPlayers <= players);
     const kind: MiniKind = isFinale ? 'murder' : pool[Math.floor(Math.random() * pool.length)];
     this.lastMini = kind;
     s.sub = 'intro';
