@@ -1,0 +1,28 @@
+{
+  "name": "lan-abfahrt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Party-Spiel für die Freundesgruppe – TV zeigt das Spiel, Handys sind die Controller.",
+  "scripts": {
+    "dev": "tsx watch --ignore ./client --ignore ./dist server/index.ts",
+    "build": "vite build",
+    "start": "tsx server/index.ts --prod",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "phaser": "^3.90.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "tsx": "^4.20.0",
+    "vite": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.9.0"
+  }
+}
