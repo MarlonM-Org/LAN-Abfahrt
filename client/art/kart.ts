@@ -1,4 +1,4 @@
-import { KART, type Track, project } from '../../shared/kart';
+import { KART, type Track, type TrackDef, project } from '../../shared/kart';
 import { C } from './palette';
 import { Pix, rng } from './pix';
 import * as O from './objects';
@@ -36,8 +36,24 @@ const THEME = {
   pool: { road: '#c9bba0', roadDark: '#b3a486', roadLight: '#ddd2bb', band: 'lawn' },
 } as const;
 
+/** Aufrecht stehende Deko (Palme, Schirm …) mit Fußpunkt in Weltkoordinaten – für die Verfolger-Ansicht als Billboard */
+export interface KartProp {
+  x: number;
+  y: number;
+  img: Pix;
+}
+
 /** Komplette Strecke als Hintergrundbild (480 × 270) */
 export function paintKartTrack(track: Track, W: number, H: number): Pix {
+  return paintKartScene(track, W, H).ground;
+}
+
+/**
+ * Strecke als Bodentextur plus aufrecht stehende Deko getrennt (Mode-7-Ansicht).
+ * Mit `flat = true` wird alles in den Boden gemalt (Draufsicht auf dem TV).
+ */
+export function paintKartScene(track: Track, W: number, H: number, flat = true): { ground: Pix; props: KartProp[] } {
+  const props: KartProp[] = [];
   const p = new Pix(W, H);
   const theme = track.def.theme;
   const T = THEME[theme];
@@ -163,26 +179,28 @@ export function paintKartTrack(track: Track, W: number, H: number): Pix {
   // 6) Deko neben der Strecke
   const free = (x: number, y: number, rad: number) => project(track, x, y).dist > band + rad;
   const spots: { x: number; y: number; r: number }[] = [];
-  const place = (img: Pix, x: number, y: number, rad = 8) => {
+  const place = (img: Pix, x: number, y: number, rad: number, tall: boolean) => {
     const cy = y - img.h / 2;
     if (spots.some((o) => Math.hypot(o.x - x, o.y - cy) < o.r + Math.max(img.w, img.h) / 2)) return false;
     if (x - img.w / 2 < 2 || x + img.w / 2 > W - 2 || y > H - 2) return false;
     if (y - img.h < 20 || !free(x, y, rad) || !free(x, y - img.h / 2, Math.max(rad, img.w / 2)) || !free(x, y - img.h + 4, rad)) return false;
-    p.draw(img, x - img.w / 2, y - img.h);
+    if (tall && !flat) props.push({ x, y, img });
+    else p.draw(img, x - img.w / 2, y - img.h);
     spots.push({ x, y: cy, r: Math.max(img.w, img.h) / 2 - 4 });
     return true;
   };
-  const scatter = (count: number, make: (i: number) => Pix, rad: number, region = { x: 0, y: 24, w: W, h: H - 24 }) => {
+  // `tall`: steht aufrecht (wird in der Verfolger-Ansicht als Billboard gezeichnet)
+  const scatter = (count: number, make: (i: number) => Pix, rad: number, tall = true, region = { x: 0, y: 24, w: W, h: H - 24 }) => {
     let placed = 0;
     for (let tries = 0; tries < count * 30 && placed < count; tries++) {
       const x = region.x + r() * region.w;
       const y = region.y + r() * region.h;
-      if (place(make(placed), x, y, rad)) placed++;
+      if (place(make(placed), x, y, rad, tall)) placed++;
     }
   };
   if (theme === 'beach') {
     const cols = [C.red, C.blue, C.green, C.orange, C.pink];
-    scatter(6, (i) => O.towel(cols[i % cols.length]), 10);
+    scatter(6, (i) => O.towel(cols[i % cols.length]), 10, false);
     scatter(4, (i) => O.umbrella(cols[(i + 2) % cols.length]), 14);
     scatter(4, (i) => O.palm(30 + i), 18);
     scatter(3, (i) => O.deckchair(cols[i % cols.length]), 12);
@@ -205,6 +223,19 @@ export function paintKartTrack(track: Track, W: number, H: number): Pix {
     scatter(4, () => O.plant(), 8);
     scatter(3, (i) => O.umbrella([C.blue, C.red, C.green][i % 3]), 14);
   }
+  return { ground: p, props };
+}
+
+/** Kachel (32 × 32) für das Gelände außerhalb der 480 × 270-Welt (Mode-7-Ansicht bis zum Horizont) */
+export function paintKartOutside(theme: TrackDef['theme']): Pix {
+  const p = new Pix(32, 32);
+  const r = rng(950);
+  if (theme === 'beach') paintSand(p, 0, 0, 32, 32, 951);
+  else if (theme === 'harbor') {
+    p.rect(0, 0, 32, 32, C.waterDark);
+    p.speckle(0, 0, 32, 32, C.water, 40, r, 2);
+    p.speckle(0, 0, 32, 32, C.waterLight, 14, r, 3);
+  } else paintGrass(p, 0, 0, 32, 32, 953, false);
   return p;
 }
 

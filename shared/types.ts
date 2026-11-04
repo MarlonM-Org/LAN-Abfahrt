@@ -876,6 +876,11 @@ export interface KartCar {
   drift: number;
   charged: boolean;
   offroad: boolean;
+  /** Für die Vorhersage am Handy: Geschwindigkeit, Drift-Ladung (s), Rest-Turbo (ms) */
+  vx: number;
+  vy: number;
+  dc: number;
+  bm: number;
 }
 
 export interface KartEvent {
@@ -894,6 +899,14 @@ export interface KartState {
   closing: boolean;
   track: number;
   laps: number;
+  /** split = Verfolger-Ansichten auf dem geteilten TV, phone = jedes Handy zeigt seine eigene (TV: Draufsicht) */
+  view: import('./kart').KartView;
+  /** Wer im Splitscreen eine Ansicht bekommt (max. 4, in dieser Reihenfolge) */
+  panes: string[];
+  /** Darf der VIP auf Splitscreen umschalten? (≤ 4 Menschen) */
+  splitOk: boolean;
+  /** Serverzeit des Physik-Schritts zu diesem Stand (für Interpolation/Vorhersage) */
+  t: number;
   karts: Record<string, KartCar>;
   boxes: { x: number; y: number; on: boolean }[];
   hazards: { id: number; kind: 'banana' | 'coconut'; x: number; y: number }[];

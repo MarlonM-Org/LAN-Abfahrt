@@ -95,6 +95,7 @@ export class Bot {
   /** Kart-Rennen: eigene Ideallinie (seitlicher Versatz) und Item-Zeitpunkt */
   private kartLane = rand(-6, 6);
   private kartItemAt = 0;
+  private kartDrift = false;
   /** Kurzzeitgedächtnis für die Smash-Arena */
   private sm = { shieldUntil: 0, lastJump: 0, lastA: 0, lastB: 0, stick: '', stickAt: 0 };
   /** Wasserbomben-Schlacht: kleines Bot-Gedächtnis */
@@ -914,10 +915,14 @@ export class Bot {
       if (car && !car.finished) {
         this.once('kart', async () => {
           await sleep(rand(80, 130));
-          const ap = autopilot(getTrack(k.track), car.x, car.y, car.angle, 70, this.kartLane);
+          const speed = Math.hypot(car.vx, car.vy);
+          const ap = autopilot(getTrack(k.track), car.x, car.y, car.angle, Math.max(40, speed), this.kartLane);
           // etwas menschliche Unschärfe
           const steer = Math.max(-1, Math.min(1, ap.steer + rand(-0.15, 0.15)));
-          this.send('steer', { x: Math.round(steer * 100) / 100, brake: ap.brake && Math.random() < 0.7 });
+          // Driften in Kurven (mit Hysterese, damit die Ladung nicht verloren geht), bremsen nur wenn's eng wird
+          if (!this.kartDrift && Math.abs(ap.steer) > 0.55 && speed > 50 && !car.offroad) this.kartDrift = Math.random() < 0.6;
+          else if (this.kartDrift && (Math.abs(ap.steer) < 0.2 || speed < 30)) this.kartDrift = false;
+          this.send('steer', { x: Math.round(steer * 100) / 100, gas: true, brake: ap.brake && !this.kartDrift && Math.random() < 0.5, drift: this.kartDrift });
           if (car.item) {
             if (!this.kartItemAt) this.kartItemAt = Date.now() + rand(600, 3500);
             if (Date.now() >= this.kartItemAt) {

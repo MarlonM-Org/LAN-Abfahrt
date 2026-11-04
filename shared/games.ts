@@ -23,7 +23,7 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   ttt: { title: 'Verräter im Ferienhaus', tagline: 'Poolnudeln raus – wer spielt falsch?', minPlayers: 4 },
   verstecken: { title: 'Versteckspiel mit Möbeln', tagline: 'Werdet zur Kühlbox – und bloß nicht bewegen!', minPlayers: 3 },
   parcours: { title: 'Fallen-Parcours', tagline: 'Baut Fallen – und schafft es selbst zur Cocktailbar!', minPlayers: 2 },
-  kart: { title: 'Kart-Rennen', tagline: 'Handy kippen zum Lenken – drei Runden ums Ferienhaus!', minPlayers: 2 },
+  kart: { title: 'Kart-Rennen', tagline: 'Verfolger-Kamera wie auf dem SNES – Gas, Drift, Items!', minPlayers: 2 },
   turm: { title: 'Wackelturm', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2 },
   igel: { title: 'Igel-Krieg', tagline: 'Kokosnüsse, Wasserbomben – wer bleibt auf der Insel?', minPlayers: 2 },
   smash: { title: 'Smash-Arena', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2 },
