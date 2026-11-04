@@ -1,5 +1,5 @@
 import type { BoardState, MiniKind } from '../shared/types';
-import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, MINI_INFO } from '../shared/games';
+import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, MINI_INFO, fitsPlayers } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
 const STEP_MS = 280;
@@ -105,6 +105,14 @@ export class Board {
     this.timers.later(900 + value * STEP_MS, () => this.land(playerId, path));
   }
 
+  /** Spieler ist mitten im eigenen Zug weg (Handy gesperrt, App gewechselt) → nach kurzer Zeit automatisch würfeln */
+  playerDisconnected(id: string) {
+    if (this.state.sub !== 'roll' || id !== this.currentPlayer) return;
+    this.timers.later(5000, () => {
+      if (!this.ctx.isConnected(id)) this.roll(id);
+    });
+  }
+
   /** Nach einem Minispiel: Münzen gutschreiben, nächste Runde. */
   afterMini(coins: Record<string, number>) {
     for (const [id, c] of Object.entries(coins)) if (id in this.state.coins) this.addCoins(id, c);
@@ -174,11 +182,13 @@ export class Board {
   private intro() {
     const s = this.state;
     // Finale: eines der Versteckte-Rollen-Spiele (Mord oder Verräter)
-    const players = this.ctx.connectedCount();
-    const finales = FINALE_KINDS.filter((k) => players >= MINI_INFO[k].minPlayers);
+    const n = this.ctx.connectedCount();
+    const finales = FINALE_KINDS.filter((k) => fitsPlayers(k, n));
     const isFinale = s.round === s.maxRounds && finales.length > 0;
-    // Nur Spiele, für die genug Leute da sind (z. B. Urlaubs-Fangen ab 3)
-    const pool: MiniKind[] = BOARD_KINDS.filter((k) => k !== this.lastMini && MINI_INFO[k].minPlayers <= players);
+    // Nur Spiele, die zur Spielerzahl passen (z. B. Urlaubs-Fangen ab 3, max. 8 Spieler)
+    const fitting = BOARD_KINDS.filter((k) => fitsPlayers(k, n));
+    const pool: MiniKind[] = fitting.filter((k) => k !== this.lastMini);
+    if (!pool.length) pool.push(...(fitting.length ? fitting : BOARD_KINDS));
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
     const kind: MiniKind = isFinale ? pick(finales) : pick(pool);
     this.lastMini = kind;

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LAN-Abfahrt – Musik-Werkstatt</title>
+    <link rel="stylesheet" href="./musik/style.css" />
+  </head>
+  <body>
+    <header id="top">
+      <h1>♪ Musik-Werkstatt</h1>
+      <div class="meta">
+        <label>Titel <input id="title" maxlength="60" /></label>
+        <label>Von <input id="author" maxlength="40" placeholder="dein Name" /></label>
+        <label>Stil <select id="style"></select></label>
+        <label>Tonart <select id="keyRoot"></select><select id="keyMode"><option value="0">Dur</option><option value="1">Moll</option></select></label>
+      </div>
+      <div class="actions">
+        <button id="new" class="btn">Neu</button>
+        <button id="library" class="btn">Vorlage laden</button>
+        <button id="save" class="btn primary">Speichern</button>
+        <button id="saveAs" class="btn">Speichern unter …</button>
+        <button id="delete" class="btn danger">Löschen</button>
+        <button id="midiBtn" class="btn">MIDI importieren</button>
+        <input id="midiFile" type="file" accept=".mid,.midi,audio/midi" hidden />
+        <button id="export" class="btn">Exportieren ▾</button>
+        <a id="tvLink" class="btn link" href="/tv.html" target="_blank">TV</a>
+      </div>
+    </header>
+
+    <section id="transport">
+      <button id="play" class="btn big" title="Leertaste">▶ Play</button>
+      <button id="stop" class="btn" title="Stopp (Leertaste)">■</button>
+      <label class="toggle"><input id="loop" type="checkbox" checked /> Loop</label>
+      <label>BPM <input id="bpm" type="number" min="40" max="260" step="1" /></label>
+      <label>Swing <input id="swing" type="range" min="0" max="0.5" step="0.01" /><span id="swingVal"></span></label>
+      <label>Takte <input id="bars" type="number" min="1" max="16" step="1" /></label>
+      <span class="sep"></span>
+      <button id="undo" class="btn" title="Strg+Z">↶</button>
+      <button id="redo" class="btn" title="Strg+Y">↷</button>
+      <span class="sep"></span>
+      <span class="hint">Takt <b id="cursorBar">1</b>:</span>
+      <button id="copyBar" class="btn" title="Strg+C">Kopieren</button>
+      <button id="pasteBar" class="btn" title="Strg+V">Einfügen</button>
+      <button id="clearBar" class="btn">Leeren</button>
+      <span class="sep"></span>
+      <label class="toggle"><input id="snap" type="checkbox" /> Skalen-Snap</label>
+      <label>Gesamt <input id="master" type="range" min="0" max="1" step="0.01" /></label>
+      <span id="status" class="status"></span>
+    </section>
+
+    <main>
+      <aside id="channels">
+        <div class="tabs" id="tabs"></div>
+        <div class="chan-settings">
+          <label>Klang <select id="wave"></select></label>
+          <label>Lautstärke <input id="chVol" type="range" min="0" max="0.3" step="0.005" /></label>
+          <label>Hüllkurve <select id="env"><option value="hold">Halten</option><option value="pluck">Zupfen</option></select></label>
+          <label class="toggle"><input id="chMute" type="checkbox" /> Kanal stumm</label>
+          <hr />
+          <label>Schlagzeug <input id="drumVol" type="range" min="0" max="2" step="0.05" /></label>
+          <label class="toggle"><input id="drumMute" type="checkbox" /> Schlagzeug stumm</label>
+        </div>
+        <div class="sing">
+          <h3>🎤 Einsingen</h3>
+          <label>Ziel <select id="singChannel"><option value="lead">Melodie</option><option value="bass">Bass</option><option value="harmony">Begleitung</option></select></label>
+          <label>Ab Takt <input id="singFrom" type="number" min="1" max="16" value="1" /></label>
+          <label>Takte <input id="singBars" type="number" min="1" max="16" value="4" /></label>
+          <label class="toggle"><input id="singCount" type="checkbox" checked /> Einzähler (1 Takt)</label>
+          <label class="toggle"><input id="singClick" type="checkbox" checked /> Metronom</label>
+          <label class="toggle"><input id="singBacking" type="checkbox" checked /> Begleitung mitspielen</label>
+          <label class="toggle"><input id="singSnap" type="checkbox" checked /> Auf Tonart ziehen</label>
+          <div class="row">
+            <button id="singStart" class="btn primary">● Aufnahme</button>
+            <button id="singStop" class="btn" hidden>■ Fertig</button>
+          </div>
+          <div id="singInfo" class="hint">Singe oder summe die Melodie – sie landet als Noten im Zielkanal.</div>
+          <div class="row" id="proposalRow" hidden>
+            <button id="accept" class="btn primary">✓ Übernehmen</button>
+            <button id="reject" class="btn">✕ Verwerfen</button>
+          </div>
+        </div>
+        <div class="assign">
+          <h3>Auf dem TV</h3>
+          <label>Für Szene <select id="assignScene"></select></label>
+          <button id="assignBtn" class="btn">Diesen Song zuordnen</button>
+          <div class="hint">Speichert den Song und stellt ihn für die Szene ein (live auf dem TV).</div>
+        </div>
+      </aside>
+      <section id="editor">
+        <div id="roll"></div>
+        <div id="drums"></div>
+        <p class="help">Klick = Note setzen (ziehen = länger) · Note ziehen = verschieben · rechter Rand = Länge · Rechtsklick/Entf = löschen · Umschalt+Klick = mehrere · Leertaste = Play/Stopp · Strg+Z/Y · Strg+C/V = Takt kopieren/einfügen</p>
+      </section>
+    </main>
+
+    <div id="libraryDlg" class="modal-bg" hidden>
+      <div class="modal">
+        <h2>Vorlage laden</h2>
+        <div class="chips" id="libChips"></div>
+        <div class="lib-list" id="libList"></div>
+        <div class="row end"><button id="libClose" class="btn">Schließen</button></div>
+      </div>
+    </div>
+    <script type="module" src="./musik/main.ts"></script>
+  </body>
+</html>

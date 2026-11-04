@@ -14,6 +14,7 @@ export default defineConfig({
       input: {
         controller: resolve(dir, 'client/index.html'),
         tv: resolve(dir, 'client/tv.html'),
+        musik: resolve(dir, 'client/musik.html'),
       },
     },
   },

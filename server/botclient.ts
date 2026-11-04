@@ -24,6 +24,12 @@ import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
 import type { FangenState } from '../shared/types';
+import type { SumoState } from '../shared/types';
+import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
+import type { TourState } from '../shared/types';
+import { TOUR_LOCATIONS } from '../shared/tourist';
+import type { SpruecheState } from '../shared/types';
+import { SPRUECHE } from '../shared/sprueche';
 
 export interface BotOptions {
   url: string;
@@ -97,6 +103,8 @@ export class Bot {
   private ws = { nextThrow: 0, lastX: 0, lastY: 0, checkAt: 0, wanderUntil: 0, wx: 0, wy: 0, strafe: 1, strafeAt: 0 };
   /** Urlaubs-Fangen: Gedächtnis des Bots (nur, was auch auf dem TV zu sehen ist) */
   private fg: FangenMemory = { round: 0, seen: new Set(), goal: null, until: 0 };
+  /** Sprüche-Duell: bereits erledigte Antworten/Abstimmungen */
+  private quipDone = new Set<string>();
   /** Geisterjagd: Gedächtnis gegen Festhängen an Möbeln */
   private gj = { px: 0, py: 0, checkAt: 0, jitterUntil: 0, jx: 0, jy: 0 };
 
@@ -477,6 +485,51 @@ export class Bot {
         this.send('jump', { down: false });
         this.pc.jumping = false;
       }, rand(200, 340));
+    }
+  }
+
+  /** Sprüche-Duell: Antworten aus der Witzkiste, zufällig abstimmen */
+  private quipStep(st: SpruecheState, vip: boolean) {
+    const p = this.priv?.kind === 'sprueche' && this.priv.state.round === st.round && this.priv.state.sub === st.sub ? this.priv.state : null;
+    if (st.sub === 'answer' && p?.todo.length) {
+      const task = p.todo[0];
+      const key = `ans-${st.round}-${task.id}`;
+      if (!this.quipDone.has(key)) {
+        this.quipDone.add(key);
+        this.once(`quip-${key}`, async () => {
+          await sleep(rand(2000, 7000));
+          const text = QUIP_BOT_ANSWERS[Math.floor(Math.random() * QUIP_BOT_ANSWERS.length)];
+          this.send('answer', { round: st.round, prompt: task.id, text });
+        });
+      }
+    }
+    if (st.sub === 'vote' && p?.canVote) {
+      const key = `vote-${st.round}-${st.match}`;
+      if (!this.quipDone.has(key)) {
+        this.quipDone.add(key);
+        this.once(`quip-${key}`, async () => {
+          await sleep(rand(1200, 4500));
+          if (!st.final) return this.send('vote', { match: st.match, pick: Math.random() < 0.5 ? 0 : 1 });
+          const options = shuffleQuip((st.finalAnswers ?? []).map((_, i) => i).filter((i) => i !== p.mine));
+          const picks = options.slice(0, 1 + Math.floor(Math.random() * SPRUECHE.FINAL_PICKS));
+          for (const idx of picks) {
+            this.send('fvote', { idx, on: true });
+            await sleep(rand(200, 600));
+          }
+          if (picks.length) this.send('fdone');
+        });
+      }
+    }
+    // Bot-VIP blättert in der Auflösung etwas schneller weiter (Timer gibt es trotzdem)
+    if (vip && (st.sub === 'reveal' || st.sub === 'scores')) {
+      const key = `next-${st.sub}-${st.round}-${st.match}`;
+      this.once(`quip-${key}`, async () => {
+        if (this.quipDone.has(key)) return;
+        this.quipDone.add(key);
+        await sleep(st.sub === 'scores' ? 3500 : 4000);
+        const s2 = this.state?.mini?.kind === 'sprueche' ? this.state.mini.state : null;
+        if (s2 && s2.sub === st.sub && s2.round === st.round && s2.match === st.match) this.socket.emit('vip:mini', 'next');
+      });
     }
   }
 
@@ -963,6 +1016,8 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'sprueche') this.quipStep(m.state, !!me?.isVip);
+
     if (m.kind === 'fangen' && (m.state.sub === 'chase' || m.state.sub === 'intro')) {
       const st = m.state;
       this.once('fangen', async () => {
@@ -973,6 +1028,8 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'sumo') sumoBot(this, m.state);
+
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
       const p = this.priv?.kind === 'geist' ? this.priv.state : null;
@@ -982,6 +1039,8 @@ export class Bot {
         if (dir) this.send('stick', { x: Math.round(dir.x * 100) / 100, y: Math.round(dir.y * 100) / 100 });
       });
     }
+
+    if (m.kind === 'tourist') tourBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -1912,3 +1971,188 @@ export function solveConstellation(name: string, stars: { id: number; x: number;
   return [];
 }
 
+
+// ------------------------------------------------------------------ Sumo-Steg
+
+interface SumoBotMemory {
+  nextAt: number;
+  moving: boolean;
+  /** Eigene Ungenauigkeit, damit nicht alle Bots gleich spielen */
+  slop: number;
+  wobble: number;
+}
+
+const sumoBotMem = new WeakMap<Bot, SumoBotMemory>();
+
+/** Sicherer Boden für den Bot: nur heile Planken ('!' knackt gleich weg) */
+function sumoBotSafe(tiles: string, x: number, y: number) {
+  const cell = sumoCellAt(x, y);
+  return !!cell && tiles[sumoIdx(cell[0], cell[1])] === '#';
+}
+
+/**
+ * Sumo-Bot: läuft zum nächsten Gegner – möglichst von der Steg-Mitte aus, damit der Schubs
+ * nach außen geht –, rempelt, wenn er nah und ausgerichtet ist, und hält sich vom Rand fern.
+ */
+function sumoBot(bot: Bot, st: SumoState) {
+  let mem = sumoBotMem.get(bot);
+  if (!mem) sumoBotMem.set(bot, (mem = { nextAt: 0, moving: false, slop: rand(0.05, 0.3), wobble: rand(0, 6) }));
+  const me = st.players[bot.id];
+  if (st.sub !== 'play' || !me?.alive) {
+    if (mem.moving) {
+      mem.moving = false;
+      bot.send('stick', { x: 0, y: 0 });
+    }
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 140);
+
+  // Mitte der heilen Planken
+  let cx = 0;
+  let cy = 0;
+  let n = 0;
+  for (let i = 0; i < st.tiles.length; i++) {
+    if (st.tiles[i] !== '#') continue;
+    cx += SUMO.OX + (i % SUMO.COLS) * SUMO.TILE + SUMO.TILE / 2;
+    cy += SUMO.OY + Math.floor(i / SUMO.COLS) * SUMO.TILE + SUMO.TILE / 2;
+    n++;
+  }
+  if (!n) {
+    cx = me.x;
+    cy = me.y;
+  } else {
+    cx /= n;
+    cy /= n;
+  }
+  const norm = (x: number, y: number) => {
+    const l = Math.hypot(x, y) || 1;
+    return { x: x / l, y: y / l, l: Math.hypot(x, y) };
+  };
+
+  const foes = Object.entries(st.players).filter(([id, p]) => id !== bot.id && p.alive);
+  const target = foes.sort((a, b) => Math.hypot(a[1].x - me.x, a[1].y - me.y) - Math.hypot(b[1].x - me.x, b[1].y - me.y))[0]?.[1];
+
+  let want = { x: 0, y: 0 };
+  let dashOk = false;
+  if (target) {
+    // Von innen anlaufen: Punkt zwischen Gegner und Steg-Mitte
+    const out = norm(target.x - cx, target.y - cy);
+    const behind = { x: target.x - out.x * 14, y: target.y - out.y * 14 };
+    const toBehind = norm(behind.x - me.x, behind.y - me.y);
+    const toT = norm(target.x - me.x, target.y - me.y);
+    const goal = toBehind.l > 10 && toT.l > 16 ? toBehind : toT;
+    want = { x: goal.x, y: goal.y };
+    // Rempeln: nah dran, Stoß zeigt grob nach außen, und man landet selbst nicht im Wasser
+    const aligned = toT.x * out.x + toT.y * out.y > 0.2 || out.l < 10;
+    const land = sumoBotSafe(st.tiles, me.x + toT.x * 30, me.y + toT.y * 30);
+    dashOk = toT.l < 34 && aligned && land && me.cd <= 0;
+    if (dashOk) want = { x: toT.x, y: toT.y };
+  }
+
+  // Randvermeidung: voraus schauen und Umgebung abtasten
+  const home = norm(cx - me.x, cy - me.y);
+  let danger = 0;
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    if (!sumoBotSafe(st.tiles, me.x + Math.cos(a) * 12, me.y + Math.sin(a) * 12)) danger++;
+  }
+  const aheadBad = !sumoBotSafe(st.tiles, me.x + want.x * 16, me.y + want.y * 16) || !sumoBotSafe(st.tiles, me.x + want.x * 28, me.y + want.y * 28);
+  if (aheadBad || danger >= 3 || !sumoBotSafe(st.tiles, me.x, me.y)) {
+    const k = aheadBad ? 1.4 : danger / 4;
+    want = { x: want.x + home.x * k, y: want.y + home.y * k };
+    dashOk = dashOk && !aheadBad;
+  }
+  // etwas menschliche Unschärfe
+  const wob = Math.sin(now / 700 + mem.wobble) * mem.slop;
+  const w = norm(want.x + wob * -want.y, want.y + wob * want.x);
+  if (w.l < 0.05) {
+    if (mem.moving) bot.send('stick', { x: 0, y: 0 });
+    mem.moving = false;
+    return;
+  }
+  mem.moving = true;
+  bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
+  if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
+
+// ------------------------------------------------------------------ Wer ist der Tourist?
+
+/** Pro Bot und Runde: wann der Bot-Tourist rät bzw. der Bot jemanden anklagt */
+const tourMem = new WeakMap<Bot, { round: number; guessAt: number; accuseAt: number }>();
+
+/**
+ * Bots können nicht reden – sie fragen nach ein paar Sekunden zufällig jemanden,
+ * raten als Tourist irgendwann einen Ort, klagen selten zufällig an und stimmen zufällig ab.
+ */
+function tourBot(bot: Bot, st: TourState) {
+  const p = bot.priv?.kind === 'tourist' ? bot.priv.state : null;
+  if (!p || p.round !== st.round || !(bot.id in st.points)) return;
+  let mem = tourMem.get(bot);
+  if (!mem || mem.round !== st.round) {
+    const now = Date.now();
+    mem = { round: st.round, guessAt: now + rand(25000, 70000), accuseAt: Math.random() < 0.35 ? now + rand(15000, 80000) : Infinity };
+    tourMem.set(bot, mem);
+  }
+  const others = Object.keys(st.points).filter((id) => id !== bot.id);
+  const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  const cur = () => (bot.state?.mini?.kind === 'tourist' ? bot.state.mini.state : null);
+
+  if (st.sub === 'play') {
+    if (st.asker === bot.id) {
+      bot.once(`tour-ask-${st.round}-${st.askSeq}`, async () => {
+        await sleep(rand(2500, 6000));
+        const s2 = cur();
+        if (!s2 || s2.sub !== 'play' || s2.asker !== bot.id || s2.askSeq !== st.askSeq) return;
+        const back = s2.lastAsk?.to === bot.id ? s2.lastAsk.from : null;
+        bot.send('ask', { target: pickOne(others.filter((id) => id !== back)) });
+      });
+    }
+    const now = Date.now();
+    if (p.tourist && now >= mem.guessAt) {
+      mem.guessAt = Infinity;
+      bot.send('guess', { loc: Math.floor(Math.random() * TOUR_LOCATIONS.length) });
+    } else if (now >= mem.accuseAt && !st.accusers.includes(bot.id)) {
+      mem.accuseAt = Infinity;
+      bot.send('accuse', { target: pickOne(others) });
+    }
+  }
+
+  const v = st.vote;
+  if (st.sub === 'vote' && v && v.passed === null && v.accuser !== bot.id && v.accused !== bot.id && p.myVote === null) {
+    bot.once(`tour-vote-${st.phaseNo}`, async () => {
+      await sleep(rand(1000, 3500));
+      if (cur()?.phaseNo === st.phaseNo) bot.send('vote', { yes: Math.random() < 0.6 });
+    });
+  }
+}
+
+/** Sprüche-Duell: Antworten der Bots (passen zu fast jeder Frage) */
+const QUIP_BOT_ANSWERS = [
+  'Ein Bot mit Sonnenbrand',
+  'Dosenbier im Handgepäck',
+  'Mein drittes Paar Badelatschen',
+  'Kevin vom Animationsteam',
+  'Zu viel Knoblauch',
+  'Die Oma von Tobi',
+  'Ein Flamingo namens Gerd',
+  'Sangria mit Strohhalm aus Nudeln',
+  'Ein sehr lauter Schlager',
+  'Leider ausverkauft',
+  '404: Witz nicht gefunden',
+  'Der Pool ist leer',
+  'Sand. Überall Sand.',
+  'Eine Möwe mit Sonnenbrille',
+  'Pommes rot-weiß',
+  'Ein USB-Stick voller Urlaubsfotos',
+];
+
+function shuffleQuip<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}

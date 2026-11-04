@@ -45,7 +45,10 @@ export type MiniKind =
   | 'stillepost'
   | 'sup' | 'tidy' | 'fangen'
   | 'geist'
-  | 'boule';
+  | 'boule'
+  | 'sumo'
+  | 'tourist'
+  | 'sprueche';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -193,6 +196,63 @@ export interface MurderPrivate {
   killTarget: string | null;
   bodyHere: boolean;
   myVote: string | null;
+}
+
+// ------------------------------------------------------------------ Wer ist der Tourist?
+
+export type TourSub = 'intro' | 'play' | 'vote' | 'reveal' | 'over';
+
+export type TourOutcome = 'guess-right' | 'guess-wrong' | 'caught' | 'wrong-accuse' | 'timeout';
+
+/** Öffentlicher Zustand – enthält den Ort erst in der Auflösung, Rollen nie */
+export interface TourState {
+  sub: TourSub;
+  round: number;
+  rounds: number;
+  /** Zeit bis zum Ende der aktuellen Phase (ms) */
+  endsIn: number;
+  /** Restzeit der Fragerunde (pausiert während einer Anklage) */
+  roundLeft: number;
+  roundMs: number;
+  /** Zählt jede Phase hoch (für Countdown/Screen-Keys) */
+  phaseNo: number;
+  points: Record<string, number>;
+  touristCount: number;
+  /** Wer gerade fragen darf */
+  asker: string | null;
+  /** Letzte Frage: „from fragt to“ */
+  lastAsk: { from: string; to: string } | null;
+  askSeq: number;
+  /** Wer in dieser Runde schon angeklagt hat */
+  accusers: string[];
+  vote: {
+    accuser: string;
+    accused: string;
+    voted: string[];
+    /** erst nach der Abstimmung gesetzt */
+    yes: number | null;
+    no: number | null;
+    passed: boolean | null;
+  } | null;
+  reveal: {
+    location: string;
+    touristen: string[];
+    outcome: TourOutcome;
+    accuser: string | null;
+    accused: string | null;
+    guesser: string | null;
+    guess: string | null;
+    gains: Record<string, number>;
+  } | null;
+}
+
+export interface TourPrivate {
+  round: number;
+  tourist: boolean;
+  /** Nur für Einheimische */
+  location: string | null;
+  role: string | null;
+  myVote: boolean | null;
 }
 
 // ------------------------------------------------------------------ Date Night: Abstieg
@@ -1138,6 +1198,72 @@ export interface StillepostPrivate {
   myVote: number | null;
 }
 
+// ------------------------------------------------------------------ Sprüche-Duell
+
+/** Ein Duell: zwei Antworten auf dieselbe Frage (Autoren erst ab der Auflösung öffentlich) */
+export interface SpruecheDuel {
+  answers: [string, string];
+  /** null während der Abstimmung (anonym) */
+  authors: [string, string] | null;
+  votes: [number, number] | null;
+  voters: [string[], string[]] | null;
+  gained: [number, number] | null;
+  /** "ABRÄUMER!": Index der Antwort mit allen Stimmen */
+  sweep: 0 | 1 | null;
+}
+
+export interface SpruecheFinalAnswer {
+  text: string;
+  /** Autor erst in der Auflösung */
+  by: string | null;
+  votes: number | null;
+  gained: number | null;
+}
+
+export interface SpruecheState {
+  sub: 'intro' | 'answer' | 'vote' | 'reveal' | 'scores' | 'over';
+  /** 1 … rounds, die letzte Runde ist das Finale */
+  round: number;
+  rounds: number;
+  final: boolean;
+  multiplier: number;
+  endsIn: number;
+  players: string[];
+  /** Antwortphase: Anzahl beantworteter Fragen pro Spieler / benötigt */
+  answered: Record<string, number>;
+  need: number;
+  /** Duell bzw. Finale: Frage, um die es gerade geht */
+  prompt: string;
+  match: number;
+  matches: number;
+  duel: SpruecheDuel | null;
+  finalAnswers: SpruecheFinalAnswer[] | null;
+  /** Wer abstimmen darf / schon abgestimmt hat */
+  voters: string[];
+  voted: string[];
+  points: Record<string, number>;
+  /** Punkte der letzten Runde (für die Zwischenwertung) */
+  roundGain: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export interface SpruechePrivate {
+  round: number;
+  sub: SpruecheState['sub'];
+  /** Antwortphase: offene Fragen in Reihenfolge (id = Fragenindex der Runde) */
+  todo: { id: number; prompt: string }[];
+  answered: number;
+  /** "Sicherheits-Spruch"-Vorschlag (seq zählt hoch) */
+  suggest: { text: string; seq: number } | null;
+  /** Abstimmung: eigene Antwort (Index) – dafür darf man nicht stimmen */
+  mine: number | null;
+  canVote: boolean;
+  /** Eigene Stimme(n): Duell 0/1, Finale bis zu 3 Indizes */
+  myVotes: number[];
+  /** Finale: Abstimmung abgeschlossen */
+  voteDone: boolean;
+}
+
 // ------------------------------------------------------------------ Controller-Spiele: Urlaubs-Fangen
 
 export interface FangenHunter {
@@ -1235,6 +1361,40 @@ export interface GeistState {
   roundWinner: 'ghost' | 'hunters' | null;
   roundReason: string | null;
   points: Record<string, number>;
+}
+
+// ------------------------------------------------------------------ Sumo-Steg
+
+export interface SumoPlayer {
+  x: number;
+  y: number;
+  /** Blickrichtung für das Sprite */
+  f: 1 | -1;
+  alive: boolean;
+  /** Rempelt gerade */
+  dash: boolean;
+  /** Restliche Abklingzeit des Remplers (ms) */
+  cd: number;
+  /** Gerade weggeschubst (rutscht, kann kurz nicht steuern) */
+  stun: boolean;
+  /** Zählt hoch bei jedem Treffer (Handy vibriert) */
+  hits: number;
+  wins: number;
+  /** Wie oft man jemanden ins Wasser geschubst hat (alle Runden) */
+  pushes: number;
+}
+
+export interface SumoState {
+  sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  endsIn: number;
+  round: number;
+  winRounds: number;
+  /** COLS × ROWS Zeichen, siehe SumoTile in shared/sumo.ts */
+  tiles: string;
+  /** Die letzte Insel bricht (Sudden Death) */
+  sudden: boolean;
+  players: Record<string, SumoPlayer>;
+  roundWinner: string | null;
 }
 
 /** Nur an den jeweiligen Spieler */
@@ -1349,7 +1509,10 @@ export type MiniSnapshot =
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
   | { kind: 'geist'; state: GeistState }
-  | { kind: 'boule'; state: BouleState };
+  | { kind: 'boule'; state: BouleState }
+  | { kind: 'sumo'; state: SumoState }
+  | { kind: 'tourist'; state: TourState }
+  | { kind: 'sprueche'; state: SpruecheState };
 
 export interface GameState {
   phase: Phase;
@@ -1372,6 +1535,8 @@ export interface GameState {
   customQuestionCount: number;
   /** Eigene Startsätze für Stille Post */
   customPostCount: number;
+  /** Eigene Fragen fürs Sprüche-Duell */
+  customQuipCount: number;
 }
 
 export interface LeaderEntry {
@@ -1390,6 +1555,8 @@ export type PrivateState =
   | { kind: 'stillepost'; state: StillepostPrivate }
   | { kind: 'fangen'; state: FangenPrivate }
   | { kind: 'geist'; state: GeistPrivate }
+  | { kind: 'tourist'; state: TourPrivate }
+  | { kind: 'sprueche'; state: SpruechePrivate }
   | null;
 
 export interface JoinRequest {
@@ -1404,6 +1571,12 @@ export interface JoinResponse {
   ok: boolean;
   playerId?: string;
   error?: string;
+}
+
+/** Erstes Event nach dem Verbinden: Server-Start-ID + alle Minispiele, die der Server kennt */
+export interface ServerHello {
+  boot: string;
+  kinds: string[];
 }
 
 export interface StartRequest {

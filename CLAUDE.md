@@ -8,6 +8,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run typecheck` – TypeScript prüfen (vor jedem Commit)
 - `npm run build` / `npm start` – Produktiv-Build
 - `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
+- `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen) und MIDI-Parser
 
 ## Architektur-Regeln
 
@@ -20,3 +21,4 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - Handy-UI: Screens nur neu bauen, wenn sich der Screen-Key ändert (`pickScreen()`), sonst nur Werte updaten – sonst gehen Taps/Wischgesten verloren.
 - Phaser-Szenen werden beim Neustart wiederverwendet: Instanzfelder in `create()` zurücksetzen.
 - UI-Texte auf Deutsch, Pixel-Look (Font „Press Start 2P“, Welt 480 × 270).
+- Musik: Song-Format v2 in `shared/music.ts`, eingebaute Loops in `shared/musicBuiltin.ts`, Synth/Sequencer in `client/music/player.ts` (TV **und** Werkstatt `/musik.html` nutzen denselben). Eigene Songs + Szenen-Zuordnung speichert `server/music.ts` unter `data/music/`; Änderungen gehen per `music:songs`/`music:assign` live an die TVs.
