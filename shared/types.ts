@@ -26,7 +26,8 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy'
+  | 'bowling';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +311,56 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Bowling
+
+/** Aufzeichnung eines Wurfs (cm, ganzzahlig), damit der TV ihn abspielen kann */
+export interface BowlingTrack {
+  /** Sekunden zwischen zwei Keyframes */
+  dt: number;
+  frames: number;
+  /** x0, y0, x1, y1, … pro Keyframe */
+  ball: number[];
+  /** pro Pin: null = stand nicht, [x, y] = blieb liegen/stehen, sonst x, y pro Keyframe */
+  pins: (number[] | null)[];
+  /** Keyframe, ab dem der Pin umfällt (−1 = bleibt stehen) */
+  downAt: number[];
+  /** Keyframe, in dem der Ball in die Rinne fällt (−1 = nie) */
+  gutterAt: number;
+}
+
+export type BowlingMark = 'strike' | 'spare' | 'gutter' | 'miss' | 'pins';
+
+export interface BowlingRoll {
+  seq: number;
+  playerId: string;
+  /** nur während des Abspielens (sub = 'roll') – spart Bandbreite */
+  track: BowlingTrack | null;
+  knocked: number;
+  mark: BowlingMark;
+  /** Strikes in Folge (für "Doppel!" / "Truthahn!") */
+  streak: number;
+}
+
+export interface BowlingState {
+  sub: 'intro' | 'aim' | 'roll' | 'over';
+  endsIn: number;
+  /** Anzahl Frames in diesem Spiel */
+  frames: number;
+  order: string[];
+  turn: string;
+  /** aktueller Frame (0-basiert) und Wurf im Frame */
+  frame: number;
+  ball: number;
+  /** zählt bei jedem neuen Zielen hoch */
+  aimSeq: number;
+  /** Startposition, die der Werfer gerade einstellt (−1 … 1) */
+  aimX: number;
+  /** stehende Pins vor dem nächsten Wurf */
+  rack: boolean[];
+  rolls: Record<string, number[]>;
+  last: BowlingRoll | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +449,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'bowling'; state: BowlingState };
 
 export interface GameState {
   phase: Phase;
