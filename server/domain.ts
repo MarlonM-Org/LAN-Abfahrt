@@ -69,9 +69,13 @@ async function minimumTtl(cfg: DomainConfig): Promise<number> {
   }
 }
 
+/**
+ * Legt einen Eintrag an oder ändert ihn (leere `records` = löschen).
+ * PUT auf einen einzelnen Eintrag geht bei deSEC nur, wenn es ihn schon gibt –
+ * der Sammel-PATCH auf /rrsets/ legt ihn bei Bedarf neu an.
+ */
 async function putRecord(cfg: DomainConfig, subname: string, type: string, records: string[], ttl: number) {
-  const sub = subname || '@';
-  await desec(cfg, 'PUT', `${API}/domains/${cfg.zone}/rrsets/${sub}/${type}/`, { subname, type, ttl, records });
+  await desec(cfg, 'PATCH', `${API}/domains/${cfg.zone}/rrsets/`, [{ subname, type, ttl, records }]);
 }
 
 /** Setzt den A-Record der deSEC-Zone auf die Laptop-IP. */
