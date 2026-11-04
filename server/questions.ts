@@ -15,7 +15,7 @@ export class QuestionStore {
 
   constructor(
     file = 'questions.json',
-    private kind: 'wwe' | 'nhie' = 'wwe',
+    private kind: 'wwe' | 'nhie' | 'post' = 'wwe',
   ) {
     this.file = path.resolve(dir, '../data', file);
     try {
@@ -33,7 +33,11 @@ export class QuestionStore {
   add(question: string): string | null {
     let q = question.trim().replace(/\s+/g, ' ').slice(0, 120);
     if (q.length < 4) return null;
-    if (this.kind === 'wwe') {
+    if (this.kind === 'post') {
+      // Stille Post: Startsatz ohne Satzzeichen-Zwang, erster Buchstabe groß
+      q = q.slice(0, 90).replace(/[.!]+$/, '');
+      q = q.charAt(0).toUpperCase() + q.slice(1);
+    } else if (this.kind === 'wwe') {
       q = q.replace(/^wer würde eher\s*/i, '');
       if (!q.startsWith('...')) q = `... ${q}`;
       if (!q.endsWith('?')) q += '?';

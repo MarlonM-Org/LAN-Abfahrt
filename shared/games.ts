@@ -14,14 +14,16 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
   sup: { title: 'SUP-Rennen', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
   tidy: { title: 'Aufräumen!', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
+  stillepost: { title: 'Stille Post mit Bildern', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder'];
-/** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder', 'stillepost'];
+/** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord).
+ *  Stille Post ist für eine Brett-Runde zu lang und nur einzeln spielbar. */
 export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];

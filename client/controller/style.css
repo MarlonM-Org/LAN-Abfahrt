@@ -268,3 +268,45 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
 @keyframes shake { 50% { transform: translateX(3px); } }
 .partner { color: var(--ink); }
+
+/* ---------------------------------------------------------------- Stille Post mit Bildern */
+textarea.sp-input {
+  width: 100%; font: inherit; font-size: 13px; line-height: 1.6; padding: 10px; resize: none;
+  background: var(--paper-light); color: var(--ink); border: 3px solid var(--wood-dark);
+  box-shadow: inset 0 2px 0 var(--paper-dark); user-select: text; -webkit-user-select: text; border-radius: 0;
+}
+.sp-canvas {
+  display: block; align-self: center; width: min(100%, 50vh); aspect-ratio: 1; touch-action: none;
+  background: #fff6dc; border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline);
+}
+.sp-canvas.view { width: min(100%, 42vh); }
+.sp-locked .sp-canvas { opacity: 0.6; }
+.sp-prompt { text-align: center; background: var(--paper-light); border: 3px solid var(--wood-dark); padding: 6px 8px; }
+.sp-prompt small { color: var(--ink-soft); font-size: 8px; }
+.sp-prompt h2 { color: var(--red); }
+.sp-palette { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
+.sp-swatch { padding: 0; height: 32px; border: 3px solid var(--wood-darker); box-shadow: 0 2px 0 var(--outline); font-size: 0; }
+.sp-swatch.eraser {
+  font-size: 0; color: transparent;
+  background-image: linear-gradient(135deg, transparent 42%, #e46e98 42% 58%, transparent 58%) !important;
+  background-color: #fff6dc !important;
+}
+.sp-swatch.active { outline: 3px solid var(--red); outline-offset: 1px; transform: translateY(-2px); }
+.sp-tools { display: grid; grid-template-columns: 1fr 1fr 1fr 1.6fr 1.6fr; gap: 6px; }
+.sp-tools button { padding: 6px 2px; font-size: 8px; min-height: 36px; }
+.sp-size { display: flex; align-items: center; justify-content: center; }
+.sp-size i { display: block; border-radius: 50%; }
+.sp-size.active { background: var(--gold); }
+.sp-next { min-height: 30vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }
+.sp-votes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sp-vote {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; font-size: 9px;
+  background: var(--paper-light); color: var(--ink); text-shadow: none;
+  border: 3px solid var(--wood-dark); box-shadow: 0 3px 0 var(--wood-darker); min-height: 80px;
+}
+.sp-vote small { color: var(--ink-soft); font-size: 8px; }
+.sp-vote canvas { width: 100%; aspect-ratio: 1; border: 2px solid var(--paper-dark); }
+.sp-vote span { flex: 1; display: flex; align-items: center; line-height: 1.6; word-break: break-word; }
+.sp-vote.active { background: var(--gold); }
+.sp-vote:disabled { opacity: 0.4; }
+.sp-input:disabled { opacity: 0.6; }
