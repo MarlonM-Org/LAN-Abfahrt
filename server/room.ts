@@ -29,6 +29,7 @@ import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
 import { WweGame } from './wwe';
+import { VersteckGame } from './verstecken';
 
 const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
@@ -282,6 +283,9 @@ export class Room {
         break;
       case 'tidy':
         this.mini = new TidyGame(ids, ctx);
+        break;
+      case 'verstecken':
+        this.mini = new VersteckGame(ids, ctx);
         break;
     }
     this.results = null;
