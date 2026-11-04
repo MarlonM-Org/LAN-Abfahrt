@@ -27,6 +27,7 @@ import { IgelGame } from './igel';
 import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { ARCADE_POINTS } from '../shared/games';
+import { WasserGame } from './wasser';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -345,6 +346,9 @@ export class Room {
         break;
       case 'smash':
         this.mini = new SmashGame(ids, ctx);
+        break;
+      case 'wasser':
+        this.mini = new WasserGame(ids, ctx);
         break;
     }
     this.results = null;

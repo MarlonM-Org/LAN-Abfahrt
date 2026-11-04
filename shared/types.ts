@@ -1,5 +1,7 @@
 import type { PropType } from './verstecken';
 
+import type { WasserState } from './wasser';
+
 export interface Look {
   skin: number;
   hair: number;
@@ -38,7 +40,8 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'kart'
   | 'sup' | 'tidy' | 'turm'
   | 'sup' | 'tidy' | 'igel'
-  | 'smash';
+  | 'smash'
+  | 'sup' | 'tidy' | 'wasser';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1109,7 +1112,8 @@ export type MiniSnapshot =
   | { kind: 'kart'; state: KartState }
   | { kind: 'turm'; state: TurmState }
   | { kind: 'igel'; state: IgelState }
-  | { kind: 'smash'; state: SmashState };
+  | { kind: 'smash'; state: SmashState }
+  | { kind: 'wasser'; state: WasserState };
 
 export interface GameState {
   phase: Phase;

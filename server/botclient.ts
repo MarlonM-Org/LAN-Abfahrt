@@ -16,6 +16,7 @@ import { SMASH_STAGES, mainPlatform } from '../shared/smash';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
+import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 
 export interface BotOptions {
   url: string;
@@ -83,6 +84,8 @@ export class Bot {
   private kartItemAt = 0;
   /** Kurzzeitgedächtnis für die Smash-Arena */
   private sm = { shieldUntil: 0, lastJump: 0, lastA: 0, lastB: 0, stick: '', stickAt: 0 };
+  /** Wasserbomben-Schlacht: kleines Bot-Gedächtnis */
+  private ws = { nextThrow: 0, lastX: 0, lastY: 0, checkAt: 0, wanderUntil: 0, wx: 0, wy: 0, strafe: 1, strafeAt: 0 };
 
   constructor(
     public name: string,
@@ -433,6 +436,67 @@ export class Bot {
         this.pc.jumping = false;
       }, rand(200, 340));
     }
+  }
+
+  /** Wasserbomben-Schlacht: hinlaufen, Abstand halten, mit Streuung werfen, nachfüllen, fliehen */
+  private wasserStep(st: WasserState) {
+    const me = st.players[this.id];
+    if (!me) return;
+    if (st.sub !== 'play') return this.send('stick', { x: 0, y: 0 });
+    const now = Date.now();
+    const mem = this.ws;
+    const dist = (a: BotPoint, b: BotPoint) => Math.hypot(a.x - b.x, a.y - b.y);
+    const bases = me.t ? [WASSER_BASE[me.t]] : [WASSER_BASE.A, WASSER_BASE.B];
+    const nearest = (pts: BotPoint[]) => pts.reduce((a, b) => (dist(me, a) <= dist(me, b) ? a : b));
+    const enemies = Object.entries(st.players).filter(([id, p]) => id !== this.id && (st.ffa || p.t !== me.t));
+    const targets = enemies.filter(([, p]) => p.s === 'ok').map(([, p]) => p);
+    const target = targets.length ? targets.reduce((a, b) => (dist(me, a) <= dist(me, b) ? a : b)) : null;
+    let goal: BotPoint | null = null;
+
+    if (me.s === 'drying') return this.send('stick', { x: 0, y: 0 });
+    if (me.s === 'soaked') goal = nearest(bases.map((b) => b.towel));
+    else if (me.w > 75 && target && dist(me, target) < 140) goal = nearest(bases.map((b) => b.bucket));
+    else if (me.a === 0 && me.pi === 0) {
+      const bucket = nearest(bases.map((b) => b.bucket));
+      goal = dist(me, WASSER_HOSE) < dist(me, bucket) * 1.3 ? WASSER_HOSE : bucket;
+    } else if (st.pistol && me.pi === 0 && dist(me, st.pistol) < 110) goal = st.pistol;
+    else if (target) {
+      const d = dist(me, target);
+      const want = me.pi > 0 ? 34 : 90;
+      if (now > mem.strafeAt) {
+        mem.strafe = Math.random() < 0.5 ? 1 : -1;
+        mem.strafeAt = now + rand(1200, 2600);
+      }
+      if (d > want + 15) goal = target;
+      else if (d < want - 25) goal = { x: me.x + ((me.x - target.x) / d) * 30, y: me.y + ((me.y - target.y) / d) * 30 };
+      else goal = { x: me.x + (-(target.y - me.y) / d) * 25 * mem.strafe, y: me.y + ((target.x - me.x) / d) * 25 * mem.strafe };
+      // Werfen (mit Streuung) bzw. spritzen
+      if (me.pi > 0) {
+        if (d < WASSER.PISTOL_RANGE + 8) this.send('aim', { x: (target.x - me.x) / d, y: (target.y - me.y) / d });
+      } else if (me.a > 0 && d < WASSER.RANGE * 0.95 && now > mem.nextThrow) {
+        mem.nextThrow = now + rand(900, 1800);
+        const vx = (target.x - me.x) / WASSER.RANGE + rand(-0.08, 0.08);
+        const vy = (target.y - me.y) / WASSER.RANGE + rand(-0.08, 0.08);
+        this.send('aim', { x: vx, y: vy });
+        setTimeout(() => this.send('throw', { x: vx, y: vy }), rand(250, 450));
+      }
+    } else goal = nearest(bases.map((b) => b.bucket));
+
+    // Festgefahren? Kurz zufällig laufen
+    if (now > mem.checkAt) {
+      const moved = Math.hypot(me.x - mem.lastX, me.y - mem.lastY);
+      if (goal && moved < 3 && dist(me, goal) > 12) {
+        const a = Math.random() * Math.PI * 2;
+        mem.wx = Math.cos(a);
+        mem.wy = Math.sin(a);
+        mem.wanderUntil = now + 600;
+      }
+      mem.lastX = me.x;
+      mem.lastY = me.y;
+      mem.checkAt = now + 1000;
+    }
+    if (now < mem.wanderUntil) return this.send('stick', { x: mem.wx, y: mem.wy });
+    this.send('stick', goal ? steer(me, goal) : { x: 0, y: 0 });
   }
 
   react(s: GameState) {
@@ -809,6 +873,14 @@ export class Bot {
       if (me2?.state === 'fight') this.once('smash', async () => {
         await sleep(rand(50, 110));
         this.smashBrain(m.state, me2);
+      });
+    }
+
+    if (m.kind === 'wasser') {
+      const st = m.state;
+      this.once('wasser', async () => {
+        this.wasserStep(st);
+        await sleep(110);
       });
     }
 
@@ -1364,6 +1436,37 @@ export function smashThink(bot: SmashBrainHost & { id: string }, mem: { shieldUn
       btn('b', sgn, 0);
     }
   }
+}
+
+export interface BotPoint {
+  x: number;
+  y: number;
+}
+
+/** Läuft um Hecken/Pool herum: wählt die freie Richtung, die dem Ziel am nächsten kommt */
+function steer(from: BotPoint, goal: BotPoint): BotPoint {
+  const d = Math.hypot(goal.x - from.x, goal.y - from.y);
+  if (d < 3) return { x: 0, y: 0 };
+  const R = WASSER.PLAYER_R + 2;
+  const blocked = (x: number, y: number) => WASSER_BLOCKERS.some((r) => x > r.x - R && x < r.x + r.w + R && y > r.y - R && y < r.y + r.h + R);
+  let best = { x: 0, y: 0 };
+  let bestScore = Infinity;
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    const look = Math.min(12, d);
+    if (blocked(from.x + ux * look, from.y + uy * look) || blocked(from.x + ux * 5, from.y + uy * 5)) continue;
+    const nx = from.x + ux * 12;
+    const ny = from.y + uy * 12;
+    const score = Math.hypot(goal.x - nx, goal.y - ny);
+    if (score < bestScore) {
+      bestScore = score;
+      best = { x: ux, y: uy };
+    }
+  }
+  const slow = d < 12 ? Math.max(0.3, d / 12) : 1;
+  return { x: Math.round(best.x * slow * 100) / 100, y: Math.round(best.y * slow * 100) / 100 };
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */
