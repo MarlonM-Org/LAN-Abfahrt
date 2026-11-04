@@ -45,7 +45,8 @@ export type MiniKind =
   | 'stillepost'
   | 'sup' | 'tidy' | 'fangen'
   | 'geist'
-  | 'sumo';
+  | 'sumo'
+  | 'tourist';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -193,6 +194,63 @@ export interface MurderPrivate {
   killTarget: string | null;
   bodyHere: boolean;
   myVote: string | null;
+}
+
+// ------------------------------------------------------------------ Wer ist der Tourist?
+
+export type TourSub = 'intro' | 'play' | 'vote' | 'reveal' | 'over';
+
+export type TourOutcome = 'guess-right' | 'guess-wrong' | 'caught' | 'wrong-accuse' | 'timeout';
+
+/** Öffentlicher Zustand – enthält den Ort erst in der Auflösung, Rollen nie */
+export interface TourState {
+  sub: TourSub;
+  round: number;
+  rounds: number;
+  /** Zeit bis zum Ende der aktuellen Phase (ms) */
+  endsIn: number;
+  /** Restzeit der Fragerunde (pausiert während einer Anklage) */
+  roundLeft: number;
+  roundMs: number;
+  /** Zählt jede Phase hoch (für Countdown/Screen-Keys) */
+  phaseNo: number;
+  points: Record<string, number>;
+  touristCount: number;
+  /** Wer gerade fragen darf */
+  asker: string | null;
+  /** Letzte Frage: „from fragt to“ */
+  lastAsk: { from: string; to: string } | null;
+  askSeq: number;
+  /** Wer in dieser Runde schon angeklagt hat */
+  accusers: string[];
+  vote: {
+    accuser: string;
+    accused: string;
+    voted: string[];
+    /** erst nach der Abstimmung gesetzt */
+    yes: number | null;
+    no: number | null;
+    passed: boolean | null;
+  } | null;
+  reveal: {
+    location: string;
+    touristen: string[];
+    outcome: TourOutcome;
+    accuser: string | null;
+    accused: string | null;
+    guesser: string | null;
+    guess: string | null;
+    gains: Record<string, number>;
+  } | null;
+}
+
+export interface TourPrivate {
+  round: number;
+  tourist: boolean;
+  /** Nur für Einheimische */
+  location: string | null;
+  role: string | null;
+  myVote: boolean | null;
 }
 
 // ------------------------------------------------------------------ Date Night: Abstieg
@@ -1321,7 +1379,8 @@ export type MiniSnapshot =
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
   | { kind: 'geist'; state: GeistState }
-  | { kind: 'sumo'; state: SumoState };
+  | { kind: 'sumo'; state: SumoState }
+  | { kind: 'tourist'; state: TourState };
 
 export interface GameState {
   phase: Phase;
@@ -1362,6 +1421,7 @@ export type PrivateState =
   | { kind: 'stillepost'; state: StillepostPrivate }
   | { kind: 'fangen'; state: FangenPrivate }
   | { kind: 'geist'; state: GeistPrivate }
+  | { kind: 'tourist'; state: TourPrivate }
   | null;
 
 export interface JoinRequest {

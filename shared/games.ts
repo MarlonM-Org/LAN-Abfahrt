@@ -32,6 +32,7 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   fangen: { title: 'Urlaubs-Fangen', tagline: 'Der Animateur ist unsichtbar – nur sein Handy kennt die Karte!', minPlayers: 3 },
   geist: { title: 'Geisterjagd', tagline: 'Stromausfall! Ein unsichtbarer Geist spukt durchs Haus ...', minPlayers: 3 },
   sumo: { title: 'Sumo-Steg', tagline: 'Rempeln, schubsen, platsch – wer bleibt auf dem Steg?', minPlayers: 2 },
+  tourist: { title: 'Wer ist der Tourist?', tagline: 'Alle kennen den Ort – nur einer nicht. Fragt euch durch!', minPlayers: 4 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
@@ -41,7 +42,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'sumo'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'sumo', 'tourist'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
@@ -485,6 +486,6 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'enten', 'igel', 'turm'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger'] },
-  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist'] },
+  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'tourist'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'stillepost'] },
 ];

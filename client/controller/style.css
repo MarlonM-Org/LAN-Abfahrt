@@ -781,3 +781,33 @@ textarea.sp-input {
 .ghost-status.danger-text { color: var(--red); animation: shake 0.2s infinite; }
 .stick-area.small { min-height: 0; }
 .map-legend { font-size: 8px; }
+
+/* ---------------------------------------------------------------- Wer ist der Tourist? */
+.tour-turn { display: flex; flex-direction: column; gap: 8px; }
+.tour-turn .btn-grid button { font-size: 9px; padding: 12px 4px; }
+.tour-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 112px; padding: 12px; text-align: center; cursor: pointer;
+  background: repeating-linear-gradient(45deg, #3f8fe0 0 8px, #5aa2ea 8px 16px);
+  color: #fff4d6; text-shadow: 1px 1px 0 var(--outline);
+  border: 3px solid var(--outline); box-shadow: inset 0 0 0 3px #f4efe2, 0 3px 0 var(--outline);
+}
+.tour-card.open { background: var(--paper-light); color: var(--ink); text-shadow: none; box-shadow: inset 0 0 0 3px var(--gold), 0 3px 0 var(--outline); }
+.tour-card-back, .tour-card-front { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.tour-card-back b { font-size: 14px; font-weight: normal; }
+.tour-card small { font-size: 8px; opacity: 0.8; }
+.tour-big { font-size: 15px; font-weight: normal; line-height: 1.5; }
+.tour-know { width: 100%; font-size: 14px; padding: 14px 8px; }
+.tour-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink); font-size: 9px; }
+.tour-head button { flex: none; font-size: 8px; padding: 6px 8px; }
+.tour-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tour-list .tour-loc { font-size: 8px; padding: 9px 3px; line-height: 1.4; overflow-wrap: anywhere; }
+.tour-list .tour-loc.off { text-decoration: line-through; opacity: 0.45; }
+.tour-list.guessing .tour-loc { background: #f2c33a; animation: tour-pulse 0.8s infinite alternate; }
+@keyframes tour-pulse { to { filter: brightness(1.15); } }
+.tour-list.guessing .tour-loc.off { animation: none; }
+.tour-accuse { font-size: 14px; }
+.tour-yesno { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tour-yesno button { min-height: 26vh; font-size: 22px; }
+.tour-yesno .tour-no { background: var(--green); box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
+.tour-reveal { display: flex; flex-direction: column; gap: 6px; }

@@ -48,6 +48,7 @@ import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
 import { StillepostGame } from './stillepost';
+import { TouristGame } from './tourist';
 
 const MAX_PLAYERS = 12;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -391,6 +392,9 @@ export class Room {
         break;
       case 'sumo':
         this.mini = new SumoGame(ids, ctx);
+        break;
+      case 'tourist':
+        this.mini = new TouristGame(ids, ctx);
         break;
     }
     this.results = null;

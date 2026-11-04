@@ -24,6 +24,8 @@ import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, t
 import type { FangenState } from '../shared/types';
 import type { SumoState } from '../shared/types';
 import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
+import type { TourState } from '../shared/types';
+import { TOUR_LOCATIONS } from '../shared/tourist';
 
 export interface BotOptions {
   url: string;
@@ -953,6 +955,8 @@ export class Bot {
         if (dir) this.send('stick', { x: Math.round(dir.x * 100) / 100, y: Math.round(dir.y * 100) / 100 });
       });
     }
+
+    if (m.kind === 'tourist') tourBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -1987,4 +1991,55 @@ function sumoBot(bot: Bot, st: SumoState) {
   mem.moving = true;
   bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
+
+// ------------------------------------------------------------------ Wer ist der Tourist?
+
+/** Pro Bot und Runde: wann der Bot-Tourist rät bzw. der Bot jemanden anklagt */
+const tourMem = new WeakMap<Bot, { round: number; guessAt: number; accuseAt: number }>();
+
+/**
+ * Bots können nicht reden – sie fragen nach ein paar Sekunden zufällig jemanden,
+ * raten als Tourist irgendwann einen Ort, klagen selten zufällig an und stimmen zufällig ab.
+ */
+function tourBot(bot: Bot, st: TourState) {
+  const p = bot.priv?.kind === 'tourist' ? bot.priv.state : null;
+  if (!p || p.round !== st.round || !(bot.id in st.points)) return;
+  let mem = tourMem.get(bot);
+  if (!mem || mem.round !== st.round) {
+    const now = Date.now();
+    mem = { round: st.round, guessAt: now + rand(25000, 70000), accuseAt: Math.random() < 0.35 ? now + rand(15000, 80000) : Infinity };
+    tourMem.set(bot, mem);
+  }
+  const others = Object.keys(st.points).filter((id) => id !== bot.id);
+  const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  const cur = () => (bot.state?.mini?.kind === 'tourist' ? bot.state.mini.state : null);
+
+  if (st.sub === 'play') {
+    if (st.asker === bot.id) {
+      bot.once(`tour-ask-${st.round}-${st.askSeq}`, async () => {
+        await sleep(rand(2500, 6000));
+        const s2 = cur();
+        if (!s2 || s2.sub !== 'play' || s2.asker !== bot.id || s2.askSeq !== st.askSeq) return;
+        const back = s2.lastAsk?.to === bot.id ? s2.lastAsk.from : null;
+        bot.send('ask', { target: pickOne(others.filter((id) => id !== back)) });
+      });
+    }
+    const now = Date.now();
+    if (p.tourist && now >= mem.guessAt) {
+      mem.guessAt = Infinity;
+      bot.send('guess', { loc: Math.floor(Math.random() * TOUR_LOCATIONS.length) });
+    } else if (now >= mem.accuseAt && !st.accusers.includes(bot.id)) {
+      mem.accuseAt = Infinity;
+      bot.send('accuse', { target: pickOne(others) });
+    }
+  }
+
+  const v = st.vote;
+  if (st.sub === 'vote' && v && v.passed === null && v.accuser !== bot.id && v.accused !== bot.id && p.myVote === null) {
+    bot.once(`tour-vote-${st.phaseNo}`, async () => {
+      await sleep(rand(1000, 3500));
+      if (cur()?.phaseNo === st.phaseNo) bot.send('vote', { yes: Math.random() < 0.6 });
+    });
+  }
 }
