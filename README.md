@@ -99,8 +99,11 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
+- 🦆 **Ententeich** (ab 2 Spielern) – Duck Hunt in der Urlaubslagune: alle schießen gleichzeitig, jeder hat ein Fadenkreuz in seiner Farbe. Enten (10), Pommes-klauende Möwen (20) und Flamingos (30) treffen, Badegäste auf Schwimmringen lieber nicht (−15). 3 Schuss, dann nach unten wischen (oder „Nachladen“). Schnelle Treffer hintereinander geben Combo-Bonus, 3 Wellen mit immer mehr und schnelleren Vögeln.
+  - **Zielen mit Bewegungssensor** (braucht HTTPS): Handy wie eine Lichtpistole halten, Oberkante zum TV, auf die TV-Mitte zielen und „Zentrieren“ tippen.
+  - **Ohne HTTPS/Sensor**: Touchpad – wischen bewegt das Fadenkreuz (schnell wischen = weiter).
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+Alle laufen auch im Party-Modus auf dem Spielbrett.
 
 ## Trinkspiel
 

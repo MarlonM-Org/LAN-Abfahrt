@@ -268,3 +268,37 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
 @keyframes shake { 50% { transform: translateX(3px); } }
 .partner { color: var(--ink); }
+
+/* ---------------------------------------------------------------- Ententeich */
+.en-status { display: flex; align-items: center; gap: 10px; min-height: 26px; }
+.en-swatch { width: 18px; height: 18px; border: 3px solid var(--outline); flex: none; }
+.en-ammo { display: flex; gap: 4px; }
+.en-ammo i { width: 10px; height: 22px; border: 2px solid var(--outline); background: var(--paper-dark); opacity: 0.5; }
+.en-ammo i.full { background: linear-gradient(#e04a3f 0 62%, #d9a83a 62%); opacity: 1; }
+.en-msg { flex: 1; text-align: right; color: var(--red); font-size: 10px; }
+.en-tools { display: flex; gap: 8px; }
+.en-tools button { flex: 1; }
+.en-pad {
+  position: relative; min-height: 30vh; flex: 1; touch-action: none; overflow: hidden;
+  background: linear-gradient(#9fd8f5 0 45%, #4aa2dc 45% 84%, #f1d49a 84%);
+  border: 4px solid var(--wood-dark); box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.35), 0 3px 0 var(--outline);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.en-pad span { font-size: 8px; color: var(--ink); padding: 4px; pointer-events: none; }
+.en-pad-dot {
+  position: absolute; left: 59%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  border: 3px solid var(--outline); pointer-events: none;
+}
+.en-fire {
+  flex: 1.3; min-height: 30vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  touch-action: none; color: #fff4d6; text-shadow: 2px 2px 0 var(--wood-darker);
+  background: #d8473c; border: 3px solid var(--outline);
+  box-shadow: inset 0 5px 0 #f07a6c, inset 0 -7px 0 #9c2a20, 0 3px 0 var(--outline);
+}
+.en-fire b { font-size: 26px; font-weight: normal; }
+.en-fire small { font-size: 8px; opacity: 0.85; }
+.en-fire.empty { background: #8d7a6a; box-shadow: inset 0 5px 0 #a99683, inset 0 -7px 0 #5e4e40, 0 3px 0 var(--outline); }
+.en-fire.wait { opacity: 0.6; }
+.en-fire.bang { animation: en-bang 0.15s; }
+@keyframes en-bang { 0% { filter: brightness(1.8); transform: translateY(3px); } 100% { filter: none; transform: none; } }
+.en-motion { background: var(--sea); min-height: 30vh; font-size: 16px; }

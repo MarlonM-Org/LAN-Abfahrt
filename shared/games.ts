@@ -14,15 +14,16 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   bomb: { title: 'Tick-Tack-Bumm', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
   sup: { title: 'SUP-Rennen', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
   tidy: { title: 'Aufräumen!', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
+  enten: { title: 'Ententeich', tagline: 'Handy auf den TV richten und abdrücken – aber nicht auf die Badegäste!', minPlayers: 2 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'murder'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'enten', 'murder'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'enten'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -177,4 +178,38 @@ export const TIDY = {
   COUNTDOWN_MS: 3000,
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
+};
+
+// ------------------------------------------------------------------ Ententeich
+
+export const ENTEN = {
+  /** Spielfeld (rechts davon steht die Rangliste) */
+  FIELD_W: 404,
+  /** Schilfkante: hier starten die Enten */
+  REED_Y: 226,
+  /** Wasserbereich, auf dem die Badegäste treiben */
+  FLOAT_MIN_Y: 168,
+  FLOAT_MAX_Y: 212,
+  INTRO_MS: 6000,
+  BANNER_MS: 2400,
+  AMMO: 3,
+  RELOAD_MS: 750,
+  SHOT_COOLDOWN_MS: 140,
+  /** Treffer innerhalb dieser Zeit zählen als Combo */
+  COMBO_MS: 2200,
+  COMBO_BONUS: 5,
+  COMBO_MAX_BONUS: 25,
+  /** Wie weit ein Fehlschuss Vögel aufschreckt */
+  DODGE_R: 42,
+  /** Rückblick für die Treffer-Prüfung (Netz-/Anzeigeverzögerung) */
+  LAG_MS: 220,
+  POINTS: { duck: 10, gull: 20, flamingo: 30, float: -15 } as Record<string, number>,
+  RADIUS: { duck: 9, gull: 8, flamingo: 11, float: 11 } as Record<string, number>,
+  WAVES: [
+    { name: 'Enten-Aufwärmen', ms: 24000, maxBirds: 3, every: 1100, speed: 1, life: 6500, floats: 1, weights: { duck: 0.82, gull: 0.13, flamingo: 0.05 } },
+    { name: 'Möwen-Alarm!', ms: 26000, maxBirds: 4, every: 850, speed: 1.25, life: 5500, floats: 2, weights: { duck: 0.55, gull: 0.35, flamingo: 0.1 } },
+    { name: 'Flamingo-Fieber', ms: 26000, maxBirds: 6, every: 620, speed: 1.5, life: 4600, floats: 3, weights: { duck: 0.45, gull: 0.37, flamingo: 0.18 } },
+  ],
+  /** 12 gut unterscheidbare Fadenkreuz-Farben */
+  COLORS: [0xff4040, 0x3f8fff, 0x4ee04e, 0xffe03a, 0xff7ad8, 0xff9a2e, 0xa67bff, 0x3fe8d8, 0xffffff, 0xc8ff3a, 0xd89a5a, 0xc0305f],
 };
