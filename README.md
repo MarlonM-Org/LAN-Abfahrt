@@ -47,6 +47,18 @@ $env:PUBLIC_HOST="192.168.178.23"; npm run dev
 PUBLIC_HOST=192.168.178.23 npm run dev
 ```
 
+### HTTPS (für Spiele mit Bewegungssensor)
+
+iPhones geben den Bewegungssensor (Bowling, Ententeich, Kipp-Lenkung) nur über HTTPS frei. Alles andere läuft weiter über HTTP.
+
+1. `.env.example` nach `.env` kopieren und `PUBLIC_DOMAIN=party.deinedomain.de` eintragen
+2. Zertifikat für diese Domain nach `certs/fullchain.pem` und `certs/privkey.pem` legen
+3. Die Domain muss auf die Laptop-IP im aktuellen WLAN zeigen
+
+Dann läuft zusätzlich `https://party.deinedomain.de:3443/` – der QR-Code zeigt automatisch die HTTPS-Adresse. TV und Bots nutzen weiter `http://localhost:3000`.
+
+> **FritzBox:** Der DNS-Rebind-Schutz blockt Domains, die auf eine Heimnetz-IP zeigen. Unter *Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz* die Domain als Ausnahme eintragen.
+
 Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start`.
 
 ## Auf den Fernseher bringen
