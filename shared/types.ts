@@ -26,7 +26,8 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy'
+  | 'geist';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +311,52 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Geisterjagd
+
+export interface GeistHunter {
+  x: number;
+  y: number;
+  /** Blickrichtung = Richtung der Taschenlampe (Radiant) */
+  angle: number;
+  moving: boolean;
+  light: boolean;
+  /** Akku 0–1 */
+  battery: number;
+  /** Akku leer → steht still und lädt */
+  empty: boolean;
+  /** Erschreckt (liegt am Boden) */
+  down: boolean;
+  /** Fortschritt der Wiederbelebung 0–1 */
+  revive: number;
+}
+
+export interface GeistState {
+  sub: 'intro' | 'play' | 'roundEnd' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  /** Wer in dieser Runde der Geist ist (öffentlich – nur die Position ist geheim) */
+  ghostId: string;
+  health: number;
+  maxHealth: number;
+  hunters: Record<string, GeistHunter>;
+  /** Nur gesetzt, solange der Geist sichtbar ist (Licht, Blitz, Berührung) */
+  ghost: { x: number; y: number; why: 'light' | 'flash' | 'touch' } | null;
+  /** Zählt hoch bei jedem Blitz */
+  flashSeq: number;
+  /** Letzte Schreck-Aktion */
+  lastScare: { victim: string; seq: number } | null;
+  lastRevive: { id: string; seq: number } | null;
+  roundWinner: 'ghost' | 'hunters' | null;
+  roundReason: string | null;
+  points: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export type GeistPrivate =
+  | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number }
+  | { role: 'hunter'; fear: number };
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +445,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'geist'; state: GeistState };
 
 export interface GameState {
   phase: Phase;
@@ -418,7 +466,7 @@ export interface GameState {
   customQuestionCount: number;
 }
 
-export type PrivateState = { kind: 'murder'; state: MurderPrivate } | null;
+export type PrivateState = { kind: 'murder'; state: MurderPrivate } | { kind: 'geist'; state: GeistPrivate } | null;
 
 export interface JoinRequest {
   name: string;

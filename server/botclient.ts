@@ -7,6 +7,7 @@ import type { GameState, PrivateState } from '../shared/types';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { ROOMS } from '../shared/games';
+import { GEIST, inCone, navTarget, roomCenter } from '../shared/geist';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 
 export interface BotOptions {
@@ -37,6 +38,8 @@ export class Bot {
   private resultsEntered = 0;
   private lastPhase = '';
   private timer: NodeJS.Timeout;
+  /** Geisterjagd: Gedächtnis gegen Festhängen an Möbeln */
+  private gj = { px: 0, py: 0, checkAt: 0, jitterUntil: 0, jx: 0, jy: 0 };
 
   constructor(
     public name: string,
@@ -289,6 +292,16 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'geist' && m.state.sub === 'play') {
+      const g = m.state;
+      const p = this.priv?.kind === 'geist' ? this.priv.state : null;
+      if (p) this.once('geist', async () => {
+        await sleep(rand(100, 160));
+        const dir = p.role === 'ghost' ? this.geistGhost(g, p.x, p.y, p.lit) : this.geistHunter(g, p.fear);
+        if (dir) this.send('stick', { x: Math.round(dir.x * 100) / 100, y: Math.round(dir.y * 100) / 100 });
+      });
+    }
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;
@@ -331,6 +344,130 @@ export class Bot {
         });
       }
     }
+  }
+
+  // ---------------------------------------------------------------- Geisterjagd
+
+  /** Richtung zum Ziel (über Türen), mit Ausweichen, falls man irgendwo hängt */
+  private geistSteer(from: { x: number; y: number }, to: { x: number; y: number }, scale = 1) {
+    const now = Date.now();
+    const mem = this.gj;
+    if (now >= mem.checkAt) {
+      const moved = Math.hypot(from.x - mem.px, from.y - mem.py);
+      if (moved < 3 && Math.hypot(to.x - from.x, to.y - from.y) > 10 && now > mem.jitterUntil) {
+        const a = Math.random() * Math.PI * 2;
+        mem.jx = Math.cos(a);
+        mem.jy = Math.sin(a);
+        mem.jitterUntil = now + 500;
+      }
+      mem.px = from.x;
+      mem.py = from.y;
+      mem.checkAt = now + 700;
+    }
+    if (now < mem.jitterUntil) return { x: mem.jx, y: mem.jy };
+    const wp = navTarget(from, to);
+    const dx = wp.x - from.x;
+    const dy = wp.y - from.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 3) return { x: 0, y: 0 };
+    return { x: (dx / d) * scale, y: (dy / d) * scale };
+  }
+
+  /** Geist-Bot: kennt alle Positionen (wie der echte Geist), meidet Licht, sucht sich einzelne Jäger */
+  private geistGhost(g: import('../shared/types').GeistState, x: number, y: number, lit: boolean) {
+    const me = { x, y };
+    const alive = Object.values(g.hunters).filter((h) => !h.down);
+    // Gefahr: Lichtkegel in der Nähe
+    const threat = alive.find((h) => h.light && inCone(h.x, h.y, h.angle, x, y, 22));
+    if (lit || threat) {
+      const h = threat ?? alive.sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
+      if (h) {
+        // Seitlich aus dem Kegel raus und weg
+        const side = Math.sin(Math.atan2(y - h.y, x - h.x) - h.angle) >= 0 ? 1 : -1;
+        const px = -Math.sin(h.angle) * side;
+        const py = Math.cos(h.angle) * side;
+        const ax = x - h.x;
+        const ay = y - h.y;
+        const al = Math.hypot(ax, ay) || 1;
+        const vx = px * 0.8 + (ax / al) * 0.6;
+        const vy = py * 0.8 + (ay / al) * 0.6;
+        const vl = Math.hypot(vx, vy) || 1;
+        return this.geistSteer(me, { x: x + (vx / vl) * 40, y: y + (vy / vl) * 40 });
+      }
+    }
+    if (!alive.length) return { x: 0, y: 0 };
+    // Ziel: möglichst einzelner Jäger, nicht zu weit weg
+    const score = (h: (typeof alive)[number]) => {
+      const iso = Math.min(200, ...alive.filter((o) => o !== h).map((o) => Math.hypot(o.x - h.x, o.y - h.y)));
+      return iso - Math.hypot(h.x - x, h.y - y) * 0.4 - (h.light ? 40 : 0);
+    };
+    const target = [...alive].sort((a, b) => score(b) - score(a))[0];
+    const d = Math.hypot(target.x - x, target.y - y);
+    const iso = Math.min(200, ...alive.filter((o) => o !== target).map((o) => Math.hypot(o.x - target.x, o.y - target.y)));
+    // Je länger die Runde läuft, desto mutiger; vorher lauern, bis jemand allein ist
+    const elapsed = 1 - g.endsIn / GEIST.ROUND_MS;
+    const brave = iso > 90 - 80 * elapsed || (!target.light && iso > 50);
+    if (!brave) {
+      const lurk = { x: target.x - Math.cos(target.angle) * 125, y: target.y - Math.sin(target.angle) * 125 };
+      return this.geistSteer(me, { x: Math.max(20, Math.min(460, lurk.x)), y: Math.max(38, Math.min(256, lurk.y)) }, 0.8);
+    }
+    // Von hinten anschleichen: Punkt hinter dem Jäger anpeilen
+    const behind = { x: target.x - Math.cos(target.angle) * 10, y: target.y - Math.sin(target.angle) * 10 };
+    const facingMe = Math.abs(Math.atan2(Math.sin(Math.atan2(y - target.y, x - target.x) - target.angle), Math.cos(Math.atan2(y - target.y, x - target.x) - target.angle))) < 0.9;
+    if (target.light && facingMe && d < GEIST.LIGHT_LEN + 25) {
+      // Im Bogen drumherum
+      const a = Math.atan2(y - target.y, x - target.x) + 0.9;
+      return this.geistSteer(me, { x: target.x + Math.cos(a) * 50, y: target.y + Math.sin(a) * 50 });
+    }
+    return this.geistSteer(me, d < 30 ? target : behind);
+  }
+
+  /** Jäger-Bot: läuft in lockeren Gruppen, Licht an bei Gänsehaut, rettet Freunde */
+  private geistHunter(g: import('../shared/types').GeistState, fear: number) {
+    const me = g.hunters[this.id];
+    if (!me || me.down || me.empty) return me?.down || me?.empty ? { x: 0, y: 0 } : null;
+    const ids = Object.keys(g.hunters).sort();
+    const now = Date.now();
+    // Licht schalten
+    const ghostNear = g.ghost && g.ghost.why !== 'flash' ? Math.hypot(g.ghost.x - me.x, g.ghost.y - me.y) < GEIST.LIGHT_LEN + 30 : false;
+    const wantLight = (ghostNear || fear > 0.3) && me.battery > 0.12;
+    if (wantLight !== me.light && (wantLight || fear < 0.15 || me.battery < 0.12)) {
+      this.once('geist-light', async () => {
+        await sleep(rand(150, 450));
+        this.send('light', { on: wantLight });
+        await sleep(300);
+      });
+    }
+    // Erschreckte Freunde retten
+    const downed = ids.filter((id) => id !== this.id && g.hunters[id].down).map((id) => g.hunters[id]);
+    const help = downed.sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
+    if (help && Math.hypot(help.x - me.x, help.y - me.y) < 220) {
+      if (Math.hypot(help.x - me.x, help.y - me.y) < GEIST.REVIVE_DIST - 6) {
+        // Daneben stehen und mit der Lampe Wache halten (langsam drehen)
+        const a = now / 500;
+        return { x: Math.cos(a) * 0.2, y: Math.sin(a) * 0.2 };
+      }
+      return this.geistSteer(me, help);
+    }
+    // Sichtbarer Geist → hinterher
+    if (g.ghost && g.ghost.why !== 'touch') return this.geistSteer(me, g.ghost);
+    // Gänsehaut → umsehen (Leuchtturm)
+    if (fear > 0.45) {
+      const a = now / 380 + ids.indexOf(this.id);
+      return { x: Math.cos(a) * 0.25, y: Math.sin(a) * 0.25 };
+    }
+    // Lockere Gruppen (ab 4 Jägern zwei Gruppen), wechselnde Räume
+    const group = ids.length >= 4 ? ids.indexOf(this.id) % 2 : 0;
+    const mates = ids.filter((id, i) => id !== this.id && !g.hunters[id].down && (ids.length >= 4 ? i % 2 : 0) === group).map((id) => g.hunters[id]);
+    if (mates.length) {
+      const cx = mates.reduce((s2, h) => s2 + h.x, 0) / mates.length;
+      const cy = mates.reduce((s2, h) => s2 + h.y, 0) / mates.length;
+      if (Math.hypot(cx - me.x, cy - me.y) > 70) return this.geistSteer(me, { x: cx, y: cy });
+    }
+    const room = (Math.floor(now / 8000) * (group ? 5 : 1) + group * 3) % 6;
+    const c = roomCenter(room);
+    const slot = ids.indexOf(this.id);
+    return this.geistSteer(me, { x: c.x + ((slot % 3) - 1) * 18, y: c.y + (Math.floor(slot / 3) % 2) * 16 - 8 }, 0.9);
   }
 }
 

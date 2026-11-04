@@ -100,7 +100,9 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+- 👻 **Geisterjagd** (ab 3 Spielern) – Stromausfall im Ferienhaus: Einer ist der Geist und auf dem TV unsichtbar, nur sein Handy zeigt ihm die Karte. Die anderen jagen ihn mit Taschenlampen (Licht kostet Akku). Brummt das Handy und steigt die Gänsehaut, ist der Geist nah! Sichtbar wird er nur im Lichtkegel, bei Blitzen und wenn er jemanden erschreckt. Erschreckte Jäger rettet man, indem man 2 s neben ihnen steht. Jede Runde ist jemand anderes der Geist.
+
+Alle laufen auch im Party-Modus auf dem Spielbrett (Spiele mit Mindestspielerzahl nur, wenn genug mitspielen).
 
 ## Trinkspiel
 
