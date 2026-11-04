@@ -771,3 +771,23 @@ textarea.sp-input {
 .ghost-status.danger-text { color: var(--red); animation: shake 0.2s infinite; }
 .stick-area.small { min-height: 0; }
 .map-legend { font-size: 8px; }
+
+/* ---------------------------------------------------------------- Sprüche-Duell */
+.sq-prompt { text-align: center; background: var(--paper-light); border: 3px solid var(--wood-dark); padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.sq-prompt small { color: var(--ink-soft); font-size: 8px; }
+.sq-prompt h2 { line-height: 1.8; word-break: break-word; }
+.sq-blank { color: var(--red); white-space: nowrap; }
+.sq-count { text-align: right; font-size: 8px; color: var(--ink-soft); margin: -6px 0 0; }
+.sq-answers { display: flex; flex-direction: column; gap: 10px; }
+.sq-answer {
+  min-height: 84px; padding: 12px 10px; font-size: 12px; line-height: 1.7; word-break: break-word; text-align: center;
+  background: var(--paper-light); color: var(--ink); text-shadow: none;
+  border: 3px solid var(--wood-dark); box-shadow: 0 3px 0 var(--wood-darker);
+}
+.sq-answers.final { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sq-answers.final .sq-answer { min-height: 64px; font-size: 9px; padding: 8px 6px; }
+.sq-answer.active { background: var(--gold); border-color: var(--red); }
+.sq-answer.mine { border-style: dashed; }
+.sq-answer:disabled { opacity: 0.45; }
+.sq-answer.active:disabled { opacity: 1; }
+.sq-next { min-height: 26vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }

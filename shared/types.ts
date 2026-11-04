@@ -44,7 +44,8 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'wasser'
   | 'stillepost'
   | 'sup' | 'tidy' | 'fangen'
-  | 'geist';
+  | 'geist'
+  | 'sprueche';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1075,6 +1076,72 @@ export interface StillepostPrivate {
   myVote: number | null;
 }
 
+// ------------------------------------------------------------------ Sprüche-Duell
+
+/** Ein Duell: zwei Antworten auf dieselbe Frage (Autoren erst ab der Auflösung öffentlich) */
+export interface SpruecheDuel {
+  answers: [string, string];
+  /** null während der Abstimmung (anonym) */
+  authors: [string, string] | null;
+  votes: [number, number] | null;
+  voters: [string[], string[]] | null;
+  gained: [number, number] | null;
+  /** "ABRÄUMER!": Index der Antwort mit allen Stimmen */
+  sweep: 0 | 1 | null;
+}
+
+export interface SpruecheFinalAnswer {
+  text: string;
+  /** Autor erst in der Auflösung */
+  by: string | null;
+  votes: number | null;
+  gained: number | null;
+}
+
+export interface SpruecheState {
+  sub: 'intro' | 'answer' | 'vote' | 'reveal' | 'scores' | 'over';
+  /** 1 … rounds, die letzte Runde ist das Finale */
+  round: number;
+  rounds: number;
+  final: boolean;
+  multiplier: number;
+  endsIn: number;
+  players: string[];
+  /** Antwortphase: Anzahl beantworteter Fragen pro Spieler / benötigt */
+  answered: Record<string, number>;
+  need: number;
+  /** Duell bzw. Finale: Frage, um die es gerade geht */
+  prompt: string;
+  match: number;
+  matches: number;
+  duel: SpruecheDuel | null;
+  finalAnswers: SpruecheFinalAnswer[] | null;
+  /** Wer abstimmen darf / schon abgestimmt hat */
+  voters: string[];
+  voted: string[];
+  points: Record<string, number>;
+  /** Punkte der letzten Runde (für die Zwischenwertung) */
+  roundGain: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export interface SpruechePrivate {
+  round: number;
+  sub: SpruecheState['sub'];
+  /** Antwortphase: offene Fragen in Reihenfolge (id = Fragenindex der Runde) */
+  todo: { id: number; prompt: string }[];
+  answered: number;
+  /** "Sicherheits-Spruch"-Vorschlag (seq zählt hoch) */
+  suggest: { text: string; seq: number } | null;
+  /** Abstimmung: eigene Antwort (Index) – dafür darf man nicht stimmen */
+  mine: number | null;
+  canVote: boolean;
+  /** Eigene Stimme(n): Duell 0/1, Finale bis zu 3 Indizes */
+  myVotes: number[];
+  /** Finale: Abstimmung abgeschlossen */
+  voteDone: boolean;
+}
+
 // ------------------------------------------------------------------ Controller-Spiele: Urlaubs-Fangen
 
 export interface FangenHunter {
@@ -1285,7 +1352,8 @@ export type MiniSnapshot =
   | { kind: 'wasser'; state: WasserState }
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
-  | { kind: 'geist'; state: GeistState };
+  | { kind: 'geist'; state: GeistState }
+  | { kind: 'sprueche'; state: SpruecheState };
 
 export interface GameState {
   phase: Phase;
@@ -1308,6 +1376,8 @@ export interface GameState {
   customQuestionCount: number;
   /** Eigene Startsätze für Stille Post */
   customPostCount: number;
+  /** Eigene Fragen fürs Sprüche-Duell */
+  customQuipCount: number;
 }
 
 export interface LeaderEntry {
@@ -1326,6 +1396,7 @@ export type PrivateState =
   | { kind: 'stillepost'; state: StillepostPrivate }
   | { kind: 'fangen'; state: FangenPrivate }
   | { kind: 'geist'; state: GeistPrivate }
+  | { kind: 'sprueche'; state: SpruechePrivate }
   | null;
 
 export interface JoinRequest {
