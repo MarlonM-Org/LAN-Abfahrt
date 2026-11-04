@@ -40,7 +40,7 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'igel'
   | 'smash';
 
-export type GameMode = 'party' | 'date' | 'drink';
+export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
 // ------------------------------------------------------------------ Flunkyball
 
@@ -1071,6 +1071,8 @@ export interface ResultsState {
   subtitle: string;
   rows: ResultRow[];
   final: boolean;
+  /** Nur im Arcade-Modus: Punkte dieser Runde pro Spieler */
+  arcade?: Record<string, number>;
   /** Nur im Trinkspiel: Schlücke dieser Runde */
   sips?: Record<string, number>;
   /** Nur bei Date Night: gemeinsam verdiente Herzen */
@@ -1121,10 +1123,21 @@ export interface GameState {
   drinkActive: boolean;
   customNhieCount: number;
   botCount: number;
+  /** Arcade: Punkte pro Spieler über alle Spiele (dauerhaft gespeichert) */
+  leaderboard: LeaderEntry[];
+  arcadeActive: boolean;
   board: BoardState | null;
   mini: MiniSnapshot | null;
   results: ResultsState | null;
   customQuestionCount: number;
+}
+
+export interface LeaderEntry {
+  name: string;
+  points: number;
+  games: number;
+  wins: number;
+  perGame: Partial<Record<MiniKind, { points: number; plays: number; wins: number }>>;
 }
 
 export type PrivateState =

@@ -5,7 +5,9 @@ Party-Spiel für unsere Freundesgruppe – im Stil von Mario Party / Jackbox:
 
 Aktueller Stand (v0.3):
 
-**Drei Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Trinkspiel** und **Date Night**.
+**Vier Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Arcade**, **Trinkspiel** und **Date Night**.
+
+**Arcade:** Alle Spiele einzeln auswählbar. Jede Runde bringt Punkte nach Platzierung (10/6/3/1, bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
 
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 8 Spieler, Pixel-Avatar-Editor auf dem Handy

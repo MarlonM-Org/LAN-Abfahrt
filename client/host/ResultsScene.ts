@@ -89,6 +89,8 @@ export class ResultsScene extends Phaser.Scene {
       if (s.partyActive) {
         this.layer.add(this.add.image(x + w - 46, ry + 9, ensureTex(this, 'coin', O.coinIcon)));
         this.layer.add(ink(this, x + w - 14, ry + 6, `+${row.coins}`, { origin: [1, 0] }));
+      } else if (r.arcade) {
+        this.layer.add(ink(this, x + w - 14, ry + 6, `+${r.arcade[row.playerId] ?? 0} Pkt`, { origin: [1, 0], color: RED_INK }));
       }
     });
   }

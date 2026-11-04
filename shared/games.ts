@@ -462,3 +462,17 @@ export function turmCellOffsets(shape: number, angle: number): { x: number; y: n
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
   });
 }
+
+// ------------------------------------------------------------------ Arcade
+
+/** Punkte nach Platzierung im Arcade-Modus */
+export const ARCADE_POINTS = [10, 6, 3, 1];
+
+/** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
+export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours'] },
+  { title: 'Zielen & Werfen', kinds: ['bowling', 'enten', 'igel', 'turm'] },
+  { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger'] },
+  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb'] },
+];

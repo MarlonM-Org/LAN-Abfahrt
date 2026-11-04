@@ -17,6 +17,7 @@ function build(r: ResultsState, vip: boolean) {
       ${party && !r.final && row ? `<h2 class="yellow">+${row.coins} Münzen</h2>` : ''}
       ${r.hearts !== undefined ? `<h1 class="pink">♥ ${r.hearts} / ${r.maxHearts}</h1><p>gemeinsam verdient</p>` : ''}
       ${r.sips && row ? `<h2 class="pink">${r.sips[row.playerId] ?? 0} Schlücke</h2>` : ''}
+      ${r.arcade && row ? `<h2 class="yellow">+${r.arcade[row.playerId] ?? 0} Arcade-Punkte</h2>` : ''}
       ${r.final && first ? '<h2 class="yellow">Du bist Urlaubs-Champion!</h2>' : ''}
     </div>
   `);

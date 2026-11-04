@@ -658,3 +658,8 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .sm-btn.jump, .sm-btn.a { transform: none; }
   .sm-btn.jump.pressed, .sm-btn.a.pressed { transform: translateY(2px) scale(0.97); }
 }
+.mode-tabs.four { grid-template-columns: 1fr 1fr; }
+table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
+table.lb td { padding: 4px 2px; border-bottom: 1px dashed var(--paper-dark); color: var(--ink); }
+table.lb td:not(:nth-child(2)):not(:first-child) { text-align: right; }
+table.lb tr.me td { color: var(--red); }

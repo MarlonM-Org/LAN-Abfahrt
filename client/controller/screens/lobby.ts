@@ -1,8 +1,8 @@
 import type { Look, MiniKind } from '../../../shared/types';
 import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
-import { DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS } from '../../../shared/games';
+import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
-import { LS, app, avatarCanvas, el, paintAvatar, q, socket, store, toast } from '../core';
+import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
 
 /** Avatar-Editor. `onDone` tritt dem Spiel bei bzw. aktualisiert den Charakter. */
 export function buildEdit(onDone: () => void) {
@@ -91,8 +91,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
 
   if (vip) {
     menu.append(el(`<p>Du bist der VIP – du wählst, was gespielt wird.</p>`));
-    const tabs = el(`<div class="mode-tabs three"></div>`);
-    for (const [m, label] of [['party', 'Party'], ['drink', 'Trinkspiel'], ['date', 'Date ♥']] as const) {
+    const tabs = el(`<div class="mode-tabs four"></div>`);
+    for (const [m, label] of [['party', 'Party'], ['arcade', 'Arcade'], ['drink', 'Trinken'], ['date', 'Date ♥']] as const) {
       const b = el(`<button class="mode-tab ${m === mode ? 'active' : 'secondary'}">${label}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:mode', m));
       q(tabs, '.mode-tabs').append(b);
@@ -113,7 +113,18 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     menu.append(row);
   };
 
-  if (vip && mode === 'date') {
+  if (mode === 'arcade') {
+    if (vip) {
+      menu.append(el(`<h2>Arcade</h2><p>Jedes Spiel einzeln – die Punkte landen im Leaderboard.</p>`));
+      for (const g of ARCADE_GROUPS) singles(g.kinds, g.title);
+    }
+    menu.append(leaderboardPanel());
+    if (vip) {
+      const reset = el(`<button class="secondary small">Leaderboard zurücksetzen</button>`).firstElementChild as HTMLButtonElement;
+      reset.addEventListener('click', () => confirm('Alle Arcade-Punkte löschen?') && socket.emit('vip:resetLeaderboard'));
+      menu.append(reset);
+    }
+  } else if (vip && mode === 'date') {
     menu.append(el(`<h2>Date Night</h2><p>Für genau 2 Spieler – ihr spielt zusammen und sammelt Herzen.</p>`));
     for (const v of DATE_VERSIONS) {
       const b = el(`<button class="date-btn">${v.title}<br/><small>${v.subtitle}</small></button>`).firstElementChild as HTMLButtonElement;
@@ -202,4 +213,27 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     q(root, '.q-count').textContent = `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`;
     for (const g of gated) g.btn.disabled = n < g.min || (g.max !== undefined && n > g.max);
   };
+}
+
+/** Leaderboard + eigene Punkte pro Spiel */
+function leaderboardPanel() {
+  const list = store.state?.leaderboard ?? [];
+  const mine = list.find((e) => e.name === store.name);
+  const rows = list
+    .slice(0, 10)
+    .map((e, i) => `<tr class="${e.name === store.name ? 'me' : ''}"><td>${i + 1}.</td><td>${escapeHtml(e.name)}</td><td>${e.points}</td><td>${e.wins}</td></tr>`)
+    .join('');
+  const per = mine
+    ? Object.entries(mine.perGame)
+        .sort((a, b) => (b[1]?.points ?? 0) - (a[1]?.points ?? 0))
+        .map(([k, g]) => `<tr><td>${escapeHtml(MINI_INFO[k as MiniKind]?.title ?? k)}</td><td>${g!.points}</td><td>${g!.plays}x</td></tr>`)
+        .join('')
+    : '';
+  return el(`
+    <div class="panel">
+      <p class="label-left">Leaderboard (Punkte · Siege)</p>
+      ${rows ? `<table class="lb"><tbody>${rows}</tbody></table>` : '<p>Noch keine Punkte – spielt los!</p>'}
+      ${mine ? `<p class="label-left">Deine Punkte pro Spiel</p><table class="lb"><tbody>${per}</tbody></table>` : ''}
+    </div>
+  `);
 }
