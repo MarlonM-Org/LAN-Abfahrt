@@ -3,10 +3,10 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { GameState, PrivateState } from '../shared/types';
+import type { GameState, PrivateState, TurmLane } from '../shared/types';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { ROOMS } from '../shared/games';
+import { ROOMS, TURM, turmCellOffsets } from '../shared/games';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 
 export interface BotOptions {
@@ -265,6 +265,37 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'turm' && m.state.sub === 'play') {
+      const lane = m.state.lanes.find((l) => l.id === this.id);
+      const act = lane?.active;
+      if (lane && act) {
+        this.once(`turm-${act.id}`, async () => {
+          const plan = planTurm(lane);
+          await sleep(rand(250, 600));
+          for (let i = 0; i < (plan.rot - act.rot + 4) % 4; i++) {
+            this.send('rotate');
+            await sleep(rand(110, 200));
+          }
+          const cur = () => {
+            const s2 = this.state?.mini?.kind === 'turm' ? this.state.mini.state : null;
+            return s2?.lanes.find((l) => l.id === this.id)?.active;
+          };
+          for (let i = 0; i < 40; i++) {
+            const a = cur();
+            if (!a || a.id !== act.id) return;
+            const dx = plan.x - a.x;
+            if (Math.abs(dx) < TURM.BLOCK / 4) break;
+            this.send('shift', { dir: Math.sign(dx) });
+            await sleep(rand(100, 170));
+          }
+          await sleep(rand(100, 400));
+          if (cur()?.id === act.id) this.send('drop', { on: true });
+          for (let i = 0; i < 60 && cur()?.id === act.id; i++) await sleep(100);
+          this.send('drop', { on: false });
+        });
+      }
+    }
+
     if (m.kind === 'tidy' && m.state.sub === 'play') {
       const t = m.state;
       const me2 = t.players[this.id];
@@ -335,6 +366,91 @@ export class Bot {
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */
+/**
+ * Wackelturm-Bot: wählt Drehung und Position fürs fallende Teil.
+ * Grobe Oberflächen-Karte des Turms in Halbblock-Spalten; bevorzugt flach aufliegende
+ * Teile (wenig Lücken), niedrige Stellen und die Nähe zum Turm-Schwerpunkt.
+ */
+export function planTurm(lane: TurmLane): { rot: number; x: number } {
+  const B = TURM.BLOCK;
+  const half = B / 2;
+  const bw = B / 4;
+  const n = Math.round((TURM.LANE_HALF * 2 * B) / bw);
+  const binX = (i: number) => -TURM.LANE_HALF * B + (i + 0.5) * bw;
+  const platHalf = (TURM.PLATFORM_W / 2) * B;
+  const surf = Array.from({ length: n }, (_, i) => (Math.abs(binX(i)) < platHalf ? 0 : -Infinity));
+  /** Spalten unter einer Zelle (r: halbe Breite) */
+  const binsOf = (cx: number, r: number) => {
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) if (Math.abs(binX(i) - cx) < r) out.push(i);
+    return out;
+  };
+  let comX = 0;
+  let count = 0;
+  const p = lane.pieces;
+  for (let k = 0; k < p.length; k += 6) {
+    const [, shape, , x, y, a] = p.slice(k, k + 6);
+    if (y < -B) continue;
+    comX += x;
+    count++;
+    for (const o of turmCellOffsets(shape, a / 100)) {
+      const top = y - o.y + B / 2 + 1;
+      for (const i of binsOf(x + o.x, B / 2 + 1)) surf[i] = Math.max(surf[i], top);
+    }
+  }
+  comX = count ? comX / count : 0;
+  const act = lane.active!;
+  let best = { rot: 0, x: 0, score: Infinity };
+  // Nur flach liegende Drehungen (geringste Höhe) – hohe, schmale Teile kippen zu leicht
+  const heightOf = (rot: number) => {
+    const ys = turmCellOffsets(act.shape, (rot * Math.PI) / 2).map((o) => o.y);
+    return Math.max(...ys) - Math.min(...ys);
+  };
+  const flat = Math.min(...[0, 1, 2, 3].map(heightOf));
+  for (let rot = 0; rot < 4; rot++) {
+    if (heightOf(rot) > flat + 1) continue;
+    const offs = turmCellOffsets(act.shape, (rot * Math.PI) / 2);
+    const minOx = Math.min(...offs.map((o) => o.x));
+    const maxOx = Math.max(...offs.map((o) => o.x));
+    for (let x = -platHalf; x <= platHalf; x += half) {
+      // Nur Positionen, bei denen das Teil komplett über der Plattform liegt
+      if (x + minOx - B / 2 < -platHalf - 0.5 || x + maxOx + B / 2 > platHalf + 0.5) continue;
+      // Landehöhe des Schwerpunkts: höchster Kontakt unter irgendeiner Zelle
+      let comY = -Infinity;
+      const under: number[] = [];
+      for (const o of offs) {
+        const bins = binsOf(x + o.x, B / 2 - 1);
+        const s = bins.length ? Math.max(...bins.map((i) => surf[i])) : -Infinity;
+        under.push(s);
+        comY = Math.max(comY, s + o.y + B / 2);
+      }
+      if (!Number.isFinite(comY)) continue;
+      let holes = 0;
+      let overSea = 0;
+      let top = -Infinity;
+      let supLo = Infinity;
+      let supHi = -Infinity;
+      offs.forEach((o, j) => {
+        const bottom = comY - o.y - B / 2;
+        top = Math.max(top, comY - o.y + B / 2);
+        // Zellen, unter denen eine eigene Zelle liegt, zählen nicht
+        if (offs.some((q) => Math.abs(q.x - o.x) < 2 && q.y > o.y + 2)) return;
+        if (Number.isFinite(under[j])) holes += Math.max(0, bottom - under[j]);
+        else overSea++;
+        if (Number.isFinite(under[j]) && bottom - under[j] < 2) {
+          supLo = Math.min(supLo, x + o.x - B / 2);
+          supHi = Math.max(supHi, x + o.x + B / 2);
+        }
+      });
+      // Liegt der Schwerpunkt nicht über der Auflage, kippt das Teil
+      const tips = x < supLo + 3 || x > supHi - 3 ? B * 2 : 0;
+      const score = top + holes * 0.8 + tips + overSea * B * 3 + Math.abs(x - comX) * 0.25 + Math.random() * B * 0.4;
+      if (score < best.score) best = { rot, x, score };
+    }
+  }
+  return { rot: best.rot, x: best.x };
+}
+
 export function solveConstellation(name: string, stars: { id: number; x: number; y: number }[]): [number, number][] {
   const c = CONSTELLATIONS.find((k) => k.name === name);
   if (!c) return [];

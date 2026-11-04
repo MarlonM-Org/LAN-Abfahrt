@@ -99,8 +99,9 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
+- 🗼 **Wackelturm** (ab 2 Spielern) – wie Tricky Towers: Jeder stapelt auf seinem eigenen Steg Urlaubsgepäck (Surfbretter, Kühlboxen, Liegestühle, Koffer, Reisetaschen, Cocktailkisten) in Tetris-Formen – mit echter Physik (`matter-js` auf dem Server), der Turm wackelt und kann einstürzen. Am Handy: ◀ ▶ verschieben (halten = wiederholen), ⟳ drehen, ▼ gedrückt halten = schneller fallen; das nächste Teil wird angezeigt. Ins Meer gefallene Teile kosten ein Leben (3 Leben, bei einem Einsturz höchstens eins pro 2 s), danach ist der Turm eingefroren. Wer zuerst das Gipfelkreuz erreicht und den Turm 2 s hält, gewinnt; danach haben die anderen noch 20 s. Nach 2:30 zählt die Höhe. Alle 30 s erwischt den Führenden eine Windböe. Tick-Zeit messen: `TURM_PROF=1 npm run dev`.
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+Alle laufen auch im Party-Modus auf dem Spielbrett.
 
 ## Trinkspiel
 

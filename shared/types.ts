@@ -26,7 +26,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'turm';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +310,53 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Wackelturm
+
+/** Das gerade fallende (gesteuerte) Teil. x/y: Schwerpunkt, y = Höhe über der Plattform (nach oben). */
+export interface TurmActive {
+  id: number;
+  shape: number;
+  /** Farbvariante 0–2 */
+  v: number;
+  x: number;
+  y: number;
+  /** Anzahl 90°-Drehungen im Uhrzeigersinn */
+  rot: number;
+}
+
+export interface TurmLane {
+  id: string;
+  lives: number;
+  /** Aktuelle stabile Turmhöhe in Physik-Einheiten */
+  height: number;
+  /** Bisher beste stabile Höhe */
+  best: number;
+  /** Platzierung, sobald der Gipfel erreicht ist (1, 2, …), sonst 0 */
+  place: number;
+  finishMs: number | null;
+  /** Keine Leben mehr → Turm eingefroren */
+  frozen: boolean;
+  /** Fortschritt des "Halten!"-Countdowns über der Ziellinie (0–1) */
+  hold: number;
+  /** Vorschau: nächstes Teil [Form, Variante] */
+  next: [number, number];
+  active: TurmActive | null;
+  /** Liegende Teile, flach: [id, Form, Variante, x, y, Winkel·100, …] (y nach oben, Winkel im Uhrzeigersinn) */
+  pieces: number[];
+  /** Windböe: Richtung (−1/1) oder 0 */
+  gust: number;
+  /** Zählt hoch, wenn ein Teil verloren ging (für Effekte) */
+  lostSeq: number;
+}
+
+export interface TurmState {
+  sub: 'countdown' | 'play' | 'over';
+  endsIn: number;
+  /** Ms bis zur nächsten Windböe (nur Anzeige) */
+  gustIn: number;
+  lanes: TurmLane[];
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +445,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'turm'; state: TurmState };
 
 export interface GameState {
   phase: Phase;
