@@ -137,6 +137,14 @@ export class MurderGame implements MiniGame {
 
   playerDisconnected() {
     // Spieler bleiben im Spiel – beim Wiederverbinden geht es weiter.
+    // Läuft gerade eine Abstimmung, nicht auf Abwesende warten.
+    const s = this.state;
+    if (s.sub !== 'vote' || !this.votes.size) return;
+    const voters = this.ids.filter((v) => s.alive[v] && this.ctx.isConnected(v));
+    if (voters.every((v) => this.votes.has(v))) {
+      this.timers.clear();
+      this.tallyVotes();
+    }
   }
 
   dispose() {

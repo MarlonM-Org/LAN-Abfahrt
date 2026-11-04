@@ -32,6 +32,7 @@ import { WasserScene } from './WasserScene';
 import { StillepostScene } from './StillepostScene';
 import { FangenScene } from './FangenScene';
 import { GeistScene } from './GeistScene';
+import { initPlayersPanel } from './playersPanel';
 
 const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist'];
 
@@ -62,6 +63,7 @@ async function start() {
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
+  initPlayersPanel(socket); // Panel „Spieler“ (Taste P)
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
   const overlay = document.getElementById('sound');

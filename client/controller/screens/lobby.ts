@@ -3,6 +3,7 @@ import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../
 import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
+import { lobbyPlayerList } from '../players';
 
 /** Avatar-Editor. `onDone` tritt dem Spiel bei bzw. aktualisiert den Charakter. */
 export function buildEdit(onDone: () => void) {
@@ -85,6 +86,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     <button class="secondary small" data-act="edit">Charakter ändern</button>
   `);
   q(root, '.row-center').append(avatarCanvas(6, store.look));
+  const plist = lobbyPlayerList();
+  q(root, '.count').after(plist.root);
   const menu = q(root, '.menu');
   const gated: { btn: HTMLButtonElement; min: number; max?: number }[] = [];
   if (mode === 'date') q(root, '.q-panel').classList.add('hidden');
@@ -216,9 +219,11 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
 
   return () => {
     const st = store.state;
-    const n = st?.players.filter((p) => p.connected).length ?? 0;
+    const n = st?.players.filter((p) => p.connected && !p.removed).length ?? 0;
+    const off = st?.players.filter((p) => !p.connected && !p.removed).length ?? 0;
     q(root, '.hello').textContent = `Hi ${store.name}!`;
-    q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}`;
+    q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}${off ? ` · ${off} offline` : ''}`;
+    plist.update();
     q(root, '.q-count').textContent =
       mode === 'drink'
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`

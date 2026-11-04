@@ -5,6 +5,7 @@ import type {
   GameState,
   JoinRequest,
   JoinResponse,
+  KickResponse,
   MiniKind,
   Phase,
   PlayerPublic,
@@ -47,6 +48,7 @@ import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
 import { StillepostGame } from './stillepost';
+import { KickList, OFFLINE_REMOVE_MS, OFFLINE_SWEEP_MS, isLoopback } from './players';
 
 const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
@@ -57,6 +59,8 @@ interface Player extends PlayerPublic {
   socketId: string | null;
   joinedAt: number;
   isBot?: boolean;
+  /** Zeitpunkt, seit dem der Spieler offline ist (null = online) */
+  offlineSince: number | null;
 }
 
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
@@ -79,12 +83,19 @@ export class Room {
   private leaderboard = new Leaderboard();
   private arcadeActive = false;
   private lastKind: MiniKind | null = null;
+  /** Wer im laufenden Minispiel mitspielt */
+  private miniIds: string[] | null = null;
+  /** Gekickte Spieler-IDs (Handy mit alter ID bekommt „Du wurdest entfernt“) */
+  private kicks = new KickList();
+  private offlineBucket = '';
 
   constructor(
     private io: Server,
     private joinUrl: string,
     private localUrl: string,
-  ) {}
+  ) {
+    setInterval(() => this.sweepOffline(), OFFLINE_SWEEP_MS).unref();
+  }
 
   handle(socket: Socket) {
     let playerId: string | null = null;
@@ -103,20 +114,27 @@ export class Room {
       if (!name) return reply({ ok: false, error: 'Bitte gib einen Namen ein.' });
 
       let p = msg.playerId ? this.players.get(msg.playerId) : undefined;
+      if (p?.removed || (!p && this.kicks.has(msg.playerId))) {
+        return reply({ ok: false, kicked: true, error: 'Du wurdest aus der Runde entfernt.' });
+      }
       if (!p) {
         if (this.phase !== 'lobby') {
           return reply({ ok: false, error: 'Gerade läuft ein Spiel – gleich geht’s weiter!' });
         }
+        // Gleicher Name, alte ID offline (z. B. Browserdaten gelöscht) → alten grauen Eintrag ersetzen
+        for (const [id, o] of this.players) if (!o.connected && o.name.toLowerCase() === name.toLowerCase()) this.players.delete(id);
+        if (this.players.size >= MAX_PLAYERS) this.evictOffline();
         if (this.players.size >= MAX_PLAYERS) {
           return reply({ ok: false, error: `Lobby ist voll (max. ${MAX_PLAYERS}).` });
         }
-        p = { id: randomUUID(), name, look: sanitizeLook(msg.look), connected: true, isVip: false, socketId: null, joinedAt: Date.now() };
+        p = { id: randomUUID(), name, look: sanitizeLook(msg.look), connected: true, isVip: false, socketId: null, joinedAt: Date.now(), offlineSince: null };
         this.players.set(p.id, p);
       }
       p.name = name;
       p.look = sanitizeLook(msg.look);
       p.socketId = socket.id;
       p.connected = true;
+      p.offlineSince = null;
       p.isBot = msg.bot === true;
       playerId = p.id;
       socket.join('players');
@@ -168,7 +186,7 @@ export class Room {
     });
 
     socket.on('vip:addBot', () => {
-      if (!isVip() || this.phase !== 'lobby' || this.players.size >= MAX_PLAYERS) return;
+      if (!isVip() || this.phase !== 'lobby' || this.connectedIds().length >= MAX_PLAYERS) return;
       const used = new Set([...this.players.values()].map((p) => p.name));
       const name = BOT_NAMES.find((n) => !used.has(n)) ?? `Bot ${this.bots.length + 1}`;
       this.bots.push(new Bot(name, { url: this.localUrl }));
@@ -240,17 +258,19 @@ export class Room {
       if (!p || p.socketId !== socket.id) return; // bereits mit neuem Socket verbunden
       p.connected = false;
       p.socketId = null;
-      if (this.phase === 'lobby') {
-        this.players.delete(playerId);
-      } else if (this.connectedIds().length === 0) {
-        // Alle Handys weg → sonst hängt das Spiel fest und niemand kann neu beitreten
+      // Offline-Spieler bleiben ein paar Minuten (grau) in der Lobby – wer zurückkommt, ist wieder drin
+      p.offlineSince = Date.now();
+      if (this.phase === 'lobby' && p.isBot) this.players.delete(playerId); // Bots kommen nicht zurück
+      else if (this.phase !== 'lobby' && (this.connectedIds().length === 0 || (!p.isBot && !this.humansOnline()))) {
+        // Alle Handys weg (nur noch Bots) → sonst hängt das Spiel fest und niemand kann neu beitreten
         return this.backToLobby();
-      } else if (this.phase === 'mini') {
-        this.mini?.playerDisconnected(playerId);
       }
+      this.playerGone(playerId);
       this.ensureVip();
       this.changed();
     });
+
+    this.handleKicks(socket, () => playerId);
   }
 
   // ---------------------------------------------------------------- Ablauf
@@ -260,9 +280,10 @@ export class Room {
     this.board = new Board(ids, rounds, {
       onChange: () => this.changed(),
       startMini: (kind) => this.startMini(kind),
-      isConnected: (id) => !!this.players.get(id)?.connected,
+      isConnected: (id) => this.isOnline(id),
       nameOf: (id) => this.nameOf(id),
-      connectedCount: () => this.connectedIds().length,
+      connectedCount: () => this.gameIds().length,
+      isGone: (id) => !!this.players.get(id)?.removed,
     });
     this.results = null;
     this.phase = 'board';
@@ -288,11 +309,12 @@ export class Room {
   private startMini(kind: MiniKind) {
     this.mini?.dispose();
     this.lastKind = kind;
-    const ids = this.dateRun ? this.dateRun.state.couple.filter((id) => this.players.has(id)) : this.connectedIds();
+    const ids = this.gameIds();
+    this.miniIds = ids;
     const ctx: MiniCtx = {
       onChange: () => this.changed(),
       finish: (r) => this.finishMini(kind, r),
-      isConnected: (id) => !!this.players.get(id)?.connected,
+      isConnected: (id) => this.isOnline(id),
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
       lookOf: (id) => this.players.get(id)?.look,
@@ -395,6 +417,7 @@ export class Room {
   private finishMini(kind: MiniKind, r: MiniResult) {
     this.mini?.dispose();
     this.mini = null;
+    this.miniIds = null;
     const coinsPerGroup = r.coins ?? PLACE_COINS;
     const rows = r.groups.flatMap((group, gi) =>
       group.map((id) => ({
@@ -503,6 +526,7 @@ export class Room {
   private backToLobby() {
     this.mini?.dispose();
     this.mini = null;
+    this.miniIds = null;
     this.board?.dispose();
     this.board = null;
     this.dateRun = null;
@@ -510,15 +534,155 @@ export class Room {
     this.arcadeActive = false;
     this.results = null;
     this.phase = 'lobby';
-    for (const [id, p] of this.players) if (!p.connected) this.players.delete(id);
+    // Entfernte Spieler endgültig raus; Offline-Spieler bleiben (grau), bis ihre Frist abläuft
+    for (const [id, p] of this.players) if (p.removed) this.players.delete(id);
+    this.removeStaleOffline();
     this.ensureVip();
     this.changed();
+  }
+
+  // ---------------------------------------------------------------- Spieler entfernen & Offline
+  // Kick vom VIP-Handy bzw. vom Laptop (TV-Panel „Spieler“), Offline-Frist in der Lobby.
+  // Helfer/Konstanten: server/players.ts
+
+  private handleKicks(socket: Socket, myId: () => string | null) {
+    const reply = (ack: unknown, r: KickResponse) => typeof ack === 'function' && (ack as (r: KickResponse) => void)(r);
+    const isVip = () => !!this.players.get(myId() ?? '')?.isVip;
+    const isHost = () => isLoopback(socket.handshake.address) || isLoopback(socket.conn?.remoteAddress);
+
+    // VIP-Handy: einzelnen Spieler entfernen (nicht sich selbst)
+    socket.on('vip:kick', (id: unknown, ack?: unknown) => {
+      if (!isVip()) return reply(ack, { ok: false, error: 'Nur der VIP darf Spieler entfernen.' });
+      const target = String(id ?? '');
+      if (target === myId()) return reply(ack, { ok: false, error: 'Du kannst dich nicht selbst entfernen.' });
+      const n = this.kickPlayers([target]);
+      reply(ack, n ? { ok: true, removed: n } : { ok: false, error: 'Spieler nicht gefunden.' });
+    });
+
+    // VIP-Handy: alle anderen entfernen (VIP bleibt)
+    socket.on('vip:kickOthers', (ack?: unknown) => {
+      if (!isVip()) return reply(ack, { ok: false, error: 'Nur der VIP darf Spieler entfernen.' });
+      const n = this.kickPlayers([...this.players.keys()].filter((id) => id !== myId()));
+      reply(ack, { ok: true, removed: n });
+    });
+
+    // Laptop/TV: nur von Loopback-Verbindungen (127.0.0.1 / ::1)
+    socket.on('host:whoami', (ack?: unknown) => {
+      if (typeof ack === 'function') ack({ local: isHost() });
+    });
+    socket.on('host:kick', (id: unknown, ack?: unknown) => {
+      if (!isHost()) return reply(ack, { ok: false, error: 'Nur direkt am Laptop (localhost) erlaubt.' });
+      const n = this.kickPlayers([String(id ?? '')]);
+      reply(ack, n ? { ok: true, removed: n } : { ok: false, error: 'Spieler nicht gefunden.' });
+    });
+    socket.on('host:kickAll', (ack?: unknown) => {
+      if (!isHost()) return reply(ack, { ok: false, error: 'Nur direkt am Laptop (localhost) erlaubt.' });
+      reply(ack, { ok: true, removed: this.kickPlayers([...this.players.keys()]) });
+    });
+  }
+
+  /** Spieler entfernen. Lobby: sofort weg. Laufendes Spiel: als „entfernt“ markiert, das Spiel läuft ohne ihn weiter. */
+  private kickPlayers(ids: string[]): number {
+    let n = 0;
+    let human = false;
+    for (const id of ids) {
+      const p = this.players.get(id);
+      if (!p || p.removed) continue;
+      n += 1;
+      human ||= !p.isBot;
+      this.kicks.add(id);
+      // Handy informieren und trennen (es verbindet sich nicht von selbst neu)
+      const sock = p.socketId ? this.io.sockets.sockets.get(p.socketId) : undefined;
+      if (sock) {
+        sock.emit('kicked');
+        sock.leave('players');
+        setTimeout(() => sock.disconnect(true), 200);
+      }
+      // Bot (über „+ Bot“ hinzugefügt) beenden
+      const bi = this.bots.findIndex((b) => b.id === id);
+      if (bi >= 0) this.bots.splice(bi, 1)[0].stop();
+      p.socketId = null;
+      p.connected = false;
+      p.isVip = false;
+      p.offlineSince ??= Date.now();
+      if (this.phase === 'lobby') {
+        this.players.delete(id);
+      } else {
+        // Bleibt bis zur Lobby im Zustand (Namen/Avatare in laufenden Szenen), zählt aber nirgends mehr
+        p.removed = true;
+        this.playerGone(id);
+      }
+    }
+    if (!n) return 0;
+    if (this.phase !== 'lobby' && (this.connectedIds().length === 0 || (human && !this.humansOnline()))) {
+      this.backToLobby();
+    } else {
+      this.ensureVip();
+      this.changed();
+    }
+    return n;
+  }
+
+  /** Spieler offline gegangen oder entfernt: laufendes Spiel/Brett soll nicht auf ihn warten. */
+  private playerGone(id: string) {
+    if (this.phase === 'mini') this.mini?.playerDisconnected(id);
+    else if (this.phase === 'board') this.board?.playerGone(id);
+  }
+
+  /** Lobby: Offline-Spieler nach Ablauf der Frist entfernen; Anzeige „offline seit X min“ aktualisieren. */
+  private sweepOffline() {
+    if (this.phase !== 'lobby') return;
+    const removed = this.removeStaleOffline();
+    const offline = [...this.players.values()].filter((p) => p.offlineSince !== null);
+    const bucket = offline.map((p) => `${p.id}:${Math.floor((Date.now() - p.offlineSince!) / 60_000)}`).join('|');
+    if (removed || bucket !== this.offlineBucket) {
+      this.offlineBucket = bucket;
+      if (removed) this.ensureVip();
+      this.changed();
+    }
+  }
+
+  private removeStaleOffline(): number {
+    let n = 0;
+    const cut = Date.now() - OFFLINE_REMOVE_MS;
+    for (const [id, p] of this.players) {
+      if (!p.connected && p.offlineSince !== null && (p.isBot || p.offlineSince <= cut)) {
+        this.players.delete(id);
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  /** Lobby voll: den am längsten offline gebliebenen Spieler rauswerfen, damit Neue reinkommen. */
+  private evictOffline() {
+    const oldest = [...this.players.values()]
+      .filter((p) => !p.connected && p.offlineSince !== null)
+      .sort((a, b) => a.offlineSince! - b.offlineSince!)[0];
+    if (oldest) this.players.delete(oldest.id);
   }
 
   // ---------------------------------------------------------------- Helfer
 
   private connectedIds() {
-    return [...this.players.values()].filter((p) => p.connected).map((p) => p.id);
+    return [...this.players.values()].filter((p) => p.connected && !p.removed).map((p) => p.id);
+  }
+
+  private humansOnline() {
+    return this.connectedIds().some((id) => !this.players.get(id)!.isBot);
+  }
+
+  /** Online und nicht entfernt – das sehen die Spiele als „verbunden“. */
+  private isOnline(id: string) {
+    const p = this.players.get(id);
+    return !!p && p.connected && !p.removed;
+  }
+
+  /** Wer beim nächsten Minispiel mitspielt: Party → nur Spieler auf dem Brett, Date → das Paar, sonst alle Verbundenen. */
+  private gameIds() {
+    if (this.dateRun) return this.dateRun.state.couple.filter((id) => this.players.has(id) && !this.players.get(id)!.removed);
+    if (this.board) return this.board.state.order.filter((id) => this.isOnline(id));
+    return this.connectedIds();
   }
 
   private nameOf(id: string) {
@@ -538,7 +702,16 @@ export class Room {
       phase: this.phase,
       players: [...this.players.values()]
         .sort((a, b) => a.joinedAt - b.joinedAt)
-        .map(({ id, name, look, connected, isVip }) => ({ id, name, look, connected, isVip })),
+        .map(({ id, name, look, connected, isVip, offlineSince, removed, isBot }) => ({
+          id,
+          name,
+          look,
+          connected,
+          isVip,
+          ...(offlineSince !== null && !connected ? { offlineMs: Date.now() - offlineSince } : {}),
+          ...(removed ? { removed } : {}),
+          ...(isBot ? { bot: true } : {}),
+        })),
       joinUrl: this.joinUrl,
       partyActive: !!this.board,
       mode: this.mode,
@@ -553,6 +726,7 @@ export class Room {
       results: this.results,
       customQuestionCount: this.questions.all.length,
       customPostCount: this.posts.all.length,
+      inGame: this.phase === 'mini' ? this.miniIds : null,
     };
   }
 

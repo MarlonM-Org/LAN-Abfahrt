@@ -12,6 +12,8 @@ Aktueller Stand (v0.3):
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 8 Spieler, Pixel-Avatar-Editor auf dem Handy
 - Der erste Spieler ist **VIP** und wählt am Handy, was gespielt wird (und kann jederzeit abbrechen)
+- **Spieler entfernen:** Der VIP sieht in der Lobby alle Spieler und kann einzelne (✕ entfernen) oder alle anderen rauswerfen – im laufenden Spiel über den Knopf „Spieler“ oben links, sobald jemand offline ist. Am Laptop öffnet **P** (oder der Knopf „Spieler“ oben links in der TV-Ansicht) dasselbe Panel inkl. „Alle entfernen“ – das geht nur direkt am Laptop (`localhost`). Wer entfernt wurde, kann einfach neu beitreten
+- **Offline-Spieler** (Tab zu, WLAN weg) bleiben grau in der Lobby („offline seit 2 min“) und spielen beim nächsten Spiel nicht mit; wer innerhalb von 5 Minuten zurückkommt, ist wieder drin, danach fliegt er automatisch raus (`OFFLINE_KICK_MIN=…` ändert die Frist). Laufende Spiele warten nicht auf Abwesende
 - **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
   - Alle würfeln am Handy, Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus
   - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los

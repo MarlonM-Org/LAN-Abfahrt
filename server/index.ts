@@ -42,7 +42,8 @@ const joinUrl = tls ? `https://${PUBLIC_DOMAIN}:${HTTPS_PORT}/` : `http://${PUBL
 const app = express();
 const httpServer = http.createServer(app);
 const httpsServer = tls ? https.createServer(tls, app) : null;
-const io = new Server(httpServer);
+// Schneller merken, wenn ein Handy weg ist (Tab zu, WLAN weg, Akku leer): ≤ ~22 s statt 45 s (Standard)
+const io = new Server(httpServer, { pingInterval: 10_000, pingTimeout: 12_000 });
 if (httpsServer) io.attach(httpsServer);
 const room = new Room(io, joinUrl, `http://localhost:${PORT}`);
 io.on('connection', (socket) => room.handle(socket));

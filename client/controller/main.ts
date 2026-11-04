@@ -27,6 +27,7 @@ import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
+import { buildKicked, initVipPlayersButton } from './players';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -40,19 +41,43 @@ function join() {
       localStorage.setItem(LS.id, r.playerId);
       store.joined = true;
       store.editing = false;
+      store.waitForLobby = false;
       requestWakeLock();
+    } else if (r.kicked) {
+      return onKicked();
     } else {
       toast(r.error ?? 'Beitreten hat nicht geklappt.');
       store.joined = false;
+      store.waitForLobby = !!store.state && store.state.phase !== 'lobby';
     }
     render();
   });
 }
 
+/** Vom VIP/Laptop entfernt: gespeicherte Spieler-ID vergessen (kein Bann – „Neu beitreten“ geht immer). */
+function onKicked() {
+  // Selbst trennen – „Neu beitreten“ baut eine frische Verbindung auf
+  if (socket.connected) socket.disconnect();
+  store.kicked = true;
+  store.joined = false;
+  store.playerId = undefined;
+  localStorage.removeItem(LS.id);
+  render();
+}
+
+function rejoin() {
+  store.kicked = false;
+  store.playerId = undefined;
+  if (socket.connected) join();
+  else socket.connect(); // → 'connect' → join()
+  render();
+}
+
 startTimeSync(socket);
 
+socket.on('kicked', onKicked);
 socket.on('connect', () => {
-  if (store.name && !store.editing) join();
+  if (store.name && !store.editing && !store.kicked) join();
   else render();
 });
 socket.on('disconnect', () => {
@@ -73,6 +98,11 @@ socket.on('state', (s: GameState) => {
   if (store.joined && !s.players.some((p) => p.id === store.playerId)) {
     store.joined = false;
     if (store.name && !store.editing) join();
+  }
+  // Während eines Spiels abgewiesen → beitreten, sobald wieder die Lobby da ist
+  if (store.waitForLobby && !store.joined && !store.kicked && s.phase === 'lobby' && !store.editing) {
+    store.waitForLobby = false;
+    join();
   }
   render();
 });
@@ -100,9 +130,11 @@ function render() {
 }
 
 function pickScreen(): Screen {
+  if (store.kicked) return ['kicked', () => buildKicked(rejoin)];
   if (store.editing || !store.name) return ['edit', () => buildEdit(afterEdit)];
   if (!socket.connected) return ['offline', message('Verbinde ...', 'Bist du im selben WLAN wie der PC?')];
   const s = store.state;
+  if (!store.joined && store.waitForLobby) return ['waitlobby', message('Gerade läuft ein Spiel', 'Du steigst automatisch ein, sobald die Runde vorbei ist.')];
   if (!store.joined || !s) return ['joining', message('Trete bei ...')];
   const vip = !!me()?.isVip;
 
@@ -119,6 +151,8 @@ function pickScreen(): Screen {
       const m = s.mini;
       if (!m) return ['wait', message('Warte ...')];
       if (!(store.playerId && s.players.some((p) => p.id === store.playerId))) return ['wait', message('Warte ...')];
+      // Erst nach Spielstart zurückgekommen → diese Runde zuschauen
+      if (s.inGame && !s.inGame.includes(store.playerId)) return ['watch', message('Du schaust zu', 'Diese Runde läuft ohne dich – beim nächsten Spiel bist du dabei!')];
       switch (m.kind) {
         case 'flunky':
           return pickFlunky(m.state);
@@ -216,6 +250,7 @@ async function requestWakeLock() {
 }
 
 onKartRerender(() => render());
+initVipPlayersButton();
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

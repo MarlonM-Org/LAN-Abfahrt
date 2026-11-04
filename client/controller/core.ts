@@ -16,6 +16,10 @@ export const store = {
   look: loadLook(),
   joined: false,
   editing: !localStorage.getItem(LS.name),
+  /** Vom VIP/Laptop entfernt → „Du wurdest entfernt“-Screen */
+  kicked: false,
+  /** Beitreten ging nicht, weil gerade ein Spiel läuft → automatisch beitreten, sobald die Lobby da ist */
+  waitForLobby: false,
   /** performance.now()-Zeitpunkt, an dem der aktuelle Countdown abläuft */
   endsAt: 0,
 };

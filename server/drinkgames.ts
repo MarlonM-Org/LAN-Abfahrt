@@ -78,7 +78,10 @@ export class NhieGame implements MiniGame {
     return { kind: 'nhie', state: { ...this.state, endsIn: Math.max(0, this.deadline - Date.now()) } };
   }
 
-  playerDisconnected() {}
+  playerDisconnected() {
+    // Haben alle anderen schon geantwortet, nicht auf den Timer warten
+    if (this.state.sub === 'question' && this.answers.size && this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => this.answers.has(p))) this.reveal();
+  }
   dispose() {
     this.timers.clear();
   }
@@ -158,7 +161,9 @@ export class HiloGame implements MiniGame {
     return { kind: 'hilo', state: { ...this.state, endsIn: Math.max(0, this.deadline - Date.now()) } };
   }
 
-  playerDisconnected() {}
+  playerDisconnected() {
+    if (this.state.sub === 'guess' && this.guesses.size && this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => this.guesses.has(p))) this.reveal();
+  }
   dispose() {
     this.timers.clear();
   }

@@ -134,7 +134,11 @@ export class RhythmGame implements MiniGame {
     );
   }
 
-  playerDisconnected() {}
+  playerDisconnected() {
+    // Partner weg, der andere ist schon bereit → nicht 25 s warten
+    const s = this.state;
+    if (s.sub === 'ready' && s.ready.length && this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => s.ready.includes(p))) this.play();
+  }
 
   dispose() {
     this.timers.clear();
