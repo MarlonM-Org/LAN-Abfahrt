@@ -35,6 +35,7 @@ import { SprintGame } from './sprint';
 import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
+import { VersteckGame } from './verstecken';
 
 const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
@@ -310,6 +311,9 @@ export class Room {
         break;
       case 'ttt':
         this.mini = new TttGame(ids, ctx);
+        break;
+      case 'verstecken':
+        this.mini = new VersteckGame(ids, ctx);
         break;
     }
     this.results = null;

@@ -1,3 +1,5 @@
+import type { PropType } from './verstecken';
+
 export interface Look {
   skin: number;
   hair: number;
@@ -30,7 +32,8 @@ export type MiniKind =
   | 'flieger' | 'kurve' | 'arena'
   | 'bowling'
   | 'sup' | 'tidy' | 'enten'
-  | 'sup' | 'tidy' | 'ttt';
+  | 'sup' | 'tidy' | 'ttt'
+  | 'verstecken';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -640,6 +643,89 @@ export interface TttPrivate {
   info: { seq: number; text: string } | null;
 }
 
+// ------------------------------------------------------------------ Versteckspiel mit Möbeln
+
+/** Ein Möbelstück auf dem TV – echte Möbel und verkleidete Spieler sehen gleich aus. */
+export interface VsObject {
+  /** Zufällige ID pro Runde (verrät nichts) */
+  o: number;
+  t: PropType;
+  v: number;
+  x: number;
+  y: number;
+  /** gespiegelt */
+  f: boolean;
+}
+
+export interface VsAvatar {
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  moving: boolean;
+  stunned: boolean;
+}
+
+export interface VsCheck {
+  seq: number;
+  by: string;
+  x: number;
+  y: number;
+  ok: boolean;
+  /** Bei Erfolg: wer gefunden wurde */
+  found: string | null;
+}
+
+export interface VsWhistle {
+  seq: number;
+  /** ungefähre Position (verwackelt) */
+  x: number;
+  y: number;
+  zone: number;
+  forced: boolean;
+}
+
+export interface VerstState {
+  sub: 'intro' | 'hide' | 'seek' | 'reveal' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  seekers: string[];
+  hiders: string[];
+  /** In dieser Runde gefundene Verstecker (Reihenfolge) */
+  found: string[];
+  objects: VsObject[];
+  /** Sichtbare Figuren: Sucher + noch unverkleidete Verstecker */
+  avatars: Record<string, VsAvatar>;
+  checks: VsCheck[];
+  whistles: VsWhistle[];
+  scores: Record<string, number>;
+  /** Nur in "reveal": wer welches Möbel war */
+  reveal: { id: string; x: number; y: number; t: PropType }[] | null;
+  /** Wer die Runde gewonnen hat (nur reveal/over) */
+  winner: 'seekers' | 'hiders' | null;
+}
+
+export interface VerstPrivate {
+  role: 'seeker' | 'hider';
+  found: boolean;
+  foundBy: string | null;
+  disguise: { t: PropType; v: number } | null;
+  locked: boolean;
+  /** Eigene Position (für die eigene Anzeige/Bots) */
+  x: number;
+  y: number;
+  zone: number;
+  hint: string;
+  hintLevel: 'ok' | 'warn' | 'bad';
+  /** Möbel in Reichweite zum Verwandeln */
+  canMorph: boolean;
+  whistleIn: number;
+  stunIn: number;
+  score: number;
+  finds: number;
+  note: { text: string; seq: number } | null;
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -734,7 +820,8 @@ export type MiniSnapshot =
   | { kind: 'arena'; state: ArenaState }
   | { kind: 'bowling'; state: BowlingState }
   | { kind: 'enten'; state: EntenState }
-  | { kind: 'ttt'; state: TttState };
+  | { kind: 'ttt'; state: TttState }
+  | { kind: 'verstecken'; state: VerstState };
 
 export interface GameState {
   phase: Phase;
@@ -758,6 +845,7 @@ export type PrivateState =
   | { kind: 'murder'; state: MurderPrivate }
   | { kind: 'flieger'; state: FliegerPrivate }
   | { kind: 'ttt'; state: TttPrivate }
+  | { kind: 'verstecken'; state: VerstPrivate }
   | null;
 
 export interface JoinRequest {

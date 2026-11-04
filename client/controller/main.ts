@@ -16,6 +16,7 @@ import { pickArena, pickSup, pickTidy } from './screens/controller';
 import { pickBowling } from './screens/bowling';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
+import { pickVerstecken } from './screens/verstecken';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -145,6 +146,8 @@ function pickScreen(): Screen {
           return pickEnten(m.state);
         case 'ttt':
           return pickTtt(m.state);
+        case 'verstecken':
+          return pickVerstecken(m.state);
       }
     }
   }

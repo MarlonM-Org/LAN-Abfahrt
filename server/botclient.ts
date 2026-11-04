@@ -11,6 +11,7 @@ import { KURVE, ROOMS, TTT } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lineFree, nextWaypoint, roomInner } from '../shared/house';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
+import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 
 export interface BotOptions {
   url: string;
@@ -58,6 +59,19 @@ export class Bot {
   private lastFire = 0;
   /** Gedächtnis für "Verräter im Ferienhaus" */
   private ttt = { round: 0, grudges: new Set<string>(), lastAttack: 0, goal: null as { x: number; y: number } | null, stuckX: 0, stuckY: 0, stuckAt: 0 };
+  /** Versteckspiel: Plan des Verstecker-Bots bzw. Gedächtnis des Sucher-Bots */
+  vs = {
+    round: 0,
+    spot: null as { x: number; y: number; t: PropType } | null,
+    seen: new Map<number, { x: number; y: number; movedAt: number }>(),
+    checked: new Set<number>(),
+    target: null as number | null,
+    targetSince: 0,
+    whistle: null as { x: number; y: number; at: number } | null,
+    lastWhistleSeq: 0,
+    lastPos: { x: 0, y: 0, at: 0 },
+    wander: null as { x: number; y: number } | null,
+  };
 
   constructor(
     public name: string,
@@ -298,6 +312,10 @@ export class Bot {
     if (!this.arenaStick) return;
     this.arenaStick = false;
     this.send('stick', { x: 0, y: 0 });
+  }
+
+  playVerstecken(m: VerstStateT) {
+    vsStep(this, m);
   }
 
   stop() {
@@ -626,6 +644,8 @@ export class Bot {
 
     if (m.kind === 'ttt') this.playTtt(m.state);
 
+    if (m.kind === 'verstecken') this.playVerstecken(m.state);
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;
@@ -805,6 +825,160 @@ export function kurveLookAhead(st: KurveState, myId: string, brain: KurveBrain, 
     }
   }
   return horizon + 1;
+}
+
+export type VerstStateT = Extract<NonNullable<GameState['mini']>, { kind: 'verstecken' }>['state'];
+
+/** Versteckspiel-Bots: Verstecker suchen sich einen passenden Platz neben einem Möbel, Sucher prüfen Möbel. */
+function vsStep(bot: Bot, m: VerstStateT) {
+  const p = bot.priv?.kind === 'verstecken' ? bot.priv.state : null;
+  if (!p) return;
+  const v = bot.vs;
+  if (v.round !== m.round) {
+    v.round = m.round;
+    v.spot = null;
+    v.seen.clear();
+    v.checked.clear();
+    v.target = null;
+    v.whistle = null;
+    v.wander = null;
+  }
+  const goTo = (tx: number, ty: number, slow = 1) => {
+    const wp = verstWaypoint(p.x, p.y, tx, ty);
+    const dx = wp.x - p.x;
+    const dy = wp.y - p.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 2) return true;
+    const k = Math.min(1, d / 10) * slow;
+    bot.send('stick', { x: (dx / d) * k, y: (dy / d) * k });
+    return false;
+  };
+
+  if (p.role === 'hider') {
+    if (p.found || (m.sub !== 'hide' && m.sub !== 'seek')) return;
+    if (m.sub === 'seek') {
+      bot.once('vs-hide-seek', async () => {
+        await sleep(rand(1500, 3500));
+        if (p.disguise && !p.locked) bot.send('lock');
+        if (p.whistleIn <= 0 && Math.random() < 0.18) bot.send('whistle');
+      });
+      return;
+    }
+    // Verstecken: Platz planen
+    if (!v.spot) {
+      const objs = shuffleArr(m.objects);
+      for (const o of objs) {
+        const info = PROPS[o.t];
+        for (let k = 0; k < 8 && !v.spot; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          const dist = rand(info.w / 2 + 10, VS.MORPH_R - 8);
+          const x = Math.round(o.x + Math.cos(ang) * dist);
+          const y = Math.round(o.y + Math.sin(ang) * dist * 0.6);
+          if (!canStand(x, y) || !canStand(x - 6, y) || !canStand(x + 6, y)) continue;
+          const others = m.objects;
+          if (judgeSpot({ t: o.t, x, y }, others, false, true).level !== 'ok') continue;
+          if (others.some((q) => overlap(baseRect({ t: o.t, x, y }), baseRect(q)) > 0)) continue;
+          if (!info.zones.includes(zoneAt(x, y))) continue;
+          v.spot = { x, y, t: o.t };
+        }
+        if (v.spot) break;
+      }
+      if (!v.spot) return;
+    }
+    const s = v.spot;
+    if (p.disguise && p.locked) return;
+    if (!p.disguise || p.disguise.t !== s.t) {
+      if (Math.hypot(p.x - s.x, p.y - s.y) > 3) {
+        goTo(s.x, s.y);
+        return;
+      }
+      bot.send('stick', { x: 0, y: 0 });
+      bot.once('vs-morph', async () => {
+        await sleep(rand(250, 500));
+        bot.send('morph');
+      });
+      return;
+    }
+    if (Math.hypot(p.x - s.x, p.y - s.y) > 3) {
+      goTo(s.x, s.y, 0.7);
+      return;
+    }
+    bot.send('stick', { x: 0, y: 0 });
+    bot.once('vs-lock', async () => {
+      await sleep(rand(300, 900));
+      if (!p.locked) bot.send('lock');
+    });
+    return;
+  }
+
+  // ---------------------------------------------------------------- Sucher
+  if (m.sub !== 'seek' || p.stunIn > 0) return;
+  const now = Date.now();
+  for (const o of m.objects) {
+    const old = v.seen.get(o.o);
+    if (!old) v.seen.set(o.o, { x: o.x, y: o.y, movedAt: 0 });
+    else if (Math.abs(old.x - o.x) + Math.abs(old.y - o.y) > 0) v.seen.set(o.o, { x: o.x, y: o.y, movedAt: now });
+  }
+  const lastW = m.whistles.at(-1);
+  if (lastW && lastW.seq > v.lastWhistleSeq) {
+    v.lastWhistleSeq = lastW.seq;
+    v.whistle = { x: lastW.x, y: lastW.y, at: now };
+  }
+  const objs = m.objects.filter((o) => !v.checked.has(o.o));
+  let target = objs.find((o) => o.o === v.target);
+  if (target && now - v.targetSince > 9000) {
+    // hängt fest → anderes Ziel
+    v.checked.add(target.o);
+    target = undefined;
+  }
+  if (!target) {
+    const me = { x: p.x, y: p.y };
+    const score = (o: (typeof objs)[number]) => {
+      let sc = Math.hypot(o.x - me.x, o.y - me.y) + Math.random() * 60;
+      const seen = v.seen.get(o.o);
+      if (seen && now - seen.movedAt < 10000) sc -= 220;
+      if (v.whistle && now - v.whistle.at < 15000 && Math.hypot(o.x - v.whistle.x, o.y - v.whistle.y) < 50) sc -= 150;
+      return sc;
+    };
+    target = [...objs].sort((a, b) => score(a) - score(b))[0];
+    if (!target) return;
+    v.target = target.o;
+    v.targetSince = now;
+  }
+  const info = PROPS[target.t];
+  const side = p.x <= target.x ? -1 : 1;
+  const ax = target.x + side * (info.w / 2 + 5);
+  const ay = target.y;
+  const standX = canStand(ax, ay) ? ax : target.x - side * (info.w / 2 + 5);
+  const standY = canStand(standX, ay) ? ay : ay + 6;
+  const av = m.avatars[bot.id];
+  const dir = av?.dir ?? 1;
+  const inFront = pickTarget(m.objects, p.x, p.y, dir);
+  if (inFront?.o === target.o) {
+    bot.send('stick', { x: 0, y: 0 });
+    bot.once('vs-check', async () => {
+      await sleep(rand(250, 700));
+      bot.send('check');
+      v.checked.add(target!.o);
+      v.target = null;
+    });
+    return;
+  }
+  if (Math.hypot(p.x - standX, p.y - standY) < 3) {
+    // Zum Möbel drehen
+    bot.send('stick', { x: target.x > p.x ? 0.3 : -0.3, y: 0 });
+    return;
+  }
+  goTo(standX, standY);
+}
+
+function shuffleArr<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */
