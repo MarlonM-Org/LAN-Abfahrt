@@ -270,6 +270,7 @@ export function trackForScene(scene: string): TrackName {
     case 'bomb':
       return 'bar';
     case 'rhythm':
+    case 'boule':
       return 'romantic';
     default:
       return 'action';

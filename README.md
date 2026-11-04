@@ -59,7 +59,7 @@ PUBLIC_HOST=192.168.178.23 npm run dev
 
 ### HTTPS (für Spiele mit Bewegungssensor)
 
-iPhones geben den Bewegungssensor (Bowling, Ententeich, Kipp-Lenkung) nur über HTTPS frei. Alles andere läuft weiter über HTTP.
+iPhones geben den Bewegungssensor (Bowling, Boule, Ententeich, Kipp-Lenkung) nur über HTTPS frei. Alles andere läuft weiter über HTTP.
 
 Aufbau (einmalig einrichten):
 
@@ -139,6 +139,7 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
 - 💣 **Bomben-Arena** (2–12 Spieler) – Bomberman im Strandgarten: Joystick links, „BOMBE“-Knopf rechts. Kokosnüsse/Wasserbomben legen, Sandburgen, Liegestühle und Kühlboxen sprengen, Power-ups sammeln (+1 Bombe, +1 Reichweite, Flip-Flops = schneller). Wer getroffen wird, ist nass („Platsch!“) und für die Runde raus; nach 60 s kommt die Flut und füllt die Arena von außen. Wer zuerst 2 Runden gewinnt (max. 3 Runden), ist Champion. Testen: `npm run bots -- 8 --game=arena`.
 - 🎳 **Strand-Bowling** (ab 2 Spielern) – reihum auf der Bahn an der Strandbar. Am Handy erst die Startposition wählen, dann **„HALTEN & SCHWINGEN“** gedrückt halten, das Handy wie eine Bowlingkugel nach vorn schwingen und am Ende loslassen (Tempo = Schwung, Richtung = Drehung des Handys, Effet = Handgelenk drehen). Ohne HTTPS/Sensor wird die Kugel nach oben **gewischt** (schnell = hart, schräg = Richtung, im Bogen = Effet). Normale Bowling-Wertung inkl. Strike/Spare-Bonus, aber kürzer: bis 3 Spieler 5 Frames, bis 6 Spieler 3, ab 7 Spielern 2.
+- 🥥 **Boule am Strand** (2–12 Spieler) – Pétanque im Sand bei Sonnenuntergang. Bis 4 Spieler jeder gegen jeden (2 Spieler: je 3 Kugeln, 3–4 Spieler: je 2), ab 5 Spielern **Team Sonne gegen Team Meer** (1–2 Kugeln pro Person, jedes Team gleich viele). Das Schweinchen (eine kleine Kokosnuss) wird zu Beginn jeder Aufnahme automatisch an eine zufällige Stelle geworfen. Es wirft immer die Seite, die **nicht** am nächsten am Schweinchen liegt. Am Handy **„Legen“** (hoher Bogen, rollt aus) oder **„Schießen“** (flach und hart, räumt Kugeln weg) wählen, dann wie beim Bowling **„HALTEN & SCHWINGEN“** (Schwung = Weite, Drehung = Richtung, Handgelenk = Effet) oder nach oben **wischen**. Die Mini-Karte zeigt die Lage, dazu die nötige Kraft fürs Schweinchen. Nach jeder Aufnahme wird gemessen: Jede eigene Kugel, die näher liegt als die beste gegnerische, gibt einen Punkt. Bis 7 Punkte oder max. 4 Aufnahmen (bei 6 Kugeln pro Seite 3). Testen: `npm run bots -- 6 --game=boule`.
 - 🦆 **Ententeich** (ab 2 Spielern) – Duck Hunt in der Urlaubslagune: alle schießen gleichzeitig, jeder hat ein Fadenkreuz in seiner Farbe. Enten (10), Pommes-klauende Möwen (20) und Flamingos (30) treffen, Badegäste auf Schwimmringen lieber nicht (−15). 3 Schuss, dann nach unten wischen (oder „Nachladen“). Schnelle Treffer hintereinander geben Combo-Bonus, 3 Wellen mit immer mehr und schnelleren Vögeln.
   - **Zielen mit Bewegungssensor** (braucht HTTPS): Handy wie eine Lichtpistole halten, Oberkante zum TV, auf die TV-Mitte zielen und „Zentrieren“ tippen.
   - **Ohne HTTPS/Sensor**: Touchpad – wischen bewegt das Fadenkreuz (schnell wischen = weiter).
