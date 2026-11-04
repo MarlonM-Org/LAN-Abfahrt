@@ -22,6 +22,7 @@ import { BowlingGame } from './bowling';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
+import { TurmGame } from './turm';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -322,6 +323,9 @@ export class Room {
         break;
       case 'kart':
         this.mini = new KartGame(ids, ctx);
+        break;
+      case 'turm':
+        this.mini = new TurmGame(ids, ctx);
         break;
     }
     this.results = null;

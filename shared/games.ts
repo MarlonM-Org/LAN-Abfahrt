@@ -23,17 +23,18 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   verstecken: { title: 'Versteckspiel mit Möbeln', tagline: 'Werdet zur Kühlbox – und bloß nicht bewegen!', minPlayers: 3 },
   parcours: { title: 'Fallen-Parcours', tagline: 'Baut Fallen – und schafft es selbst zur Cocktailbar!', minPlayers: 2 },
   kart: { title: 'Kart-Rennen', tagline: 'Handy kippen zum Lenken – drei Runden ums Ferienhaus!', minPlayers: 2 },
+  turm: { title: 'Wackelturm', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -381,3 +382,81 @@ export const TTT_ROLES: Record<TttRole, { name: string; color: string }> = {
 
 /** Farbnamen der Shirts (für den Spurensucher des Detektivs: „ein ___ Shirt“) */
 export const SHIRT_NAMES = ['rotes', 'blaues', 'grünes', 'gelbes', 'lila', 'oranges', 'türkises', 'weißes', 'schwarzes', 'rosa'];
+
+// ------------------------------------------------------------------ Wackelturm
+
+/** Alle Längen in Physik-Einheiten (1 Block = BLOCK), Höhen in Blöcken über der Plattform */
+export const TURM = {
+  BLOCK: 16,
+  /** Breite der Plattform in Blöcken */
+  PLATFORM_W: 6,
+  /** Zielhöhe (Gipfelkreuz) in Blöcken */
+  GOAL: 22,
+  /** Sichtbarer Bereich der Bahn: oberhalb / unterhalb der Plattform (Blöcke) */
+  VIEW_TOP: 25,
+  VIEW_BOTTOM: 1.5,
+  /** So weit (Blöcke ab Mitte) darf man das fallende Teil seitlich schieben */
+  LANE_HALF: 5,
+  /** Fallgeschwindigkeit in Blöcken pro Sekunde (normal / mit ▼) */
+  FALL: 2,
+  FAST: 11,
+  /** Neue Teile erscheinen zufällig bis zu so viele Blöcke neben der Mitte */
+  SPAWN_JITTER: 1.5,
+  /** Abstand des neuen Teils über dem höchsten Punkt des Turms (Blöcke) */
+  SPAWN_GAP: 5,
+  LIVES: 3,
+  /** Weitere verlorene Teile innerhalb dieser Zeit kosten kein zusätzliches Leben */
+  LOSS_GRACE_MS: 2000,
+  /** So lange muss der Turm über dem Ziel stehen bleiben */
+  HOLD_MS: 2000,
+  TIME_MS: 150000,
+  /** Nach dem ersten Gipfel haben die anderen noch so lange Zeit */
+  AFTER_FINISH_MS: 20000,
+  COUNTDOWN_MS: 3500,
+  GUST_EVERY_MS: 30000,
+  GUST_MS: 3500,
+  /** Bahnfarben (Bestmarke, Namensschild) */
+  COLORS: [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8, 0x8d5629, 0x5f6bd6, 0xa8c43a, 0x7f7b73],
+};
+
+/** Urlaubs-Teile in Tetromino-Form. Zellen als [Spalte, Zeile], Zeile nach unten. */
+export const TURM_SHAPES: { name: string; cells: [number, number][] }[] = [
+  { name: 'Surfbrett', cells: [[0, 0], [1, 0], [2, 0], [3, 0]] },
+  { name: 'Kühlbox', cells: [[0, 0], [1, 0], [0, 1], [1, 1]] },
+  { name: 'Liegestuhl', cells: [[0, 0], [1, 0], [2, 0], [1, 1]] },
+  { name: 'Koffer', cells: [[0, 0], [0, 1], [0, 2], [1, 2]] },
+  { name: 'Reisetasche', cells: [[1, 0], [1, 1], [1, 2], [0, 2]] },
+  { name: 'Cocktailkiste', cells: [[1, 0], [2, 0], [0, 1], [1, 1]] },
+  { name: 'Sangriakiste', cells: [[0, 0], [1, 0], [1, 1], [2, 1]] },
+];
+
+/** Schwerpunkt einer Form in Zellen (Mittelwert der Zellmitten) */
+export function turmCom(shape: number): { x: number; y: number; cols: number; rows: number } {
+  const cells = TURM_SHAPES[shape].cells;
+  let x = 0;
+  let y = 0;
+  let cols = 0;
+  let rows = 0;
+  for (const [c, r] of cells) {
+    x += c + 0.5;
+    y += r + 0.5;
+    cols = Math.max(cols, c + 1);
+    rows = Math.max(rows, r + 1);
+  }
+  return { x: x / cells.length, y: y / cells.length, cols, rows };
+}
+
+/**
+ * Zellmitten einer Form relativ zum Schwerpunkt, gedreht um `angle`
+ * (Bildschirm-Koordinaten: y nach unten, positive Winkel = im Uhrzeigersinn).
+ */
+export function turmCellOffsets(shape: number, angle: number): { x: number; y: number }[] {
+  const com = turmCom(shape);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return TURM_SHAPES[shape].cells.map(([c, r]) => {
+    const dx = (c + 0.5 - com.x) * TURM.BLOCK;
+    const dy = (r + 0.5 - com.y) * TURM.BLOCK;
+    return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
+  });
+}

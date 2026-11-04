@@ -19,6 +19,7 @@ import { pickTtt } from './screens/ttt';
 import { pickVerstecken } from './screens/verstecken';
 import { pickParcours } from './screens/parcours';
 import { onKartRerender, pickKart } from './screens/kart';
+import { pickTurm } from './screens/turm';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -154,6 +155,8 @@ function pickScreen(): Screen {
           return pickParcours(m.state);
         case 'kart':
           return pickKart(m.state);
+        case 'turm':
+          return pickTurm(m.state);
       }
     }
   }
