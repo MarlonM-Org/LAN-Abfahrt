@@ -5,7 +5,7 @@
  *   npm run bots              → 3 Bots treten bei
  *   npm run bots -- 5         → 5 Bots
  *   npm run bots -- 3 --party → Bot wird VIP und startet direkt eine Party (3 Runden)
- *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist …)
+ *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist, sumo …)
  *   npm run bots -- 2 --date        → zwei Bots spielen die komplette Date Night
  *   npm run bots -- 4 --drink       → Bots spielen ein paar Runden Trinkspiel
  */

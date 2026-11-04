@@ -38,6 +38,7 @@ import { StarsGame } from './stars';
 import { Board } from './board';
 import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
+import { SumoGame } from './sumo';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
@@ -387,6 +388,9 @@ export class Room {
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);
+        break;
+      case 'sumo':
+        this.mini = new SumoGame(ids, ctx);
         break;
     }
     this.results = null;

@@ -27,6 +27,7 @@ import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
+import { pickSumo } from './screens/sumo';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -178,6 +179,8 @@ function pickScreen(): Screen {
           return pickFangen(m.state);
         case 'geist':
           return pickGeist(m.state);
+        case 'sumo':
+          return pickSumo(m.state);
       }
     }
   }
