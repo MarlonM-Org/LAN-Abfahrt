@@ -70,7 +70,7 @@ Tipp: PC und Apple TV per LAN-Kabel anschließen – dann ist die Verzögerung k
 
 ```
 server/   index.ts (HTTP + Vite), room.ts (Lobby/VIP/Ablauf), board.ts (Spielbrett),
-          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, questions.ts
+          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, questions.ts, smash.ts
 shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), avatar.ts, flunky.ts
 client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel)
           index.html + controller/ (Handy-UI, ein Modul pro Spiel in screens/)
@@ -99,8 +99,9 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
+- 🥊 **Smash-Arena** (2–8 Spieler) – Plattform-Prügelei à la Smash Bros. mit den eigenen Avataren auf der *Strandbar* (schwebendes Surfbrett) oder der *Pool-Party* (wippender Flamingo). Treffer erhöhen die Prozente, je höher, desto weiter fliegt man – wer über den Rand fliegt, verliert ein Leben (3, ab 6 Spielern 2). Handy: Joystick links (laufen, ▼ ducken/durch Plattformen fallen, Richtung = Schlagvariante), rechts **SCHLAG**, **SPEZIAL** (zufälliges Urlaubs-Item: Flip-Flop-Wurf, Sonnenschirm-Rückstoß, Cocktail-Spritzer, Luftmatratzen-Klatscher, Wasserpistole), **SPRUNG** (zweimal in der Luft) und **SCHILD** (halten). Items: Kokosnuss, Wasserbombe, Erste-Hilfe-Ananas (−30 %). Wer zuletzt steht, gewinnt – nach 3 Minuten zählen Leben, dann Prozente.
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+Alle laufen auch im Party-Modus auf dem Spielbrett.
 
 ## Trinkspiel
 

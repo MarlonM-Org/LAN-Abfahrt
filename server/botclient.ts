@@ -3,10 +3,11 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { GameState, PrivateState } from '../shared/types';
+import type { GameState, PrivateState, SmashFighter, SmashState } from '../shared/types';
 import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { ROOMS } from '../shared/games';
+import { SMASH_STAGES, mainPlatform } from '../shared/smash';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 
 export interface BotOptions {
@@ -37,6 +38,8 @@ export class Bot {
   private resultsEntered = 0;
   private lastPhase = '';
   private timer: NodeJS.Timeout;
+  /** Kurzzeitgedächtnis für die Smash-Arena */
+  private sm = { shieldUntil: 0, lastJump: 0, lastA: 0, lastB: 0, stick: '', stickAt: 0 };
 
   constructor(
     public name: string,
@@ -57,6 +60,10 @@ export class Bot {
       this.state = s;
       this.react(s);
     });
+  }
+
+  private smashBrain(st: SmashState, me: SmashFighter) {
+    smashThink(this, this.sm, st, me);
   }
 
   stop() {
@@ -289,6 +296,14 @@ export class Bot {
       }
     }
 
+    if (m.kind === 'smash' && m.state.sub === 'fight') {
+      const me2 = m.state.fighters[this.id];
+      if (me2?.state === 'fight') this.once('smash', async () => {
+        await sleep(rand(50, 110));
+        this.smashBrain(m.state, me2);
+      });
+    }
+
     if (m.kind === 'murder') {
       const ms = m.state;
       const p = this.priv?.kind === 'murder' ? this.priv.state : null;
@@ -330,6 +345,128 @@ export class Bot {
           this.send('vote', { target });
         });
       }
+    }
+  }
+}
+
+const ATTACK_ANIMS = new Set(['jab', 'side', 'up', 'down', 'nair', 'dair', 'spec']);
+
+export interface SmashBrainHost {
+  send(action: string, payload?: unknown): void;
+}
+
+/** Smash-Arena-Bot: hinlaufen, hauen, manchmal blocken – und vor allem zurück auf die Bühne kommen */
+export function smashThink(bot: SmashBrainHost & { id: string }, mem: { shieldUntil: number; lastJump: number; lastA: number; lastB: number; stick: string; stickAt: number }, st: SmashState, me: SmashFighter) {
+  const now = Date.now();
+  const stage = SMASH_STAGES.find((x) => x.id === st.stage)!;
+  const main = mainPlatform(stage);
+  const left = main.x;
+  const right = main.x + main.w;
+  const top = main.y;
+  const stick = (x: number, y: number) => {
+    const key = `${x},${y}`;
+    if (key === mem.stick && now - mem.stickAt < 300) return;
+    mem.stick = key;
+    mem.stickAt = now;
+    bot.send('stick', { x, y });
+  };
+  const btn = (b: string, x = 0, y = 0) => bot.send('btn', { b, down: true, x, y });
+  if (me.anim === 'hurt' || me.anim === 'stun' || me.anim === 'dizzy') {
+    stick(me.x < (left + right) / 2 ? 1 : -1, 0);
+    return;
+  }
+  // Zurück auf die Bühne!
+  const offstage = me.x < left - 2 || me.x > right + 2 || me.y > top + 4;
+  if (offstage) {
+    if (mem.shieldUntil) {
+      bot.send('btn', { b: 'shield', down: false });
+      mem.shieldUntil = 0;
+    }
+    const dir = me.x < (left + right) / 2 ? 1 : -1;
+    stick(dir, 0);
+    const low = me.y > top - 30;
+    if (low && me.vy > -40 && now - mem.lastJump > 280) {
+      if (me.jumps > 0) {
+        mem.lastJump = now;
+        btn('jump', dir, 0);
+      } else if (me.special === 'schirm' && me.cd === 0) {
+        mem.lastJump = now;
+        btn('b', dir, 0);
+      }
+    }
+    return;
+  }
+  if (mem.shieldUntil) {
+    if (now < mem.shieldUntil) return;
+    mem.shieldUntil = 0;
+    bot.send('btn', { b: 'shield', down: false });
+  }
+  const others = Object.entries(st.fighters).filter(([id, f]) => id !== bot.id && f.state === 'fight');
+  if (!others.length) return stick(0, 0);
+  const [, t] = others.sort(([, a], [, b]) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
+  const dx = t.x - me.x;
+  const dy = t.y - me.y;
+  const sgn = dx >= 0 ? 1 : -1;
+
+  // Gegenstände
+  if (!me.hold) {
+    const it = st.items.find((i) => Math.abs(i.x - me.x) < 70 && Math.abs(i.y - me.y) < 30);
+    if (it && Math.abs(dx) > 30) {
+      if (it.type !== 'ananas' && Math.abs(it.x - me.x) < 12 && now - mem.lastA > 250) {
+        mem.lastA = now;
+        btn('a');
+        return;
+      }
+      stick(it.x > me.x ? 1 : -1, 0);
+      return;
+    }
+  } else if (Math.abs(dx) < 150 && Math.abs(dy) < 30 && now - mem.lastA > 300) {
+    mem.lastA = now;
+    btn('a', sgn, 0);
+    return;
+  }
+
+  // Blocken, wenn der Gegner gerade zuschlägt
+  if (me.ground && Math.abs(dx) < 34 && Math.abs(dy) < 26 && ATTACK_ANIMS.has(t.anim) && me.shield > 40 && Math.random() < 0.3) {
+    mem.shieldUntil = now + 300 + Math.random() * 400;
+    stick(0, 0);
+    bot.send('btn', { b: 'shield', down: true, x: 0, y: 0 });
+    return;
+  }
+
+  // Hinlaufen (aber nicht von der Bühne rennen)
+  const tOnStage = t.x > left && t.x < right && t.y <= top + 2;
+  const wantX = tOnStage ? t.x - sgn * 13 : Math.max(left + 14, Math.min(right - 14, t.x));
+  const mx = Math.abs(wantX - me.x) > 6 ? (wantX > me.x ? 1 : -1) : 0;
+  const drop = dy > 30 && me.ground && me.y < top - 4 && Math.abs(dx) < 60;
+  stick(mx, drop ? 1 : 0);
+  if (dy < -38 && me.ground && Math.abs(dx) < 90 && now - mem.lastJump > 700) {
+    mem.lastJump = now;
+    btn('jump', mx, 0);
+    return;
+  }
+
+  // Angreifen
+  if (Math.abs(dx) < 27 && Math.abs(dy) < 28 && now - mem.lastA > 240) {
+    mem.lastA = now;
+    if (dy < -16) btn('a', 0, -1);
+    else if (!me.ground && dy > 10) btn('a', 0, 1);
+    else {
+      const r = Math.random();
+      if (t.pct > 80 || r < 0.45) btn('a', sgn, 0);
+      else if (r < 0.7) btn('a', 0, me.ground ? 1 : 0);
+      else btn('a', 0, 0);
+    }
+    return;
+  }
+  if (me.cd === 0 && now - mem.lastB > 600) {
+    const sp = me.special;
+    const ranged = (sp === 'flipflop' || sp === 'wasser') && Math.abs(dy) < 18 && Math.abs(dx) > 25 && Math.abs(dx) < (sp === 'wasser' ? 95 : 160);
+    const close = (sp === 'cocktail' && Math.abs(dx) < 36 && Math.abs(dy) < 20) || (sp === 'matratze' && Math.abs(dx) < 40 && Math.abs(dy) < 30);
+    const up = sp === 'schirm' && Math.abs(dx) < 20 && dy < -10 && dy > -60;
+    if ((ranged || close || up) && Math.random() < 0.5) {
+      mem.lastB = now;
+      btn('b', sgn, 0);
     }
   }
 }
