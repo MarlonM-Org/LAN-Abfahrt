@@ -268,3 +268,51 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .balance .needle { position: absolute; top: -4px; width: 6px; height: 24px; margin-left: -3px; background: var(--ink); }
 @keyframes shake { 50% { transform: translateX(3px); } }
 .partner { color: var(--ink); }
+
+/* ---------------------------------------------------------------- Kart-Rennen */
+#app:has(.kart) { padding: 10px; gap: 8px; }
+.kart {
+  flex: 1; display: grid; gap: 10px;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-areas: 'top top' 'hint hint' 'steer steer' 'brake use';
+}
+.kart-top { grid-area: top; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.k-pos { font-size: 22px; color: var(--red); }
+.k-lap { color: var(--ink); }
+.k-item { display: flex; flex-direction: column; align-items: center; font-size: 7px; color: var(--ink-soft); }
+.k-item canvas { width: 48px; height: 48px; image-rendering: pixelated; background: var(--paper-light); border: 3px solid var(--wood-darker); }
+.k-hint { grid-area: hint; min-height: 1.7em; color: var(--red); font-size: 9px; }
+.kart-steer { grid-area: steer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 0; }
+.k-pad {
+  width: 100%; flex: 1; min-height: 110px; position: relative; touch-action: none;
+  display: flex; align-items: center; justify-content: space-between; padding: 0 14px;
+  font-size: 20px; color: var(--wood-dark);
+  background: repeating-linear-gradient(90deg, var(--paper-light) 0 18px, #f3e3bd 18px 20px);
+  border: 4px solid var(--wood-dark); border-radius: 18px; box-shadow: inset 0 0 0 3px var(--wood-light), 0 3px 0 var(--outline);
+}
+.k-knob {
+  position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%;
+  background: var(--wood); border: 4px solid var(--wood-darker); box-shadow: inset 0 4px 0 var(--wood-light); pointer-events: none;
+}
+.k-wheel { width: 128px; height: 128px; border-radius: 50%; border: 10px solid var(--wood-darker); background: var(--paper-light); position: relative; }
+.k-wheel-in { position: absolute; inset: 0; transition: transform 60ms linear; }
+.k-wheel-in::before { content: ''; position: absolute; left: -2px; right: -2px; top: 50%; height: 10px; margin-top: -5px; background: var(--wood-dark); }
+.k-wheel-in::after { content: ''; position: absolute; left: 50%; top: 50%; bottom: -2px; width: 10px; margin-left: -5px; background: var(--wood-dark); }
+.k-tilt-btns { display: flex; gap: 8px; }
+.kart .big-btn { min-height: 20vh; font-size: 15px; line-height: 1.6; }
+.kart .big-btn small { font-size: 7px; }
+.k-brake { grid-area: brake; background: #d8473c; box-shadow: inset 0 4px 0 #f07a6e, inset 0 -6px 0 #9a2c22, 0 3px 0 var(--outline); }
+.k-use { grid-area: use; background: #f2c33a; box-shadow: inset 0 4px 0 #ffe08a, inset 0 -6px 0 #c08316, 0 3px 0 var(--outline); }
+.kart .big-btn.down { transform: translateY(2px); filter: brightness(0.9); }
+.k-motion { font-size: 8px; }
+
+@media (orientation: landscape) {
+  .kart { gap: 8px; grid-template-columns: 1fr 1.3fr 1fr; grid-template-rows: auto auto 1fr; grid-template-areas: 'top top top' 'brake hint use' 'brake steer use'; }
+  .kart.kart-touch { grid-template-columns: 1.7fr 1fr; grid-template-rows: auto auto 1fr 1fr; grid-template-areas: 'top top' 'hint hint' 'steer use' 'steer brake'; }
+  .kart .big-btn { min-height: 0; }
+  .k-pos { font-size: 18px; }
+  .k-item { flex-direction: row; gap: 6px; }
+  .k-item canvas { width: 36px; height: 36px; }
+  .k-wheel { width: 104px; height: 104px; }
+}

@@ -8,6 +8,7 @@ import { randomLook } from '../shared/avatar';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { ROOMS } from '../shared/games';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
+import { autopilot, getTrack } from '../shared/kart';
 
 export interface BotOptions {
   url: string;
@@ -37,6 +38,9 @@ export class Bot {
   private resultsEntered = 0;
   private lastPhase = '';
   private timer: NodeJS.Timeout;
+  /** Kart-Rennen: eigene Ideallinie (seitlicher Versatz) und Item-Zeitpunkt */
+  private kartLane = rand(-6, 6);
+  private kartItemAt = 0;
 
   constructor(
     public name: string,
@@ -285,6 +289,28 @@ export class Bot {
           if (dl > 5) this.send('stick', { x: dx / dl, y: dy / dl });
           else this.send('stick', { x: ux / ul, y: uy / ul });
           if (Math.random() < 0.02) this.send('dash');
+        });
+      }
+    }
+
+    if (m.kind === 'kart' && m.state.sub === 'race') {
+      const k = m.state;
+      const car = k.karts[this.id];
+      if (car && !car.finished) {
+        this.once('kart', async () => {
+          await sleep(rand(80, 130));
+          const ap = autopilot(getTrack(k.track), car.x, car.y, car.angle, 70, this.kartLane);
+          // etwas menschliche Unschärfe
+          const steer = Math.max(-1, Math.min(1, ap.steer + rand(-0.15, 0.15)));
+          this.send('steer', { x: Math.round(steer * 100) / 100, brake: ap.brake && Math.random() < 0.7 });
+          if (car.item) {
+            if (!this.kartItemAt) this.kartItemAt = Date.now() + rand(600, 3500);
+            if (Date.now() >= this.kartItemAt) {
+              this.kartItemAt = 0;
+              this.send('item');
+            }
+          }
+          if (Math.random() < 0.01) this.kartLane = rand(-6, 6);
         });
       }
     }

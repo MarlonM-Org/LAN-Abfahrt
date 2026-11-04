@@ -11,6 +11,7 @@ import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
 import { pickBomb, pickHilo, pickNhie } from './screens/drink';
 import { pickSup, pickTidy } from './screens/controller';
+import { onKartRerender, pickKart } from './screens/kart';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -128,6 +129,8 @@ function pickScreen(): Screen {
           return pickSup(m.state);
         case 'tidy':
           return pickTidy(m.state);
+        case 'kart':
+          return pickKart(m.state);
       }
     }
   }
@@ -164,6 +167,8 @@ async function requestWakeLock() {
     /* nur über HTTPS verfügbar – egal */
   }
 }
+
+onKartRerender(() => render());
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

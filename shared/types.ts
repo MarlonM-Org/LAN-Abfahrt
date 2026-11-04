@@ -26,7 +26,7 @@ export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
   | 'nhie' | 'hilo' | 'bomb'
-  | 'sup' | 'tidy';
+  | 'sup' | 'tidy' | 'kart';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -310,6 +310,55 @@ export interface TidyState {
   lastScore: { team: Team; type: string; seq: number } | null;
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Kart-Rennen
+
+export type KartItem = 'coconut' | 'banana' | 'ice' | 'gull';
+
+export interface KartCar {
+  x: number;
+  y: number;
+  angle: number;
+  /** Aktuelle Lenkung (−1…1) – nur für die Optik */
+  steer: number;
+  /** 0 = noch vor der Startlinie, 1…LAPS = laufende Runde */
+  lap: number;
+  place: number;
+  finished: boolean;
+  finishMs: number | null;
+  item: KartItem | null;
+  /** > 0: dreht sich gerade (Rest in ms) */
+  spin: number;
+  boost: boolean;
+  /** −1/1 = driftet nach links/rechts, 0 = nein; 2 = Mini-Turbo geladen */
+  drift: number;
+  charged: boolean;
+  offroad: boolean;
+}
+
+export interface KartEvent {
+  seq: number;
+  kind: 'hit' | 'gull' | 'item' | 'finish' | 'turbo';
+  who: string;
+  /** z. B. Verursacher */
+  by: string | null;
+  text: string;
+}
+
+export interface KartState {
+  sub: 'countdown' | 'race' | 'over';
+  /** Countdown bzw. Restzeit nach dem Sieger (sonst Notbremse) */
+  endsIn: number;
+  closing: boolean;
+  track: number;
+  laps: number;
+  karts: Record<string, KartCar>;
+  boxes: { x: number; y: number; on: boolean }[];
+  hazards: { id: number; kind: 'banana' | 'coconut'; x: number; y: number }[];
+  gulls: { id: number; x: number; y: number; target: string; from: string }[];
+  finishOrder: string[];
+  events: KartEvent[];
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -398,7 +447,8 @@ export type MiniSnapshot =
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
   | { kind: 'sup'; state: SupState }
-  | { kind: 'tidy'; state: TidyState };
+  | { kind: 'tidy'; state: TidyState }
+  | { kind: 'kart'; state: KartState };
 
 export interface GameState {
   phase: Phase;
