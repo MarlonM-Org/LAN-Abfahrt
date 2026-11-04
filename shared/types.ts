@@ -43,7 +43,8 @@ export type MiniKind =
   | 'smash'
   | 'sup' | 'tidy' | 'wasser'
   | 'stillepost'
-  | 'sup' | 'tidy' | 'fangen';
+  | 'sup' | 'tidy' | 'fangen'
+  | 'geist';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1130,6 +1131,52 @@ export interface FangenPrivate {
   decoyActive: boolean;
 }
 
+// ------------------------------------------------------------------ Geisterjagd
+
+export interface GeistHunter {
+  x: number;
+  y: number;
+  /** Blickrichtung = Richtung der Taschenlampe (Radiant) */
+  angle: number;
+  moving: boolean;
+  light: boolean;
+  /** Akku 0–1 */
+  battery: number;
+  /** Akku leer → steht still und lädt */
+  empty: boolean;
+  /** Erschreckt (liegt am Boden) */
+  down: boolean;
+  /** Fortschritt der Wiederbelebung 0–1 */
+  revive: number;
+}
+
+export interface GeistState {
+  sub: 'intro' | 'play' | 'roundEnd' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  /** Wer in dieser Runde der Geist ist (öffentlich – nur die Position ist geheim) */
+  ghostId: string;
+  health: number;
+  maxHealth: number;
+  hunters: Record<string, GeistHunter>;
+  /** Nur gesetzt, solange der Geist sichtbar ist (Licht, Blitz, Berührung) */
+  ghost: { x: number; y: number; why: 'light' | 'flash' | 'touch' } | null;
+  /** Zählt hoch bei jedem Blitz */
+  flashSeq: number;
+  /** Letzte Schreck-Aktion */
+  lastScare: { victim: string; seq: number } | null;
+  lastRevive: { id: string; seq: number } | null;
+  roundWinner: 'ghost' | 'hunters' | null;
+  roundReason: string | null;
+  points: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export type GeistPrivate =
+  | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number }
+  | { role: 'hunter'; fear: number };
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -1235,7 +1282,8 @@ export type MiniSnapshot =
   | { kind: 'smash'; state: SmashState }
   | { kind: 'wasser'; state: WasserState }
   | { kind: 'stillepost'; state: StillepostState }
-  | { kind: 'fangen'; state: FangenState };
+  | { kind: 'fangen'; state: FangenState }
+  | { kind: 'geist'; state: GeistState };
 
 export interface GameState {
   phase: Phase;
@@ -1275,6 +1323,7 @@ export type PrivateState =
   | { kind: 'verstecken'; state: VerstPrivate }
   | { kind: 'stillepost'; state: StillepostPrivate }
   | { kind: 'fangen'; state: FangenPrivate }
+  | { kind: 'geist'; state: GeistPrivate }
   | null;
 
 export interface JoinRequest {

@@ -29,17 +29,18 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   wasser: { title: 'Wasserbomben-Schlacht', tagline: 'Zielen, werfen, platsch – wer wird klatschnass?', minPlayers: 2 },
   stillepost: { title: 'Stille Post mit Bildern', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3 },
   fangen: { title: 'Urlaubs-Fangen', tagline: 'Der Animateur ist unsichtbar – nur sein Handy kennt die Karte!', minPlayers: 3 },
+  geist: { title: 'Geisterjagd', tagline: 'Stromausfall! Ein unsichtbarer Geist spukt durchs Haus ...', minPlayers: 3 },
 };
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 

@@ -37,6 +37,7 @@ import { WrapGame } from './wrap';
 import { StarsGame } from './stars';
 import { Board } from './board';
 import { FlunkyGame } from './flunky';
+import { GeistGame } from './geist';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
@@ -358,6 +359,9 @@ export class Room {
         break;
       case 'fangen':
         this.mini = new FangenGame(ids, ctx);
+        break;
+      case 'geist':
+        this.mini = new GeistGame(ids, ctx);
         break;
     }
     this.results = null;
