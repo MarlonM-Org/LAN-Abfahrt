@@ -771,3 +771,31 @@ textarea.sp-input {
 .ghost-status.danger-text { color: var(--red); animation: shake 0.2s infinite; }
 .stick-area.small { min-height: 0; }
 .map-legend { font-size: 8px; }
+
+/* ---------------------------------------------------------------- Grill-Chaos */
+.gr { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.gr-coop { background: #f0973a; color: #fff4d6; text-shadow: 1px 1px 0 var(--wood-darker); }
+.gr-carry { display: flex; align-items: center; gap: 10px; background: var(--paper-light); border: 3px solid var(--wood-darker); padding: 4px 8px; }
+.gr-held { width: 88px; height: 80px; image-rendering: pixelated; background: repeating-linear-gradient(45deg, #e9dcc0 0 6px, #e1d2b2 6px 12px); border: 2px solid var(--wood-dark); flex: none; }
+.gr-carry-txt { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gr-carry-txt small { font-size: 7px; color: var(--ink-soft); }
+.gr-what { font-size: 9px; line-height: 1.5; font-weight: normal; }
+.gr-hint { min-height: 2.6em; margin: 0; color: var(--ink); font-size: 9px; line-height: 1.5; }
+.gr.fire .gr-hint { color: #c0392b; }
+.gr-orders { display: flex; gap: 4px; overflow: hidden; min-height: 66px; }
+.gr-order { flex: 0 0 calc((100% - 20px) / 6); min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--paper-light); border: 2px solid var(--wood-dark); padding: 2px; }
+.gr-order canvas { width: 44px; height: 40px; image-rendering: pixelated; }
+.gr-order span { font-size: 6px; line-height: 1.4; min-height: 2.8em; color: var(--ink-soft); text-align: center; overflow-wrap: anywhere; hyphens: auto; max-width: 100%; }
+.gr-order i { display: block; width: 100%; height: 4px; background: var(--wood-darker); }
+.gr-order b { display: block; height: 100%; background: #46b04a; }
+.gr-order b.mid { background: #f2c33a; }
+.gr-order b.low { background: #e0503f; }
+.gr-controls { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
+.gr-controls .stick-area { min-height: 0; }
+.gr-controls .stick-pad { width: 168px; height: 168px; }
+.gr-btns { display: flex; flex-direction: column; gap: 10px; }
+.gr-btns .big-btn { min-height: 0; height: 24vh; max-height: 190px; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 6px 4px; -webkit-touch-callout: none; user-select: none; }
+.gr-btns .big-btn small { font-size: 6px; line-height: 1.4; }
+.big-btn.gr-grab { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.big-btn.gr-act { background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
+.big-btn.gr-act.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }

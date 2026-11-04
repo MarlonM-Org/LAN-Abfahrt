@@ -28,6 +28,7 @@ import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { ARCADE_POINTS, ARCADE_RANDOM } from '../shared/games';
 import { WasserGame } from './wasser';
+import { GrillGame } from './grill';
 import { FangenGame } from './fangen';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
@@ -385,6 +386,9 @@ export class Room {
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);
+        break;
+      case 'grill':
+        this.mini = new GrillGame(ids, ctx);
         break;
     }
     this.results = null;

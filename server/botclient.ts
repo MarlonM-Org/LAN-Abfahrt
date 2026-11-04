@@ -18,6 +18,7 @@ import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
+import { grillBot } from './grillbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -884,6 +885,14 @@ export class Bot {
       if (me2?.state === 'fight') this.once('smash', async () => {
         await sleep(rand(50, 110));
         this.smashBrain(m.state, me2);
+      });
+    }
+
+    if (m.kind === 'grill') {
+      const st = m.state;
+      this.once('grill', async () => {
+        grillBot(this, st);
+        await sleep(rand(90, 140));
       });
     }
 
