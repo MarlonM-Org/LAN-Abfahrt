@@ -257,7 +257,13 @@ export function trackForScene(scene: string): TrackName {
     case 'descent':
       return scene === 'descent' || scene === 'wrap' ? 'action' : 'romantic';
     case 'murder':
+    case 'ttt':
+    case 'verstecken':
+    case 'geist':
+    case 'fangen':
       return 'spooky';
+    case 'stillepost':
+      return 'bar';
     case 'wwe':
     case 'nhie':
     case 'hilo':

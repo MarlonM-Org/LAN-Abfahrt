@@ -19,6 +19,10 @@ export interface MiniCtx {
   finish(result: MiniResult): void;
   isConnected(id: string): boolean;
   nameOf(id: string): string;
+  /** Testspieler? (z. B. für Hinweise, die Menschen per Zuruf bekommen) */
+  isBot?(id: string): boolean;
+  /** Aussehen eines Spielers (z. B. Shirt-Farbe als Spur) */
+  lookOf?(id: string): import('../shared/types').Look | undefined;
   mode: import('../shared/types').GameMode;
 }
 

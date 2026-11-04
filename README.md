@@ -15,13 +15,21 @@ Aktueller Stand (v0.3):
 - **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
   - Alle würfeln am Handy, Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus
   - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los
-  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung – **Finale: Mord im Ferienhaus**
+  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern)
   - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
 - **Minispiele** (auch einzeln spielbar):
   - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
   - 🗳️ **Wer würde eher …?** – geheim abstimmen, Punkte für die Mehrheit. **Eigene Fragen** können in der Lobby am Handy hinzugefügt werden (gespeichert in `data/questions.json`)
   - 🏖️ **Liegestuhl-Sprint** – Reaktionstest bei Sonnenaufgang, wer zu früh tippt, hat einen Fehlstart
+  - ✈️ **Urlaubsflieger** (ab 2 Spielern, kooperativ à la Spaceteam) – jedes Handy ist ein Cockpit mit albernen Knöpfen und Schaltern; die geheime Anweisung oben betrifft meist ein *anderes* Handy, also laut rufen! Erledigte Anweisungen bringen den Flieger von Düsseldorf über Mallorca, Kreta und die Malediven nach Bali, verpasste kosten Treibstoff
+  - 🌀 **Kurven-Duell** (2–12 Spieler) – à la „Achtung, die Kurve!“: Am Handy nur LINKS/RECHTS halten, jeder zieht eine Spur – wer Rand oder Spur rammt, ist raus, alle anderen bekommen einen Punkt. Lücken in den Spuren, Power-ups: Turbo, Schnecke (alle anderen langsam), Durch Wände
+  - 🪴 **Versteckspiel mit Möbeln** (ab 3 Spielern, à la Prop Hunt) – Verstecker verwandeln sich per Handy in Kühlbox, Topfpflanze, Flamingo-Ring & Co. und rasten ein, die Sucher (1 pro ~4 Spieler, wechselt jede Runde) prüfen verdächtige Möbel. Falsch geprüft = schwindelig, Pfeifen gibt Punkte, verrät aber die Ecke
+  - 🏁 **Fallen-Parcours** (ab 2 Spielern, à la Ultimate Chicken Horse) – jede Runde baut jeder am Handy ein Teil (Plattform, Planke, Trampolin, Seeigel, Kokosnuss-Kanone, Ventilator, Eisfläche, Schwebeplattform, Bombe) per Joystick in die Strecke, dann rennen alle gleichzeitig vom Handtuch zur Cocktailbar (Joystick + SPRINGEN, länger drücken = höher, Wandsprung möglich). Ziel 4 P., Erster +2, eigene Falle erwischt jemanden +1 (max. 2) – aber nur, wenn nicht alle und nicht keiner ankommen. Wer zuerst 15 Punkte hat (max. 6 Runden), gewinnt
+  - 🏎️ **Kart-Rennen** (2–12 Karts, von oben) – drei Runden auf Strandpromenade, Hafen oder Pool-Runde. Gas gibt das Kart selbst; gelenkt wird per Touch-Pad oder – über HTTPS – durch Kippen des Handys (Bewegungssensor). BREMSE + Lenken = Drift mit Mini-Turbo, Items aus den ?-Boxen: Kokosnuss, Bananenschale, Turbo-Eis und für die Letzten die Möwe, die dem Führenden sein Item klaut
+  - 🖍️ **Stille Post mit Bildern** (ab 3 Spielern) – Satz schreiben, reihum malen und beschreiben, dann führt der TV jede Kette vor und alle verteilen Likes. **Eigene Startsätze** lassen sich in der Lobby (Party-Modus) hinzufügen (`data/stillepost.json`)
+  - 🕵️ **Urlaubs-Fangen** (ab 3 Spielern, inspiriert von „Mario Chase“) – einer ist der Animateur und auf dem TV **unsichtbar**, nur sein Handy zeigt die ganze Karte. Alle anderen jagen ihn per Joystick durch die Ferienanlage, achten auf kurz aufblitzende Fußspuren und den „warm/kalt“-Ring unter jedem Fänger – und rufen sich zu. Fänger haben einen Sprint, der Animateur eine Ablenkung (falsche Spur). Jeder Runde ein neuer Animateur
   - 🔪 **Mord im Ferienhaus** (ab 4 Spielern, ab 7 mit zwei Mördern) – geheime Rollen auf dem Handy, Aufgaben in den Räumen, Morde wenn man allein mit jemandem ist, Leichen melden, diskutieren, abstimmen
+  - 🏊 **Verräter im Ferienhaus** (ab 4 Spielern, à la „Trouble in Terrorist Town“) – alle laufen per Joystick durchs Ferienhaus. Geheime Verräter (≈ 1 pro 4 Spieler) knocken mit Poolnudel, Wasserpistole und Kokosnuss aus; ab 6 Spielern gibt es einen bekannten Detektiv mit Hut, der an Ausgeknockten die Shirt-Farbe des Täters findet. Verräter haben am Handy einen Shop im Geheimfach (Bananenschale, Tarnumhang, Fake-Funkspruch). 2–3 Runden mit neuen Rollen, Punkte für Sieg, richtige und falsche Knockouts
 
 ## Starten
 
@@ -77,8 +85,9 @@ Tipp: PC und Apple TV per LAN-Kabel anschließen – dann ist die Verzögerung k
 
 ```
 server/   index.ts (HTTP + Vite), room.ts (Lobby/VIP/Ablauf), board.ts (Spielbrett),
-          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, questions.ts
-shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), avatar.ts, flunky.ts
+          minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, ttt.ts, questions.ts, …
+          (pro Minispiel eine Datei, z. B. kurve.ts, arena.ts, bowling.ts, parcours.ts)
+shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), house.ts (Ferienhaus-Grundriss), avatar.ts, flunky.ts, …
 client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel)
           index.html + controller/ (Handy-UI, ein Modul pro Spiel in screens/)
 scripts/  bots.ts                (Testspieler)
@@ -106,8 +115,15 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 
 - 🏄 **SUP-Rennen** – zu zweit auf einem Board: einer paddelt links, einer rechts. Links paddeln dreht nach rechts (und umgekehrt); wer ungleichmäßig paddelt, verliert das Gleichgewicht und fällt ins Wasser. Felsen, Bojen und Quallen ausweichen!
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
+- 💣 **Bomben-Arena** (2–12 Spieler) – Bomberman im Strandgarten: Joystick links, „BOMBE“-Knopf rechts. Kokosnüsse/Wasserbomben legen, Sandburgen, Liegestühle und Kühlboxen sprengen, Power-ups sammeln (+1 Bombe, +1 Reichweite, Flip-Flops = schneller). Wer getroffen wird, ist nass („Platsch!“) und für die Runde raus; nach 60 s kommt die Flut und füllt die Arena von außen. Wer zuerst 2 Runden gewinnt (max. 3 Runden), ist Champion. Testen: `npm run bots -- 8 --game=arena`.
+- 🎳 **Strand-Bowling** (ab 2 Spielern) – reihum auf der Bahn an der Strandbar. Am Handy erst die Startposition wählen, dann **„HALTEN & SCHWINGEN“** gedrückt halten, das Handy wie eine Bowlingkugel nach vorn schwingen und am Ende loslassen (Tempo = Schwung, Richtung = Drehung des Handys, Effet = Handgelenk drehen). Ohne HTTPS/Sensor wird die Kugel nach oben **gewischt** (schnell = hart, schräg = Richtung, im Bogen = Effet). Normale Bowling-Wertung inkl. Strike/Spare-Bonus, aber kürzer: bis 3 Spieler 5 Frames, bis 6 Spieler 3, ab 7 Spielern 2.
+- 🦆 **Ententeich** (ab 2 Spielern) – Duck Hunt in der Urlaubslagune: alle schießen gleichzeitig, jeder hat ein Fadenkreuz in seiner Farbe. Enten (10), Pommes-klauende Möwen (20) und Flamingos (30) treffen, Badegäste auf Schwimmringen lieber nicht (−15). 3 Schuss, dann nach unten wischen (oder „Nachladen“). Schnelle Treffer hintereinander geben Combo-Bonus, 3 Wellen mit immer mehr und schnelleren Vögeln.
+  - **Zielen mit Bewegungssensor** (braucht HTTPS): Handy wie eine Lichtpistole halten, Oberkante zum TV, auf die TV-Mitte zielen und „Zentrieren“ tippen.
+  - **Ohne HTTPS/Sensor**: Touchpad – wischen bewegt das Fadenkreuz (schnell wischen = weiter).
+- 🗼 **Wackelturm** (ab 2 Spielern) – wie Tricky Towers: Jeder stapelt auf seinem eigenen Steg Urlaubsgepäck (Surfbretter, Kühlboxen, Liegestühle, Koffer, Reisetaschen, Cocktailkisten) in Tetris-Formen – mit echter Physik (`matter-js` auf dem Server), der Turm wackelt und kann einstürzen. Am Handy: ◀ ▶ verschieben (halten = wiederholen), ⟳ drehen, ▼ gedrückt halten = schneller fallen; das nächste Teil wird angezeigt. Ins Meer gefallene Teile kosten ein Leben (3 Leben, bei einem Einsturz höchstens eins pro 2 s), danach ist der Turm eingefroren. Wer zuerst das Gipfelkreuz erreicht und den Turm 2 s hält, gewinnt; danach haben die anderen noch 20 s. Nach 2:30 zählt die Höhe. Alle 30 s erwischt den Führenden eine Windböe. Tick-Zeit messen: `TURM_PROF=1 npm run dev`.
+- 🥊 **Smash-Arena** (2–8 Spieler) – Plattform-Prügelei à la Smash Bros. mit den eigenen Avataren auf der *Strandbar* (schwebendes Surfbrett) oder der *Pool-Party* (wippender Flamingo). Treffer erhöhen die Prozente, je höher, desto weiter fliegt man – wer über den Rand fliegt, verliert ein Leben (3, ab 6 Spielern 2). Handy: Joystick links (laufen, ▼ ducken/durch Plattformen fallen, Richtung = Schlagvariante), rechts **SCHLAG**, **SPEZIAL** (zufälliges Urlaubs-Item: Flip-Flop-Wurf, Sonnenschirm-Rückstoß, Cocktail-Spritzer, Luftmatratzen-Klatscher, Wasserpistole), **SPRUNG** (zweimal in der Luft) und **SCHILD** (halten). Items: Kokosnuss, Wasserbombe, Erste-Hilfe-Ananas (−30 %). Wer zuletzt steht, gewinnt – nach 3 Minuten zählen Leben, dann Prozente.
 
-Beide laufen auch im Party-Modus auf dem Spielbrett.
+Alle laufen auch im Party-Modus auf dem Spielbrett.
 
 ## Trinkspiel
 

@@ -16,8 +16,19 @@ import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OP
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
+import { KurveGame } from './kurve';
+import { ArenaGame } from './arena';
+import { BowlingGame } from './bowling';
+import { EntenGame } from './enten';
+import { ParcoursGame } from './parcours';
+import { KartGame } from './kart';
+import { TurmGame } from './turm';
+import { IgelGame } from './igel';
+import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { ARCADE_POINTS, ARCADE_RANDOM } from '../shared/games';
+import { WasserGame } from './wasser';
+import { FangenGame } from './fangen';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -26,11 +37,16 @@ import { WrapGame } from './wrap';
 import { StarsGame } from './stars';
 import { Board } from './board';
 import { FlunkyGame } from './flunky';
+import { GeistGame } from './geist';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
+import { TttGame } from './ttt';
 import { WweGame } from './wwe';
+import { FliegerGame } from './flieger';
+import { VersteckGame } from './verstecken';
+import { StillepostGame } from './stillepost';
 
 const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
@@ -40,6 +56,7 @@ const MINI_KINDS = Object.keys(MINI_INFO) as MiniKind[];
 interface Player extends PlayerPublic {
   socketId: string | null;
   joinedAt: number;
+  isBot?: boolean;
 }
 
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
@@ -55,6 +72,7 @@ export class Room {
   private nhie = new QuestionStore('nhie.json', 'nhie');
   private results: ResultsState | null = null;
   private questions = new QuestionStore();
+  private posts = new QuestionStore('stillepost.json', 'post');
   private flushTimer: NodeJS.Timeout | null = null;
 
   private bots: Bot[] = [];
@@ -99,6 +117,7 @@ export class Room {
       p.look = sanitizeLook(msg.look);
       p.socketId = socket.id;
       p.connected = true;
+      p.isBot = msg.bot === true;
       playerId = p.id;
       socket.join('players');
       this.ensureVip();
@@ -200,7 +219,7 @@ export class Room {
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
-      const store = kind === 'nhie' ? this.nhie : this.questions;
+      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : this.questions;
       const q = store.add(String(text ?? ''));
       if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
       this.changed();
@@ -275,6 +294,8 @@ export class Room {
       finish: (r) => this.finishMini(kind, r),
       isConnected: (id) => !!this.players.get(id)?.connected,
       nameOf: (id) => this.nameOf(id),
+      isBot: (id) => !!this.players.get(id)?.isBot,
+      lookOf: (id) => this.players.get(id)?.look,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
@@ -316,6 +337,54 @@ export class Room {
         break;
       case 'tidy':
         this.mini = new TidyGame(ids, ctx);
+        break;
+      case 'flieger':
+        this.mini = new FliegerGame(ids, ctx);
+        break;
+      case 'kurve':
+        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.look.shirt));
+        break;
+      case 'arena':
+        this.mini = new ArenaGame(ids, ctx);
+        break;
+      case 'bowling':
+        this.mini = new BowlingGame(ids, ctx);
+        break;
+      case 'enten':
+        this.mini = new EntenGame(ids, ctx);
+        break;
+      case 'ttt':
+        this.mini = new TttGame(ids, ctx);
+        break;
+      case 'verstecken':
+        this.mini = new VersteckGame(ids, ctx);
+        break;
+      case 'parcours':
+        this.mini = new ParcoursGame(ids, ctx);
+        break;
+      case 'kart':
+        this.mini = new KartGame(ids, ctx);
+        break;
+      case 'turm':
+        this.mini = new TurmGame(ids, ctx);
+        break;
+      case 'igel':
+        this.mini = new IgelGame(ids, ctx);
+        break;
+      case 'smash':
+        this.mini = new SmashGame(ids, ctx);
+        break;
+      case 'wasser':
+        this.mini = new WasserGame(ids, ctx);
+        break;
+      case 'stillepost':
+        this.mini = new StillepostGame(ids, ctx, this.posts.all);
+        break;
+      case 'fangen':
+        this.mini = new FangenGame(ids, ctx);
+        break;
+      case 'geist':
+        this.mini = new GeistGame(ids, ctx);
         break;
     }
     this.results = null;
@@ -483,6 +552,7 @@ export class Room {
       mini: this.mini?.snapshot() ?? null,
       results: this.results,
       customQuestionCount: this.questions.all.length,
+      customPostCount: this.posts.all.length,
     };
   }
 

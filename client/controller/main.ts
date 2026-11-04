@@ -11,7 +11,22 @@ import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
 import { pickBomb, pickHilo, pickNhie } from './screens/drink';
-import { pickSup, pickTidy } from './screens/controller';
+import { pickFlieger } from './screens/flieger';
+import { pickKurve } from './screens/kurve';
+import { pickArena, pickSup, pickTidy } from './screens/controller';
+import { pickBowling } from './screens/bowling';
+import { pickEnten } from './screens/enten';
+import { pickTtt } from './screens/ttt';
+import { pickVerstecken } from './screens/verstecken';
+import { pickParcours } from './screens/parcours';
+import { onKartRerender, pickKart } from './screens/kart';
+import { pickTurm } from './screens/turm';
+import { pickIgel } from './screens/igel';
+import { pickSmash } from './screens/smash';
+import { pickWasser } from './screens/wasser';
+import { pickStillepost } from './screens/stillepost';
+import { pickFangen } from './screens/fangen';
+import { pickGeist } from './screens/geist';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -131,6 +146,38 @@ function pickScreen(): Screen {
           return pickSup(m.state);
         case 'tidy':
           return pickTidy(m.state);
+        case 'flieger':
+          return pickFlieger(m.state);
+        case 'kurve':
+          return pickKurve(m.state);
+        case 'arena':
+          return pickArena(m.state);
+        case 'bowling':
+          return pickBowling(m.state);
+        case 'enten':
+          return pickEnten(m.state);
+        case 'ttt':
+          return pickTtt(m.state);
+        case 'verstecken':
+          return pickVerstecken(m.state);
+        case 'parcours':
+          return pickParcours(m.state);
+        case 'kart':
+          return pickKart(m.state);
+        case 'turm':
+          return pickTurm(m.state);
+        case 'igel':
+          return pickIgel(m.state);
+        case 'smash':
+          return pickSmash(m.state);
+        case 'wasser':
+          return pickWasser(m.state);
+        case 'stillepost':
+          return pickStillepost(m.state, vip);
+        case 'fangen':
+          return pickFangen(m.state);
+        case 'geist':
+          return pickGeist(m.state);
       }
     }
   }
@@ -167,6 +214,8 @@ async function requestWakeLock() {
     /* nur über HTTPS verfügbar – egal */
   }
 }
+
+onKartRerender(() => render());
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

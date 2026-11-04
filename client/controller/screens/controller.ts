@@ -1,6 +1,7 @@
-import type { SupState, TidyState } from '../../../shared/types';
+import type { ArenaState, SupState, TidyState } from '../../../shared/types';
 import { TEAM_INFO } from '../../../shared/flunky';
-import { type Screen, app, el, message, nameOf, q, send, store, tapButton } from '../core';
+import { SHIRTS } from '../../../shared/avatar';
+import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
 
 // ------------------------------------------------------------------ Joystick
 
@@ -128,6 +129,53 @@ export function pickTidy(s: TidyState): Screen {
       q(root, '.score').textContent = st.baskets.length > 1 ? `Sonne ${st.score.A} : ${st.score.B} Meer` : `${st.score.A} Teile`;
       const pl = st.players[store.playerId!];
       dash.disabled = !!pl && pl.dashLeft > 0;
+    };
+  }];
+}
+
+// ------------------------------------------------------------------ Bomben-Arena
+
+export function pickArena(s: ArenaState): Screen {
+  const id = store.playerId!;
+  const mine = s.players[id];
+  if (!mine) return ['spectate', message('Du schaust zu')];
+  if (s.sub === 'over') return ['ar-over', message('Arena vorbei!', 'Schau auf den Fernseher!')];
+  if (!mine.alive && s.sub === 'play') return [`ar-dead-${s.round}`, message('PLATSCH!', 'Du bist nass und für diese Runde raus. Zuschauen …')];
+  return ['ar-ctl', () => {
+    const look = me()?.look;
+    const color = look ? SHIRTS[look.shirt] : '#f2c33a';
+    const root = el(`
+      <div class="arena-head" style="border-color:${color}">
+        <span class="arena-av"></span>
+        <div><div class="arena-round"></div><div class="arena-stats"></div></div>
+      </div>
+      <p class="hint arena-hint"></p>
+      <div class="arena-controls">
+        <div class="stick-area"></div>
+        <button class="big-btn arena-bomb">BOMBE</button>
+      </div>
+    `);
+    if (look) q(root, '.arena-av').append(avatarCanvas(3, look));
+    joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+    const bomb = q<HTMLButtonElement>(root, '.arena-bomb');
+    tapButton(bomb, () => {
+      send('bomb');
+      navigator.vibrate?.(25);
+    });
+    app.append(root);
+    return () => {
+      const st = store.state?.mini?.kind === 'arena' ? store.state.mini.state : null;
+      const p = st?.players[id];
+      if (!st || !p) return;
+      q(root, '.arena-round').textContent = `Runde ${st.round} · Siege ${p.wins}/${st.winRounds}`;
+      q(root, '.arena-stats').textContent = `Bomben ${p.bombs} · Weite ${p.range} · Tempo ${p.speed + 1}`;
+      let hint = '';
+      if (st.sub === 'countdown') hint = `Gleich geht’s los … ${secondsLeft()}`;
+      else if (st.sub === 'roundOver') hint = st.roundWinner === id ? 'Rundensieg! Du bist trocken geblieben!' : st.roundWinner ? `${nameOf(st.roundWinner)} gewinnt die Runde.` : 'Alle nass – Unentschieden!';
+      else if (st.floodActive) hint = 'FLUT! Weg vom Rand!';
+      else hint = `Flut in ${secondsLeft()}s`;
+      q(root, '.arena-hint').textContent = hint;
+      bomb.disabled = st.sub !== 'play' || !p.alive;
     };
   }];
 }

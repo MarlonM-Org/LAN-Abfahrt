@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { BoardState, GameState, Point } from '../../shared/types';
-import { FIELD_POS, FIELD_TYPES, MINI_INFO } from '../../shared/games';
+import { FIELD_POS, FIELD_TYPES, FINALE_KINDS, MINI_INFO } from '../../shared/games';
 import { WORLD } from '../../shared/flunky';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
@@ -175,7 +175,7 @@ export class BoardScene extends Phaser.Scene {
     if (this.introShown) return;
     this.introShown = true;
     const info = MINI_INFO[b.nextMini];
-    const isFinale = b.round === b.maxRounds && b.nextMini === 'murder';
+    const isFinale = b.round === b.maxRounds && FINALE_KINDS.includes(b.nextMini);
     const bg = this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x1a1008, 0.6).setOrigin(0);
     const card = this.add.container(WORLD.W / 2, WORLD.H / 2);
     card.add(panel(this, -170, -70, 340, 140));

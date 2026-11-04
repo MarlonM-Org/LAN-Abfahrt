@@ -10,14 +10,30 @@ import { FlunkyScene } from './FlunkyScene';
 import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
+import { TttScene } from './TttScene';
 import { setState } from './store';
 import { startTimeSync } from '../timesync';
 import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
+import { FliegerScene } from './FliegerScene';
+import { KurveScene } from './KurveScene';
+import { ArenaScene } from './ArenaScene';
+import { BowlingScene } from './BowlingScene';
+import { EntenScene } from './EntenScene';
+import { VersteckScene } from './VersteckScene';
+import { ParcoursScene } from './ParcoursScene';
+import { KART_SCENES } from './KartScene';
+import { TurmScene } from './TurmScene';
+import { IgelScene } from './IgelScene';
+import { SmashScene } from './SmashScene';
+import { WasserScene } from './WasserScene';
+import { StillepostScene } from './StillepostScene';
+import { FangenScene } from './FangenScene';
+import { GeistScene } from './GeistScene';
 
-const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy'];
+const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -40,7 +56,7 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES],
+    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene],
   });
 
   let currentKey = '';
