@@ -1,3 +1,4 @@
+import '@fontsource/press-start-2p/400.css';
 import Phaser from 'phaser';
 import { io } from 'socket.io-client';
 import type { GameState } from '../../shared/types';
@@ -32,7 +33,7 @@ async function start() {
     width: WORLD.W,
     height: WORLD.H,
     pixelArt: true,
-    backgroundColor: '#1d2b53',
+    backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene],
   });

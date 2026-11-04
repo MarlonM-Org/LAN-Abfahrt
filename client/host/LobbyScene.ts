@@ -2,8 +2,12 @@ import Phaser from 'phaser';
 import QRCode from 'qrcode';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { FONT, bus, getState } from './store';
-import { ensureAvatar } from './textures';
+import { C } from '../art/palette';
+import * as O from '../art/objects';
+import { paintGrass, paintPath } from '../art/ground';
+import { bus, getState } from './store';
+import { figure } from './textures';
+import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 
 const SLOTS = 8;
 
@@ -13,6 +17,7 @@ export class LobbyScene extends Phaser.Scene {
   private urlText!: Phaser.GameObjects.Text;
   private hintText!: Phaser.GameObjects.Text;
   private renderedUrl = '';
+  private renderedPlayers = '';
 
   constructor() {
     super('lobby');
@@ -21,27 +26,41 @@ export class LobbyScene extends Phaser.Scene {
   create() {
     // Szenen-Instanzen werden beim Neustart wiederverwendet → Zustand zurücksetzen
     this.renderedUrl = '';
-    this.drawBackground();
+    this.renderedPlayers = '';
 
-    this.add
-      .text(WORLD.W / 2, 16, 'LAN-ABFAHRT', { fontFamily: FONT, fontSize: '16px', color: '#ffec27' })
-      .setOrigin(0.5, 0)
-      .setShadow(2, 2, '#ab5236', 0, false, true);
-    this.add
-      .text(WORLD.W / 2, 38, 'Urlaubs-Edition', { fontFamily: FONT, fontSize: '8px', color: '#fff1e8' })
-      .setOrigin(0.5, 0);
+    background(this, 'lobby', WORLD.W, WORLD.H, (p) => {
+      paintGrass(p, 0, 0, WORLD.W, WORLD.H, 4);
+      paintPath(p, [{ x: 66, y: 92 }, { x: 70, y: 150 }, { x: 150, y: 244 }, { x: 480, y: 250 }], 16, 8);
+      paintPath(p, [{ x: 150, y: 244 }, { x: 60, y: 270 }], 14, 9);
+    });
 
-    this.qrLayer = this.add.container(0, 0);
-    this.playerLayer = this.add.container(0, 0);
+    // Deko
+    prop(this, 'cottage', O.cottage, 64, 92);
+    for (let x = 130; x < WORLD.W; x += 32) prop(this, 'fence32', () => O.fence(32), x + 16, 30);
+    prop(this, 'tree1', () => O.tree(1), 462, 74);
+    prop(this, 'tree7', () => O.tree(7), 22, 268);
+    prop(this, 'fruitTree', () => O.fruitTree(3), 452, 214);
+    prop(this, 'bush3', () => O.bush(3), 140, 106);
+    prop(this, 'bush4', () => O.bush(4, true), 430, 248);
+    prop(this, 'flowerPink', () => O.flower(C.pink), 120, 98);
+    prop(this, 'flowerWhite', () => O.flower(C.white), 126, 100);
+    prop(this, 'rock', () => O.rock(), 28, 112);
 
-    this.add.text(30, 204, 'Mit dem Handy', { fontFamily: FONT, fontSize: '8px', color: '#fff1e8' });
-    this.add.text(30, 216, 'scannen!', { fontFamily: FONT, fontSize: '8px', color: '#fff1e8' });
-    this.urlText = this.add
-      .text(WORLD.W / 2, 246, '', { fontFamily: FONT, fontSize: '8px', color: '#1a1c2c' })
-      .setOrigin(0.5, 0);
-    this.hintText = this.add
-      .text(WORLD.W / 2, 258, '', { fontFamily: FONT, fontSize: '8px', color: '#ab5236' })
-      .setOrigin(0.5, 0);
+    // Titelschild
+    panel(this, 150, 2, 220, 40).setDepth(500);
+    ink(this, 260, 10, 'LAN-ABFAHRT', { size: 16, color: RED_INK }).setDepth(501);
+    ink(this, 260, 28, '~ Urlaubs-Edition ~').setDepth(501);
+
+    // QR-Code auf einem Brett
+    const board = ensureTex(this, 'qrboard', () => O.noticeBoard(124, 122));
+    this.add.image(10, 104, board).setOrigin(0, 0).setDepth(240);
+    this.qrLayer = this.add.container(0, 0).setDepth(241);
+
+    this.playerLayer = this.add.container(0, 0).setDepth(300);
+
+    panel(this, 150, 232, 316, 36).setDepth(500);
+    this.urlText = ink(this, 308, 240, '').setDepth(501);
+    this.hintText = ink(this, 308, 252, '', { color: RED_INK }).setDepth(501);
 
     const onState = (s: GameState) => this.render(s);
     bus.on('state', onState);
@@ -51,56 +70,43 @@ export class LobbyScene extends Phaser.Scene {
     if (s) this.render(s);
   }
 
-  private drawBackground() {
-    const g = this.add.graphics();
-    // Himmel → Meer → Strand
-    const bands = [0x29366f, 0x3b5dc9, 0x41a6f6, 0x73eff7];
-    bands.forEach((c, i) => g.fillStyle(c).fillRect(0, i * 14, WORLD.W, 14));
-    g.fillStyle(0x3b5dc9).fillRect(0, 56, WORLD.W, WORLD.H);
-    g.fillStyle(0xf4d58d).fillRect(0, 236, WORLD.W, WORLD.H - 236);
-    // Sonne
-    g.fillStyle(0xffcd75).fillCircle(420, 22, 12);
-    // Panel für Spieler
-    g.fillStyle(0x1a1c2c, 0.75).fillRect(170, 58, 290, 172);
-    g.lineStyle(1, 0xffec27).strokeRect(170.5, 58.5, 289, 171);
-  }
-
   private render(s: GameState) {
     if (s.joinUrl !== this.renderedUrl) this.renderQr(s.joinUrl);
 
+    const n = s.players.filter((p) => p.connected).length;
+    this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : 'Der VIP wählt am Handy ein Spiel!');
+
+    const key = s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}`).join('|');
+    if (key === this.renderedPlayers) return;
+    this.renderedPlayers = key;
+
     this.playerLayer.removeAll(true);
-    const cellW = 72;
-    const cellH = 84;
     for (let i = 0; i < SLOTS; i++) {
       const p = s.players[i];
-      const cx = 170 + 18 + (i % 4) * cellW + cellW / 2 - 18;
-      const cy = 64 + Math.floor(i / 4) * cellH;
+      const col = i % 4;
+      const row = Math.floor(i / 4);
+      const x = 196 + col * 74 + (row % 2) * 18;
+      const y = 120 + row * 88;
       if (!p) {
-        this.playerLayer.add(
-          this.add.text(cx, cy + 28, '?', { fontFamily: FONT, fontSize: '16px', color: '#5f574f' }).setOrigin(0.5, 0),
-        );
+        const ghost = this.add.ellipse(x, y - 2, 22, 7, 0x000000, 0.12);
+        this.playerLayer.add(ghost);
         continue;
       }
-      const sprite = this.add.image(cx, cy + 58, ensureAvatar(this, p.look)).setOrigin(0.5, 1).setScale(3);
-      if (!p.connected) sprite.setAlpha(0.35);
-      this.tweens.add({ targets: sprite, y: sprite.y - 3, duration: 400 + i * 37, yoyo: true, repeat: -1 });
-      this.playerLayer.add(sprite);
-      this.playerLayer.add(
-        this.add
-          .text(cx, cy + 62, p.name.slice(0, 8), { fontFamily: FONT, fontSize: '8px', color: '#fff1e8' })
-          .setOrigin(0.5, 0),
-      );
-      if (p.isVip) {
-        this.playerLayer.add(
-          this.add.text(cx, cy + 72, 'VIP', { fontFamily: FONT, fontSize: '8px', color: '#ffec27' }).setOrigin(0.5, 0),
-        );
-      }
+      const f = figure(this, p.look, x, y, 2);
+      if (!p.connected) f.setAlpha(0.4);
+      const img = f.getData('img') as Phaser.GameObjects.Image;
+      this.tweens.add({ targets: img, y: -3, duration: 380 + i * 41, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      this.playerLayer.add(f);
+      this.playerLayer.add(nameTag(this, x, y + 4, p.name.slice(0, 8)));
+      if (p.isVip) this.playerLayer.add(this.crown(x, y - 59));
     }
+  }
 
-    const n = s.players.filter((p) => p.connected).length;
-    this.hintText.setText(
-      n < 2 ? 'Warte auf mindestens 2 Spieler ...' : 'Der VIP wählt am Handy ein Spiel!',
-    );
+  private crown(x: number, y: number) {
+    const key = ensureTex(this, 'crown', O.crown);
+    const img = this.add.image(x, y, key).setScale(1);
+    this.tweens.add({ targets: img, y: y - 2, duration: 600, yoyo: true, repeat: -1 });
+    return img;
   }
 
   private renderQr(url: string) {
@@ -110,16 +116,16 @@ export class LobbyScene extends Phaser.Scene {
 
     const qr = QRCode.create(url, { errorCorrectionLevel: 'M' });
     const size = qr.modules.size;
-    const cell = Math.max(2, Math.floor(130 / (size + 4)));
-    const total = (size + 4) * cell;
-    const ox = 20 + Math.floor((140 - total) / 2);
-    const oy = 62;
+    const cell = Math.max(2, Math.floor(104 / (size + 2)));
+    const total = (size + 2) * cell;
+    const ox = 10 + Math.floor((124 - total) / 2);
+    const oy = 104 + Math.floor((122 - total) / 2);
     const g = this.add.graphics();
     g.fillStyle(0xffffff).fillRect(ox, oy, total, total);
-    g.fillStyle(0x000000);
+    g.fillStyle(Phaser.Display.Color.HexStringToColor(INK).color);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        if (qr.modules.get(x, y)) g.fillRect(ox + (x + 2) * cell, oy + (y + 2) * cell, cell, cell);
+        if (qr.modules.get(x, y)) g.fillRect(ox + (x + 1) * cell, oy + (y + 1) * cell, cell, cell);
       }
     }
     this.qrLayer.add(g);

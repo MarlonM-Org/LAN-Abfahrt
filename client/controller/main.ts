@@ -1,3 +1,4 @@
+import '@fontsource/press-start-2p/400.css';
 import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
 import { type Screen, LS, app, el, me, message, socket, store, toast } from './core';
 import { buildEdit, buildLobby } from './screens/lobby';

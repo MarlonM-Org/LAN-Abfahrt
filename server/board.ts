@@ -131,7 +131,7 @@ export class Board {
       if (s.coins[id] >= COCKTAIL_PRICE) {
         this.addCoins(id, -COCKTAIL_PRICE);
         s.cocktails[id] += 1;
-        msgs.push(`${name} kauft einen Cocktail! 🍹`);
+        msgs.push(`${name} kauft einen Cocktail!`);
         this.moveBar();
       } else {
         msgs.push(`${name} kommt an der Bar vorbei, hat aber keine ${COCKTAIL_PRICE} Münzen.`);
