@@ -18,6 +18,7 @@ import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
 import { pickVerstecken } from './screens/verstecken';
 import { pickParcours } from './screens/parcours';
+import { onKartRerender, pickKart } from './screens/kart';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -151,6 +152,8 @@ function pickScreen(): Screen {
           return pickVerstecken(m.state);
         case 'parcours':
           return pickParcours(m.state);
+        case 'kart':
+          return pickKart(m.state);
       }
     }
   }
@@ -187,6 +190,8 @@ async function requestWakeLock() {
     /* nur über HTTPS verfügbar – egal */
   }
 }
+
+onKartRerender(() => render());
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

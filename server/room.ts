@@ -21,6 +21,7 @@ import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
+import { KartGame } from './kart';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
@@ -318,6 +319,9 @@ export class Room {
         break;
       case 'parcours':
         this.mini = new ParcoursGame(ids, ctx);
+        break;
+      case 'kart':
+        this.mini = new KartGame(ids, ctx);
         break;
     }
     this.results = null;

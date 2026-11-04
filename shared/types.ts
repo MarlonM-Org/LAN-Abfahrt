@@ -34,7 +34,8 @@ export type MiniKind =
   | 'sup' | 'tidy' | 'enten'
   | 'sup' | 'tidy' | 'ttt'
   | 'verstecken'
-  | 'sup' | 'tidy' | 'parcours';
+  | 'sup' | 'tidy' | 'parcours'
+  | 'sup' | 'tidy' | 'kart';
 
 export type GameMode = 'party' | 'date' | 'drink';
 
@@ -781,6 +782,55 @@ export interface ParcoursState {
   fx: { seq: number; kind: 'boom' | 'ko' | 'goal' | 'place'; x: number; y: number; who: string | null }[];
 }
 
+// ------------------------------------------------------------------ Controller-Spiele: Kart-Rennen
+
+export type KartItem = 'coconut' | 'banana' | 'ice' | 'gull';
+
+export interface KartCar {
+  x: number;
+  y: number;
+  angle: number;
+  /** Aktuelle Lenkung (−1…1) – nur für die Optik */
+  steer: number;
+  /** 0 = noch vor der Startlinie, 1…LAPS = laufende Runde */
+  lap: number;
+  place: number;
+  finished: boolean;
+  finishMs: number | null;
+  item: KartItem | null;
+  /** > 0: dreht sich gerade (Rest in ms) */
+  spin: number;
+  boost: boolean;
+  /** −1/1 = driftet nach links/rechts, 0 = nein; 2 = Mini-Turbo geladen */
+  drift: number;
+  charged: boolean;
+  offroad: boolean;
+}
+
+export interface KartEvent {
+  seq: number;
+  kind: 'hit' | 'gull' | 'item' | 'finish' | 'turbo';
+  who: string;
+  /** z. B. Verursacher */
+  by: string | null;
+  text: string;
+}
+
+export interface KartState {
+  sub: 'countdown' | 'race' | 'over';
+  /** Countdown bzw. Restzeit nach dem Sieger (sonst Notbremse) */
+  endsIn: number;
+  closing: boolean;
+  track: number;
+  laps: number;
+  karts: Record<string, KartCar>;
+  boxes: { x: number; y: number; on: boolean }[];
+  hazards: { id: number; kind: 'banana' | 'coconut'; x: number; y: number }[];
+  gulls: { id: number; x: number; y: number; target: string; from: string }[];
+  finishOrder: string[];
+  events: KartEvent[];
+}
+
 // ------------------------------------------------------------------ Date Night: Ablauf
 
 export interface DateCard {
@@ -877,7 +927,8 @@ export type MiniSnapshot =
   | { kind: 'enten'; state: EntenState }
   | { kind: 'ttt'; state: TttState }
   | { kind: 'verstecken'; state: VerstState }
-  | { kind: 'parcours'; state: ParcoursState };
+  | { kind: 'parcours'; state: ParcoursState }
+  | { kind: 'kart'; state: KartState };
 
 export interface GameState {
   phase: Phase;

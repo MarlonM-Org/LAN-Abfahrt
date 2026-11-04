@@ -13,6 +13,7 @@ import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lineFree, nextWaypoint, roomInner } from '../shared/house';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
+import { autopilot, getTrack } from '../shared/kart';
 
 export interface BotOptions {
   url: string;
@@ -75,6 +76,9 @@ export class Bot {
   };
   /** Fallen-Parcours: Bauziel, gedrosselte Eingaben, Sprung-Halten */
   private pc = { target: null as { round: number; x: number; y: number; rot: number } | null, stick: '', stickAt: 0, actAt: 0, jumping: false, sloppy: Math.random() * 0.25 };
+  /** Kart-Rennen: eigene Ideallinie (seitlicher Versatz) und Item-Zeitpunkt */
+  private kartLane = rand(-6, 6);
+  private kartItemAt = 0;
 
   constructor(
     public name: string,
@@ -736,6 +740,28 @@ export class Bot {
     if (m.kind === 'verstecken') this.playVerstecken(m.state);
 
     if (m.kind === 'parcours') this.parcours(m.state);
+
+    if (m.kind === 'kart' && m.state.sub === 'race') {
+      const k = m.state;
+      const car = k.karts[this.id];
+      if (car && !car.finished) {
+        this.once('kart', async () => {
+          await sleep(rand(80, 130));
+          const ap = autopilot(getTrack(k.track), car.x, car.y, car.angle, 70, this.kartLane);
+          // etwas menschliche Unschärfe
+          const steer = Math.max(-1, Math.min(1, ap.steer + rand(-0.15, 0.15)));
+          this.send('steer', { x: Math.round(steer * 100) / 100, brake: ap.brake && Math.random() < 0.7 });
+          if (car.item) {
+            if (!this.kartItemAt) this.kartItemAt = Date.now() + rand(600, 3500);
+            if (Date.now() >= this.kartItemAt) {
+              this.kartItemAt = 0;
+              this.send('item');
+            }
+          }
+          if (Math.random() < 0.01) this.kartLane = rand(-6, 6);
+        });
+      }
+    }
 
     if (m.kind === 'murder') {
       const ms = m.state;
