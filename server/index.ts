@@ -5,6 +5,7 @@ import https from 'node:https';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
+import { domainConfigFromEnv, prepareDomain } from './domain';
 import { getLanAddress } from './net';
 import { Room } from './room';
 
@@ -25,7 +26,10 @@ const PUBLIC_HOST = process.env.PUBLIC_HOST ?? getLanAddress();
 
 // HTTPS (nur nötig für den Bewegungssensor auf iPhones): aktiv, sobald eine Domain
 // und ein passendes Zertifikat vorhanden sind. HTTP auf PORT läuft immer weiter (TV, Bots).
-const PUBLIC_DOMAIN = process.env.PUBLIC_DOMAIN;
+const domainCfg = domainConfigFromEnv(root);
+// Mit deSEC: IP eintragen + Zertifikat holen/erneuern, bevor der Server startet
+if (domainCfg) await prepareDomain(domainCfg, PUBLIC_HOST);
+const PUBLIC_DOMAIN = domainCfg?.domain ?? process.env.PUBLIC_DOMAIN;
 const TLS_CERT = path.resolve(root, process.env.TLS_CERT ?? 'certs/fullchain.pem');
 const TLS_KEY = path.resolve(root, process.env.TLS_KEY ?? 'certs/privkey.pem');
 const tls =

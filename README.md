@@ -51,13 +51,23 @@ PUBLIC_HOST=192.168.178.23 npm run dev
 
 iPhones geben den Bewegungssensor (Bowling, Ententeich, Kipp-Lenkung) nur über HTTPS frei. Alles andere läuft weiter über HTTP.
 
-1. `.env.example` nach `.env` kopieren und `PUBLIC_DOMAIN=party.deinedomain.de` eintragen
-2. Zertifikat für diese Domain nach `certs/fullchain.pem` und `certs/privkey.pem` legen
-3. Die Domain muss auf die Laptop-IP im aktuellen WLAN zeigen
+Aufbau (einmalig einrichten):
 
-Dann läuft zusätzlich `https://party.deinedomain.de:3443/` – der QR-Code zeigt automatisch die HTTPS-Adresse. TV und Bots nutzen weiter `http://localhost:3000`.
+```
+lan-party.ma-und-ma.de                 ──CNAME──▶  lan-abfahrt.dedyn.io          (deSEC, A-Record = Laptop-IP)
+_acme-challenge.lan-party.ma-und-ma.de ──CNAME──▶  _acme-challenge.lan-abfahrt.dedyn.io  (für Let's Encrypt)
+```
 
-> **FritzBox:** Der DNS-Rebind-Schutz blockt Domains, die auf eine Heimnetz-IP zeigen. Unter *Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz* die Domain als Ausnahme eintragen.
+1. **deSEC:** Konto auf [desec.io](https://desec.io) anlegen, eine kostenlose dynDNS-Domain `<name>.dedyn.io` registrieren und unter *Token Management* einen Token erstellen.
+2. **Strato:** Für die Subdomain `lan-party` die zwei CNAME-Einträge oben anlegen.
+3. **`.env`:** `.env.example` nach `.env` kopieren, `DESEC_ZONE`, `DESEC_TOKEN` und `PUBLIC_DOMAIN` eintragen.
+4. `npm run domain` – trägt die Laptop-IP bei deSEC ein und holt das Zertifikat. `npm run domain -- --check` zeigt, wohin die Domain gerade zeigt.
+
+Danach passiert das bei jedem `npm run dev` / `npm start` automatisch: IP eintragen, Zertifikat bei Bedarf erneuern (ab 30 Tage vor Ablauf, dafür braucht der Laptop kurz Internet). Die Handys verbinden sich dann über `https://lan-party.ma-und-ma.de:3443/` – der QR-Code zeigt automatisch diese Adresse. TV und Bots nutzen weiter `http://localhost:3000`.
+
+Ohne deSEC geht es auch manuell: `PUBLIC_DOMAIN` setzen und ein eigenes Zertifikat nach `certs/fullchain.pem` + `certs/privkey.pem` legen.
+
+> **FritzBox:** Der DNS-Rebind-Schutz blockt Domains, die auf eine Heimnetz-IP zeigen. Unter *Heimnetz → Netzwerk → Netzwerkeinstellungen → DNS-Rebind-Schutz* `lan-party.ma-und-ma.de` und `lan-abfahrt.dedyn.io` als Ausnahmen eintragen. In fremden Netzen mit ähnlichem Schutz bleibt nur HTTP (alles außer Bewegungssensor geht trotzdem).
 
 Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start`.
 
