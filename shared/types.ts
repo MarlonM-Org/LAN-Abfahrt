@@ -1342,6 +1342,12 @@ export interface JoinResponse {
   error?: string;
 }
 
+/** Erstes Event nach dem Verbinden: Server-Start-ID + alle Minispiele, die der Server kennt */
+export interface ServerHello {
+  boot: string;
+  kinds: string[];
+}
+
 export interface StartRequest {
   mode: 'party' | 'date' | 'drink' | 'random' | MiniKind;
   rounds?: number;

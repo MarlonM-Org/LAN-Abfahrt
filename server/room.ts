@@ -9,6 +9,7 @@ import type {
   Phase,
   PlayerPublic,
   ResultsState,
+  ServerHello,
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
@@ -52,6 +53,8 @@ const MAX_PLAYERS = 8;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max'];
 const MIN_PLAYERS = 2;
 const MINI_KINDS = Object.keys(MINI_INFO) as MiniKind[];
+/** Ändert sich bei jedem Serverstart – Handys/TV laden dann neu (sonst läuft dort evtl. noch alter Code) */
+const BOOT_ID = randomUUID();
 
 interface Player extends PlayerPublic {
   socketId: string | null;
@@ -91,6 +94,8 @@ export class Room {
     const me = () => (playerId ? this.players.get(playerId) : undefined);
     const isVip = () => !!me()?.isVip;
     const inCouple = () => !!playerId && !!this.dateRun?.state.couple.includes(playerId);
+
+    socket.emit('server:hello', { boot: BOOT_ID, kinds: MINI_KINDS } satisfies ServerHello);
 
     socket.on('host:hello', () => {
       socket.join('hosts');
