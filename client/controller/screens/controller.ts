@@ -4,6 +4,9 @@ import { SHIRTS } from '../../../shared/avatar';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
 import { stickZone } from '../stick';
 import { haptic } from '../haptic';
+import { spectatorBar } from '../spectator';
+import { ARENA } from '../../../shared/arena';
+import { SPECTATOR } from '../../../shared/spectator';
 
 // ------------------------------------------------------------------ Joystick
 
@@ -144,7 +147,8 @@ export function pickArena(s: ArenaState): Screen {
   const mine = s.players[id];
   if (!mine) return ['spectate', message('Du schaust zu')];
   if (s.sub === 'over') return ['ar-over', message('Arena vorbei!', 'Schau auf den Fernseher!')];
-  if (!mine.alive && s.sub === 'play') return [`ar-dead-${s.round}`, message('PLATSCH!', 'Du bist nass und für diese Runde raus. Zuschauen …')];
+  // Raus: als Geist alle 8 s eine Wasserbombe an den Rand werfen + auf den Rundensieger tippen
+  if (!mine.alive && (s.sub === 'play' || s.sub === 'roundOver')) return [`ar-dead-${s.round}`, buildArenaGhost];
   return ['ar-ctl', () => {
     const look = me()?.look;
     const color = look ? SHIRTS[look.shirt] : '#f2c33a';
@@ -180,4 +184,70 @@ export function pickArena(s: ArenaState): Screen {
       bomb.disabled = st.sub !== 'play' || !p.alive;
     };
   }];
+}
+
+// ------------------------------------------------------------------ Bomben-Arena: Geister-Screen
+
+const GHOST_TILE = 6;
+const MAP_COLORS: Record<string, string> = { '#': '#5e3518', P: '#2f7d32', b: '#c99b5a', '.': '#f1d49a', '~': '#3f8fe0' };
+
+/** Quer: links Stick fürs Zielkreuz, Mitte Mini-Karte + Zuschauer-Leiste, rechts WERFEN */
+function buildArenaGhost() {
+  const id = store.playerId!;
+  const root = el(`
+    <div class="lx ar-lx ar-ghost">
+      <div class="lx-head"><b>👻 Geist</b><span class="arena-round ghost-round"></span><span class="arena-stats grow ghost-hint"></span></div>
+      <div class="lx-left ar-stick"><span class="st-label">ZIELEN · Zielkreuz am Rand verschieben</span></div>
+      <div class="lx-mid"><canvas class="ghost-map" width="${ARENA.COLS * GHOST_TILE}" height="${ARENA.ROWS * GHOST_TILE}"></canvas></div>
+      <div class="lx-right"><button class="big-btn ghost-throw">WASSER-<br/>BOMBE<small>alle 8 s</small><i class="cd"></i></button></div>
+    </div>
+  `);
+  stickZone(q(root, '.ar-stick'), (x, y) => send('ghost', { x, y }));
+  const throwBtn = q<HTMLButtonElement>(root, '.ghost-throw');
+  const cd = q(root, '.ghost-throw .cd');
+  tapButton(throwBtn, () => {
+    if (throwBtn.disabled) return;
+    send('throw');
+    haptic(30);
+  });
+  const canvas = q<HTMLCanvasElement>(root, '.ghost-map');
+  const ctx = canvas.getContext('2d')!;
+  const mid = q(root, '.lx-mid');
+  const bar = spectatorBar(mid);
+  app.append(root);
+  haptic([60, 40, 120]);
+  return () => {
+    bar();
+    const st = store.state?.mini?.kind === 'arena' ? store.state.mini.state : null;
+    if (!st) return;
+    const g = st.ghosts?.[id];
+    q(root, '.ghost-round').textContent = `Runde ${st.round}`;
+    q(root, '.ghost-hint').textContent =
+      st.sub === 'roundOver' ? (st.roundWinner ? `${nameOf(st.roundWinner)} gewinnt die Runde.` : 'Alle nass – Unentschieden!') : g && g.cd > 0 ? `Nachladen … ${Math.ceil(g.cd / 1000)}s` : 'Rache! Wirf eine Wasserbombe an den Rand.';
+    const ready = st.sub === 'play' && !!g && g.cd <= 0;
+    throwBtn.disabled = !ready;
+    cd.style.transform = `scaleY(${g && st.sub === 'play' ? Math.min(1, g.cd / SPECTATOR.ARENA_GHOST_MS) : 1})`;
+    // Mini-Karte
+    const T = GHOST_TILE;
+    for (let y = 0; y < ARENA.ROWS; y++) {
+      for (let x = 0; x < ARENA.COLS; x++) {
+        ctx.fillStyle = MAP_COLORS[st.grid[y * ARENA.COLS + x]] ?? '#f1d49a';
+        ctx.fillRect(x * T, y * T, T, T);
+      }
+    }
+    ctx.fillStyle = '#2d1b12';
+    for (const b of st.bombs) ctx.fillRect(b.x * T + 1, b.y * T + 1, T - 2, T - 2);
+    for (const [pid, p] of Object.entries(st.players)) {
+      if (!p.alive) continue;
+      const look = store.state?.players.find((x) => x.id === pid)?.look;
+      ctx.fillStyle = look ? SHIRTS[look.shirt] : '#fff';
+      ctx.fillRect(Math.round(p.x * T) + 1, Math.round(p.y * T) + 1, T - 2, T - 2);
+    }
+    if (g) {
+      const blink = Math.floor(performance.now() / 250) % 2 === 0;
+      ctx.strokeStyle = blink ? '#e0503f' : '#fff4d6';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(Math.round(g.x) * T - 2, Math.round(g.y) * T - 2, T + 4, T + 4);
+    }
+  };
 }

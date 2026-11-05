@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { SHIRTS } from '../../shared/avatar';
 import { ANGELN, type AngelCatch, type AngelLost, type AngelnState, type AngelPlayer, FISH, fmtKg, laneW, laneX } from '../../shared/angeln';
 import { LAKE, baitBox, bobber, catchSprite, fishShadow, paintLake, rod, rowBoat } from '../art/angeln';
 import * as O from '../art/objects';
 import { reeds } from '../art/lagoon';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
+import { pcol } from './playerColor';
 import { GOLD, LIGHT, background, ensureTex, ink, panel, prop, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -156,7 +156,7 @@ export class AngelnScene extends Phaser.Scene {
     const pl = playerById(id);
     if (!pl) return undefined;
     const x = Math.round(laneX(p.lane, n));
-    const color = SHIRTS[pl.look.shirt] ?? '#ffffff';
+    const color = pcol(id).hex;
     const fig = figure(this, pl.look, x, FEET).setDepth(300);
     const rodImg = this.add.image(x + 3, FEET - 9, ensureTex(this, 'an_rod', rod)).setOrigin(0, 1).setDepth(301);
     const bob = this.add.image(x, LAKE.JETTY_TOP, ensureTex(this, `an_bob_${color}`, () => bobber(color))).setOrigin(0.5, 0.8).setDepth(30).setVisible(false);

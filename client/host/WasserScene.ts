@@ -6,7 +6,7 @@ import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { bucket, hedge, hoseReel, nozzle, paintGarden, waterBalloon, waterPistol } from '../art/garden';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, type Figure } from './textures';
 import { BLUE_INK, NameTags, background, ensureTex, fitText, ink, panel, prop, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -20,7 +20,7 @@ const mmss = (ms: number) => {
 };
 
 interface Fig {
-  f: Phaser.GameObjects.Container;
+  f: Figure;
   img: Phaser.GameObjects.Image;
   bar: Phaser.GameObjects.Graphics;
   gun: Phaser.GameObjects.Image;
@@ -292,7 +292,7 @@ export class WasserScene extends Phaser.Scene {
       tagSpecs.push({ id, x: a.x, y: a.y - 36, name: this.names.get(id) ?? '?', color: hex(p.c), alpha: p.s === 'ok' ? 1 : 0.75 });
 
       a.img.setFlipX(p.d < 0);
-      a.img.setY(p.m ? -Math.abs(Math.sin(now / 80)) * 2 : 0);
+      a.f.play(p.s === 'soaked' ? 'hit' : p.m ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 4).setDepth(a.y + 4);
       // Nass = bläulich, Abtrocknen = gelblich
       if (p.s === 'soaked') a.img.setTint(0x8fc4ff);

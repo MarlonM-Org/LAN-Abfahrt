@@ -7,6 +7,7 @@ import { ballShine, beachBall, paintAutoballPitch } from '../art/autoball';
 import { kartSprite } from '../art/kartsprites';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, GOLD, LIGHT, background, ensureTex, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -135,7 +136,8 @@ export class AutoballScene extends Phaser.Scene {
     const pl = playerById(id);
     if (!car || !pl) return undefined;
     const color = TEAM_INFO[car.t].color;
-    const shadow = this.add.ellipse(1, 3, 15, 8, 0x000000, 0.25);
+    // Ring in der Spielerfarbe des Abends (Kart selbst in Teamfarbe)
+    const shadow = this.add.ellipse(1, 3, 15, 8, 0x000000, 0.25).setStrokeStyle(1, pcol(id).num);
     const body = this.add.image(0, 0, ensureTex(this, `afb_kart_${car.t}`, () => kartSprite(color)));
     const head = this.add.image(0, -3, ensurePortrait(this, pl.look)).setScale(0.62).setOrigin(0.5, 0.6);
     const lift = this.add.container(0, 0, [body, head]);

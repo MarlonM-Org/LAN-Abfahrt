@@ -1,5 +1,6 @@
 import type { EntenKind, EntenPlayer, EntenShot, EntenState, EntenTarget, MiniSnapshot } from '../shared/types';
 import { ENTEN } from '../shared/games';
+import { playerColor } from '../shared/players';
 import { WORLD } from '../shared/flunky';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore } from './minigame';
 
@@ -69,7 +70,7 @@ export class EntenGame implements MiniGame {
         hits: 0,
         shots: 0,
         combo: 0,
-        color: ENTEN.COLORS[i % ENTEN.COLORS.length],
+        color: playerColor(ctx.colorOf?.(id) ?? i).num,
         lastShot: 0,
         lastHit: 0,
         reloadAt: 0,

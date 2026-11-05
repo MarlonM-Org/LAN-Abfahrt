@@ -1,14 +1,11 @@
 import type { GolfBallPub, GolfFx, GolfFxKind, GolfState, MiniSnapshot, SkipInfo } from '../shared/types';
 import { GOLF, GOLF_HOLES, type GolfBody, golfIdealPutt, golfPowerToSpeed, golfStep, golfWalls } from '../shared/golf';
-import { SHIRTS } from '../shared/avatar';
+import { playerColor } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, shuffle, waitLabel } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
 const r1 = (v: number) => Math.round(v * 10) / 10;
-const hexNum = (h: string) => parseInt(h.slice(1), 16);
-/** Ersatzfarben, falls zwei Spieler dieselbe Shirt-Farbe haben (oder Weiß/Schwarz) */
-const FALLBACK = ['#e0503f', '#3f8fe0', '#ffd25e', '#9b5fc0', '#f0973a', '#2fb5a5', '#f07aa8', '#46b04a', '#8fd8ff', '#c9467e', '#a0e060', '#ff9a7a'];
 
 interface Ball extends GolfBody {
   strokes: number;
@@ -55,12 +52,9 @@ export class GolfGame implements MiniGame {
   ) {
     this.holeCount = ctx.mode === 'party' ? Math.min(5, GOLF_HOLES.length) : GOLF_HOLES.length;
     this.order = shuffle(ids);
-    const used = new Set<string>();
     this.order.forEach((id, i) => {
-      let col = SHIRTS[ctx.lookOf?.(id)?.shirt ?? -1] ?? FALLBACK[i % FALLBACK.length];
-      if (used.has(col) || col === '#f4efe2' || col === '#3b3b4f') col = FALLBACK.find((c) => !used.has(c)) ?? col;
-      used.add(col);
-      this.colors[id] = hexNum(col);
+      // Ballfarbe = Spielerfarbe des Abends
+      this.colors[id] = playerColor(ctx.colorOf?.(id) ?? i).num;
       this.scores[id] = GOLF_HOLES.slice(0, this.holeCount).map(() => null);
     });
     this.timers.later(GOLF.INTRO_MS, () => this.startHole(0));

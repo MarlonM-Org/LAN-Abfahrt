@@ -26,6 +26,8 @@ export interface PlayerPublic {
   id: string;
   name: string;
   look: Look;
+  /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) – bleibt, solange der Spieler im Raum ist */
+  color: number;
   connected: boolean;
   isVip: boolean;
   /** Offline: seit wie vielen ms (Stand dieses Snapshots) */
@@ -508,6 +510,8 @@ export interface KurveState {
   deaths: { id: string; x: number; y: number; seq: number }[];
   pickup: { id: string; type: KurvePower; x: number; y: number; seq: number } | null;
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Bomben-Arena
@@ -546,6 +550,10 @@ export interface ArenaState {
   players: Record<string, ArenaPlayer>;
   /** Nur in roundOver/over: Rundensieger (null = Unentschieden) */
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+  /** Geister (Ausgeschiedene): Zielkreuz in Kacheln + Abklingzeit der Wasserbombe (ms) */
+  ghosts?: Record<string, { x: number; y: number; cd: number }>;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Bowling
@@ -1262,6 +1270,8 @@ export interface SmashState {
   items: { id: number; type: import('./smash').ItemKind; x: number; y: number }[];
   fx: SmashFx[];
   winner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 // ------------------------------------------------------------------ Stille Post mit Bildern
@@ -1699,6 +1709,12 @@ export interface SumoState {
   sudden: boolean;
   players: Record<string, SumoPlayer>;
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+  /** Geister (Ausgeschiedene): Abklingzeit der Welle (ms) */
+  ghosts?: Record<string, { cd: number }>;
+  /** Laufende Geister-Wellen: Start (x, y), Richtung (dx, dy), zurückgelegte Strecke d (px) */
+  waves?: { seq: number; by: string; x: number; y: number; dx: number; dy: number; d: number }[];
 }
 
 // ------------------------------------------------------------------ Zauber-Arena
@@ -1842,6 +1858,8 @@ export interface BogenState {
   chest: { x: number; y: number } | null;
   fx: BogenFx[];
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 /** Nur an den jeweiligen Spieler */
@@ -1924,7 +1942,20 @@ export interface ResultsState {
 
 // ------------------------------------------------------------------ Gesamtzustand
 
-export type Phase = 'lobby' | 'board' | 'mini' | 'results' | 'story';
+/** `intro` = Regelkarte vor einem Minispiel (Ziel, Steuerung, Übungsfeld, „Bereit!“) */
+export type Phase = 'lobby' | 'board' | 'intro' | 'mini' | 'results' | 'story';
+
+/** Regelkarte vor dem Minispiel: Start, sobald alle bereit sind – spätestens bei `endsAt` (Server-Zeit, ms) */
+export interface IntroState {
+  kind: MiniKind;
+  /** Wer gleich mitspielt */
+  ids: string[];
+  /** Wer „Bereit!“ gedrückt hat (Bots sofort) */
+  ready: string[];
+  endsAt: number;
+  /** Spiel lief heute schon: nur 5 s, ohne Bereit-Pflicht */
+  short: boolean;
+}
 
 export type MiniSnapshot =
   | { kind: 'flunky'; state: FlunkyState }
@@ -2019,8 +2050,12 @@ export interface GameLive {
   skippable?: SkipInfo | null;
   /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
   nochmal: NochmalState | null;
+  /** Regelkarte (nur in Phase `intro`) */
+  intro?: IntroState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
   showBoard: boolean;
+  /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */
+  emotes?: import('./spectator').EmoteEntry[];
 }
 
 /** Was TV, Handy und Bots lesen: `meta` + `state` zusammengeführt ({ ...meta, ...live }). */

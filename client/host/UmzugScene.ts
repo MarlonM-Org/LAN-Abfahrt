@@ -8,7 +8,7 @@ import { bus, getState, playerById } from './store';
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { say } from './speech';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { BLUE_INK, INK, background, ensureTex, ink, panel, txt } from './ui';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -347,7 +347,7 @@ export class UmzugScene extends Phaser.Scene {
       a.x += (p.x - a.x) * 0.45;
       a.y += (p.y - a.y) * 0.45;
       if (Math.abs(p.fx) > 0.2) a.img.setFlipX(p.fx < 0);
-      a.img.setY(p.m ? -Math.abs(Math.sin(now / 80)) * 2 : 0);
+      playAvatar(a.img, p.m ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 5).setDepth(a.y + 5);
       const k = carried.get(id);
       if (k !== undefined) {

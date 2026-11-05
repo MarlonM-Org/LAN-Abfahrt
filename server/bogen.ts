@@ -13,7 +13,8 @@ import {
   bogenWrapX,
   bogenWrapY,
 } from '../shared/bogen';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { BetBook } from './spectator';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -72,6 +73,8 @@ export class BogenGame implements MiniGame {
   private chest: { x: number; y: number } | null = null;
   private nextChestAt = 0;
   private timers = new Timers();
+  /** Zuschauer: Wetten der Ausgeschiedenen auf den Rundensieger */
+  private bets = new BetBook();
 
   constructor(
     private ids: string[],
@@ -105,6 +108,7 @@ export class BogenGame implements MiniGame {
     this.stageIdx = (this.firstStage + this.round - 1) % BOGEN_STAGES.length;
     this.endAt = 0;
     this.roundWinner = null;
+    this.bets.newRound(this.round);
     this.arrows = [];
     this.chest = null;
     const active = shuffle(this.ids.filter((id) => this.ctx.isConnected(id)));
@@ -144,6 +148,7 @@ export class BogenGame implements MiniGame {
     const alive = this.alive();
     this.roundWinner = alive.length === 1 ? alive[0].id : null;
     if (this.roundWinner) this.players.get(this.roundWinner)!.wins += 1;
+    this.bets.resolve(this.roundWinner);
     this.sub = 'roundOver';
     this.deadline = now + BOGEN.ROUND_OVER_MS;
     this.ctx.onChange();
@@ -161,7 +166,7 @@ export class BogenGame implements MiniGame {
       const p = this.players.get(id)!;
       return p.wins * 1000 + p.kills;
     };
-    const groups = groupByScore(this.ids, score);
+    const groups = this.bets.rank(this.ids, score);
     const top = groups[0] ?? [];
     const champ = top.length === 1 ? this.ctx.nameOf(top[0]) : null;
     this.timers.later(1500, () =>
@@ -170,7 +175,7 @@ export class BogenGame implements MiniGame {
         details: Object.fromEntries(
           this.ids.map((id) => {
             const p = this.players.get(id)!;
-            return [id, `${p.wins} ${p.wins === 1 ? 'Sieg' : 'Siege'} · ${p.kills} ${p.kills === 1 ? 'Treffer' : 'Treffer'}`];
+            return [id, `${p.wins} ${p.wins === 1 ? 'Sieg' : 'Siege'} · ${p.kills} ${p.kills === 1 ? 'Treffer' : 'Treffer'}${this.bets.detail(id)}`];
           }),
         ),
         subtitle: champ ? `${champ} ist Meisterschütze der Bogen-Arena!` : 'Unentschieden in der Bogen-Arena!',
@@ -603,6 +608,11 @@ export class BogenGame implements MiniGame {
     const p = this.players.get(id);
     if (!p) return;
     const pl = asRecord(payload);
+    if (action === 'bet') {
+      const open = this.sub === 'play' && !this.endAt;
+      if (this.bets.place(id, payload, this.ids, this.alive().map((a) => a.id), open)) this.ctx.onChange();
+      return;
+    }
     const num = (v: unknown) => clamp(Number(v) || 0, -1, 1);
     const setStick = (x: number, y: number) => {
       if (y > 0.7 && p.sy <= 0.7) p.downSince = Date.now();
@@ -664,6 +674,12 @@ export class BogenGame implements MiniGame {
         chest: this.chest,
         fx: this.fx.map(({ at: _at, ...f }) => f),
         roundWinner: this.roundWinner,
+        spectator: this.bets.info(
+          this.alive().map((a) => a.id),
+          this.round,
+          this.sub === 'play' && !this.endAt,
+          this.sub === 'play' || this.sub === 'countdown' ? undefined : this.roundWinner,
+        ),
       },
     };
   }

@@ -2,11 +2,12 @@ import Phaser from 'phaser';
 import type { BowlingRoll, BowlingState, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { BOWL, PIN_POS, scoreFrames } from '../../shared/bowling';
-import { SHIRTS } from '../../shared/avatar';
+import { playerColor } from '../../shared/players';
 import { bowlingBall, bowlingPin, paintBeachAlley, tikiTorch } from '../art/bowling';
 import { crown } from '../art/objects';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
+import { pcol } from './playerColor';
 import { GOLD, INK, LIGHT, RED_INK, background, ensureTex, fitText, ink, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -94,7 +95,7 @@ export class BowlingScene extends Phaser.Scene {
     const pinKey = ensureTex(this, 'bowlpin', bowlingPin);
     for (let i = 0; i < 10; i++) this.pins.push(this.add.image(0, 0, pinKey).setOrigin(0.5, 1));
     this.ballShadow = this.add.ellipse(0, 0, 10, 3, 0x000000, 0.25);
-    this.ball = this.add.image(0, 0, ensureTex(this, 'bowlball_0', () => bowlingBall(SHIRTS[0])));
+    this.ball = this.add.image(0, 0, ensureTex(this, 'bowlball_0', () => bowlingBall(playerColor(0).hex)));
     this.sign = txt(this, 0, 0, 'STRANDBAHN', { color: GOLD }).setOrigin(0.5, 0.5);
 
     // Anzeigetafel + HUD
@@ -166,7 +167,7 @@ export class BowlingScene extends Phaser.Scene {
   }
 
   private setBallColor(id: string) {
-    const col = SHIRTS[playerById(id)?.look.shirt ?? 0] ?? SHIRTS[0];
+    const col = pcol(id).hex;
     if (col === this.ballColor) return;
     this.ballColor = col;
     this.ball.setTexture(ensureTex(this, `bowlball_${col}`, () => bowlingBall(col)));
@@ -513,6 +514,7 @@ export class BowlingScene extends Phaser.Scene {
     if (st.sub === 'intro' || st.sub === 'over') return;
     const p = playerById(who);
     this.hud.add(panel(this, 3, 3, 150, 32));
+    if (p) this.hud.add(this.add.rectangle(17, 28, 18, 17, pcol(who).num).setOrigin(0.5, 1));
     if (p) this.hud.add(this.add.image(17, 27, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
     this.hud.add(fitText(ink(this, 30, 9, tagName(p?.name ?? '?'), { origin: [0, 0], color: RED_INK }), 12 * 8));
     const status = st.sub === 'aim' ? `Frame ${st.frame + 1}/${st.frames} · Wurf ${st.ball + 1}` : 'wirft …';
@@ -549,6 +551,7 @@ export class BowlingScene extends Phaser.Scene {
       const bg = this.add.rectangle(x0, y, w, rowH - 2, isActive ? 0xf7e4b5 : 0xe6c88a, isActive ? 1 : 0.85).setOrigin(0, 0);
       bg.setStrokeStyle(1, 0x2d1b12);
       this.board.add(bg);
+      this.board.add(this.add.rectangle(x0 + 1, y + 1, 3, rowH - 4, pcol(id).num).setOrigin(0, 0));
       if (pl) this.board.add(this.add.image(x0 + 10, y + rowH - 3, ensurePortrait(this, pl.look)).setOrigin(0.5, 1));
       // Name auf Spaltenbreite verkleinern statt auf 4 Zeichen kürzen
       const nm = tagName(pl?.name ?? '?');

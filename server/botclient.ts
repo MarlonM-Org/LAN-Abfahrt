@@ -21,6 +21,7 @@ import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint a
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
+import { spectatorBot } from './spectatorbot';
 import { umzugBot } from './umzugbot';
 import { golfBot } from './golfbot';
 import { spionBot } from './spionbot';
@@ -744,9 +745,21 @@ export class Bot {
       });
     }
 
+    // Regelkarte vor dem Spiel: Bots sind sofort bereit
+    if (s.phase === 'intro' && s.intro && !s.intro.ready.includes(this.id)) {
+      const it = s.intro;
+      this.once(`intro-${it.kind}-${it.endsAt}`, async () => {
+        if (this.leader) this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (kurz, 5 s)' : ' (15 s)'}`);
+        await sleep(rand(150, 500));
+        this.socket.emit('intro:ready');
+      });
+    }
+
     if (s.phase !== 'mini' || !s.mini) return;
 
     const m = s.mini;
+    // Zuschauer: Emotes, Wetten, Geister-Aktionen (Arena/Sumo)
+    spectatorBot(this, s);
     if (m.kind === 'flunky') {
       const f = m.state;
       if (f.sub === 'aim' && f.throwerId === this.id) {

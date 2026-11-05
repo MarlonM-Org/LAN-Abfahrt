@@ -8,7 +8,7 @@ import { candle, cobweb, ghostSprite, wardrobe } from '../art/geist';
 import { paintTiles, paintWoodFloor } from '../art/ground';
 import type { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { GREEN_INK, NameTags, RED_INK, background, ensureTex, ink, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -288,8 +288,10 @@ export class GeistScene extends Phaser.Scene {
       v.img.setFlipX(Math.cos(v.angle) < 0);
       if (h.down) {
         v.img.setAngle(90).setTint(0x9d9ab8).setY(-2);
+        playAvatar(v.img, 'hit');
       } else {
-        v.img.setAngle(0).clearTint().setY(h.moving ? -Math.abs(Math.sin(this.time.now / 80)) * 2 : 0);
+        v.img.setAngle(0).clearTint().setY(0);
+        playAvatar(v.img, h.moving ? 'walk' : 'idle');
       }
       v.status.setText(h.down ? 'HILFE!' : h.empty ? 'Akku leer' : '');
       v.status.setColor(h.down ? '#ff9fc4' : C.gold);

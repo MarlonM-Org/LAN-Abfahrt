@@ -1,6 +1,7 @@
 import type { KurveState } from '../../../shared/types';
 import { KURVE, KURVE_POWER_INFO } from '../../../shared/games';
 import { haptic } from '../haptic';
+import { spectatorBar } from '../spectator';
 import { type Screen, app, el, message, nameOf, q, send, store } from '../core';
 
 /**
@@ -88,10 +89,13 @@ export function pickKurve(s: KurveState): Screen {
     // Handy gedreht / Ausrichtungs-Overlay: gehaltene Knöpfe loslassen
     window.addEventListener('input-reset', release);
     document.addEventListener('visibilitychange', release);
+    // Zuschauer-Leiste (Live-Stand, Wetten, Emotes) – nur sichtbar, solange man raus ist (CSS .kv-lx.out)
+    const bar = spectatorBar(q(root, '.lx-mid'));
     app.append(root);
 
     let deadRound = 0;
     return () => {
+      bar();
       const st = store.state?.mini?.kind === 'kurve' ? store.state.mini.state : null;
       const p = st?.players[id];
       if (!st || !p) return;
@@ -105,7 +109,7 @@ export function pickKurve(s: KurveState): Screen {
       else if (p.fx.length) status = p.fx.map((f) => (f === 'slow' ? 'Du wirst ausgebremst!' : KURVE_POWER_INFO[f].label)).join(' ');
       else status = st.storm ? 'Sturm! Alle werden schneller ...' : `Noch ${alive} im Rennen – +1 für jeden Crash der anderen`;
       q(root, '.kv-status').textContent = status;
-      root.querySelector('.kv-lx')!.classList.toggle('out', !p.alive && st.sub === 'play');
+      root.querySelector('.kv-lx')!.classList.toggle('out', !p.alive && (st.sub === 'play' || st.sub === 'roundEnd'));
       if (!p.alive && st.sub === 'play' && deadRound !== st.round) {
         deadRound = st.round;
         haptic([60, 40, 120]);

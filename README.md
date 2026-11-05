@@ -22,6 +22,7 @@ Aktueller Stand (v0.3):
   - Nach jeder Runde ein Minispiel (standardmäßig nur kurze und mittlere bis ca. 4 min, siehe `MINI_LENGTH` in `shared/games.ts`; der VIP-Schalter **„Lange Spiele“** neben der Rundenwahl nimmt auch Golf, Bowling & Co. dazu), Münzen nach Platzierung mit derselben Staffel wie in Arcade (bei 12 Spielern 10/9/8/7/6/5/5/4/3/2/1/1, der Startspieler wechselt jede Runde); Koop-Spiele zahlen allen dasselbe nach Ergebnis (Urlaubsflieger: Bali erreicht 8, je fehlender Etappe weniger, Absturz am Start 1, MVP +2; Grill-Chaos gemeinsam: 1/2/3 Sterne = 3/6/10 Münzen) – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern)
   - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
 - **Minispiele** (auch einzeln spielbar):
+  - 📋 **Regelkarte** vor jedem Minispiel (Spielbrett, Arcade, Einzelspiel – nicht bei Date-Night-Kapiteln, Trinkspielen und „Nochmal“): Der TV zeigt Icon, Titel, „à la …“, einen Satz Ziel, bis zu drei Steuer-Kacheln, wie das Handy gehalten wird, und alle Mitspieler mit Häkchen. Am Handy stehen dieselben Punkte plus ein **Übungsfeld** mit den echten Bedienelementen des Spiels (schwebender Stick, Knöpfe mit Vibration) und einer Mini-Figur, die darauf reagiert – schon in der richtigen Haltung (Quer-Spiele quer, mit Dreh-Hinweis). Los geht’s, sobald alle **BEREIT!** gedrückt haben, spätestens nach 15 s; lief das Spiel heute schon, nur 5 s ohne Bereit-Pflicht. VIP („▶ Jetzt starten“) und Laptop (Weiter/Enter) kürzen ab, Bots sind sofort bereit. Texte: `MINI_HOWTO` in `shared/games.ts` – das Übungsfeld liest die Knöpfe direkt daraus („BOMBE: legen“ = Knopf BOMBE, 🕹️ = Stick)
   - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
   - 🗳️ **Wer würde eher …?** – geheim abstimmen, Punkte für die Mehrheit. **Eigene Fragen** können in der Lobby am Handy hinzugefügt werden (gespeichert in `data/questions.json`)
   - 🏖️ **Liegestuhl-Sprint** – Reaktionstest bei Sonnenaufgang, wer zu früh tippt, hat einen Fehlstart
@@ -230,6 +231,15 @@ Alle laufen auch im Party-Modus auf dem Spielbrett (lange wie Bowling nur mit �
 
 Jedes Spiel legt fest, wie das Handy gehalten wird (`orientation` in `shared/games.ts`): **quer** für alles mit Stick + Knöpfen (zwei Daumen wie am Gamepad – Kart, Wasserbomben, Igel-Krieg, Grill-Chaos, Smash …), **hochkant** für Sensor-Würfe, Listen, Text und Malen (Bowling, Darts, Golf, Stille Post …), **egal** für einen einzelnen Riesenknopf. Vor jedem Spiel zeigt das Handy eine kurze Ansage-Karte, der TV blendet „📱↔ Handys QUER halten“ bzw. hochkant ein, das Brett-Intro nennt es auch, und in den Spiellisten steht ↔ hinter Quer-Spielen. Hält jemand das Handy falsch, legt sich ein Hinweis mit Dreh-Animation über das Spiel (Eingaben werden dabei losgelassen); dreht es sich nicht, ist meist die Ausrichtungssperre im Kontrollzentrum an (iPhone). Auf Android geht das Handy beim ersten Tipp in einem Spiel ins Vollbild und wird in die richtige Lage gesperrt – das bleibt für die ganze Session. Laptops und Tablets bekommen nie einen Hinweis. Alle Quer-Spiele nutzen dasselbe Layout (Kopfzeile, links ein schwebender Stick – Daumen irgendwo aufsetzen –, rechts die Knöpfe), ausgelegt auf 300 px Höhe. Zum Testen am Laptop: `/?orient` erzwingt Hinweis und Ansage auch mit Maus.
 
+### Zuschauer
+
+Wer ausgeschieden ist oder erst nach dem Spielstart dazukommt, starrt nicht mehr auf „Du schaust zu“: Jeder Zuschauer-/Warte-Screen am Handy hat unten eine **Zuschauer-Leiste** (`client/controller/spectator.ts`) mit dem **Live-Stand** (wer lebt noch – Avatare, grau = raus; bei Teamspielen der Spielstand, sonst die Punkte-Spitze) und vier **Emotes** 😂 😱 👏 🍅. Ein Emote steigt auf dem TV mit dem Mini-Porträt des Spielers vom unteren Rand auf und verblasst (eigenes DOM-Overlay über allen Szenen, 2 s Abklingzeit pro Spieler).
+
+- **Wetten** (Bomben-Arena, Sumo-Steg, Bogen-Arena, Kurven-Duell, Smash-Arena): Wer raus ist, tippt in der Leiste einmal pro Runde auf einen der Lebenden. Richtig getippt = **+1 Punkt** im Spiel (fließt in die Platzierung ein, hebt aber nie über Platz 1; im Ergebnis steht „🎲 +1“). Der TV zeigt unten rechts „🎲 3 Wetten auf Lena“, bei einem Treffer gibt’s Konfetti.
+- **Geister-Aktionen:** In der **Bomben-Arena** werfen Ausgeschiedene alle 8 s eine Wasserbombe auf eine Randkachel (bzw. die Kante der Flut) – Stick verschiebt das Zielkreuz auf der Mini-Karte, Knopf wirft. Im **Sumo-Steg** schicken sie alle 5 s per Knopf eine **Welle** vom Rand quer über den Steg, die jedem, den sie erwischt, einen kleinen Stoß gibt (wer davon ins Wasser fällt, zählt als „geschubst“ für den Geist).
+
+Bots machen beim Testen mit (gelegentliche Emotes, Wetten, Geister-Aktionen): `npm run bots -- 8 --game=sumo`.
+
 ## Trinkspiel
 
 Partyklassiker reihum, ohne Punkte – gezählt werden nur Schlücke (Wasser zählt auch!):
@@ -245,6 +255,10 @@ Alle Texte stehen in `shared/dates.ts` und können frei angepasst werden; neue V
 ## Grafik
 
 Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – keine Bilddateien. Eine Übersicht aller Sprites gibt es im Dev-Modus unter <http://localhost:3000/art.html>.
+
+**Spielerfarbe:** Jeder bekommt beim Beitritt eine von 12 Farben für den ganzen Abend (`PLAYER_COLORS` in `shared/players.ts`, Rot, Blau, Grün, Gelb, Lila, Orange, Türkis, Weiß, Grau, Pink, Weinrot, Braun). Der Raum vergibt die erste freie und merkt sie sich, solange der Spieler im Raum ist (`PlayerPublic.color`, Bots auch). Die Töne sind auf Abstand geprüft (kein Blau neben Hellblau, kein Gelb neben Limette). Die Spiele nutzen die Farbe statt der Shirt-Farbe für Ring, Namensschild, Spur, Fadenkreuz, Kugel/Ball und den Rahmen ums HUD-Porträt. Auf dem TV liefert `pcol(id)` (`client/host/playerColor.ts`) die Farbe, auf dem Server `ctx.colorOf(id)`. Am Handy hat der Rahmen die eigene Farbe, und die Lobby zeigt „Du bist ORANGE“. Das Shirt bleibt frei wählbar.
+
+**Avatar-Animation:** `shared/avatar.ts` baut aus denselben Look-Daten neben dem Standbild ein Spritesheet (`AV_SHEET_ROWS`, eine Zeile pro Animation): Stehen mit Blinzeln, Laufen (4 Frames mit Bein- und Armwechsel), Sprung, Treffer-Gesicht und Jubel (Arme hoch). `figure()` in `client/host/textures.ts` liefert einen Container mit `play('idle' | 'walk' | 'jump' | 'hit' | 'cheer')`. Für Szenen ohne Container gibt es `avatarSprite()` und `playAvatar()`. Absprung und Landung haben Squash & Stretch (scaleY 1,15 bzw. 0,85). Szenen rufen `play('walk')` auf, wenn sich die Figur bewegt (Snapshot-Flag oder Positionsänderung). Laufen schaltet erst nach kurzer Ruhe auf Stehen um, damit geglättete Positionen nicht flackern. Der Sieger auf dem Podium jubelt. Alle Frames zeigt `art.html`.
 
 ## Ideen / Roadmap
 

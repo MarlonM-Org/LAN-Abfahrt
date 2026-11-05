@@ -4,7 +4,7 @@ import { WORLD } from '../../shared/flunky';
 import { STASHES, type SuessState } from '../../shared/suess';
 import { candySprite, dizzyStar, guardCap, lootSack, paintSuessHouse } from '../art/suess';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { GOLD, ensureTex, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -83,7 +83,7 @@ export class SuessScene extends Phaser.Scene {
       a.y += (pos.y - a.y) * 0.35;
       a.img.setFlipX(pos.dir < 0);
       const fast = gd?.sprinting;
-      a.img.setY(pos.moving ? -Math.abs(Math.sin(now / (fast ? 50 : th ? 80 + th.carry * 8 : 80))) * 2 : 0);
+      playAvatar(a.img, pos.moving ? 'walk' : 'idle', fast ? 1.6 : th ? 80 / (80 + th.carry * 8) : 1);
       a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
       if (th) {
         const out = th.state === 'out';

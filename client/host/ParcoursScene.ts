@@ -5,7 +5,7 @@ import { PARCOURS as P, type ParcoursPart, fanZone, partRect, partSize } from '.
 import * as O from '../art/objects';
 import { coconutPix, paintParcours, partPix } from '../art/parcours';
 import { bus, getState, playerById } from './store';
-import { ensureAvatar } from './textures';
+import { ensureAvatar, avatarSprite, playAvatar } from './textures';
 import { GOLD, INK, NameTags, background, ensureTex, ink, panel, prop, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -24,7 +24,7 @@ interface PartView {
 
 interface RunnerView {
   root: Phaser.GameObjects.Container;
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
   x: number;
   y: number;
   st: string;
@@ -129,7 +129,7 @@ export class ParcoursScene extends Phaser.Scene {
       if (r.st !== 'dead' && v.root.visible) tagSpecs.push({ id, x: Math.round(v.x), y: Math.round(v.y) - 37, name: short(id), color: hex(P.COLORS[st.colors[id] ?? 0]) });
       v.img.setFlipX(r.face < 0);
       const moving = r.st === 'run' && r.ground && Math.abs(r.x - v.x) > 0.3;
-      v.img.setY(moving ? -Math.abs(Math.sin(this.time.now / 70)) * 1.5 : 0);
+      playAvatar(v.img, r.st === 'dead' ? 'hit' : r.st === 'goal' ? 'cheer' : !r.ground ? 'jump' : moving ? 'walk' : 'idle');
     }
     this.tags.update(st.sub === 'countdown' || st.sub === 'run' || st.sub === 'score' ? tagSpecs : []);
   }
@@ -263,7 +263,7 @@ export class ParcoursScene extends Phaser.Scene {
       if (!pl) continue;
       if (!v) {
         const color = P.COLORS[st.colors[id] ?? 0];
-        const img = this.add.image(0, 0, ensureAvatar(this, pl.look)).setOrigin(0.5, 1).setScale(0.75);
+        const img = avatarSprite(this, pl.look).setScale(0.75);
         const mark = this.add.triangle(0, -25, 0, 0, 6, 0, 3, 4, color).setStrokeStyle(1, 0x2d1b12);
         // Namen kommen aus NameTags (verteilt sich selbst, bei Gedränge Initiale + Farbpunkt)
         const root = this.add.container(r.x, r.y, [img, mark]).setDepth(500);
