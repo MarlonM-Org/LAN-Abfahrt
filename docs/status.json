@@ -1,11 +1,54 @@
 {
-  "updated": "2026-11-05 20:25",
+  "updated": "2026-11-05 21:40",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Review Phase 1: Regelkarte + Übungsfeld + Bereit!",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/regelkarte",
+      "detail": "Intro-Phase vor jedem Minispiel: Ziel, 3 Piktogramme, Übungsfeld am Handy, BEREIT-Knopf, bei bekannten Spielen 5 s"
+    },
+    {
+      "title": "Review Phase 1: Zuschauer-Ebene",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/zuschauer",
+      "detail": "Emotes schweben am TV, Wetten auf den Rundensieger in Arena/Sumo/Bogen/Kurve/Smash, Rache-Möwen (Arena) und Wellen (Sumo) für Ausgeschiedene"
+    },
+    {
+      "title": "Review Phase 2: Spielerfarbe pro Abend + Avatar-Frames",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/spielerfarbe-avatar",
+      "detail": "12 eindeutige Farben überall gleich (Ring, Schild, Spur, Handy-Rahmen), Laufzyklus/Sprung/Treffer/Jubel/Blinzeln statt Sinus-Hüpfer"
+    },
+    {
+      "title": "Review Phase 3: Party-Modus 2.0 (Stufe S)",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/party2",
+      "detail": "Alle würfeln gleichzeitig, Bonus-Cocktails mit Reveal, Endspurt doppelt, Finale = 2 Cocktails, Party speichern/fortsetzen, Nachzügler, Tageszeit"
+    },
+    {
+      "title": "Review Phase 4: Igel-Krieg Stufe M",
+      "kind": "igel",
+      "type": "Review-Umsetzung",
+      "branch": "review/igel-m",
+      "detail": "„Alle gleichzeitig“ ab 7, 10 Waffen, Kisten, Gasfässer, Spieler-Teams, Zielhilfe, Spruch-Knöpfe, Ton"
+    },
+    {
+      "title": "Review Reste: Juice in allen Szenen, Namensschilder, Parcours-Stick, zwei Rollenträger",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/juice-rest",
+      "detail": "Ton/Partikel in den übrigen Szenen, Namensschilder entzerren, Laptop-Knöpfe nicht übers HUD, leere Arenen beleben, Fangen/Geist mit zwei Rollenträgern"
+    }
+  ],
   "queue": [],
   "done": [
     {
