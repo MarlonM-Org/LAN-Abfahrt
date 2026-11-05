@@ -1154,6 +1154,16 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
   .gr-orders { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 
+/* ---------------------------------------------------------------- Umzugschaos */
+.lx.um-lx { --lx-l: 38%; --lx-r: 30%; }
+.um-stars { display: flex; gap: 10px; justify-content: center; min-height: 14px; font-size: 11px; color: #8a8276; }
+.um-stars span { display: flex; align-items: baseline; gap: 3px; }
+.um-stars span.on { color: #d99a2b; text-shadow: 1px 1px 0 var(--outline); }
+.um-stars small { font-size: 6px; color: var(--ink-soft); }
+.big-btn.um-grab.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+.big-btn.um-throw.um-fragile { background: #e0503f; box-shadow: inset 0 4px 0 #ff8a7a, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.big-btn.um-throw:disabled { opacity: 0.55; }
+
 /* ---------------------------------------------------------------- Wer ist der Tourist? */
 .tour-turn { display: flex; flex-direction: column; gap: 8px; }
 .tour-turn .btn-grid button { font-size: 9px; padding: 12px 4px; }

@@ -11,6 +11,7 @@ import type { AngelnState } from './angeln';
 import type { KofferState } from './koffer';
 import type { WackelState } from './wackel';
 import type { SuessState } from './suess';
+import type { UmzugState } from './umzug';
 
 export interface Look {
   skin: number;
@@ -79,6 +80,7 @@ export type MiniKind =
   | 'angeln'
   | 'koffer'
   | 'suess'
+  | 'umzug'
   | 'wackel';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
@@ -1953,6 +1955,7 @@ export type MiniSnapshot =
   | { kind: 'koffer'; state: KofferState }
   | { kind: 'suess'; state: SuessState }
   | { kind: 'spion'; state: SpionState }
+  | { kind: 'umzug'; state: UmzugState }
   | { kind: 'wackel'; state: WackelState };
 
 /**

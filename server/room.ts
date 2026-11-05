@@ -74,6 +74,7 @@ import { AngelnGame } from './angeln';
 import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
+import { UmzugGame } from './umzug';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
 const MAX_PLAYERS = 12;
@@ -755,6 +756,9 @@ export class Room {
         break;
       case 'suess':
         this.mini = new SuessGame(ids, ctx);
+        break;
+      case 'umzug':
+        this.mini = new UmzugGame(ids, ctx);
         break;
     }
     this.results = null;
