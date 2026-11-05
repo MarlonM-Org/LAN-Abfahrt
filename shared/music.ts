@@ -193,6 +193,8 @@ export function defaultSongForScene(scene: string): string {
       return 'sport';
     case 'wasser': case 'angeln': case 'sup':
       return 'wasser';
+    case 'werwars':
+      return 'bar';
     default: // descent, wrap, parcours, …
       return 'action';
   }

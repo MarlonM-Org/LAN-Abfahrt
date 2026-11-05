@@ -7,7 +7,7 @@
  *   npm run bots -- 3 --party → Bot wird VIP und startet direkt eine Party (3 Runden)
  *   npm run bots -- 8 --party --rounds=5 → Party mit 5 Runden
  *   npm run bots -- 8 --party --resume   → gespeicherte Party (data/party.json) fortsetzen, z. B. nach Server-Neustart
- *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kingscup, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist, grill, boule, sumo, volley, tourist, sprueche, werwolf, pixel, bogen, darts, golf, autoball, wpistole, zauber, angeln, koffer, suess, spion, umzug, wackel, wackel …)
+ *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kingscup, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist, grill, boule, sumo, volley, tourist, sprueche, werwolf, pixel, bogen, darts, golf, autoball, wpistole, zauber, angeln, koffer, suess, spion, umzug, wackel, werwars …)
  *   npm run bots -- 4 --game=kart --nochmal=2 → danach zweimal „Nochmal“ (Leaderboard des Abends zählt weiter)
  *   npm run bots -- 2 --date        → zwei Bots spielen die komplette Date Night
  *   npm run bots -- 4 --drink       → Bots spielen ein paar Runden Trinkspiel

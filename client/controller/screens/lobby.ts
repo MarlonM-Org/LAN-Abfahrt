@@ -273,15 +273,16 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   }
 
   // Eigene Fragen (Wer würde eher / Ich hab noch nie) bzw. Startsätze für Stille Post / Fragen fürs Sprüche-Duell
-  type QKind = 'wwe' | 'nhie' | 'post' | 'quip';
+  type QKind = 'wwe' | 'nhie' | 'post' | 'quip' | 'werwars';
   const qKinds: [QKind, string][] =
-    mode === 'drink' ? [['nhie', 'Ich hab noch nie'], ['wwe', 'Wer würde eher']] : [['post', 'Stille Post'], ['quip', 'Sprüche-Duell']];
-  const qNames: Record<QKind, string> = { nhie: 'Ich hab noch nie', wwe: 'Wer würde eher', post: 'Stille Post:', quip: 'Sprüche-Duell:' };
+    mode === 'drink' ? [['nhie', 'Ich hab noch nie'], ['wwe', 'Wer würde eher']] : [['post', 'Stille Post'], ['quip', 'Sprüche-Duell'], ['werwars', 'Wer war’s?']];
+  const qNames: Record<QKind, string> = { nhie: 'Ich hab noch nie', wwe: 'Wer würde eher', post: 'Stille Post:', quip: 'Sprüche-Duell:', werwars: 'Wer war’s?:' };
   let qKind: QKind = qKinds[0][0];
   const qInput = q<HTMLInputElement>(root, '.q-input');
   const kindTabs = q(root, '.q-kind');
   const kindBtns: HTMLButtonElement[] = [];
   if (qKinds.length === 1) kindTabs.classList.add('hidden');
+  if (qKinds.length === 3) kindTabs.classList.add('three');
   const setKind = (k: QKind) => {
     qKind = k;
     kindBtns.forEach((b) => b.classList.toggle('active', b.dataset.k === k));
@@ -293,7 +294,9 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
           ? 'z. B. Ein Hai beim Kindergeburtstag'
           : k === 'quip'
             ? 'z. B. Das beste Mitbringsel: ___'
-            : 'Ich hab noch nie ... im Zelt geschlafen.';
+            : k === 'werwars'
+              ? 'z. B. Mein erstes Haustier'
+              : 'Ich hab noch nie ... im Zelt geschlafen.';
   };
   for (const [k, label] of qKinds) {
     const b = el(`<button class="mode-tab small" data-k="${k}">${label}</button>`).firstElementChild as HTMLButtonElement;
@@ -333,7 +336,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     q(root, '.q-count').textContent =
       mode === 'drink'
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`
-        : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen`;
+        : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen · ${st?.customWerwarsCount ?? 0} eigene Wer-war’s-Fragen`;
     arcadeUpdate?.(n);
     ses.update();
     if (tvBtn) tvBtn.textContent = st?.showBoard ? 'TV: Lobby zeigen' : 'Auf dem TV zeigen';
