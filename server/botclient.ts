@@ -21,6 +21,7 @@ import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint a
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
+import { umzugBot } from './umzugbot';
 import { golfBot } from './golfbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
@@ -1082,6 +1083,14 @@ export class Bot {
       this.once('grill', async () => {
         grillBot(this, st);
         await sleep(rand(90, 140));
+      });
+    }
+
+    if (m.kind === 'umzug') {
+      const st = m.state;
+      this.once('umzug', async () => {
+        umzugBot(this, st);
+        await sleep(rand(80, 120));
       });
     }
 
