@@ -2,7 +2,7 @@
  * Spieler entfernen (Kick) + Aufräumen von Offline-Spielern.
  *
  * Die eigentliche Verdrahtung steckt in `Room` (Abschnitt „Spieler entfernen & Offline“);
- * hier liegen nur die kleinen, unabhängigen Helfer. Loopback-Prüfung: `isLoopback` in server/net.ts.
+ * hier liegen nur die kleinen, unabhängigen Helfer. Laptop-Prüfung (localhost, nicht über den Tunnel): `isLaptop` in server/net.ts.
  */
 
 /** Nach so vielen Minuten offline in der Lobby fliegt ein Spieler automatisch raus (`OFFLINE_KICK_MIN=…`). */

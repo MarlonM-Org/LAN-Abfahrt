@@ -48,6 +48,7 @@ Aktueller Stand (v0.3):
   - 🐺 **Werwölfe im Ferienhaus** (6–12 Spieler, klassisches Werwolf ohne Spielleiter) – der TV erzählt, die Handys verteilen geheime Rollen (verdeckte Karte): Werwölfe (≈ 1 pro 4 Spieler, kennen sich), Seherin, Hexe (ein Heil- und ein Gifttrank) und ab 8 Spielern der Jäger, der sterbend jemanden mitnimmt. **Nacht:** Alle Handys sehen gleich aus und alle tippen – Wölfe einigen sich auf ein Opfer, die Seherin durchschaut jemanden, alle anderen tippen einen Verdacht und zählen Schäfchen; danach braut die Hexe. **Morgen:** Tote werden mit Rolle aufgedeckt. **Tag:** 2–3 Minuten diskutieren (VIP oder Laptop kann abkürzen), dann am Handy abstimmen (Gleichstand = niemand). Tote schauen zu und sehen alle Rollen. Gewinner-Team +3 Punkte, Überleben +1; Entfernte verlassen das Ferienhaus, Offline-Stimmen werden übersprungen
   - 🔪 **Mord im Ferienhaus** (ab 4 Spielern, ab 7 mit zwei Mördern) – geheime Rollen auf dem Handy, Aufgaben in den Räumen, Morde wenn man allein mit jemandem ist, Leichen melden, diskutieren, abstimmen
   - 🏊 **Verräter im Ferienhaus** (ab 4 Spielern, à la „Trouble in Terrorist Town“) – alle laufen per Joystick durchs Ferienhaus. Geheime Verräter (≈ 1 pro 4 Spieler) knocken mit Poolnudel, Wasserpistole und Kokosnuss aus; ab 6 Spielern gibt es einen bekannten Detektiv mit Hut, der an Ausgeknockten die Shirt-Farbe des Täters findet. Verräter haben am Handy einen Shop im Geheimfach (Bananenschale, Tarnumhang, Fake-Funkspruch). 3 Runden à 100 s mit neuen Rollen (ab 6 Spielern 2 Runden), Punkte für Sieg, richtige und falsche Knockouts
+  - 🕵️‍♀️ **Wer war’s?** (3–12 Spieler, à la „Who's Who“ / Mr. & Mrs.) – erst beantwortet jeder am Handy 60 Sekunden lang zwei persönliche Fragen, die nur er sieht („Mein peinlichster Urlaubsmoment“, „Was ich heimlich im Koffer habe“, „Mein erstes Konzert“ … – 48 Fragen im Pool, ab 7 Spielern nur eine Frage pro Kopf). Kein Einfall? Knopf „🎲 Zufallsantwort“. Dann schreibt der TV die Antworten gemischt und anonym Buchstabe für Buchstabe auf eine Pergament-Tafel (der Sprecher liest mit), alle tippen in 20 s am Handy auf den Avatar des vermuteten Autors – der Autor tippt zum Schein mit, damit ihn keiner daran erkennt, dass er nicht abstimmt. Auflösung mit Spotlight und Konfetti: richtig geraten +2, der Autor +3, wenn ihn niemand erkannt hat, +1, wenn höchstens ein Drittel richtig lag. **Eigene Fragen** lassen sich in der Lobby hinzufügen (Reiter „Wer war’s?“, `data/werwars.json`). Testen: `npm run bots -- 6 --game=werwars`
 
 ## Starten
 
@@ -99,6 +100,26 @@ Ohne deSEC geht es auch manuell: `PUBLIC_DOMAIN` setzen und ein eigenes Zertifik
 
 Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start`.
 
+## Online spielen (Freunde woanders)
+
+Über einen Cloudflare-Tunnel spielen Freunde von zu Hause mit. Am Router muss **kein Port freigegeben** werden: `cloudflared` baut die Verbindung vom Laptop nach außen auf, die Freunde bekommen eine HTTPS-Adresse. (Eine Portfreigabe wäre ohne HTTPS, zeigt die eigene IP und geht bei vielen Kabel-/Glasfaser-Anschlüssen mit DS-Lite gar nicht.)
+
+1. Einmalig [cloudflared installieren](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) – Windows: `winget install --id Cloudflare.cloudflared`, macOS: `brew install cloudflared`. Ein Cloudflare-Konto braucht es dafür nicht.
+2. `npm run online` – baut das Spiel, startet den Server und den Tunnel. Nach ein paar Sekunden steht in der Konsole `🌍 Online: https://….trycloudflare.com/` (bei jedem Start eine neue Adresse).
+3. Link verschicken – in der Handy-Lobby gibt es dafür den Knopf **„Link teilen“**:
+   - **Handys** der Freunde öffnen die Adresse.
+   - **Fernseher/Laptop** der Freunde öffnet dieselbe Adresse mit `tv.html` dahinter. Bild, Musik und Ansagen laufen dort, nur der Spielstand kommt übers Netz (das ist viel flüssiger als Bildschirm teilen). Der QR-Code auf dieser TV-Ansicht zeigt automatisch die Online-Adresse.
+   - Für Redespiele (Werwölfe, Tourist, Mord) zusätzlich ein Sprachanruf (Discord o. ä.).
+4. Wer bei dir im Raum sitzt, scannt weiter den QR-Code am eigenen TV – das läuft übers Heimnetz und spart Upload.
+
+**Sicherheit:** Was über den Tunnel kommt, hat keine Laptop-Steuerung (Overlay, Spiele starten, Spieler entfernen), und die Musik-Bibliothek lässt sich nur anhören. Der Link führt trotzdem auf deinen Laptop – nur an Freunde schicken, nicht öffentlich posten.
+
+**Leitung:** Pro Gerät, das online mitspielt, schickt der Laptop etwa 40–95 KB/s (Action-Spiele mit 8 Spielern), also 0,3–0,8 Mbit/s Upload. Die Verzögerung ist der Ping der Freunde zu dir plus bis zu 50 ms: Runden-, Quiz- und Redespiele merken davon nichts, Action-Spiele reagieren etwas träger.
+
+**Bonus:** Der Tunnel ist HTTPS – Bewegungssensor (iPhone) und „Display bleibt an“ funktionieren online auch ohne die deSEC-Einrichtung oben.
+
+**Feste Adresse:** Mit einem benannten Tunnel auf einer eigenen Domain (Domain bei Cloudflare) `ONLINE_URL=https://party.example.de` in die `.env` schreiben, `npm run build && npm start` – cloudflared startest du dann selbst. Liegt cloudflared nicht im `PATH`: `CLOUDFLARED=<Pfad>`. Im Dev-Modus geht es auch: `npm run dev -- --online` (neue Adresse bei jedem Server-Neustart).
+
 ## Sound
 
 Der TV/Laptop spielt durchgehend 8-Bit-Musik (komplett per WebAudio erzeugt, je nach Szene ein anderer Loop). Browser erlauben Ton erst nach einer Aktion: **einmal in die TV-Ansicht klicken oder eine Taste drücken**. **M** (oder der Knopf „♪ Musik“ in der Lobby) öffnet das **Musik-Menü**: Gesamt-, Musik- und Effektlautstärke, Stumm (wird im Browser gemerkt), Bibliothek zum Vorhören und die Zuordnung „welche Musik läuft wo“ – alles live, ohne Neustart.
@@ -137,7 +158,7 @@ Beim Rhythmusspiel kommt der Song ebenfalls vom TV/Laptop – TV und Handys glei
 | Spiel wählen | `A` | Arcade-Auswahl mit allen Spielen (Icons, Spielerzahl, Stimmen): Klick oder Pfeiltasten + `Enter` startet, `Esc`/`A` schließt; „Zufall“ und „Meiste Stimmen“. Ausgegraut = passt nicht zur Spielerzahl (nur in der Lobby) |
 | Spieler (oben links) | `P` | Spielerliste mit online/offline, einzelne Spieler oder „Alle entfernen“ (auch während eines Spiels) |
 
-Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst kommen** (`127.0.0.1` / `::1`). Öffnet jemand `tv.html` am Handy oder über die LAN-IP bzw. die HTTPS-Domain, gibt es kein Overlay und keine Befehle – deshalb die TV-Ansicht am Laptop immer über `localhost` öffnen.
+Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst kommen** (`127.0.0.1` / `::1`) und nicht über den Online-Tunnel laufen (der kommt zwar auch von localhost, setzt aber Proxy-Header wie `Cf-Connecting-Ip`). Öffnet jemand `tv.html` am Handy, über die LAN-IP, die HTTPS-Domain oder den Online-Link, gibt es kein Overlay und keine Befehle – deshalb die TV-Ansicht am Laptop immer über `localhost` öffnen.
 
 **Handy kurz weg (App gewechselt, Bildschirm aus):** Das Handy verbindet sich beim Zurückkommen automatisch wieder als derselbe Spieler (die Spieler-ID liegt im `localStorage`), ohne den Namen neu einzugeben.
 

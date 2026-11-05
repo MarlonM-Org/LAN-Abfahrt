@@ -83,7 +83,8 @@ export type MiniKind =
   | 'koffer'
   | 'suess'
   | 'umzug'
-  | 'wackel';
+  | 'wackel'
+  | 'werwars';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -2106,7 +2107,8 @@ export type MiniSnapshot =
   | { kind: 'suess'; state: SuessState }
   | { kind: 'spion'; state: SpionState }
   | { kind: 'umzug'; state: UmzugState }
-  | { kind: 'wackel'; state: WackelState };
+  | { kind: 'wackel'; state: WackelState }
+  | { kind: 'werwars'; state: WerwarsState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -2115,6 +2117,8 @@ export type MiniSnapshot =
 export interface GameMeta {
   players: PlayerPublic[];
   joinUrl: string;
+  /** Online-Adresse über den Cloudflare-Tunnel (`npm run online` bzw. ONLINE_URL), sonst null */
+  onlineUrl: string | null;
   customNhieCount: number;
   botCount: number;
   /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
@@ -2124,8 +2128,16 @@ export interface GameMeta {
   customPostCount: number;
   /** Eigene Fragen fürs Sprüche-Duell */
   customQuipCount: number;
+  /** Eigene Fragen für „Wer war's?“ */
+  customWerwarsCount: number;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
+}
+
+/** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */
+export interface HostInfo {
+  local: boolean;
+  online: boolean;
 }
 
 /** Laufender Zustand (Phase, Minispiel, Brett, Ergebnis) – Event `state`, bis zu 25-mal pro Sekunde. */
@@ -2257,6 +2269,7 @@ export type PrivateState =
   | { kind: 'werwolf'; state: WolfPrivate }
   | { kind: 'pixel'; state: PixelPrivate }
   | { kind: 'spion'; state: SpionPrivate }
+  | { kind: 'werwars'; state: WerwarsPrivate }
   | null;
 
 export interface JoinRequest {
@@ -2299,4 +2312,56 @@ export interface StartRequest {
   /** Party-Modus: gespeicherten Brettstand (data/party.json) fortsetzen */
   resume?: boolean;
   version?: string;
+}
+
+// ------------------------------------------------------------------ Wer war's?
+
+/** Auflösung einer Runde: wer war's, wer hat wen getippt, wer bekommt was */
+export interface WerwarsReveal {
+  author: string;
+  /** Tipper → getippter Spieler (nur echte Tipps, nicht die Schein-Tipps des Autors) */
+  guesses: Record<string, string>;
+  /** Wer richtig lag */
+  correct: string[];
+  /** Punkte dieser Runde pro Spieler */
+  gains: Record<string, number>;
+  /** 'hidden' = niemand hat den Autor erraten, 'sneaky' = höchstens ein Drittel lag richtig */
+  bonus: 'hidden' | 'sneaky' | null;
+}
+
+export interface WerwarsState {
+  sub: 'intro' | 'answer' | 'guess' | 'reveal' | 'scores' | 'over';
+  endsIn: number;
+  players: string[];
+  /** Fragen pro Spieler (2, ab 7 Spielern 1) */
+  need: number;
+  /** Schreibphase: beantwortete Fragen pro Spieler */
+  answered: Record<string, number>;
+  /** Raten: aktuelle Antwort (1 … rounds) */
+  round: number;
+  rounds: number;
+  question: string;
+  answer: string;
+  /**
+   * Wie viele schon getippt haben / tippen können – nur Zahlen, keine Namen: Der Autor tippt zum Schein mit,
+   * sonst verriete ihn die Liste derer, die (nicht) abstimmen.
+   */
+  votedCount: number;
+  voterCount: number;
+  reveal: WerwarsReveal | null;
+  points: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export interface WerwarsPrivate {
+  sub: WerwarsState['sub'];
+  round: number;
+  /** Schreibphase: offene Fragen (id = Fragenindex) */
+  todo: { id: number; question: string }[];
+  answered: number;
+  /** „Zufallsantwort“-Vorschlag (seq zählt hoch) */
+  suggest: { text: string; seq: number } | null;
+  /** Raten: Das ist meine eigene Antwort (dann ist der eigene Tipp nur Schein) */
+  mine: boolean;
+  myGuess: string | null;
 }

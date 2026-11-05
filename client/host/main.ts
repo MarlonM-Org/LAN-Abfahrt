@@ -1,7 +1,7 @@
 import '@fontsource/press-start-2p/400.css';
 import Phaser from 'phaser';
 import { io } from 'socket.io-client';
-import type { GameLive, GameMeta, GameState } from '../../shared/types';
+import type { GameLive, GameMeta, GameState, HostInfo } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { LobbyScene } from './LobbyScene';
 import { BoardScene } from './BoardScene';
@@ -11,7 +11,7 @@ import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
-import { mergeLive, mergeMeta, setState } from './store';
+import { mergeLive, mergeMeta, setState, setViaTunnel } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
@@ -58,9 +58,10 @@ import { SuessScene } from './SuessScene';
 import { SpionScene } from './SpionScene';
 import { UmzugScene } from './UmzugScene';
 import { WackelScene } from './WackelScene';
+import { WerwarsScene } from './WerwarsScene';
 import { IntroScene } from './IntroScene';
 
-const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel'];
+const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -85,7 +86,7 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene],
+    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, WerwarsScene],
   });
 
   let currentKey = '';
@@ -125,7 +126,8 @@ async function start() {
   socket.on('connect', () => socket.emit('host:hello'));
   // Steuer-Overlay nur, wenn die TV-Seite direkt am Laptop läuft (der Server prüft das)
   let controls = false;
-  socket.on('host:info', (info: { local?: boolean }) => {
+  socket.on('host:info', (info: Partial<HostInfo>) => {
+    setViaTunnel(!!info?.online);
     if (info?.local && !controls) {
       controls = true;
       installHostControls(socket);

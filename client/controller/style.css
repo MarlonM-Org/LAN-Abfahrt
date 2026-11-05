@@ -172,6 +172,8 @@ button:disabled { opacity: 0.45; filter: grayscale(0.4); }
 .yellow { color: #b9770e; }
 .pink { color: var(--pink); }
 .label-left { text-align: left; margin-bottom: 4px; color: var(--ink); }
+.online-invite .invite-text { font-size: 9px; line-height: 1.6; text-align: left; margin: 0; }
+.online-invite .invite-url { font-size: 9px; word-break: break-all; user-select: all; -webkit-user-select: all; color: var(--ink); margin: 0; }
 .row-center { display: flex; justify-content: center; }
 .menu { display: flex; flex-direction: column; gap: 10px; }
 .btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
