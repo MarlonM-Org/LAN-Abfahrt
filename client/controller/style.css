@@ -1326,6 +1326,33 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .intro-icon { font-size: 40px; line-height: 1.2; text-align: center; }
 .center p.insp, p.insp { font-size: 8px; color: var(--ink-soft); opacity: 0.85; }
 
+/* Kings Cup */
+.kc-card { width: 96px; height: 134px; margin: 0 auto; background: var(--paper-light); border: 3px solid var(--outline); box-shadow: 0 4px 0 var(--wood-darker); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #2d2d3a; animation: kc-flip 0.35s ease-out; }
+.kc-card.red { color: #c0392b; }
+.kc-card span { font-size: 34px; line-height: 1.2; }
+.kc-card small { font-size: 26px; font-family: serif; }
+@keyframes kc-flip { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.kc-rule h1 { margin-top: 10px; }
+.kc-deck { flex: 1; min-height: 50vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; touch-action: none; cursor: pointer; }
+.kc-deck b { color: var(--red); font-weight: normal; }
+.kc-back { width: 132px; height: 184px; border: 4px solid var(--outline); background-color: #3f62a8; background-image: radial-gradient(circle, #7fa0e0 0 2px, transparent 3px); background-size: 12px 12px; box-shadow: 6px 6px 0 #2d4a80, 10px 10px 0 var(--outline); animation: kc-wiggle 1.4s ease-in-out infinite; }
+.kc-deck.drawn .kc-back { transform: translateY(-60vh) rotate(-12deg); transition: transform 0.35s ease-in; animation: none; }
+@keyframes kc-wiggle { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) translateY(-4px); } }
+.big-btn.kc-race { min-height: 62vh; font-size: 26px; }
+.big-btn.kc-race.wait { background: #6e6a62; box-shadow: inset 0 -6px 0 #4a4740, 0 3px 0 var(--outline); }
+.big-btn.kc-race.go { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); animation: kc-pulse 0.3s ease-in-out infinite alternate; }
+.big-btn.kc-race.done { background: var(--wood); }
+@keyframes kc-pulse { from { filter: brightness(1); } to { filter: brightness(1.25); } }
+.kc-race-hint { color: var(--red); }
+.kc-input { text-align: center; }
+.kc-ideas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kc-ideas button { font-size: 9px; overflow-wrap: anywhere; }
+.kc-turn { padding: 8px; border: 3px solid var(--wood-dark); background: var(--paper-light); }
+.kc-turn.mine { background: var(--sun); }
+.kc-turn h2 { font-size: 16px; color: var(--red); }
+.kc-calm { color: var(--ink); }
+.kc-count { margin-top: 10px; }
+
 /* ---------------------------------------------------------------- Nochmal + Leaderboard des Abends */
 .nochmal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 button.nochmal-btn { font-size: 13px; padding: 18px 12px; line-height: 1.6; background: #f0973a; box-shadow: inset 0 3px 0 #ffb867, inset 0 -4px 0 #c06a1f, 0 3px 0 var(--outline); }

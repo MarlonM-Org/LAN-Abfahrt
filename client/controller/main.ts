@@ -12,6 +12,7 @@ import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
 import { pickBomb, pickHilo, pickNhie } from './screens/drink';
+import { pickKingsCup } from './screens/kingscup';
 import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
@@ -255,6 +256,8 @@ function pickScreen(): Screen {
           return pickHilo(m.state);
         case 'bomb':
           return pickBomb(m.state);
+        case 'kingscup':
+          return pickKingsCup(m.state, vip);
         case 'sup':
           return pickSup(m.state);
         case 'tidy':

@@ -17,6 +17,7 @@ import type {
 import { sanitizeLook } from '../shared/avatar';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
+import { KingsCupGame } from './kingscup';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
 import { KurveGame } from './kurve';
@@ -577,6 +578,9 @@ export class Room {
         break;
       case 'bomb':
         this.mini = new BombGame(ids, ctx);
+        break;
+      case 'kingscup':
+        this.mini = new KingsCupGame(ids, ctx);
         break;
       case 'sup':
         this.mini = new SupGame(ids, ctx);
