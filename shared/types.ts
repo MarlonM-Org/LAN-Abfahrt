@@ -5,6 +5,7 @@ import type { GrillState } from './grill';
 import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
+import type { AngelnState } from './angeln';
 
 export interface Look {
   skin: number;
@@ -67,7 +68,8 @@ export type MiniKind =
   | 'autoball'
   | 'werwolf'
   | 'pixel'
-  | 'zauber';
+  | 'zauber'
+  | 'angeln';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1838,7 +1840,8 @@ export type MiniSnapshot =
   | { kind: 'autoball'; state: AfbState }
   | { kind: 'werwolf'; state: WolfState }
   | { kind: 'pixel'; state: PixelState }
-  | { kind: 'zauber'; state: ZauberState };
+  | { kind: 'zauber'; state: ZauberState }
+  | { kind: 'angeln'; state: AngelnState };
 
 export interface GameState {
   phase: Phase;

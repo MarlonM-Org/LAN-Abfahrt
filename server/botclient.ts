@@ -43,6 +43,7 @@ import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
 import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
+import type { AngelnState } from '../shared/angeln';
 
 export interface BotOptions {
   url: string;
@@ -1088,6 +1089,8 @@ export class Bot {
     if (m.kind === 'sumo') sumoBot(this, m.state);
 
     if (m.kind === 'bogen') bogenBot(this, m.state);
+
+    if (m.kind === 'angeln') angelBot(this, m.state);
 
     if (m.kind === 'autoball') afbBot(this, m.state);
 
@@ -2144,6 +2147,87 @@ function sumoBot(bot: Bot, st: SumoState) {
   mem.moving = true;
   bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
+
+// ------------------------------------------------------------------ Angeln
+
+interface AngelBotMemory {
+  nextAt: number;
+  /** Für welchen Wurf schon geplant wurde (Auswerfen / Anschlagen) */
+  castFor: number;
+  castAt: number;
+  strikeFor: number;
+  strikeAt: number;
+  nibbles: number;
+  hold: boolean;
+  tilt: number;
+  /** Eigene Ruhe/Hektik beim Drill */
+  calm: number;
+  dreamUntil: number;
+}
+
+const angelBotMem = new WeakMap<Bot, AngelBotMemory>();
+
+/**
+ * Angel-Bot: wirft mit zufälliger Kraft aus, schlägt mit Reaktionszeit an (manchmal zu spät,
+ * selten zu früh) und hält beim Drill die Spannung grob in der Mitte – mit etwas Rauschen.
+ */
+function angelBot(bot: Bot, st: AngelnState) {
+  let mem = angelBotMem.get(bot);
+  if (!mem) {
+    mem = { nextAt: 0, castFor: -1, castAt: 0, strikeFor: -1, strikeAt: 0, nibbles: 0, hold: false, tilt: 0, calm: rand(0.05, 0.16), dreamUntil: 0 };
+    angelBotMem.set(bot, mem);
+  }
+  const me = st.players[bot.id];
+  if (!me || st.sub === 'over' || st.sub === 'intro') return;
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(70, 130);
+
+  if (me.st === 'idle' && st.sub === 'play') {
+    if (mem.castFor !== me.castSeq) {
+      mem.castFor = me.castSeq;
+      mem.castAt = now + rand(500, 2200);
+    } else if (now >= mem.castAt) {
+      mem.castAt = Infinity;
+      bot.send('cast', { power: Math.round(rand(0.15, 1) * 100) / 100, aim: Math.round(rand(-0.7, 0.7) * 100) / 100 });
+    }
+    return;
+  }
+  if (me.st === 'wait') {
+    // Selten auf ein Zupfen reinfallen
+    if (me.nibbles > mem.nibbles && Math.random() < 0.06) bot.send('strike');
+    mem.nibbles = me.nibbles;
+    return;
+  }
+  mem.nibbles = 0;
+  if (me.st === 'bite') {
+    if (mem.strikeFor !== me.castSeq) {
+      mem.strikeFor = me.castSeq;
+      // Reaktionszeit: meist rechtzeitig, ab und zu verpennt
+      mem.strikeAt = now + (Math.random() < 0.12 ? rand(1100, 1600) : rand(250, 850));
+    } else if (now >= mem.strikeAt) {
+      mem.strikeAt = Infinity;
+      bot.send('strike');
+    }
+    return;
+  }
+  if (me.st === 'reel') {
+    // Spannung um die Mitte halten; bei Zug lieber früher loslassen
+    const target = 0.5 - (me.pull ? 0.08 : 0) + rand(-mem.calm, mem.calm);
+    // Ab und zu träumt der Bot und kurbelt einfach weiter (→ Schnur reißt manchmal)
+    if (Math.random() < 0.004) mem.dreamUntil = now + rand(900, 1800);
+    const hold = now < mem.dreamUntil || (mem.hold ? me.tension < target + 0.06 : me.tension < target - 0.06);
+    const tilt = me.pull && Math.random() < 0.7 ? -me.pull * 0.8 : 0;
+    if (hold !== mem.hold || Math.abs(tilt - mem.tilt) > 0.3) {
+      mem.hold = hold;
+      mem.tilt = tilt;
+      bot.send('reel', { hold, tilt });
+    }
+    return;
+  }
+  mem.hold = false;
+  mem.tilt = 0;
 }
 
 // ------------------------------------------------------------------ Strand-Volleyball
