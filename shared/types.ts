@@ -2138,6 +2138,11 @@ export interface GameMeta {
   customWerwarsCount: number;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
+  /**
+   * Tageszeit 0…1 (0 Morgen, 0.35 Mittag, 0.8 Sonnenuntergang, 1 Nacht) für Himmel/Licht in allen Szenen –
+   * im Party-Modus vom Spielbrett, sonst von der echten Uhrzeit (`shared/daytime.ts`)
+   */
+  timeOfDay: number;
 }
 
 /** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */

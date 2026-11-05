@@ -38,6 +38,7 @@ import { Leaderboard } from './leaderboard';
 import { SessionBoard } from './session';
 import { ARCADE_COOP_POINTS, ARCADE_RANDOM, arcadePoints, fitsPlayers, seriesLabel } from '../shared/games';
 import { KART_TRACKS } from '../shared/kart';
+import { clockTimeOfDay } from '../shared/daytime';
 import { WasserGame } from './wasser';
 import { GrillGame } from './grill';
 import { FangenGame } from './fangen';
@@ -1490,6 +1491,8 @@ export class Room {
       customQuipCount: this.quips.all.length,
       customWerwarsCount: this.werwarsQ.all.length,
       session: this.session.state(this.present()),
+      // Party: Tageszeit vom Brett (Runde 1 morgens … Finale nachts), sonst echte Uhrzeit
+      timeOfDay: this.board?.state.timeOfDay ?? clockTimeOfDay(new Date(now)),
     };
   }
 

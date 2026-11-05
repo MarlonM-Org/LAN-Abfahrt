@@ -14,6 +14,7 @@ import { aimPath, applyOp, isThrown, squadOf } from '../../shared/igel';
 import { Pix } from '../art/pix';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { daylight, gulls } from './ambient';
 
 const TERRAIN_KEY = 'igel_terrain';
 const lookKey = (l: Look) => `${l.hair}_${l.hairStyle}_${l.shirt}`;
@@ -122,8 +123,13 @@ export class IgelScene extends Phaser.Scene {
     };
     this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
 
-    background(this, 'igelsky', IGEL.W, IGEL.H, (p) => paintIslandSky(p, 9));
-    this.clouds = this.add.tileSprite(0, 6, IGEL.W, 96, ensureTex(this, 'igel_clouds', () => this.cloudStrip())).setOrigin(0, 0).setDepth(-900).setAlpha(0.85);
+    // Parallax: Himmel (fern), Wolken, ferne Inseln (mittel) – laufen der Kamera (Schwenk/Zoom) langsamer hinterher
+    background(this, 'igelsky', IGEL.W, IGEL.H, (p) => paintIslandSky(p, 9, 'far')).setScrollFactor(0.15);
+    this.clouds = this.add.tileSprite(0, 6, IGEL.W, 96, ensureTex(this, 'igel_clouds', () => this.cloudStrip())).setOrigin(0, 0).setDepth(-900).setAlpha(0.85).setScrollFactor(0.3);
+    background(this, 'igelsea', IGEL.W, IGEL.H, (p) => paintIslandSky(p, 9, 'mid')).setDepth(-880).setScrollFactor(0.45);
+    gulls(this, { n: 2, y: [30, 110], depth: -870, scroll: 0.6 });
+    // Tageszeit nur auf Himmel und Horizont (Insel, Igel und HUD bleiben unberührt)
+    daylight(this, { depth: -860, strength: 0.7, w: IGEL.W, h: IGEL.H });
     for (let i = 0; i < 18; i++) {
       const x = Math.random() * IGEL.W;
       const y = 30 + Math.random() * 170;

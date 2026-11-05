@@ -141,3 +141,15 @@ export function shade(hex: string, f: number): string {
   const b = ch(n & 255);
   return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
 }
+
+/**
+ * Parallax: Hintergrundmaler zeichnen wahlweise nur eine Ebene – `far` (Himmel, Sonne, Horizont),
+ * `mid` (Kulisse: Hütten, Palmen, Meer) oder `near` (Boden/Spielfläche); `all` = alles in ein Bild.
+ */
+export type BgLayer = 'all' | 'far' | 'mid' | 'near';
+
+export const bgLayers = (layer: BgLayer) => ({
+  far: layer === 'all' || layer === 'far',
+  mid: layer === 'all' || layer === 'mid',
+  near: layer === 'all' || layer === 'near',
+});

@@ -10,6 +10,8 @@ import { pcol } from './playerColor';
 import { Countdown, ensureTex, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { Parallax } from './parallax';
+import { clouds, daylight, gulls } from './ambient';
 
 type C = Phaser.GameObjects.Container;
 const AY = BOGEN.AY;
@@ -42,6 +44,9 @@ export class BogenScene extends Phaser.Scene {
   private recvAt = 0;
   private stageShown = -1;
   private bg!: Phaser.GameObjects.Image;
+  private bgFar!: Phaser.GameObjects.TileSprite;
+  private bgMid!: Phaser.GameObjects.TileSprite;
+  private parallax!: Parallax;
   private bgL!: C;
   private itemL!: C;
   private actL!: C;
@@ -87,8 +92,25 @@ export class BogenScene extends Phaser.Scene {
     this.fxL = this.add.container(0, 0).setDepth(20);
     this.hud = this.add.container(0, 0).setDepth(100);
     this.juice = new Juice(this, { layer: this.fxL, hud: this.hud });
+    // Parallax: Himmel (fern) und Kulisse (mittel) wandern leicht mit dem Schwerpunkt der Spieler –
+    // die Kamera selbst steht wegen der Wrap-Kameras. Texturen kommen mit der Arena (onState).
+    this.parallax = new Parallax(this, {
+      mode: 'manual',
+      strength: 0.12,
+      layer: this.bgL,
+      focus: () => {
+        let n = 0, x = 0, y = 0;
+        for (const g of this.figs.values()) if (g.alive) (n++, (x += g.x), (y += g.y));
+        return n ? { x: x / n, y: y / n } : null;
+      },
+    });
+    this.bgFar = this.parallax.tile('__WHITE', 0.2);
+    clouds(this, { n: 3, y: [AY + 14, AY + 70], alpha: 0.6, layer: this.bgL });
+    this.bgMid = this.parallax.tile('__WHITE', 0.5);
     this.bg = this.add.image(0, 0, '__WHITE').setOrigin(0, 0);
     this.bgL.add(this.bg);
+    daylight(this, { layer: this.bgL, strength: 0.6 });
+    gulls(this, { n: 2, y: [AY + 12, AY + 80], layer: this.bgL });
 
     // HUD-Leiste oben
     const bar = this.add.graphics();
@@ -125,7 +147,9 @@ export class BogenScene extends Phaser.Scene {
     this.recvAt = performance.now();
     if (st.stage !== this.stageShown) {
       this.stageShown = st.stage;
-      this.bg.setTexture(ensureTex(this, `bogen_bg_${st.stage}`, () => bogenBackdrop(st.stage)));
+      this.bgFar.setTexture(ensureTex(this, `bogen_bg_${st.stage}_far`, () => bogenBackdrop(st.stage, 'far')));
+      this.bgMid.setTexture(ensureTex(this, `bogen_bg_${st.stage}_mid`, () => bogenBackdrop(st.stage, 'mid')));
+      this.bg.setTexture(ensureTex(this, `bogen_bg_${st.stage}_near`, () => bogenBackdrop(st.stage, 'near')));
     }
     const ids = Object.keys(st.players);
     ids.forEach((id, i) => this.ensureFig(id, i));

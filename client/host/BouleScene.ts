@@ -9,7 +9,7 @@ import { ensureAvatar, ensurePortrait } from './textures';
 import { GOLD, LIGHT, RED_INK, background, ensureTex, fitText, ink, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
-import { cloudShadows, crowd, gulls } from './ambient';
+import { cloudShadows, crowd, daylight, gulls } from './ambient';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const MAX_BALLS = 16;
@@ -68,6 +68,7 @@ export class BouleScene extends Phaser.Scene {
     this.overShown = false;
 
     background(this, 'boule', WORLD.W, WORLD.H, (p) => paintBoulePitch(p, WORLD.W, WORLD.H));
+    daylight(this, { depth: -950 });
     this.juice = new Juice(this, { depth: 1450 });
     // Leerer Sandplatz: Möwen, Wolkenschatten und Zuschauer am Rand
     gulls(this, { n: 3, y: [30, 120], depth: 1700 });

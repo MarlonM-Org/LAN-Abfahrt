@@ -9,6 +9,7 @@
  *   npm run bots -- 8 --party --resume   → gespeicherte Party (data/party.json) fortsetzen, z. B. nach Server-Neustart
  *   npm run bots -- 4 --game=murder → Bot startet direkt ein Einzelspiel (z. B. flunky, sprint, descent, wrap, nhie, hilo, bomb, kingscup, kurve, arena, bowling, enten, ttt, verstecken, parcours, kart, wasser, fangen, geist, grill, boule, sumo, volley, tourist, sprueche, werwolf, pixel, bogen, darts, golf, autoball, wpistole, zauber, angeln, koffer, suess, spion, umzug, wackel, werwars …, maexchen)
  *   npm run bots -- 4 --game=kart --nochmal=2 → danach zweimal „Nochmal“ (Leaderboard des Abends zählt weiter)
+ *   npm run bots -- 6 --game=kart --kartview=phone → alle fahren „am Handy“, der TV zeigt die Draufsicht mit Regie-Kamera
  *   npm run bots -- 2 --date        → zwei Bots spielen die komplette Date Night
  *   npm run bots -- 4 --drink       → Bots spielen ein paar Runden Trinkspiel
  */
@@ -22,6 +23,7 @@ const DATE = args.includes('--date');
 const ROUNDS = Number(args.find((a) => a.startsWith('--rounds='))?.slice(9) ?? 3);
 const RESUME = args.includes('--resume');
 const DRINK = args.includes('--drink');
+const KART_VIEW = args.includes('--kartview=phone') ? 'phone' : undefined;
 const LEAD = args.includes('--party') || RESUME || !!GAME || DATE || DRINK;
 const URL = process.env.URL ?? 'http://localhost:3000';
 const NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -38,6 +40,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       nochmal: NOCHMAL,
       rounds: ROUNDS,
       resume: RESUME,
+      kartView: KART_VIEW,
       log: (m) => console.log(m),
       onDone: () => process.exit(0),
     });

@@ -9,7 +9,7 @@ import { bus, getState, playerById } from './store';
 import { Countdown, GOLD, INK, LIGHT, RED_INK, ensureTex, ink, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
-import { cloudShadows, crowd, foam, gulls } from './ambient';
+import { cloudShadows, crowd, daylight, foam, gulls } from './ambient';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const MAX_P = 12;
@@ -69,6 +69,7 @@ export class GolfScene extends Phaser.Scene {
     this.juice = new Juice(this, { depth: 1750 });
 
     this.bg = this.add.image(0, 0, this.holeTex(0)).setOrigin(0, 0).setDepth(-1000);
+    daylight(this, { depth: -950 });
     // Leere Arena beleben: Möwen, Wolkenschatten, Wellenschaum, ein paar Zuschauer in den Ecken
     gulls(this, { n: 2, y: [8, 60], depth: 1600 });
     cloudShadows(this, { n: 3, y: [40, 230], depth: 350, alpha: 0.06 });

@@ -1,18 +1,93 @@
 /**
  * Ambient-Bewegung für leere Arenen (Boule, SUP, Golf, Flunkyball, Wraps …): Möwen, Wolken bzw.
- * Wolkenschatten, Wellenschaum und Zuschauer am Rand – alles reine Tweens, ohne Server.
+ * Wolkenschatten, Wellenschaum, wehende Palmen und Zuschauer am Rand – alles reine Tweens, ohne Server.
+ * Dazu die Tageszeit (`daylight()`): ein Multiply-Overlay über der Kulisse, das `GameMeta.timeOfDay` folgt.
  *
  * Pro Szene in `create()` aufrufen (die Objekte gehören der Szene und verschwinden beim Neustart).
  *
  *   gulls(this, { n: 2, y: [20, 70], depth: -500 });
  *   crowd(this, [[20, 250], [460, 250]], { depth: 5 });
+ *   daylight(this, { depth: -950 });   // direkt über dem Hintergrund, unter Figuren und HUD
+ *
+ * `layer`: in Szenen mit HUD-Kamera (Smash, Bogen …) wandern die Objekte in den Welt-Container.
  */
 import Phaser from 'phaser';
+import type { GameState } from '../../shared/types';
 import { randomLook } from '../../shared/avatar';
 import { ensureTex } from './ui';
 import { ensureAvatar } from './textures';
+import { bus, getState } from './store';
+import { palm } from '../art/objects';
 
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+
+type Layer = Phaser.GameObjects.Container | undefined;
+const into = <T extends Phaser.GameObjects.GameObject>(layer: Layer, go: T): T => (layer?.add(go), go);
+
+// ---------------------------------------------------------------- Tageszeit
+
+/** Tageszeit → Farbe des Multiply-Overlays (0 Morgen, 0.35 Mittag, 0.8 Sonnenuntergang, 1 Nacht) */
+export const DAY_KEYS: [number, number][] = [
+  [0, 0xffe9d2],
+  [0.35, 0xffffff],
+  [0.6, 0xfff0d2],
+  [0.8, 0xf8a878],
+  [0.9, 0xa07a9a],
+  [1, 0x5868a8],
+];
+
+export function dayColor(t: number): Phaser.Display.Color {
+  let i = 0;
+  while (i < DAY_KEYS.length - 2 && t > DAY_KEYS[i + 1][0]) i++;
+  const [t0, c0] = DAY_KEYS[i];
+  const [t1, c1] = DAY_KEYS[i + 1];
+  const k = Phaser.Math.Clamp((t - t0) / (t1 - t0 || 1), 0, 1);
+  const a = Phaser.Display.Color.ValueToColor(c0);
+  const b = Phaser.Display.Color.ValueToColor(c1);
+  const o = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, k * 100);
+  return new Phaser.Display.Color(o.r, o.g, o.b);
+}
+
+/** Aktuelle Tageszeit des Raums (0…1), 0.35 (Mittag = neutral), solange noch kein Stand da ist */
+export const timeOfDay = () => getState()?.timeOfDay ?? 0.35;
+
+/**
+ * Tageszeit-Overlay (Multiply) über der Kulisse: morgens warm, mittags neutral, abends orange, nachts blau.
+ * Liegt bei `depth` (Standard −950: über dem Hintergrund, unter allem Spielgeschehen) und folgt dem Raumwert
+ * `timeOfDay` mit einer weichen Blende. `strength` dämpft die Färbung (1 = wie auf dem Spielbrett).
+ */
+export function daylight(scene: Phaser.Scene, o: { depth?: number; w?: number; h?: number; strength?: number; layer?: Phaser.GameObjects.Container; scroll?: number } = {}) {
+  const w = o.w ?? 480;
+  const h = o.h ?? 270;
+  const strength = o.strength ?? 0.8;
+  // Etwas größer als die Welt, damit bei Kamerafahrten (Parallax, Zoom) kein Rand frei bleibt
+  const rect = scene.add.rectangle(-w / 2, -h / 2, w * 2, h * 2, 0xffffff, 1).setOrigin(0).setDepth(o.depth ?? -950).setBlendMode(Phaser.BlendModes.MULTIPLY);
+  if (o.scroll !== undefined) rect.setScrollFactor(o.scroll);
+  into(o.layer, rect);
+  let shown = -1;
+  let tween: Phaser.Tweens.Tween | null = null;
+  const apply = (t: number) => {
+    const c = dayColor(t);
+    const white = Phaser.Display.Color.ValueToColor(0xffffff);
+    const m = Phaser.Display.Color.Interpolate.ColorWithColor(white, c, 100, strength * 100);
+    rect.setFillStyle(Phaser.Display.Color.GetColor(m.r, m.g, m.b), 1);
+  };
+  const set = (t: number) => {
+    t = Phaser.Math.Clamp(t, 0, 1);
+    if (t === shown) return;
+    const from = shown < 0 ? t : shown;
+    shown = t;
+    tween?.stop();
+    const v = { t: from };
+    apply(from);
+    tween = scene.tweens.add({ targets: v, t, duration: from === t ? 1 : 2500, ease: 'Sine.inOut', onUpdate: () => apply(v.t) });
+  };
+  const onState = (s: GameState) => set(s.timeOfDay ?? 0.35);
+  bus.on('state', onState);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', onState));
+  set(timeOfDay());
+  return rect;
+}
 
 function canvas(w: number, h: number, paint: (g: CanvasRenderingContext2D) => void) {
   return () => {
@@ -43,11 +118,11 @@ function gullTex(scene: Phaser.Scene) {
 }
 
 /** Möwen ziehen in Abständen quer übers Bild (mit Flügelschlag und leichtem Auf und Ab) */
-export function gulls(scene: Phaser.Scene, o: { n?: number; y?: [number, number]; depth?: number; alpha?: number; scroll?: number } = {}) {
+export function gulls(scene: Phaser.Scene, o: { n?: number; y?: [number, number]; depth?: number; alpha?: number; scroll?: number; layer?: Layer } = {}) {
   gullTex(scene);
   const [y0, y1] = o.y ?? [16, 70];
   for (let i = 0; i < (o.n ?? 2); i++) {
-    const img = scene.add.image(-20, rnd(y0, y1), 'amb_gull0').setDepth(o.depth ?? 900).setAlpha(o.alpha ?? 0.9).setScrollFactor(o.scroll ?? 1);
+    const img = into(o.layer, scene.add.image(-20, rnd(y0, y1), 'amb_gull0').setDepth(o.depth ?? 900).setAlpha(o.alpha ?? 0.9).setScrollFactor(o.scroll ?? 1));
     let frame = 0;
     scene.time.addEvent({ delay: 170 + i * 20, loop: true, callback: () => img.setTexture(`amb_gull${(frame = 1 - frame)}`) });
     const fly = () => {
@@ -81,7 +156,7 @@ export function cloudShadows(scene: Phaser.Scene, o: { n?: number; y?: [number, 
 }
 
 /** Kleine Pixel-Wolken am Himmel, die langsam treiben */
-export function clouds(scene: Phaser.Scene, o: { n?: number; y?: [number, number]; depth?: number } = {}) {
+export function clouds(scene: Phaser.Scene, o: { n?: number; y?: [number, number]; depth?: number; alpha?: number; scroll?: number; layer?: Layer; tint?: number } = {}) {
   const [y0, y1] = o.y ?? [8, 40];
   ensureTex(scene, 'amb_cloud', canvas(30, 12, (g) => {
     g.fillStyle = '#ffffff';
@@ -90,11 +165,46 @@ export function clouds(scene: Phaser.Scene, o: { n?: number; y?: [number, number
     g.fillRect(2, 10, 26, 2);
   }));
   for (let i = 0; i < (o.n ?? 3); i++) {
-    const img = scene.add.image(rnd(0, 480), rnd(y0, y1), 'amb_cloud').setDepth(o.depth ?? -950).setAlpha(0.9).setScale(rnd(0.8, 1.4));
+    const img = into(o.layer, scene.add.image(rnd(0, 480), rnd(y0, y1), 'amb_cloud').setDepth(o.depth ?? -950).setAlpha(o.alpha ?? 0.9).setScale(rnd(0.8, 1.4)));
+    if (o.scroll !== undefined) img.setScrollFactor(o.scroll);
+    if (o.tint !== undefined) img.setTint(o.tint);
     const drift = () => {
       scene.tweens.add({ targets: img, x: 520, duration: ((520 - img.x) / 560) * rnd(50000, 80000), onComplete: () => (img.setPosition(-40, rnd(y0, y1)), drift()) });
     };
     drift();
+  }
+}
+
+/** Wehen: Objekte (Palmen, Schirme, Fahnen) pendeln leicht um ihren Fußpunkt – Ursprung unten setzen (`prop()` tut das) */
+export function sway(scene: Phaser.Scene, targets: Phaser.GameObjects.Components.Transform[], o: { angle?: number; ms?: number } = {}) {
+  targets.forEach((t, i) => {
+    const a = o.angle ?? 2;
+    scene.tweens.add({ targets: t, angle: { from: -a, to: a }, duration: (o.ms ?? 1800) + i * 230, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: i * 310 });
+  });
+}
+
+/** Palmen am Rand, die im Wind wehen (Fußpunkt = x/y). `flip` ab der Bildmitte automatisch */
+export function palms(scene: Phaser.Scene, spots: [number, number, number?][], o: { depth?: number; scale?: number; layer?: Layer; scroll?: number; alpha?: number } = {}) {
+  const imgs = spots.map(([x, y, seed], i) => {
+    const key = ensureTex(scene, `amb_palm${seed ?? 6}`, () => palm(seed ?? 6));
+    const img = into(o.layer, scene.add.image(x, y, key).setOrigin(0.5, 1).setDepth(o.depth ?? y).setScale(o.scale ?? 1).setAlpha(o.alpha ?? 1));
+    img.setFlipX(x > 240 !== (i % 3 === 0));
+    if (o.scroll !== undefined) img.setScrollFactor(o.scroll);
+    return img;
+  });
+  sway(scene, imgs, { angle: 1.6 });
+  return imgs;
+}
+
+/** Wellen: helle Kämme, die über eine Wasserfläche wandern (Seitenansicht: Horizontlinie; Draufsicht: ganze Fläche) */
+export function waves(scene: Phaser.Scene, o: { x?: [number, number]; y: [number, number]; n?: number; depth?: number; color?: number; layer?: Layer; scroll?: number }) {
+  const [x0, x1] = o.x ?? [0, 480];
+  for (let i = 0; i < (o.n ?? 12); i++) {
+    const x = rnd(x0, x1);
+    const y = rnd(o.y[0], o.y[1]);
+    const w = into(o.layer, scene.add.rectangle(x, y, rnd(5, 12), 1, o.color ?? 0xeaf8ff, 0.7).setDepth(o.depth ?? -900));
+    if (o.scroll !== undefined) w.setScrollFactor(o.scroll);
+    scene.tweens.add({ targets: w, x: x + rnd(4, 9), alpha: 0.1, duration: rnd(1300, 2300), yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: rnd(0, 1500) });
   }
 }
 

@@ -12,6 +12,8 @@ import { GOLD, INK, RED_INK, background, ensureTex, ink, panel, prop, txt } from
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { say, spokenName } from './speech';
+import { CameraRig } from './camera';
+import { dayColor } from './ambient';
 
 const { STEP_MS, MOVE_LEAD_MS } = BOARD_TIMING;
 const GEM: Record<string, [string, 'q' | 's' | undefined]> = {
@@ -20,28 +22,6 @@ const GEM: Record<string, [string, 'q' | 's' | undefined]> = {
   red: [C.red, undefined],
   event: [C.orange, 'q'],
 };
-
-/** Tageszeit → Farbe des Multiply-Overlays (0 Morgen, 0.35 Mittag, 0.8 Sonnenuntergang, 1 Nacht) */
-const DAY_KEYS: [number, number][] = [
-  [0, 0xffe9d2],
-  [0.35, 0xffffff],
-  [0.6, 0xfff0d2],
-  [0.8, 0xf8a878],
-  [0.9, 0xa07a9a],
-  [1, 0x5868a8],
-];
-
-function dayColor(t: number): Phaser.Display.Color {
-  let i = 0;
-  while (i < DAY_KEYS.length - 2 && t > DAY_KEYS[i + 1][0]) i++;
-  const [t0, c0] = DAY_KEYS[i];
-  const [t1, c1] = DAY_KEYS[i + 1];
-  const k = Phaser.Math.Clamp((t - t0) / (t1 - t0 || 1), 0, 1);
-  const a = Phaser.Display.Color.ValueToColor(c0);
-  const b = Phaser.Display.Color.ValueToColor(c1);
-  const o = Phaser.Display.Color.Interpolate.ColorWithColor(a, b, 100, k * 100);
-  return new Phaser.Display.Color(o.r, o.g, o.b);
-}
 
 const BULB_COLORS = [0xff5a5a, 0xffd25e, 0x6ad06a, 0x6ab0ff, 0xf07aa8];
 
@@ -77,6 +57,7 @@ export class BoardScene extends Phaser.Scene {
   private sun!: Phaser.GameObjects.Container;
   private moon!: Phaser.GameObjects.Container;
   private nightLayer!: Phaser.GameObjects.Container;
+  private rig!: CameraRig;
 
   constructor() {
     super('board');
@@ -134,16 +115,21 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({ targets: this.bar, scale: 1.15, duration: 500, yoyo: true, repeat: -1 });
 
     this.createDaytime();
-
-    panel(this, 60, 0, 360, 58).setDepth(1000);
-    this.roundText = ink(this, 72, 9, '', { origin: [0, 0], color: RED_INK }).setDepth(1001);
-    this.timerText = ink(this, 408, 9, '', { origin: [1, 0], color: RED_INK }).setDepth(1001);
-    this.msgText = ink(this, WORLD.W / 2, 22, '', { wrap: 336 }).setDepth(1001);
-    this.scoreLayer = this.add.container(0, 0).setDepth(900);
     this.arrow = txt(this, 0, 0, 'v', { color: C.gold }).setDepth(950).setVisible(false);
     this.tweens.add({ targets: this.arrow, y: '+=3', duration: 300, yoyo: true, repeat: -1 });
-    this.introLayer = this.add.container(0, 0).setDepth(3000);
-    this.bonusLayer = this.add.container(0, 0).setDepth(3000);
+
+    // Kamera-Schwenk: folgt der ziehenden Figur (Zoom 1.3) und schwenkt zurück; Tafel, Rangliste und Karten
+    // liegen auf der festen HUD-Kamera (alles, was in `rig.hud()` entsteht)
+    this.rig = new CameraRig(this, { w: WORLD.W, h: WORLD.H, lerp: 0.06 });
+    this.rig.hud(() => {
+      panel(this, 60, 0, 360, 58).setDepth(1000);
+      this.roundText = ink(this, 72, 9, '', { origin: [0, 0], color: RED_INK }).setDepth(1001);
+      this.timerText = ink(this, 408, 9, '', { origin: [1, 0], color: RED_INK }).setDepth(1001);
+      this.msgText = ink(this, WORLD.W / 2, 22, '', { wrap: 336 }).setDepth(1001);
+      this.scoreLayer = this.add.container(0, 0).setDepth(900);
+      this.introLayer = this.add.container(0, 0).setDepth(3000);
+      this.bonusLayer = this.add.container(0, 0).setDepth(3000);
+    });
 
     const onState = (s: GameState) => this.render(s);
     bus.on('state', onState);
@@ -399,6 +385,10 @@ export class BoardScene extends Phaser.Scene {
     if (key === this.scoreKey) return;
     this.scoreKey = key;
     this.scoreLayer.removeAll(true);
+    this.rig.hud(() => this.buildScores(b, rolling));
+  }
+
+  private buildScores(b: BoardState, rolling: boolean) {
     const sorted = [...b.order].sort((a, c) => b.cocktails[c] - b.cocktails[a] || b.coins[c] - b.coins[a]);
     // Ab 9 Spielern: zwei Spalten, sonst ragt die Tafel über den Rundweg
     const cols = sorted.length > 8 ? 2 : 1;
@@ -440,6 +430,11 @@ export class BoardScene extends Phaser.Scene {
     }
     if (this.introShown) return;
     this.introShown = true;
+    this.rig.hud(() => this.buildIntro(b));
+  }
+
+  private buildIntro(b: BoardState) {
+    if (!b.nextMini) return;
     const info = MINI_INFO[b.nextMini];
     const isFinale = b.round === b.maxRounds && FINALE_KINDS.includes(b.nextMini);
     const bg = this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x1a1008, 0.6).setOrigin(0);
@@ -504,6 +499,10 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private bonusCard(a: BoardAward, idx: number, total: number, revealed: boolean) {
+    this.rig.hud(() => this.buildBonusCard(a, idx, total, revealed));
+  }
+
+  private buildBonusCard(a: BoardAward, idx: number, total: number, revealed: boolean) {
     const bg = this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x0a0818, 0.55).setOrigin(0);
     const card = this.add.container(WORLD.W / 2, WORLD.H / 2 + 6);
     card.add(panel(this, -160, -82, 320, 164));
@@ -554,6 +553,15 @@ export class BoardScene extends Phaser.Scene {
     sfx('select', { x: dice.x });
     const total = MOVE_LEAD_MS + roll.path.length * STEP_MS;
     this.tweens.add({ targets: dice, alpha: 0, delay: total, duration: 250, onComplete: () => dice.destroy() });
+
+    // Kamera fährt mit der Figur mit; am Ziel kurz halten (bei Ereignis oder Bar länger), dann zurück zur Übersicht
+    this.rig.follow(tok, 1.3);
+    const last = roll.path[roll.path.length - 1];
+    const special = FIELD_TYPES[last] === 'event' || last === b.barField;
+    this.time.delayedCall(total, () => {
+      this.rig.hold(special ? 1500 : 700);
+      this.rig.overview();
+    });
 
     // Schritt für Schritt hüpfen (Schnelldurchlauf)
     const steps = roll.path.map((f) => this.posFor(f, roll.playerId, b.order));

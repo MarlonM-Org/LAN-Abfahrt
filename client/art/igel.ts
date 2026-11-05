@@ -2,7 +2,7 @@ import type { Look } from '../../shared/types';
 import { HAIRS, SHIRTS } from '../../shared/avatar';
 import { IGEL, type Mask } from '../../shared/igel';
 import { C } from './palette';
-import { Pix, rng, shade } from './pix';
+import { type BgLayer, Pix, bgLayers, rng, shade } from './pix';
 import { paintSky } from './ground';
 
 // ------------------------------------------------------------------ Figuren
@@ -103,18 +103,23 @@ export function waterBomb(): Pix {
 
 // ------------------------------------------------------------------ Hintergrund
 
-export function paintIslandSky(p: Pix, seed: number) {
+/** Himmel hinter der Insel – `layer`: far (Himmel, Sonne, Wolken), mid (ferne Inseln, Meer am Horizont) oder alles */
+export function paintIslandSky(p: Pix, seed: number, layer: BgLayer = 'all') {
   const { W, H } = IGEL;
   const r = rng(seed);
-  paintSky(p, 0, 0, W, H, ['#7ec8f2', '#a9dcf6', '#d6efff', '#ffe9c4']);
-  // Sonne
-  p.disc(400, 46, 16, '#ffe9a0').disc(400, 46, 12, '#fff3c4');
-  // Wolken
-  for (let i = 0; i < 5; i++) {
-    const cx = r() * W;
-    const cy = 22 + r() * 70;
-    for (let k = 0; k < 4; k++) p.ellipse(cx + k * 9 - 14, cy + (k % 2) * 2, 10, 5, k % 2 ? '#f5fbff' : C.white);
+  const L = bgLayers(layer);
+  if (L.far) {
+    paintSky(p, 0, 0, W, H, ['#7ec8f2', '#a9dcf6', '#d6efff', '#ffe9c4']);
+    // Sonne
+    p.disc(400, 46, 16, '#ffe9a0').disc(400, 46, 12, '#fff3c4');
+    // Wolken
+    for (let i = 0; i < 5; i++) {
+      const cx = r() * W;
+      const cy = 22 + r() * 70;
+      for (let k = 0; k < 4; k++) p.ellipse(cx + k * 9 - 14, cy + (k % 2) * 2, 10, 5, k % 2 ? '#f5fbff' : C.white);
+    }
   }
+  if (!L.mid) return;
   // Ferne Inseln am Horizont
   for (let i = 0; i < 3; i++) {
     const cx = r() * W;

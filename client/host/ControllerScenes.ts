@@ -11,7 +11,7 @@ import { figure, playAvatar } from './textures';
 import { BLUE_INK, NameTags, RED_INK, background, ensureTex, ink, panel, prop, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
-import { foam, gulls } from './ambient';
+import { daylight, foam, gulls, sway } from './ambient';
 import { pcol } from './playerColor';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -55,10 +55,13 @@ export class SupScene extends Phaser.Scene {
       }
     });
     bg.setScrollFactor(1);
+    const palmsL: Phaser.GameObjects.Image[] = [];
     for (let x = 60; x < W; x += 180) {
-      prop(this, 'palm', () => O.palm(6), x, SUP.TOP - 6).setScale(0.7);
+      palmsL.push(prop(this, 'palm', () => O.palm(6), x, SUP.TOP - 6).setScale(0.7));
       prop(this, 'umbrellaB', () => O.umbrella(C.blue), x + 90, WORLD.H + 6).setDepth(300);
     }
+    sway(this, palmsL);
+    daylight(this, { depth: -950, w: W });
     // Leeres Wasser beleben: Möwen (bildfest), Wellenschaum an beiden Stränden
     gulls(this, { n: 3, y: [SUP.TOP + 10, SUP.BOTTOM - 10], depth: 950, scroll: 0 });
     foam(this, { y: SUP.TOP - 11, x: [0, W], n: Math.round(W / 36), depth: -900, spread: 1 });
