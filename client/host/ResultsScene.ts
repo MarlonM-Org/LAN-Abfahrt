@@ -1,16 +1,26 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
+import { MINI_INFO } from '../../shared/games';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintGrass, paintPath } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
-import { PLACE_COLORS, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { GREEN_INK, PLACE_COLORS, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { drawSessionBoard, seriesTitle } from './sessionBoard';
+
+/** Einzelspiel-Ergebnis: erst dieses Spiel, dann das Leaderboard des Abends – im Wechsel */
+const STAGE_GAME_MS = 7000;
+const STAGE_BOARD_MS = 11000;
 
 export class ResultsScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container;
   private stateKey = '';
+  /** Einzelspiel: 'game' = Platzierung dieses Spiels, 'board' = Leaderboard des Abends */
+  private stage: 'game' | 'board' = 'game';
+  private stageTimer: Phaser.Time.TimerEvent | null = null;
+  private stageFor: unknown = null;
 
   constructor() {
     super('results');
@@ -18,6 +28,9 @@ export class ResultsScene extends Phaser.Scene {
 
   create() {
     this.stateKey = '';
+    this.stage = 'game';
+    this.stageTimer = null;
+    this.stageFor = null;
     background(this, 'results', WORLD.W, WORLD.H, (p) => {
       paintGrass(p, 0, 0, WORLD.W, WORLD.H, 61);
       paintPath(p, [{ x: 0, y: 250 }, { x: 480, y: 246 }], 18, 62);
@@ -35,13 +48,40 @@ export class ResultsScene extends Phaser.Scene {
     if (s) this.render(s);
   }
 
-  private render(s: GameState) {
+  /** Wechsel Spiel ↔ Leaderboard (startet für jedes neue Ergebnis wieder beim Spiel) */
+  private scheduleStage(s: GameState) {
     const r = s.results;
-    const key = JSON.stringify(r);
+    const single = !!r && !r.final && !!r.points && !s.partyActive;
+    if (!single) {
+      this.stageTimer?.remove();
+      this.stageTimer = null;
+      this.stage = 'game';
+      this.stageFor = null;
+      return;
+    }
+    if (this.stageFor === r) return;
+    this.stageFor = r;
+    this.stage = 'game';
+    this.stageTimer?.remove();
+    const flip = () => {
+      this.stage = this.stage === 'game' ? 'board' : 'game';
+      const cur = getState();
+      if (cur) this.render(cur);
+      this.stageTimer = this.time.delayedCall(this.stage === 'game' ? STAGE_GAME_MS : STAGE_BOARD_MS, flip);
+    };
+    this.stageTimer = this.time.delayedCall(STAGE_GAME_MS, flip);
+  }
+
+  private render(s: GameState) {
+    this.scheduleStage(s);
+    const r = s.results;
+    const single = !!r && !r.final && !!r.points && !s.partyActive;
+    const key = JSON.stringify(single ? [r, s.session, s.nochmal, this.stage] : r);
     if (key === this.stateKey) return;
     this.stateKey = key;
     this.layer.removeAll(true);
     if (!r) return;
+    if (single) return this.renderSingle(s);
 
     this.layer.add(panel(this, 60, 2, 360, 64));
     this.layer.add(ink(this, WORLD.W / 2, 9, r.final ? '~ Endstand ~' : '~ Ergebnis ~', { color: '#7a5a3a' }));
@@ -52,8 +92,54 @@ export class ResultsScene extends Phaser.Scene {
     else if (r.hearts !== undefined) this.renderHearts(s);
     else this.renderList(s);
 
-    const footer = s.arcadeActive && !s.partyActive ? 'VIP: Nächstes Spiel, Nochmal oder Menü am Handy' : s.drinkActive ? 'VIP: Nächste Runde oder Beenden am Handy' : s.date ? 'Am Handy auf „Weiter“ tippen' : r.final || !s.partyActive ? 'VIP: Am Handy zurück zur Lobby' : 'VIP: Am Handy weiter zum Spielbrett';
+    const footer = s.drinkActive ? 'VIP: Nächste Runde oder Beenden am Handy' : s.date ? 'Am Handy auf „Weiter“ tippen' : r.final || !s.partyActive ? 'VIP: Am Handy zurück zur Lobby' : 'VIP: Am Handy weiter zum Spielbrett';
     this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
+  }
+
+  /**
+   * Einzelspiel (Arcade, Laptop-Auswahl, Einzelspiel aus der Lobby): abwechselnd
+   * Platzierung + Punkte dieses Spiels und das Leaderboard des Abends (mit ▲▼ und Serie, z. B. Grand Prix).
+   */
+  private renderSingle(s: GameState) {
+    const r = s.results!;
+    const ses = s.session;
+    const series = seriesTitle(ses);
+    const board = this.stage === 'board';
+    this.layer.add(panel(this, 60, 2, 360, 64));
+    this.layer.add(ink(this, WORLD.W / 2, 9, board ? '~ Gesamtstand ~' : '~ Ergebnis ~', { color: '#7a5a3a' }));
+    const title = series ?? r.title;
+    this.layer.add(ink(this, WORLD.W / 2, title.length > 20 ? 25 : 21, title, { size: title.length > 20 ? 8 : 16, color: RED_INK }));
+    this.layer.add(ink(this, WORLD.W / 2, 40, board ? this.boardSubtitle(s) : r.subtitle, { wrap: 340 }));
+
+    if (board) {
+      drawSessionBoard(this, this.layer, ses, { x: 60, y: 70, w: 360, maxBottom: 246 }, { animate: true, title: series ? `${ses.series!.label.toUpperCase()} · GESAMT HEUTE` : undefined });
+    } else if (r.hearts !== undefined) {
+      this.renderHearts(s);
+    } else {
+      this.renderList(s);
+    }
+
+    // Kleine Punkte-Anzeige, wann gewechselt wird
+    this.layer.add(ink(this, 412, 56, board ? '○●' : '●○', { origin: [1, 0], color: '#7a5a3a' }));
+
+    const n = s.nochmal;
+    const footer = !n
+      ? 'VIP: Am Handy zurück zur Lobby'
+      : n.disabled
+        ? `Nochmal geht nicht: ${n.disabled}`.slice(0, 56)
+        : `VIP am Handy: Nochmal (${n.next}) oder anderes Spiel`;
+    this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
+  }
+
+  private boardSubtitle(s: GameState) {
+    const ser = s.session.series;
+    const leader = s.session.rows[0];
+    if (ser && ser.round > 1) {
+      const best = Object.entries(ser.totals).sort((a, b) => b[1] - a[1])[0];
+      const name = best ? (s.session.rows.find((r) => r.id === best[0])?.name ?? '?') : '?';
+      return `${MINI_INFO[ser.kind].title}: ${ser.round} Spiele in Folge – ${name} führt die Serie (${best?.[1] ?? 0} Pkt)`;
+    }
+    return leader && leader.points > 0 ? `${leader.name} führt mit ${leader.points} Punkten` : 'Punkte aus allen Einzelspielen des Abends';
   }
 
   private renderHearts(s: GameState) {
@@ -89,8 +175,8 @@ export class ResultsScene extends Phaser.Scene {
       if (s.partyActive) {
         this.layer.add(this.add.image(x + w - 46, ry + 9, ensureTex(this, 'coin', O.coinIcon)));
         this.layer.add(ink(this, x + w - 14, ry + 6, `+${row.coins}`, { origin: [1, 0] }));
-      } else if (r.arcade) {
-        this.layer.add(ink(this, x + w - 14, ry + 6, `+${r.arcade[row.playerId] ?? 0} Pkt`, { origin: [1, 0], color: RED_INK }));
+      } else if (r.points) {
+        this.layer.add(ink(this, x + w - 14, ry + 6, `+${r.points[row.playerId] ?? 0} Pkt`, { origin: [1, 0], color: GREEN_INK }));
       }
     });
   }

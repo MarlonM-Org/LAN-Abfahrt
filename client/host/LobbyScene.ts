@@ -9,6 +9,7 @@ import { paintGrass, paintPath } from '../art/ground';
 import { bus, getState } from './store';
 import { ensurePortrait, figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { drawSessionBoard } from './sessionBoard';
 
 /** Bis 8 Spieler: 2 Reihen à 4; ab 9 Spielern: 2 Reihen à 6 im Zickzack (Platz für 12) */
 const SLOTS = 8;
@@ -80,13 +81,24 @@ export class LobbyScene extends Phaser.Scene {
     this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
     const offMin = (p: GameState['players'][number]) => Math.floor((p.offlineMs ?? 0) / 60_000);
-    this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : s.mode === 'arcade' && s.arcadeVote ? this.voteHint(s) : 'Der VIP wählt am Handy ein Spiel!');
+    this.hintText.setText(
+      s.showBoard ? 'Leaderboard des Abends (L / VIP-Handy)' : n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : s.mode === 'arcade' && s.arcadeVote ? this.voteHint(s) : 'Der VIP wählt am Handy ein Spiel!',
+    );
 
-    const key = s.mode + s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') + (s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
+    // Arcade: Leaderboard des Abends, sobald heute gespielt wurde – vorher die ewige Tabelle
+    const sessionBoard = s.showBoard || (s.mode === 'arcade' && s.session.games > 0);
+    const key =
+      s.mode +
+      s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') +
+      (sessionBoard ? `S${s.showBoard}${JSON.stringify(s.session)}` : s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
     if (key === this.renderedPlayers) return;
     this.renderedPlayers = key;
 
     this.playerLayer.removeAll(true);
+    if (sessionBoard) {
+      drawSessionBoard(this, this.playerLayer, s.session, { x: 150, y: 46, w: 316, maxBottom: 228 }, { title: s.session.games ? undefined : 'LEADERBOARD HEUTE · NOCH LEER' });
+      return;
+    }
     if (s.mode === 'arcade') return this.renderLeaderboard(s);
     const wide = s.players.length > SLOTS;
     for (let i = 0; i < (wide ? SLOTS_MAX : SLOTS); i++) {

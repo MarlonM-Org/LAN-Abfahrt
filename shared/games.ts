@@ -501,8 +501,15 @@ export function turmCellOffsets(shape: number, angle: number): { x: number; y: n
 
 // ------------------------------------------------------------------ Arcade
 
-/** Punkte nach Platzierung im Arcade-Modus */
-export const ARCADE_POINTS = [10, 6, 3, 1];
+/**
+ * Leaderboard-Punkte nach Platzierungsgruppe (1. 10, 2. 7, 3. 5, 4. 4, 5. 3, 6. 2, Rest 1).
+ * Teamsiege: alle Sieger stehen in Gruppe 1 und bekommen die vollen Punkte.
+ */
+export const ARCADE_POINTS = [10, 7, 5, 4, 3, 2, 1];
+
+/** Wort für ein Spiel einer Serie („Kart-Rennen · Rennen 3“) */
+const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'Rennen', sprint: 'Lauf', parcours: 'Lauf', golf: 'Turnier', bowling: 'Spiel', darts: 'Spiel' };
+export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
 export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel'];

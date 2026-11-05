@@ -1712,8 +1712,8 @@ export interface ResultsState {
   subtitle: string;
   rows: ResultRow[];
   final: boolean;
-  /** Nur im Arcade-Modus: Punkte dieser Runde pro Spieler */
-  arcade?: Record<string, number>;
+  /** Einzelspiel (Arcade, Laptop-Auswahl, Einzelspiel aus der Lobby): Leaderboard-Punkte dieses Spiels pro Spieler */
+  points?: Record<string, number>;
   /** Nur im Trinkspiel: Schlücke dieser Runde */
   sips?: Record<string, number>;
   /** Nur bei Date Night: gemeinsam verdiente Herzen */
@@ -1780,7 +1780,7 @@ export interface GameState {
   drinkActive: boolean;
   customNhieCount: number;
   botCount: number;
-  /** Arcade: Punkte pro Spieler über alle Spiele (dauerhaft gespeichert) */
+  /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
   leaderboard: LeaderEntry[];
   arcadeActive: boolean;
   board: BoardState | null;
@@ -1795,6 +1795,62 @@ export interface GameState {
   customQuipCount: number;
   /** Arcade: „Alle dürfen wählen“ – Stimmen der Spieler für das nächste Spiel (null = aus) */
   arcadeVote?: ArcadeVoteState | null;
+  /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
+  session: SessionState;
+  /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
+  nochmal: NochmalState | null;
+  /** Lobby: Leaderboard des Abends groß auf dem TV */
+  showBoard: boolean;
+}
+
+/** Eine Zeile im Leaderboard des Abends */
+export interface SessionRow {
+  id: string;
+  name: string;
+  look: Look;
+  points: number;
+  games: number;
+  wins: number;
+  /** Aktueller Platz (Gleichstand = gleicher Platz) */
+  rank: number;
+  /** Platz vor dem zuletzt gewerteten Spiel (null = erstes Spiel des Abends bzw. neu dazugekommen) */
+  prevRank: number | null;
+  /** Punkte aus dem zuletzt gewerteten Spiel (null = war nicht dabei) */
+  last: number | null;
+  /** online · offline (Handy weg) · removed (entfernt bzw. nicht mehr in der Runde) – Punkte bleiben */
+  status: 'online' | 'offline' | 'removed';
+  bot?: boolean;
+}
+
+/** Gleiches Spiel mehrmals hintereinander (z. B. Kart-Grand-Prix): Zwischenstand der Serie */
+export interface SessionSeries {
+  kind: MiniKind;
+  /** Wie viele Spiele dieser Serie gewertet sind (1 = erstes) */
+  round: number;
+  /** z. B. „Rennen 3“ */
+  label: string;
+  /** Spieler-ID → Punkte in dieser Serie */
+  totals: Record<string, number>;
+}
+
+export interface SessionState {
+  rows: SessionRow[];
+  /** Gewertete Spiele des Abends */
+  games: number;
+  series: SessionSeries | null;
+}
+
+/** VIP/Laptop im Ergebnis eines Einzelspiels: dasselbe Spiel nochmal */
+export interface NochmalState {
+  kind: MiniKind;
+  /** z. B. „Rennen 4“ (nächstes Spiel der Serie) */
+  next: string;
+  /** Zusatz, z. B. „Strecke: Hafen“ */
+  detail?: string;
+  /** Warum gerade nicht möglich (z. B. zu wenige Spieler) */
+  disabled?: string;
+  /** Arcade-Modus: „Zufälliges Spiel“ anbieten */
+  random: boolean;
 }
 
 /** Arcade-Abstimmung in der Lobby: jeder Spieler hat höchstens eine Stimme */

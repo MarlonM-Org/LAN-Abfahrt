@@ -1176,3 +1176,23 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .arcade-tile.mine { background: #bfe6a0; outline: 3px solid var(--green); outline-offset: -3px; }
 .intro-icon { font-size: 40px; line-height: 1.2; text-align: center; }
 .center p.insp, p.insp { font-size: 8px; color: var(--ink-soft); opacity: 0.85; }
+
+/* ---------------------------------------------------------------- Nochmal + Leaderboard des Abends */
+.nochmal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+button.nochmal-btn { font-size: 13px; padding: 18px 12px; line-height: 1.6; background: #f0973a; box-shadow: inset 0 3px 0 #ffb867, inset 0 -4px 0 #c06a1f, 0 3px 0 var(--outline); }
+button.nochmal-btn small { font-size: 8px; opacity: 0.9; }
+button.nochmal-other { font-size: 12px; padding: 16px 12px; }
+.wait-vip { color: var(--ink); line-height: 1.8; }
+.wait-vip small { color: var(--ink-soft); font-size: 8px; }
+.my-total { color: var(--ink); }
+.lb-panel { margin-top: 10px; }
+.lb-panel .lb-toggle { width: 100%; text-align: left; font-size: 9px; }
+.lb-panel .lb-body { margin-top: 8px; }
+table.lb-session td:nth-child(2) { text-align: left; }
+table.lb tr.lb-head td { color: var(--ink-soft); font-size: 8px; }
+table.lb tr.off td { opacity: 0.55; }
+.lb-up { color: var(--green); }
+.lb-down { color: var(--red); }
+.lb-same { color: var(--ink-soft); }
+.lb-new { color: var(--sea); font-size: 7px; }
+.lb-off { color: var(--ink-soft); font-size: 7px; }
