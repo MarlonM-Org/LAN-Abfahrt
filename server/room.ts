@@ -22,6 +22,7 @@ import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
 import { BouleGame } from './boule';
+import { GolfGame } from './golf';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
@@ -471,6 +472,9 @@ export class Room {
         break;
       case 'sprueche':
         this.mini = new SpruecheGame(ids, ctx, this.quips.all);
+        break;
+      case 'golf':
+        this.mini = new GolfGame(ids, ctx);
         break;
     }
     this.results = null;

@@ -63,7 +63,8 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
   👥 1–12 · 📱 Bewegungssensor
 - [ ] **Boule am Strand** – Gleiche Wurfmechanik wie Bowling, passt perfekt zum Urlaub.
   👥 2–12 · 📱 Bewegungssensor
-- [ ] **Darts**, **Minigolf** (Schlagstärke per Schwung), **Angeln** (Auswerfen per Schwung, Kurbeln zum Einholen)
+- [x] **Minigolf** – Urlaubs-Minigolf: alle putten gleichzeitig, Zurückziehen wie eine Schleuder oder Putter-Schwung
+- [ ] **Darts**, **Angeln** (Auswerfen per Schwung, Kurbeln zum Einholen)
   👥 1–12 · 📱 Bewegungssensor
 
 ### Zielen
