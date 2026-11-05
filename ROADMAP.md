@@ -117,7 +117,7 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 - [ ] **Grill-Chaos** *(Vorbild: Overcooked)* – Gemeinsam Bestellungen der Urlaubs-Grillparty abarbeiten: schnippeln, grillen, Cocktails mixen, servieren.
   👥 2–8 · 📱 Joystick + Aktion
 - [x] **Umzugschaos** *(Vorbild: Moving Out)* – Ferienhaus ausräumen, bevor der Vermieter kommt: Leichtes tragen/werfen (Fenster!), Schweres zu zweit durch die Türrahmen zerren, Physik auf dem Server.
-- [ ] **Wackel-Prügelei** *(Vorbild: Gang Beasts)* – Labbrige Physik-Figuren, Ziel: andere vom Steg ins Meer schubsen.
+- [x] **Wackel-Prügelei** *(Vorbild: Gang Beasts)* – Labbrige Physik-Figuren, Ziel: andere vom Steg ins Meer schubsen.
 - [ ] **Auto-Fußball** *(Vorbild: Rocket League, von oben)* – Kann Fahrphysik mit dem Kart-Rennen teilen.
 
 ---
@@ -140,16 +140,16 @@ Quelle: **Spiel-Review** (https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1), Ei
 Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), dann Pacing, dann Spielbrett, dann Igel, dann neue Spiele. Keine weitere Echtzeit-Arena vorher.
 
 ### Phase 0 · Fehler und Fairness (S)
-- [ ] Fallen-Parcours: `MAX_RUNNERS` 12 (ab 9 Spielern laufen heute immer dieselben 8)
-- [ ] Zentrale Gnadenfrist bei Verbindungsverlust (3 s einfrieren/unverwundbar statt sofort raus in Arena, Sumo, Parcours; Kart/Smash nicht als Hindernis/Zielscheibe stehen lassen); Stick nach 700 ms ohne Update auf 0; Wake Lock bei `visibilitychange` erneuern
-- [ ] Netz: `Room.changed()` sofort senden (max. alle 40 ms) statt immer 40 ms warten; Spieler + Leaderboard als `meta`-Event nur bei Änderung; `private` nur bei Änderung; `transports: ['websocket']`
-- [ ] Punkte nach Spielerzahl (`PLACE_COINS`/`ARCADE_POINTS` → `round(10·(n−Platz)/(n−1))`, Trost-Münze), Startspieler im Brett rotieren, Koop-Münzen für Flieger (Ziel erreicht?) und Grill (Sterne), Sprint-Zeit serverseitig
-- [ ] Listen aufräumen: Igel, Turm, Descent, Wrap vom Brett; Date-Spiele aus `ARCADE_RANDOM`; `smash.maxPlayers = 8`; Spieldauer-Klasse (kurz/mittel/lang) fürs Brett; README-Dubletten
-- [ ] Pacing: TTT `ROUND_MS` 180 → 100 s und 2 Runden; Golf 5 Bahnen auf dem Brett; Sprüche ab 9 Spielern Runde 1 + Finale; Stille Post max. 6 Kettenschritte; Fangen/Geist ab 7 Spielern zwei Rollenträger
+- [x] Fallen-Parcours: `MAX_RUNNERS` 12 (ab 9 Spielern laufen heute immer dieselben 8) *(#43)*
+- [x] Zentrale Gnadenfrist bei Verbindungsverlust (3 s einfrieren/unverwundbar statt sofort raus in Arena, Sumo, Parcours; Kart/Smash nicht als Hindernis/Zielscheibe stehen lassen); Stick nach 700 ms ohne Update auf 0; Wake Lock bei `visibilitychange` erneuern *(#54)*
+- [x] Netz: `Room.changed()` sofort senden (max. alle 40 ms) statt immer 40 ms warten; Spieler + Leaderboard als `meta`-Event nur bei Änderung; `private` nur bei Änderung; `transports: ['websocket']` *(#54)*
+- [x] Punkte nach Spielerzahl (`PLACE_COINS`/`ARCADE_POINTS` → `round(10·(n−Platz)/(n−1))`, Trost-Münze), Startspieler im Brett rotieren, Koop-Münzen für Flieger (Ziel erreicht?) und Grill (Sterne), Sprint-Zeit serverseitig *(#43)*
+- [x] Listen aufräumen: Igel, Turm, Descent, Wrap vom Brett; Date-Spiele aus `ARCADE_RANDOM`; `smash.maxPlayers = 8`; Spieldauer-Klasse (kurz/mittel/lang) fürs Brett; README-Dubletten *(#45, #46 – README-Dubletten offen)*
+- [x] Pacing: TTT `ROUND_MS` 180 → 100 s und 2 Runden; Golf 5 Bahnen auf dem Brett; Sprüche ab 9 Spielern Runde 1 + Finale; Stille Post max. 6 Kettenschritte; Fangen/Geist ab 7 Spielern zwei Rollenträger *(#46 – zwei Rollenträger bei Fangen/Geist offen, stattdessen Wertung innerhalb der Rolle)*
 
 ### Phase 1 · Fundament für alle Spiele (M ×3)
-- [ ] **Ton + Juice:** `client/host/sfx.ts` (~25 Chiptune-Effekte über den vorhandenen `fxBus`, Panning nach x), `client/host/juice.ts` (shake-Stufen, flash, hitStop, slowMo, zoomPunch, burst mit Partikel-Emitter, float, banner), einheitliches `fx`-Feld im Snapshot; Versteckspiel-Pfeife auf den Synth; Sprecher per `speechSynthesis` (abschaltbar); Iris-Wipe zwischen Szenen; Ergebnis-Reveal mit Auto-Weiter. Zuerst Smash (Hit-Stop), Arena, Sumo, Bogen, Ententeich, Kart, Brett, Ergebnis
-- [ ] **Handy-Ausrichtung (Marlons Feedback):** Pflichtfeld `orientation` in `MiniInfo`, `client/controller/orientation.ts` (Ansage vor jedem Spiel, Overlay bei falscher Lage, Android-Lock im Vollbild, Laptop ausgenommen), ein schwebender Stick (`stick.ts`) statt drei, gemeinsames Querlayout `.lx`, `haptic()` mit iPhone-Ersatz (Klick-Ton + Rand-Blitz), Ansage auch am TV. Dann quer: Wasserbomben, Igel, Grill, Fangen, Geist, Verräter, Wackelturm, Versteckspiel; danach Arena, Sumo, Aufräumen, Kurve, Volley, Smash, Bogen
+- [x] **Ton + Juice:** `client/host/sfx.ts` (~25 Chiptune-Effekte über den vorhandenen `fxBus`, Panning nach x), `client/host/juice.ts` (shake-Stufen, flash, hitStop, slowMo, zoomPunch, burst mit Partikel-Emitter, float, banner), einheitliches `fx`-Feld im Snapshot; Versteckspiel-Pfeife auf den Synth; Sprecher per `speechSynthesis` (abschaltbar); Iris-Wipe zwischen Szenen; Ergebnis-Reveal mit Auto-Weiter. Zuerst Smash (Hit-Stop), Arena, Sumo, Bogen, Ententeich, Kart, Brett, Ergebnis *(#50 – Juice bisher in Smash, Arena, Sumo, Bogen, Enten, Kart, Brett, Ergebnis, Darts)*
+- [x] **Handy-Ausrichtung (Marlons Feedback):** Pflichtfeld `orientation` in `MiniInfo`, `client/controller/orientation.ts` (Ansage vor jedem Spiel, Overlay bei falscher Lage, Android-Lock im Vollbild, Laptop ausgenommen), ein schwebender Stick (`stick.ts`) statt drei, gemeinsames Querlayout `.lx`, `haptic()` mit iPhone-Ersatz (Klick-Ton + Rand-Blitz), Ansage auch am TV. Dann quer: Wasserbomben, Igel, Grill, Fangen, Geist, Verräter, Wackelturm, Versteckspiel; danach Arena, Sumo, Aufräumen, Kurve, Volley, Smash, Bogen *(#45 – 19 Spiele quer, Parcours-Stick und Pseudo-Quer fürs iPhone offen)*
 - [ ] **Regelkarte + Zuschauer:** Raum-Phase `intro` mit `MINI_INFO.howTo` (Ziel + 3 Steuer-Piktogramme), Übungsfeld am Handy, „Bereit!“; Emote-Leiste und Wetten für Ausgeschiedene; eine Spielerfarbe pro Abend mit Kürzel; Ergebnis zweispaltig ab 9
 
 ### Phase 2 · Look und Bewegung (M ×2)
@@ -163,7 +163,7 @@ Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), d
 - [ ] (M) Minispiel-Typen 2 gegen 2 und 1 gegen 3, Abend-Statistik und „Titel des Abends“ aus dem `FxLog`, Turnier als Playlist
 
 ### Phase 4 · Igel-Krieg → Worms
-- [ ] (S) Wind driftet statt neu gewürfelt; Zugzeit 30/20/15 s nach Spielerzahl; Flut pro Runde statt pro Zug; HP 60 ab 8 Spielern; Sudden Death ab 7 Spielern nach 3 min; HP am Zugende herunterzählen; Kamera (Aktiver, Geschoss, Krater); Wind sichtbar (Wolken, Balken, Pfeil im Ziel-Pad); Zuschauer-Sprüche; FEUER-Knopf
+- [x] (S) Wind driftet statt neu gewürfelt; Zugzeit 30/20/15 s nach Spielerzahl; Flut pro Runde statt pro Zug; HP 60 ab 8 Spielern; Sudden Death ab 7 Spielern nach 3 min; HP am Zugende herunterzählen; Kamera (Aktiver, Geschoss, Krater); Wind sichtbar (Wolken, Balken, Pfeil im Ziel-Pad); Zuschauer-Sprüche; FEUER-Knopf *(#46)*
 - [ ] (M) Modus „Alle gleichzeitig“ ab 7 Spielern; Waffen 4 → 10 (Wasser-Schrotflinte, Möwen-Luftschlag per Minikarte, Böller, Seeigel-Mine, Ananas-Splitterbombe, Paddel, Heilige Ananas, Surfbrett-Brücke); Kisten am Fallschirm; Gaskartuschen; Spieler-Teams; größere Insel
 - [ ] (L) Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche
 

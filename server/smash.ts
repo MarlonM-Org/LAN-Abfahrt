@@ -598,7 +598,8 @@ export class SmashGame implements MiniGame {
   }
 
   private hit(o: Fighter, by: Fighter | null, h: HitData, dir: number, now: number) {
-    if (now < o.invUntil || o.state !== 'fight') return;
+    // Ohne Verbindung (nach der 3-s-Gnadenfrist) unverwundbar – TV zeigt den Kämpfer halbtransparent
+    if (now < o.invUntil || o.state !== 'fight' || !this.ctx.isConnected(o.id)) return;
     const cx = o.x;
     const cy = o.y - SMASH.H / 2;
     if (o.shieldOn) {
@@ -909,6 +910,7 @@ export class SmashGame implements MiniGame {
               cd: Math.max(0, f.cdUntil - now),
               hold: f.hold,
               inv: now < f.invUntil,
+              ...(f.state === 'fight' && !this.ctx.isConnected(f.id) ? { away: true } : {}),
               state: f.state,
               kos: f.kos,
               place: f.place,

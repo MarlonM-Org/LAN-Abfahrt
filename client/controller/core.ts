@@ -12,10 +12,12 @@ export function kartViewPref(): 'phone' | 'tv' | undefined {
   return v === 'phone' || v === 'tv' ? v : undefined;
 }
 
-export const socket = io();
+// Gleich per WebSocket (schneller Aufbau, kein Polling-Umweg im schwachen WLAN); Polling nur, wenn WebSocket scheitert
+export const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
 
 /** Gemeinsamer Zustand des Handy-Controllers */
 export const store = {
+  /** meta (Spieler, Leaderboards – nur bei Änderung) + state (laufendes Spiel) zusammengeführt */
   state: null as GameState | null,
   priv: null as PrivateState,
   playerId: (localStorage.getItem(LS.id) ?? undefined) as string | undefined,

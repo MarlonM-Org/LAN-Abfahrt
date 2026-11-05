@@ -1,7 +1,7 @@
 import '@fontsource/press-start-2p/400.css';
 import Phaser from 'phaser';
 import { io } from 'socket.io-client';
-import type { GameState } from '../../shared/types';
+import type { GameLive, GameMeta, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { LobbyScene } from './LobbyScene';
 import { BoardScene } from './BoardScene';
@@ -11,7 +11,7 @@ import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
-import { setState } from './store';
+import { mergeLive, mergeMeta, setState } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
@@ -57,8 +57,9 @@ import { KofferScene } from './KofferScene';
 import { SuessScene } from './SuessScene';
 import { SpionScene } from './SpionScene';
 import { UmzugScene } from './UmzugScene';
+import { WackelScene } from './WackelScene';
 
-const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug'];
+const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -81,11 +82,12 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene],
+    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene],
   });
 
   let currentKey = '';
-  const socket = io();
+  // Gleich per WebSocket (schneller, kein Polling-Umweg); nur wenn das scheitert, Polling als Notlösung
+  const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
   startTimeSync(socket);
   initPlayersPanel(socket); // Panel „Spieler“ (Taste P)
   connectMusic(socket);
@@ -125,7 +127,11 @@ async function start() {
       installHostControls(socket);
     }
   });
-  socket.on('state', (s: GameState) => {
+  // meta (selten) + state (laufend) → ein GameState für Szenen und Panels
+  socket.on('meta', (m: GameMeta) => show(mergeMeta(m)));
+  socket.on('state', (l: GameLive) => show(mergeLive(l)));
+  function show(s: GameState | null) {
+    if (!s) return;
     const key = sceneKey(s);
     setState(s);
     if (key !== currentKey) {
@@ -136,7 +142,7 @@ async function start() {
       musicMenuScene(key);
     }
     showOrientBanner(s);
-  });
+  }
 
   // Beim Start eines Minispiels 6 s „📱↔ Handys QUER halten“ bzw. hochkant – auch ohne Brett-Intro (Arcade, Trinkspiel, Date)
   const orientTv = document.getElementById('orient-tv');

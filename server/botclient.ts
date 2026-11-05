@@ -3,7 +3,7 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { ArenaState, GameState, IgelState, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
+import type { ArenaState, GameLive, GameMeta, GameState, IgelState, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
 import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, PUNCH, type Mask, buildTerrain, carve, simulateBazooka, surfaceY } from '../shared/igel';
@@ -24,6 +24,7 @@ import { grillBot } from './grillbot';
 import { umzugBot } from './umzugbot';
 import { golfBot } from './golfbot';
 import { spionBot } from './spionbot';
+import { WACKEL, type WackelPlatform, type WackelState, wackelPlatformUnder, wackelStage, wackelSurfaceY } from '../shared/wackel';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -152,9 +153,20 @@ export class Bot {
       opts.log?.(`${name}: wurde entfernt`);
       this.stop();
     });
-    this.socket.on('state', (s: GameState) => {
+    // meta (Spieler, Leaderboards – nur bei Änderung) + state (laufendes Spiel) → ein GameState
+    let meta: GameMeta | null = null;
+    let live: GameLive | null = null;
+    const onState = (s: GameState) => {
       this.state = s;
       this.react(s);
+    };
+    this.socket.on('meta', (m: GameMeta) => {
+      meta = m;
+      if (live) onState({ ...m, ...live });
+    });
+    this.socket.on('state', (l: GameLive) => {
+      live = l;
+      if (meta) onState({ ...meta, ...l });
     });
   }
 
@@ -1172,6 +1184,8 @@ export class Bot {
     }
 
     if (m.kind === 'sumo') sumoBot(this, m.state);
+
+    if (m.kind === 'wackel') wackelBot(this, m.state);
 
     if (m.kind === 'bogen') bogenBot(this, m.state);
 
@@ -2314,6 +2328,175 @@ function sumoBot(bot: Bot, st: SumoState) {
   mem.moving = true;
   bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
+
+// ------------------------------------------------------------------ Wackel-Prügelei
+
+interface WackelBotMemory {
+  nextAt: number;
+  moving: boolean;
+  grabbing: boolean;
+  /** Seit wann hält der Bot einen Spieler fest */
+  holdSince: number;
+  /** Richtung, in die der Gehaltene geschleppt wird (−1/1) */
+  dragDir: number;
+  /** Eigene Ungenauigkeit/Aggressivität, damit nicht alle Bots gleich spielen */
+  slop: number;
+  aggro: number;
+  lastJump: number;
+  lastPunch: number;
+  hangSince: number;
+}
+
+const wackelBotMem = new WeakMap<Bot, WackelBotMemory>();
+
+/** Nächste Kante der Plattform (x) in Richtung dir */
+function wackelEdgeX(p: WackelPlatform, dir: number) {
+  return dir < 0 ? p.x : p.x + p.w;
+}
+
+/**
+ * Wackel-Bot: torkelt zum nächsten Gegner, haut zu, wenn er nah ist, packt ihn ab und zu und
+ * schleppt ihn zur nächsten Kante, wo er ihn ins Wasser wirft. Hängt er selbst an einer Kante,
+ * klettert er mit SPRINGEN hoch; am Rand ohne Beute dreht er um.
+ */
+function wackelBot(bot: Bot, st: WackelState) {
+  let mem = wackelBotMem.get(bot);
+  if (!mem) wackelBotMem.set(bot, (mem = { nextAt: 0, moving: false, grabbing: false, holdSince: 0, dragDir: 1, slop: rand(0.05, 0.3), aggro: rand(0.3, 0.8), lastJump: 0, lastPunch: 0, hangSince: 0 }));
+  const me = st.players[bot.id];
+  const stop = () => {
+    if (mem!.moving) {
+      mem!.moving = false;
+      bot.send('stick', { x: 0, y: 0 });
+    }
+    if (mem!.grabbing) {
+      mem!.grabbing = false;
+      bot.send('btn', { b: 'grab', down: false, x: 0, y: 0 });
+    }
+  };
+  if (st.sub !== 'play' || !me?.alive || me.parts.length < 3) return stop();
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(90, 150);
+  if (me.stun) return stop();
+
+  const stage = wackelStage(st.stage);
+  const tilt = (st.tilt * Math.PI) / 1800;
+  const mx = me.parts[0];
+  const my = me.parts[1];
+  const plat = wackelPlatformUnder(stage, mx, my + WACKEL.STAND_H - 6, tilt, 16);
+  const send = (x: number, y: number) => {
+    mem!.moving = true;
+    bot.send('stick', { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+  };
+  const grab = (on: boolean, x = 0, y = 0) => {
+    if (mem!.grabbing === on) return;
+    mem!.grabbing = on;
+    bot.send('btn', { b: 'grab', down: on, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+  };
+
+  // An einer Kante hängen → kurz zappeln, dann hochklettern
+  if (me.grab === 2) {
+    if (!mem.hangSince) mem.hangSince = now;
+    if (now - mem.hangSince > rand(300, 900) && now - mem.lastJump > 700) {
+      mem.lastJump = now;
+      bot.send('btn', { b: 'jump', down: true, x: 0, y: 0 });
+    }
+    return;
+  }
+  mem.hangSince = 0;
+
+  // Jemanden im Griff: zur nächsten Kante schleppen und dort rauswerfen
+  if (me.grab === 1) {
+    if (!mem.holdSince) {
+      mem.holdSince = now;
+      mem.dragDir = plat ? (mx - plat.x < plat.x + plat.w - mx ? -1 : 1) : me.f;
+    }
+    const edge = plat ? wackelEdgeX(plat, mem.dragDir) : mx + mem.dragDir * 40;
+    const dist = Math.abs(edge - mx);
+    if (dist < 14 || now - mem.holdSince > 3200) {
+      // Werfen: Stick nach außen, dann loslassen
+      send(mem.dragDir, -0.35);
+      mem.holdSince = 0;
+      mem.grabbing = false;
+      bot.send('btn', { b: 'grab', down: false, x: mem.dragDir, y: -0.35 });
+      mem.nextAt = now + 350;
+      return;
+    }
+    send(mem.dragDir * 0.9, 0);
+    return;
+  }
+  mem.holdSince = 0;
+
+  // Ziel: nächster Gegner (bevorzugt auf gleicher Höhe)
+  const foes = Object.entries(st.players).filter(([id, p]) => id !== bot.id && p.alive && p.parts.length >= 3);
+  const target = foes
+    .map(([id, p]) => ({ id, p, d: Math.hypot(p.parts[0] - mx, (p.parts[1] - my) * 1.6) }))
+    .sort((a, b) => a.d - b.d)[0];
+  if (!target) return stop();
+  const tx = target.p.parts[0];
+  const ty = target.p.parts[1];
+  const dx = tx - mx;
+  const dy = ty - my;
+  const dist = Math.hypot(dx, dy);
+  let wantX = Math.sign(dx) || me.f;
+  let wantY = 0;
+
+  // Wasser steigt: hoch hinaus
+  if (st.sudden && plat) {
+    const higher = stage.platforms.filter((p) => p.y < plat.y - 10).sort((a, b) => Math.abs(a.x + a.w / 2 - mx) - Math.abs(b.x + b.w / 2 - mx))[0];
+    if (higher) {
+      const cx = higher.x + higher.w / 2;
+      wantX = Math.sign(cx - mx) || 1;
+      if (Math.abs(cx - mx) < higher.w / 2 + 6 && now - mem.lastJump > 900) {
+        mem.lastJump = now;
+        bot.send('btn', { b: 'jump', down: true, x: wantX, y: -1 });
+      }
+    }
+  }
+
+  // Randvermeidung: vor der Kante umdrehen, außer der Gegner steht gleich dahinter (springen)
+  if (plat) {
+    const ahead = mx + wantX * 14;
+    const sy = wackelSurfaceY(plat, ahead, tilt);
+    if (sy === null) {
+      const landing = wackelPlatformUnder(stage, mx + wantX * 30, my + WACKEL.STAND_H, tilt, 60);
+      if (landing && Math.abs(dx) > 20 && now - mem.lastJump > 900 && Math.random() < 0.5) {
+        mem.lastJump = now;
+        bot.send('btn', { b: 'jump', down: true, x: wantX, y: -1 });
+      } else if (Math.abs(dx) > 16 || dist > 26) wantX = -wantX * 0.6;
+      else wantX *= 0.3;
+    }
+  }
+  // Gegner steht höher: hochspringen – auch von den tiefen Planken zurück aufs Deck
+  const higherAhead = stage.platforms.find((p) => p.y < my + WACKEL.STAND_H - 12 && p.y > my - 46 && mx + wantX * 28 > p.x - 4 && mx + wantX * 28 < p.x + p.w + 4);
+  if (((dy < -22 && Math.abs(dx) < 40) || (higherAhead && plat && higherAhead !== plat)) && now - mem.lastJump > 1000 && Math.random() < 0.45) {
+    mem.lastJump = now;
+    wantX = higherAhead ? Math.sign(higherAhead.x + higherAhead.w / 2 - mx) || wantX : wantX;
+    bot.send('btn', { b: 'jump', down: true, x: wantX, y: -1 });
+  }
+
+  const close = dist < 20;
+  if (close) {
+    const dirX = Math.sign(dx) || me.f;
+    const dirY = Math.max(-0.6, Math.min(0.4, dy / 20));
+    // Greifen oder hauen?
+    if (!mem.grabbing && Math.random() < 0.28 * mem.aggro) {
+      grab(true, dirX, dirY);
+      send(dirX * 0.5, dirY);
+      return;
+    }
+    if (mem.grabbing && Math.random() < 0.3) grab(false);
+    if (!mem.grabbing && me.cd <= 0 && now - mem.lastPunch > 650 && Math.random() < 0.45 + mem.aggro * 0.3) {
+      mem.lastPunch = now;
+      bot.send('btn', { b: 'punch', down: true, x: dirX, y: dirY });
+    }
+    wantX = dirX * 0.45;
+    wantY = dirY * 0.5;
+  } else if (mem.grabbing && Math.random() < 0.25) grab(false);
+
+  const wob = Math.sin(now / 600 + mem.slop * 20) * mem.slop;
+  send(Math.max(-1, Math.min(1, wantX + wob)), wantY);
 }
 
 // ------------------------------------------------------------------ Angeln

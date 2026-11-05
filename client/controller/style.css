@@ -951,6 +951,32 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .zb-hp { height: 18px; }
   .zauber .zb-wins { margin-right: 120px; }
 }
+/* ---------------------------------------------------------------- Wackel-Prügelei */
+.wackel .wk-top { border-bottom: 3px solid var(--wk-color, #e0503f); padding-bottom: 4px; }
+.wk-wins { flex: 1; display: flex; align-items: center; gap: 4px; color: var(--ink-soft); font-size: 9px; }
+.wk-outs { margin-left: 6px; color: var(--ink); }
+.wackel .sm-info b { color: #2d64a8; }
+.wackel.stunned .sm-info b { color: #a8342a; }
+.wackel .sm-zone { background: repeating-linear-gradient(45deg, rgba(63, 143, 224, 0.1) 0 8px, transparent 8px 16px), #dcebf5; border-color: #2d64a8; }
+.wackel.stunned .sm-zone { background: repeating-linear-gradient(45deg, rgba(240, 120, 40, 0.2) 0 8px, transparent 8px 16px), #f7e0c8; border-color: #a8342a; }
+.wackel .sm-knob { background: var(--wk-color, #e0503f); border-color: var(--outline); box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.4); }
+.wk-btns { display: grid; grid-template-columns: 1fr 1.1fr; grid-template-rows: auto auto; align-content: end; gap: 10px 8px; padding-bottom: 6px; }
+.wk-btns .sm-btn { color: #fff4d6; text-shadow: 2px 2px 0 var(--outline); flex-direction: column; gap: 2px; }
+.wk-btns .sm-btn small { font-size: 7px; opacity: 0.8; }
+.wk-btns .wk-jump { grid-column: 1; grid-row: 1; width: 82%; justify-self: center; font-size: 9px; background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
+.wk-btns .wk-grab { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 10px; background: #46b04a; box-shadow: inset 0 4px 0 #86d48a, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.wk-btns .wk-grab.pressed { filter: brightness(1.2); }
+.wk-btns .wk-grab.holding { background: #f0973a; box-shadow: inset 0 4px 0 #f7bd7e, inset 0 -6px 0 #b86a1a, 0 0 0 4px #ffd25e; }
+.wk-btns .wk-grab.hanging { background: #9b5fc0; box-shadow: inset 0 4px 0 #c495e0, inset 0 -6px 0 #6c3a8f, 0 0 0 4px #c79bff; }
+.wk-btns .wk-punch { grid-column: 1; grid-row: 2; font-size: 11px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7e, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.wk-btns .sm-btn.cooling { color: rgba(255, 244, 214, 0.6); }
+@media (orientation: landscape) and (max-height: 520px) {
+  .wk-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+  .wk-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
+  .wk-btns .wk-jump { width: auto; max-height: 110px; }
+  .wk-btns .wk-grab { max-height: 175px; }
+  .wackel .wk-wins { margin-right: 120px; }
+}
 .mode-tabs.four { grid-template-columns: 1fr 1fr; }
 table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
 table.lb td { padding: 4px 2px; border-bottom: 1px dashed var(--paper-dark); color: var(--ink); }
