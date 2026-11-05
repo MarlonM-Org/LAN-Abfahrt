@@ -45,7 +45,18 @@ export function pickKoffer(s: KofferState): Screen {
   const me = myCar(s);
   if (!me) return ['spectate', message('Du schaust zu')];
   if (s.sub === 'settle' || s.sub === 'over')
-    return [`koffer-over-${s.sub}`, message(s.sub === 'over' ? 'Klappe zu!' : 'Zeit um!', `${me.liters} Liter eingepackt\n${me.count} Teile · ${me.pct} % voll${me.lost ? `\n${me.lost}× rausgefallen` : ''}\nSchau auf den Fernseher!`)];
+    return [`koffer-over-${s.sub}`, () => {
+      app.append(
+        el(`<div class="center koffer-over">
+          <h2>${s.sub === 'over' ? 'Klappe zu!' : 'Zeit um!'}</h2>
+          <p class="koffer-big">${me.liters} Liter</p>
+          <p>${me.count} Teile · ${me.pct} % voll</p>
+          ${me.lost ? `<p>${me.lost}× rausgefallen</p>` : ''}
+          <p>Schau auf den Fernseher!</p>
+        </div>`),
+      );
+      return null;
+    }];
 
   return ['koffer-play', () => {
     const partner = me.owners.find((o) => o !== store.playerId);

@@ -1396,3 +1396,5 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .koffer-team { font-size: 8px; color: var(--ink); margin: 0; }
 .koffer-pad.waiting .turm-btn { filter: grayscale(0.8) brightness(0.85); }
 .top-row .timer.alert { color: var(--red); }
+.koffer-over p { margin: 6px 0; }
+.koffer-over .koffer-big { font-size: 20px; color: var(--red); }
