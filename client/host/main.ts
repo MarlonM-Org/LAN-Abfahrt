@@ -14,8 +14,9 @@ import { TttScene } from './TttScene';
 import { setState } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
+import { connectMusic, setScene, unlockMusic } from './music';
+import { isMusicMenuOpen, musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
 import { watchServerVersion } from '../version';
-import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -23,6 +24,7 @@ import { FliegerScene } from './FliegerScene';
 import { KurveScene } from './KurveScene';
 import { ArenaScene } from './ArenaScene';
 import { BowlingScene } from './BowlingScene';
+import { BouleScene } from './BouleScene';
 import { EntenScene } from './EntenScene';
 import { VersteckScene } from './VersteckScene';
 import { ParcoursScene } from './ParcoursScene';
@@ -34,11 +36,12 @@ import { WasserScene } from './WasserScene';
 import { StillepostScene } from './StillepostScene';
 import { FangenScene } from './FangenScene';
 import { GeistScene } from './GeistScene';
+import { GrillScene } from './GrillScene';
 import { SumoScene } from './SumoScene';
 import { TouristScene } from './TouristScene';
 import { SpruecheScene } from './SpruecheScene';
 
-const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'sumo', 'tourist', 'sprueche'];
+const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'tourist', 'sprueche'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -61,12 +64,14 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, SumoScene, TouristScene, SpruecheScene],
+    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, TouristScene, SpruecheScene],
   });
 
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
+  connectMusic(socket);
+  setupMusicMenu();
   watchServerVersion(socket);
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
@@ -77,10 +82,18 @@ async function start() {
   };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'm' || e.key === 'M') {
-      const muted = toggleMute();
-      const n = document.getElementById('mute');
-      if (n) n.textContent = muted ? 'Ton aus (M)' : '';
+      // M öffnet das Musik-Menü (Lautstärke, Stumm, Bibliothek, Zuordnung)
+      unlock();
+      toggleMusicMenu();
+      return;
+    }
+    if (e.key === 'Escape' && isMusicMenuOpen()) {
+      // Nur das Menü schließen – nicht zusätzlich „Spiel abbrechen“ (Laptop-Steuerung) auslösen
+      toggleMusicMenu(false);
+      e.stopImmediatePropagation();
       return;
     }
     unlock();
@@ -101,7 +114,8 @@ async function start() {
       currentKey = key;
       for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
       game.scene.start(key);
-      setTrack(trackForScene(key));
+      setScene(key);
+      musicMenuScene(key);
     }
   });
 }

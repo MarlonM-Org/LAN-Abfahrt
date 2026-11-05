@@ -1,294 +1,259 @@
 /**
  * 8-Bit-Musik für den TV/Laptop – komplett mit WebAudio erzeugt (keine Audiodateien).
- * Ein kleiner Sequencer spielt je nach Szene einen passenden Loop:
- * Pulse-Lead, Dreieck-Bass und Rauschen als Schlagzeug.
+ *
+ * Der Synth/Sequencer liegt in `client/music/player.ts` (gleicher Klang wie in der
+ * Musik-Werkstatt). Hier: Audio freischalten, Lautstärke/Stumm (localStorage), Bibliothek
+ * und Szenen-Zuordnung vom Server (REST beim Start + live per Socket.IO), Szene → Song.
  */
+import type { Socket } from 'socket.io-client';
+import { type Assignment, type Song, type SongInfo, resolveSceneSong } from '../../shared/music';
+import { BUILTIN_INFOS, builtinSong } from '../../shared/musicBuiltin';
+import { getAssignment, getSong, listSongs } from '../music/api';
+import { SongPlayer, Synth, midiHz } from '../music/player';
 
-type TrackName = 'party' | 'action' | 'romantic' | 'spooky' | 'bar' | 'none';
+const LS_VOL = 'lan-abfahrt.musik.volume';
+const LS_MUTE = 'lan-abfahrt.musik.mute';
+const LS_MUSIC = 'lan-abfahrt.musik.music';
+const LS_FX = 'lan-abfahrt.musik.fx';
 
-interface Track {
-  bpm: number;
-  /** Akkordfolge als MIDI-Grundtöne, je ein Takt */
-  chords: number[][];
-  lead: 'pulse25' | 'pulse50' | 'triangle';
-  drums: 'four' | 'rock' | 'soft' | 'none';
-  /** Melodie: pro Takt 16 Schritte, Zahl = Index in Akkord (+7 = Oktave), -1 = Pause */
-  melody: number[][];
-  swing?: number;
-  leadVol: number;
+let synth: Synth | null = null;
+let player: SongPlayer | null = null;
+let wantedScene = '';
+let currentSongId: string | null = null;
+/** Vorhören aus dem Musik-Menü läuft (dann keine Szenenmusik umschalten) */
+let previewing = false;
+
+let songs: SongInfo[] = BUILTIN_INFOS;
+let assign: Assignment = {};
+const cache = new Map<string, Song>();
+/** Stil-Zuordnung: reihum durch die Songs des Stils (pro Stil ein Zähler) */
+const rotation = new Map<string, number>();
+export type MusicChange = 'volume' | 'library';
+const listeners = new Set<(kind: MusicChange) => void>();
+
+const read = (k: string, d: number) => {
+  const v = Number(localStorage.getItem(k));
+  return Number.isFinite(v) && localStorage.getItem(k) !== null ? v : d;
+};
+let volume = Math.max(0, Math.min(1, read(LS_VOL, 1)));
+let muted = localStorage.getItem(LS_MUTE) === '1';
+let musicVol = Math.max(0, Math.min(1, read(LS_MUSIC, 1)));
+let fxVol = Math.max(0, Math.min(1, read(LS_FX, 1)));
+let ducked = false;
+
+/** Muss durch eine Nutzeraktion (Klick/Taste) aufgerufen werden */
+export function unlockMusic() {
+  if (synth) {
+    synth.resume();
+    return;
+  }
+  synth = new Synth();
+  synth.setMasterVolume(volume);
+  synth.setMuted(muted);
+  synth.setMusicVolume(musicVol);
+  synth.setFxVolume(fxVol);
+  player = new SongPlayer(synth);
+  if (wantedScene) void playScene(wantedScene);
 }
 
-const m = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
+export const audioReady = () => !!synth && synth.ctx.state === 'running';
+export const audioCtx = () => synth?.ctx ?? null;
+export const audioOut = () => synth?.master ?? null;
+
+// ------------------------------------------------------------------ Lautstärke
+
+export const getVolume = () => volume;
+export const isMuted = () => muted;
+
+export const getMusicVolume = () => musicVol;
+export const getFxVolume = () => fxVol;
+
+export function setVolume(v: number) {
+  volume = Math.max(0, Math.min(1, v));
+  localStorage.setItem(LS_VOL, String(volume));
+  synth?.setMasterVolume(volume);
+  notify('volume');
+}
+
+export function setMusicVolume(v: number) {
+  musicVol = Math.max(0, Math.min(1, v));
+  localStorage.setItem(LS_MUSIC, String(musicVol));
+  if (!ducked) synth?.setMusicVolume(musicVol);
+  notify('volume');
+}
+
+export function setFxVolume(v: number) {
+  fxVol = Math.max(0, Math.min(1, v));
+  localStorage.setItem(LS_FX, String(fxVol));
+  synth?.setFxVolume(fxVol);
+  notify('volume');
+}
+
+export function setMuted(m: boolean) {
+  muted = m;
+  localStorage.setItem(LS_MUTE, m ? '1' : '0');
+  synth?.setMuted(m);
+  notify('volume');
+  return muted;
+}
+
+export const toggleMute = () => setMuted(!muted);
+
+/** Musik leiser drehen (z. B. während der Rhythmus-Song läuft) */
+export function duckMusic(on: boolean) {
+  ducked = on;
+  synth?.setMusicVolume(on ? 0 : musicVol);
+}
+
+// ------------------------------------------------------------------ Bibliothek & Zuordnung
+
+export const getSongs = () => songs;
+export const getAssign = () => assign;
+export const getCurrentSongId = () => currentSongId;
+export const getScene = () => wantedScene;
+
+/** Benachrichtigung für das Musik-Menü (Lautstärke, Bibliothek, Zuordnung, laufender Song) */
+export function onMusicChange(fn: (kind: MusicChange) => void) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+const notify = (kind: MusicChange = 'library') => listeners.forEach((fn) => fn(kind));
+
+/** Bibliothek + Zuordnung laden und Live-Updates vom Server abonnieren */
+export function connectMusic(socket: Socket) {
+  void Promise.all([listSongs(), getAssignment()]).then(([s, a]) => {
+    songs = s;
+    assign = a;
+    notify();
+    if (wantedScene) void playScene(wantedScene);
+  });
+  socket.on('music:songs', (s: SongInfo[]) => {
+    songs = s;
+    // Geänderte eigene Songs neu laden (eingebaute sind unveränderlich)
+    for (const info of s) {
+      const c = cache.get(info.id);
+      if (c && !info.builtin && c.updated !== info.updated) cache.delete(info.id);
+    }
+    for (const id of [...cache.keys()]) if (!s.some((x) => x.id === id)) cache.delete(id);
+    notify();
+    if (wantedScene && !previewing) void playScene(wantedScene, true);
+  });
+  socket.on('music:assign', (a: Assignment) => {
+    assign = a;
+    notify();
+    if (wantedScene && !previewing) void playScene(wantedScene);
+  });
+}
+
+async function loadSong(id: string): Promise<Song | null> {
+  const c = cache.get(id) ?? builtinSong(id);
+  if (c) return c;
+  try {
+    const s = await getSong(id);
+    cache.set(id, s);
+    return s;
+  } catch {
+    return null;
+  }
+}
+
+function pickRotating(style: string, ids: string[]): string {
+  const n = rotation.get(style) ?? -1;
+  const next = (n + 1) % ids.length;
+  rotation.set(style, next);
+  return ids[next];
+}
+
+/** Welcher Song gehört zur Szene (ohne ihn zu starten; bei Stil-Zuordnung der nächste der Rotation)? */
+export function trackForScene(scene: string): string | null {
+  const raw = assign[scene] ?? assign.standard ?? '';
+  return resolveSceneSong(scene, assign, songs, (ids) => ids[((rotation.get(raw) ?? -1) + 1) % ids.length]);
+}
+
+let playToken = 0;
+/** Song zur Szene (neu) starten. `refresh`: gleicher Song erneut laden (nach Änderung in der Werkstatt) */
+async function playScene(scene: string, refresh = false) {
+  if (!synth || !player) return;
+  const raw = assign[scene] ?? assign.standard ?? '';
+  const id = resolveSceneSong(scene, assign, songs, (ids) => pickRotating(raw, ids));
+  if (id === currentSongId && !refresh && player.playing) return;
+  const token = ++playToken;
+  if (!id) {
+    player.stop();
+    currentSongId = null;
+    notify();
+    return;
+  }
+  const song = await loadSong(id);
+  if (token !== playToken || !player) return;
+  if (!song) {
+    player.stop();
+    currentSongId = null;
+    notify();
+    return;
+  }
+  if (refresh && id === currentSongId && player.playing) player.setSong(song);
+  else player.play(song, { loop: true });
+  currentSongId = id;
+  notify();
+}
+
+/** Szene wechseln → passende Musik (Zuordnung → Standard → eingebauter Loop) */
+export function setScene(scene: string) {
+  wantedScene = scene;
+  if (previewing) return;
+  void playScene(scene);
+}
+
+/** Alte API: Loop direkt nach Namen – entspricht jetzt der Szene */
+export const setTrack = (name: string) => setScene(name);
+
+// ------------------------------------------------------------------ Vorhören (Musik-Menü)
+
+/** Einen Song aus der Bibliothek anspielen (ersetzt die Szenenmusik, bis `stopPreview`) */
+export async function previewSong(id: string) {
+  unlockMusic();
+  if (!player) return;
+  previewing = true;
+  const token = ++playToken;
+  const song = await loadSong(id);
+  if (token !== playToken || !player || !previewing) return;
+  if (song) {
+    player.play(song, { loop: true });
+    currentSongId = id;
+  }
+  notify();
+}
+
+export function stopPreview() {
+  if (!previewing) return;
+  previewing = false;
+  currentSongId = null;
+  if (wantedScene) void playScene(wantedScene);
+  else player?.stop();
+  notify();
+}
+
+export const isPreviewing = () => previewing;
+
+// ------------------------------------------------------------------ Rhythmus-Song (geteiltes Gerät)
 
 const C = [60, 64, 67];
 const G = [55, 59, 62];
 const Am = [57, 60, 64];
 const F = [53, 57, 60];
-const Dm = [50, 53, 57];
-const Bb = [46, 50, 53];
-const Gm = [55, 58, 62];
-const A = [57, 61, 64];
-const Em = [52, 55, 59];
-const D = [50, 54, 57];
-
-const R = -1;
-const TRACKS: Record<Exclude<TrackName, 'none'>, Track> = {
-  party: {
-    bpm: 124,
-    chords: [C, G, Am, F],
-    lead: 'pulse25',
-    drums: 'four',
-    leadVol: 0.07,
-    melody: [
-      [2, R, 1, R, 0, R, 1, 2, R, 2, R, 3, 2, R, 1, R],
-      [1, R, 2, R, 1, R, 0, R, 1, 2, 1, R, 0, R, R, R],
-      [0, R, 1, R, 2, R, 3, R, 2, R, 1, R, 2, R, 0, R],
-      [1, R, 0, R, 1, 2, R, 3, R, 4, R, 3, 2, R, R, R],
-    ],
-  },
-  action: {
-    bpm: 150,
-    chords: [Am, F, C, G],
-    lead: 'pulse50',
-    drums: 'rock',
-    leadVol: 0.06,
-    melody: [
-      [0, 0, 2, 0, 3, 0, 2, 1, 0, 0, 2, 0, 4, 3, 2, 1],
-      [0, 0, 2, 0, 3, 0, 2, 1, 0, 1, 2, 3, 4, R, 3, R],
-      [2, 2, 3, 2, 1, 0, 1, 2, 3, R, 2, R, 1, R, 0, R],
-      [1, 1, 2, 1, 0, R, 1, 2, 4, 3, 2, 1, 2, R, R, R],
-    ],
-  },
-  romantic: {
-    bpm: 84,
-    chords: [F, Dm, Bb, C],
-    lead: 'triangle',
-    drums: 'soft',
-    leadVol: 0.12,
-    swing: 0.12,
-    melody: [
-      [2, R, R, 1, 2, R, 3, R, 2, R, R, R, 1, R, R, R],
-      [0, R, R, 1, 2, R, 1, R, 0, R, R, R, R, R, R, R],
-      [1, R, R, 2, 3, R, 2, R, 1, R, 0, R, 1, R, R, R],
-      [2, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R],
-    ],
-  },
-  spooky: {
-    bpm: 92,
-    chords: [Dm, Bb, Gm, A],
-    lead: 'triangle',
-    drums: 'soft',
-    leadVol: 0.1,
-    melody: [
-      [0, R, R, 7, R, R, 2, R, 1, R, R, R, 0, R, R, R],
-      [R, R, 2, R, R, 1, R, R, 0, R, R, R, R, R, R, R],
-      [0, R, R, 7, R, R, 2, R, 3, R, R, 2, R, 1, R, R],
-      [1, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R],
-    ],
-  },
-  bar: {
-    bpm: 108,
-    chords: [G, Em, C, D],
-    lead: 'pulse25',
-    drums: 'four',
-    leadVol: 0.06,
-    swing: 0.18,
-    melody: [
-      [2, R, 2, 1, 2, R, 3, R, 2, R, 1, R, 0, R, R, R],
-      [1, R, 1, 0, 1, R, 2, R, 1, R, 0, R, R, R, R, R],
-      [0, R, 1, R, 2, R, 3, 4, 3, R, 2, R, 1, R, R, R],
-      [2, R, 1, R, 0, R, 1, R, 2, R, R, R, R, R, R, R],
-    ],
-  },
-};
-
-let ctx: AudioContext | null = null;
-let master: GainNode | null = null;
-let musicBus: GainNode | null = null;
-let pulseWaves: Record<string, PeriodicWave> = {};
-let current: TrackName = 'none';
-let wanted: TrackName = 'none';
-let step = 0;
-let nextTime = 0;
-let timer: number | undefined;
-let muted = false;
-
-/** Muss durch eine Nutzeraktion (Klick/Taste) aufgerufen werden */
-export function unlockMusic() {
-  if (ctx) {
-    void ctx.resume();
-    return;
-  }
-  ctx = new AudioContext();
-  master = ctx.createGain();
-  master.gain.value = muted ? 0 : 0.9;
-  master.connect(ctx.destination);
-  musicBus = ctx.createGain();
-  musicBus.gain.value = 1;
-  musicBus.connect(master);
-  for (const duty of [0.25, 0.5]) {
-    const n = 32;
-    const real = new Float32Array(n);
-    const imag = new Float32Array(n);
-    for (let k = 1; k < n; k++) imag[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * duty);
-    pulseWaves[`pulse${duty * 100}`] = ctx.createPeriodicWave(real, imag);
-  }
-  setTrack(wanted);
-}
-
-export const audioReady = () => !!ctx && ctx.state === 'running';
-export const audioCtx = () => ctx;
-export const audioOut = () => master;
-
-export function toggleMute() {
-  muted = !muted;
-  if (master) master.gain.value = muted ? 0 : 0.9;
-  return muted;
-}
-
-export function setTrack(name: TrackName) {
-  wanted = name;
-  if (!ctx || name === current) return;
-  current = name;
-  clearInterval(timer);
-  if (name === 'none') return;
-  step = 0;
-  nextTime = ctx.currentTime + 0.1;
-  timer = window.setInterval(schedule, 25);
-}
-
-/** Musik leiser drehen (z. B. während der Rhythmus-Song läuft) */
-export function duckMusic(on: boolean) {
-  if (musicBus && ctx) musicBus.gain.setTargetAtTime(on ? 0 : 1, ctx.currentTime, 0.3);
-}
-
-function schedule() {
-  if (!ctx || current === 'none') return;
-  const t = TRACKS[current];
-  const stepDur = 60 / t.bpm / 4;
-  while (nextTime < ctx.currentTime + 0.15) {
-    playStep(t, step, nextTime + (step % 2 === 1 ? (t.swing ?? 0) * stepDur : 0), stepDur);
-    nextTime += stepDur;
-    step = (step + 1) % (16 * t.chords.length);
-  }
-}
-
-function playStep(t: Track, s: number, time: number, stepDur: number) {
-  const bar = Math.floor(s / 16);
-  const i = s % 16;
-  const chord = t.chords[bar % t.chords.length];
-  // Bass
-  if (i % 4 === 0 || (t.drums === 'rock' && i % 2 === 0)) tone(m(chord[0] - 12), time, stepDur * 1.8, 'triangle', 0.16);
-  // Arpeggio (leise)
-  if (t.lead !== 'triangle' && i % 2 === 0) tone(m(chord[(i / 2) % 3] + 12), time, stepDur * 0.8, 'pulse25', 0.025);
-  if (t.lead === 'triangle' && i % 4 === 2) tone(m(chord[Math.floor(i / 4) % 3] + 12), time, stepDur * 3, 'triangle', 0.04);
-  // Melodie
-  const note = t.melody[bar % t.melody.length][i];
-  if (note >= 0) {
-    const pitch = note >= 7 ? chord[(note - 7) % 3] + 24 : chord[note % 3] + 12 + (note >= 3 ? 12 : 0);
-    tone(m(pitch), time, stepDur * (t.lead === 'triangle' ? 3 : 1.6), t.lead, t.leadVol);
-  }
-  // Schlagzeug
-  if (t.drums === 'four' && i % 4 === 0) kick(time);
-  if (t.drums === 'rock' && (i === 0 || i === 8 || i === 10)) kick(time);
-  if ((t.drums === 'four' || t.drums === 'rock') && i % 8 === 4) noise(time, 0.12, 2500, 0.12);
-  if (t.drums !== 'none' && i % 2 === 1) noise(time, 0.03, 8000, t.drums === 'soft' ? 0.025 : 0.05);
-}
-
-export function tone(freq: number, time: number, dur: number, wave: 'pulse25' | 'pulse50' | 'triangle' | 'square', vol: number, out?: AudioNode) {
-  if (!ctx || !musicBus) return;
-  const o = ctx.createOscillator();
-  if (wave === 'triangle' || wave === 'square') o.type = wave;
-  else o.setPeriodicWave(pulseWaves[wave]);
-  o.frequency.value = freq;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.0001, time);
-  g.gain.exponentialRampToValueAtTime(vol, time + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-  o.connect(g).connect(out ?? musicBus);
-  o.start(time);
-  o.stop(time + dur + 0.05);
-}
-
-export function kick(time: number, out?: AudioNode) {
-  if (!ctx || !musicBus) return;
-  const o = ctx.createOscillator();
-  o.frequency.setValueAtTime(140, time);
-  o.frequency.exponentialRampToValueAtTime(45, time + 0.12);
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(0.35, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.18);
-  o.connect(g).connect(out ?? musicBus);
-  o.start(time);
-  o.stop(time + 0.2);
-}
-
-let noiseBuf: AudioBuffer | null = null;
-export function noise(time: number, dur: number, hp: number, vol: number, out?: AudioNode) {
-  if (!ctx || !musicBus) return;
-  if (!noiseBuf) {
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
-    const d = noiseBuf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-  }
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuf;
-  const f = ctx.createBiquadFilter();
-  f.type = 'highpass';
-  f.frequency.value = hp;
-  const g = ctx.createGain();
-  g.gain.setValueAtTime(vol, time);
-  g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-  src.connect(f).connect(g).connect(out ?? musicBus);
-  src.start(time);
-  src.stop(time + dur + 0.02);
-}
-
-/** Welcher Loop passt zu welcher Szene? */
-export function trackForScene(scene: string): TrackName {
-  switch (scene) {
-    case 'lobby':
-    case 'board':
-    case 'results':
-      return 'party';
-    case 'story':
-    case 'stars':
-    case 'wrap':
-    case 'descent':
-      return scene === 'descent' || scene === 'wrap' ? 'action' : 'romantic';
-    case 'murder':
-    case 'ttt':
-    case 'verstecken':
-    case 'geist':
-    case 'fangen':
-      return 'spooky';
-    case 'stillepost':
-    case 'tourist':
-    case 'sprueche':
-      return 'bar';
-    case 'wwe':
-    case 'nhie':
-    case 'hilo':
-    case 'bomb':
-      return 'bar';
-    case 'rhythm':
-      return 'romantic';
-    default:
-      return 'action';
-  }
-}
-
-// ------------------------------------------------------------------ Rhythmus-Song (geteiltes Gerät)
 
 /**
  * Spielt den Gesprächs-Song auf dem TV. `startPerf` ist der lokale performance.now()-Zeitpunkt
  * von Beat 0 (nach dem Vorlauf) – aus der synchronisierten Serverzeit berechnet.
  */
 export function playRhythmSong(startPerf: number, bpm: number, beats: number, leadIn: number) {
-  if (!ctx || !master) return;
+  if (!synth) return;
+  const s = synth;
+  const ctx = s.ctx;
   const out = ctx.createGain();
   out.gain.value = 1;
-  out.connect(master);
+  out.connect(s.fxBus);
   // performance.now() → AudioContext-Zeit
   const base = ctx.currentTime + (startPerf - performance.now()) / 1000;
   const beat = 60 / bpm;
@@ -296,18 +261,18 @@ export function playRhythmSong(startPerf: number, bpm: number, beats: number, le
   // Einzähler im Vorlauf
   for (let i = 0; i < 4; i++) {
     const t = base + leadIn / 1000 - (4 - i) * beat;
-    if (t > ctx.currentTime) tone(m(84), t, 0.08, 'square', 0.05, out);
+    if (t > ctx.currentTime) s.tone(midiHz(84), t, 0.08, 'square', 0.05, out);
   }
   for (let b = 0; b < beats; b++) {
     const t = base + leadIn / 1000 + b * beat;
     if (t < ctx.currentTime) continue;
     const chord = chords[Math.floor(b / 4) % 4];
-    if (b % 2 === 0) kick(t, out);
-    noise(t + beat / 2, 0.03, 8000, 0.05, out);
-    if (b % 4 === 2) noise(t, 0.1, 2500, 0.1, out);
-    tone(m(chord[0] - 12), t, beat * 0.9, 'triangle', 0.18, out);
-    tone(m(chord[b % 3] + 12), t, beat * 0.45, 'pulse25', 0.04, out);
-    tone(m(chord[(b + 1) % 3] + 12), t + beat / 2, beat * 0.45, 'pulse25', 0.03, out);
+    if (b % 2 === 0) s.kick(t, out);
+    s.noise(t + beat / 2, 0.03, 8000, 0.05, out);
+    if (b % 4 === 2) s.noise(t, 0.1, 2500, 0.1, out);
+    s.tone(midiHz(chord[0] - 12), t, beat * 0.9, 'triangle', 0.18, out);
+    s.tone(midiHz(chord[b % 3] + 12), t, beat * 0.45, 'pulse25', 0.04, out);
+    s.tone(midiHz(chord[(b + 1) % 3] + 12), t + beat / 2, beat * 0.45, 'pulse25', 0.03, out);
   }
   return () => out.disconnect();
 }

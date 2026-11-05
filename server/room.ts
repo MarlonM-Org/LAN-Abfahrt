@@ -20,6 +20,7 @@ import { SupGame, TidyGame } from './controllergames';
 import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
+import { BouleGame } from './boule';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
@@ -29,6 +30,7 @@ import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { ARCADE_POINTS, ARCADE_RANDOM, fitsPlayers } from '../shared/games';
 import { WasserGame } from './wasser';
+import { GrillGame } from './grill';
 import { FangenGame } from './fangen';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
@@ -437,6 +439,12 @@ export class Room {
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);
+        break;
+      case 'grill':
+        this.mini = new GrillGame(ids, ctx);
+        break;
+      case 'boule':
+        this.mini = new BouleGame(ids, ctx);
         break;
       case 'sumo':
         this.mini = new SumoGame(ids, ctx);

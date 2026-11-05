@@ -16,6 +16,7 @@ import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
 import { pickBowling } from './screens/bowling';
+import { pickBoule } from './screens/boule';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
 import { pickVerstecken } from './screens/verstecken';
@@ -28,6 +29,7 @@ import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
+import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
@@ -252,6 +254,10 @@ function pickScreen(): Screen {
           return pickFangen(m.state);
         case 'geist':
           return pickGeist(m.state);
+        case 'grill':
+          return pickGrill(m.state);
+        case 'boule':
+          return pickBoule(m.state);
         case 'sumo':
           return pickSumo(m.state);
         case 'tourist':

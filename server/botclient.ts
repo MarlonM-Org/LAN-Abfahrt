@@ -8,6 +8,8 @@ import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '.
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, PUNCH, type Mask, buildTerrain, carve, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
+import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
+import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { KURVE, ROOMS, TTT, TURM, turmCellOffsets } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
@@ -18,6 +20,7 @@ import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
+import { grillBot } from './grillbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -125,6 +128,35 @@ export class Bot {
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);
+    });
+  }
+
+  /** Boule am Strand: aufs Schweinchen legen – oder ab und zu die beste Gegnerkugel wegschießen */
+  private boulePlay(st: BouleState) {
+    this.once(`boule-${st.aimSeq}`, async () => {
+      const jack = st.jack;
+      if (!jack) return;
+      const mySide = st.sides.find((x) => x.members.includes(this.id))?.id;
+      let target = jack;
+      let shoot = false;
+      if (st.leader && st.leader !== mySide) {
+        const theirs = st.balls.filter((b) => b.side === st.leader).sort((a, b) => bouleDist(a, jack) - bouleDist(b, jack))[0];
+        if (theirs && bouleDist(theirs, jack) < 18 && Math.random() < 0.4) {
+          shoot = true;
+          target = theirs;
+        }
+      }
+      await sleep(rand(700, 1600));
+      if (shoot) {
+        this.send('style', { shoot: true });
+        await sleep(rand(300, 700));
+      }
+      const aim = bouleAim(target);
+      // beim Schießen etwas hinter die Kugel zielen, damit sie direkt getroffen wird
+      const dist = aim.dist + (shoot ? 14 : 0);
+      const boulePow = Math.max(0.18, Math.min(1, boulePowerFor(dist) + rand(-0.07, 0.07)));
+      const bouleAng = Math.max(-1, Math.min(1, aim.angle / BOULE.ANGLE_MAX + rand(-0.12, 0.12)));
+      this.send('throw', { seq: st.aimSeq, speed: boulePow, angle: bouleAng, spin: rand(-0.15, 0.15), shoot });
     });
   }
 
@@ -865,6 +897,8 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'boule' && m.state.sub === 'aim' && m.state.turn === this.id) this.boulePlay(m.state);
+
     if (m.kind === 'enten' && (m.state.sub === 'play' || m.state.sub === 'banner')) {
       const en = m.state;
       const me2 = en.players[this.id];
@@ -942,6 +976,14 @@ export class Bot {
       if (me2?.state === 'fight') this.once('smash', async () => {
         await sleep(rand(50, 110));
         this.smashBrain(m.state, me2);
+      });
+    }
+
+    if (m.kind === 'grill') {
+      const st = m.state;
+      this.once('grill', async () => {
+        grillBot(this, st);
+        await sleep(rand(90, 140));
       });
     }
 

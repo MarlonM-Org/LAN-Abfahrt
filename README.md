@@ -61,7 +61,7 @@ PUBLIC_HOST=192.168.178.23 npm run dev
 
 ### HTTPS (für Spiele mit Bewegungssensor)
 
-iPhones geben den Bewegungssensor (Bowling, Ententeich, Kipp-Lenkung) nur über HTTPS frei. Alles andere läuft weiter über HTTP.
+iPhones geben den Bewegungssensor (Bowling, Boule, Ententeich, Kipp-Lenkung) nur über HTTPS frei. Alles andere läuft weiter über HTTP.
 
 Aufbau (einmalig einrichten):
 
@@ -85,7 +85,21 @@ Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start
 
 ## Sound
 
-Der TV/Laptop spielt durchgehend 8-Bit-Musik (komplett per WebAudio erzeugt, je nach Szene ein anderer Loop). Browser erlauben Ton erst nach einer Aktion: **einmal in die TV-Ansicht klicken oder eine Taste drücken**. **M** schaltet stumm.
+Der TV/Laptop spielt durchgehend 8-Bit-Musik (komplett per WebAudio erzeugt, je nach Szene ein anderer Loop). Browser erlauben Ton erst nach einer Aktion: **einmal in die TV-Ansicht klicken oder eine Taste drücken**. **M** (oder der Knopf „♪ Musik“ in der Lobby) öffnet das **Musik-Menü**: Gesamt-, Musik- und Effektlautstärke, Stumm (wird im Browser gemerkt), Bibliothek zum Vorhören und die Zuordnung „welche Musik läuft wo“ – alles live, ohne Neustart.
+
+### Musik-Werkstatt (`/musik.html`)
+
+Eigene 8-Bit-Loops bauen – mit demselben Synth, der auch auf dem TV spielt: <http://localhost:3000/musik.html> (oder aus dem Musik-Menü heraus).
+
+- **Piano-Roll** für Melodie, Bass und Begleitung (je Kanal Wellenform, Lautstärke, Hüllkurve): Klick setzt eine Note (ziehen = länger), Noten ziehen = verschieben, rechter Rand = Länge, Rechtsklick/Entf = löschen, Umschalt+Klick = mehrere. Die Tonart (Dur/Moll + Grundton) hebt die Skalentöne hervor, „Skalen-Snap“ zieht neue Noten darauf.
+- **Schlagzeug-Raster** mit Kick, Snare, HiHat je Sechzehntel (Klick schaltet, Ziehen malt).
+- **Transport:** Play/Stopp (Leertaste), Loop, BPM, Swing, 1–16 Takte; Undo/Redo (Strg+Z/Y); Takt kopieren/einfügen/leeren (Strg+C/V, Cursor per Klick auf die Taktleiste).
+- **Vorlage laden:** alle eingebauten Loops (nach Stil gefiltert) und die eigenen Songs. Eingebaute lassen sich bearbeiten und unter neuem Namen speichern.
+- **Einsingen:** Melodie ins Mikrofon singen oder summen (Einzähler, Metronom, Begleitung wahlweise) – die Tonhöhe wird live als Linie angezeigt (YIN-Erkennung im Worker, Aufnahme über ein AudioWorklet), danach in Noten zerlegt, auf Sechzehntel und wahlweise auf die Tonart gezogen und als Vorschlag im Zielkanal gezeigt → übernehmen oder verwerfen. Braucht `http://localhost` oder HTTPS (Mikrofonzugriff). Die Erkennung stammt aus Marlons [CheatSheet](https://github.com/MarlonM-Org/CheatSheet).
+- **MIDI-Import** (.mid aus BeepBox, Bosca Ceoil, …): Spuren für Melodie/Bass/Begleitung/Schlagzeug auswählen (GM-Kanal 10 → Kick/Snare/HiHat), Noten werden auf Sechzehntel gerundet, höchstens 16 Takte. **Export** als JSON oder MIDI.
+- **„Auf dem TV“:** Song speichern und direkt einer Szene zuordnen.
+
+**Speicherung:** eigene Songs liegen als JSON (Song-Format v2) in `data/music/<id>.json`, die Zuordnung in `data/music/assign.json` (REST unter `/api/music/…`). Pro Szene (Lobby, Spielbrett, Ergebnisse, jedes Minispiel, „Standard“) kann ein bestimmter Song, ein **Stil** (Party, Action, Chill/Strand, Romantisch, Grusel, Bar, Retro-Arcade, Episch – dann wechseln die Songs dieses Stils reihum) oder Stille eingestellt sein; ohne Zuordnung laufen die eingebauten Loops wie bisher. Tests ohne Browser: `npm run test:music` (Tonhöhen-Pipeline mit synthetischem Gesang, MIDI-Parser).
 Beim Rhythmusspiel kommt der Song ebenfalls vom TV/Laptop – TV und Handys gleichen dafür ihre Uhr mit dem Server ab, damit Noten und Musik synchron sind. (Bei Bluetooth-Boxen kann es wegen deren Verzögerung minimal versetzt wirken – dann lieber Laptop-Lautsprecher oder Kabel.)
 
 ## Steuerung am Laptop & Handy kurz weg
@@ -127,15 +141,17 @@ Tipp: PC und Apple TV per LAN-Kabel anschließen – dann ist die Verzögerung k
 | Server | Node.js, Express, Socket.IO (TypeScript über `tsx`) |
 | TV-Ansicht | [Phaser 3](https://phaser.io) – 480 × 270 Pixel-Welt, hochskaliert |
 | Handy-Controller | Plain TypeScript + DOM, Vite |
-| Gemeinsam | `shared/` – Typen, Avatar-Zeichnung, Flunkyball-Geometrie |
+| Gemeinsam | `shared/` – Typen, Avatar-Zeichnung, Flunkyball-Geometrie, Song-Format (`music.ts`) |
+| Musik | `client/music/` – Synth + Sequencer (TV und Werkstatt), MIDI-Parser, Tonhöhenerkennung; `client/musik/` – die Werkstatt |
 
 ```
 server/   index.ts (HTTP + Vite), room.ts (Lobby/VIP/Ablauf), board.ts (Spielbrett),
           minigame.ts (Interface), flunky.ts, wwe.ts, sprint.ts, murder.ts, ttt.ts, questions.ts, …
           (pro Minispiel eine Datei, z. B. kurve.ts, arena.ts, bowling.ts, parcours.ts)
 shared/   types.ts (alle Zustände), games.ts (Konstanten, Fragen, Räume), house.ts (Ferienhaus-Grundriss), avatar.ts, flunky.ts, …
-client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel)
+client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel, music.ts + musicMenu.ts = TV-Musik)
           index.html + controller/ (Handy-UI, ein Modul pro Spiel in screens/)
+          musik.html + musik/    (Musik-Werkstatt), music/ (Synth, MIDI, Tonhöhe – geteilt)
 scripts/  bots.ts                (Testspieler)
 ```
 
@@ -163,10 +179,13 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 - 🧺 **Aufräumen!** – per Joystick am Handy die Figur steuern und das Chaos im Ferienhaus in den Korb des eigenen Teams schieben; „Sprint“ für einen kurzen Speed-Boost (und zum Wegschubsen).
 - 💣 **Bomben-Arena** (2–12 Spieler) – Bomberman im Strandgarten: Joystick links, „BOMBE“-Knopf rechts. Kokosnüsse/Wasserbomben legen, Sandburgen, Liegestühle und Kühlboxen sprengen, Power-ups sammeln (+1 Bombe, +1 Reichweite, Flip-Flops = schneller). Wer getroffen wird, ist nass („Platsch!“) und für die Runde raus; nach 60 s kommt die Flut und füllt die Arena von außen. Wer zuerst 2 Runden gewinnt (max. 3 Runden), ist Champion. Testen: `npm run bots -- 8 --game=arena`.
 - 🎳 **Strand-Bowling** (ab 2 Spielern) – reihum auf der Bahn an der Strandbar. Am Handy erst die Startposition wählen, dann **„HALTEN & SCHWINGEN“** gedrückt halten, das Handy wie eine Bowlingkugel nach vorn schwingen und am Ende loslassen (Tempo = Schwung, Richtung = Drehung des Handys, Effet = Handgelenk drehen). Ohne HTTPS/Sensor wird die Kugel nach oben **gewischt** (schnell = hart, schräg = Richtung, im Bogen = Effet). Normale Bowling-Wertung inkl. Strike/Spare-Bonus, aber kürzer: bis 3 Spieler 5 Frames, bis 6 Spieler 3, ab 7 Spielern 2.
+- 🥥 **Boule am Strand** (2–12 Spieler) – Pétanque im Sand bei Sonnenuntergang. Bis 4 Spieler jeder gegen jeden (2 Spieler: je 3 Kugeln, 3–4 Spieler: je 2), ab 5 Spielern **Team Sonne gegen Team Meer** (1–2 Kugeln pro Person, jedes Team gleich viele). Das Schweinchen (eine kleine Kokosnuss) wird zu Beginn jeder Aufnahme automatisch an eine zufällige Stelle geworfen. Es wirft immer die Seite, die **nicht** am nächsten am Schweinchen liegt. Am Handy **„Legen“** (hoher Bogen, rollt aus) oder **„Schießen“** (flach und hart, räumt Kugeln weg) wählen, dann wie beim Bowling **„HALTEN & SCHWINGEN“** (Schwung = Weite, Drehung = Richtung, Handgelenk = Effet) oder nach oben **wischen**. Die Mini-Karte zeigt die Lage, dazu die nötige Kraft fürs Schweinchen. Nach jeder Aufnahme wird gemessen: Jede eigene Kugel, die näher liegt als die beste gegnerische, gibt einen Punkt. Bis 7 Punkte oder max. 4 Aufnahmen (bei 6 Kugeln pro Seite 3). Testen: `npm run bots -- 6 --game=boule`.
 - 🦆 **Ententeich** (ab 2 Spielern) – Duck Hunt in der Urlaubslagune: alle schießen gleichzeitig, jeder hat ein Fadenkreuz in seiner Farbe. Enten (10), Pommes-klauende Möwen (20) und Flamingos (30) treffen, Badegäste auf Schwimmringen lieber nicht (−15). 3 Schuss, dann nach unten wischen (oder „Nachladen“). Schnelle Treffer hintereinander geben Combo-Bonus, 3 Wellen mit immer mehr und schnelleren Vögeln.
   - **Zielen mit Bewegungssensor** (braucht HTTPS): Handy wie eine Lichtpistole halten, Oberkante zum TV, auf die TV-Mitte zielen und „Zentrieren“ tippen.
   - **Ohne HTTPS/Sensor**: Touchpad – wischen bewegt das Fadenkreuz (schnell wischen = weiter).
 - 🗼 **Wackelturm** (ab 2 Spielern) – wie Tricky Towers: Jeder stapelt auf seinem eigenen Steg Urlaubsgepäck (Surfbretter, Kühlboxen, Liegestühle, Koffer, Reisetaschen, Cocktailkisten) in Tetris-Formen – mit echter Physik (`matter-js` auf dem Server), der Turm wackelt und kann einstürzen. Am Handy: ◀ ▶ verschieben (halten = wiederholen), ⟳ drehen, ▼ gedrückt halten = schneller fallen; das nächste Teil wird angezeigt. Ins Meer gefallene Teile kosten ein Leben (3 Leben, bei einem Einsturz höchstens eins pro 2 s), danach ist der Turm eingefroren. Wer zuerst das Gipfelkreuz erreicht und den Turm 2 s hält, gewinnt; danach haben die anderen noch 20 s. Nach 2:30 zählt die Höhe. Alle 30 s erwischt den Führenden eine Windböe. Tick-Zeit messen: `TURM_PROF=1 npm run dev`.
+- 🥊 **Smash-Arena** (2–8 Spieler) – Plattform-Prügelei à la Smash Bros. mit den eigenen Avataren auf der *Strandbar* (schwebendes Surfbrett) oder der *Pool-Party* (wippender Flamingo). Treffer erhöhen die Prozente, je höher, desto weiter fliegt man – wer über den Rand fliegt, verliert ein Leben (3, ab 6 Spielern 2). Handy: Joystick links (laufen, ▼ ducken/durch Plattformen fallen, Richtung = Schlagvariante), rechts **SCHLAG**, **SPEZIAL** (zufälliges Urlaubs-Item: Flip-Flop-Wurf, Sonnenschirm-Rückstoß, Cocktail-Spritzer, Luftmatratzen-Klatscher, Wasserpistole), **SPRUNG** (zweimal in der Luft) und **SCHILD** (halten). Items: Kokosnuss, Wasserbombe, Erste-Hilfe-Ananas (−30 %). Wer zuletzt steht, gewinnt – nach 3 Minuten zählen Leben, dann Prozente.
+- 🔥 **Grill-Chaos** (2–12 Spieler, à la Overcooked) – Gartengrillparty am Ferienhaus: Bestellzettel oben auf dem TV abarbeiten (Maiskolben, Zitronen-Limo, Tofu-Hotdog, Gemüsespieß, Virgin Mojito). Handy: Joystick, **NEHMEN** (aufheben/ablegen/kombinieren) und **AKTION** (halten: am Schneidebrett schnippeln, mit dem Feuerlöscher löschen). Zutaten aus den Kisten holen, schneiden, grillen (nach 5 s gar, 8 s später verbrannt + Feuer!), auf Teller/ins Glas und zur Ausgabe. Schnell servieren gibt Trinkgeld, verpasste Bestellungen kosten Punkte. Bis 6 Spieler kocht ihr gemeinsam um 1–3 Sterne, ab 7 Spielern treten Team Sonne und Team Meer in gespiegelten Küchen gegeneinander an. 3 Minuten. Testen: `npm run bots -- 4 --game=grill`.
 - 🥊 **Smash-Arena** (2–12 Spieler) – Plattform-Prügelei à la Smash Bros. mit den eigenen Avataren auf der *Strandbar* (schwebendes Surfbrett) oder der *Pool-Party* (wippender Flamingo). Treffer erhöhen die Prozente, je höher, desto weiter fliegt man – wer über den Rand fliegt, verliert ein Leben (3, ab 6 Spielern 2). Handy: Joystick links (laufen, ▼ ducken/durch Plattformen fallen, Richtung = Schlagvariante), rechts **SCHLAG**, **SPEZIAL** (zufälliges Urlaubs-Item: Flip-Flop-Wurf, Sonnenschirm-Rückstoß, Cocktail-Spritzer, Luftmatratzen-Klatscher, Wasserpistole), **SPRUNG** (zweimal in der Luft) und **SCHILD** (halten). Items: Kokosnuss, Wasserbombe, Erste-Hilfe-Ananas (−30 %). Wer zuletzt steht, gewinnt – nach 3 Minuten zählen Leben, dann Prozente.
 - 🤼 **Sumo-Steg** (2–12 Spieler) – alle stehen auf einem Holzsteg im Meer, der nach und nach wegbricht (Planken knacken erst rot, dann sind sie weg). Handy: Joystick links laufen, rechts **REMPELN** (kurzer Sprint, ~1,3 s Abklingzeit). Wer angerempelt wird, rutscht weit weg – wer *während* des eigenen Remplers getroffen wird (Frontalzusammenstoß), fliegt fast doppelt so weit. Wer ins Wasser fällt („PLATSCH!“), dümpelt im Schwimmring und schaut zu; wer zuletzt auf dem Steg steht, gewinnt die Runde. Nach 45 s bricht auch die letzte Insel. Wer zuerst 2 Runden gewinnt (max. 3), ist Steg-Champion; bei Gleichstand zählen Überleben und Schubser. Testen: `npm run bots -- 6 --game=sumo`.
 
@@ -194,6 +213,6 @@ Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – k
 - [ ] Echte Pixel-Avatare aus Fotos der Freunde
 - [ ] Weitere Minispiele: Sonnencreme-Kartoffel, Grill-Duell, Badezimmer-Rennen, Koffer packen
 - [ ] Items auf dem Spielbrett (z. B. „Doppelt würfeln“, „Cocktail klauen“)
-- [ ] Sounds & Musik
+- [x] Sounds & Musik (8-Bit-Loops, Musik-Werkstatt mit Einsingen und MIDI-Import)
 
 Ausführliche Spiele-Ideen (Arena, Bewegungssensor, geheime Rollen, Physik …) nach Aufwand sortiert: **[ROADMAP.md](ROADMAP.md)**
