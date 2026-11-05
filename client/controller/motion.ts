@@ -80,3 +80,19 @@ export function onMotion(cb: (s: MotionSample) => void): () => void {
     window.removeEventListener('devicemotion', motion);
   };
 }
+
+/** Drehrate gesamt (°/s) */
+export const swingRot = (s: MotionSample) => Math.hypot(s.rotAlpha, s.rotBeta, s.rotGamma);
+/** Beschleunigung ohne Schwerkraft (m/s²) */
+export const swingAcc = (s: MotionSample) => Math.abs(Math.hypot(s.ax, s.ay, s.az) - 9.81);
+
+/**
+ * Skala eines Schwung-Verfahrens (für das Feedback am Handy): `level` rechnet einen Messwert in die
+ * Roh-Stärke 0 … 1 um, mit der auch die Wurf-Umrechnung arbeitet; `windowMs` = ausgewertetes Zeitfenster
+ * vor dem Loslassen; `yawLimit` = ab so viel Grad gilt die Kompass-Drehung als Sprung und wird ignoriert.
+ */
+export interface SwingScale {
+  level: (s: MotionSample) => number;
+  windowMs: number;
+  yawLimit: number;
+}

@@ -12,6 +12,7 @@
     "bots": "tsx scripts/bots.ts",
     "domain": "tsx scripts/domain.ts",
     "test:music": "tsx scripts/test-music.ts",
+    "render:music": "tsx scripts/render-music.ts",
     "test:darts": "tsx scripts/test-darts.ts",
     "test:golf": "tsx scripts/test-golf.ts",
     "test:turm": "tsx scripts/test-turm.ts"
