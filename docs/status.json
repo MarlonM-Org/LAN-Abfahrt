@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 17:35",
+  "updated": "2026-11-05 17:50",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "inProgress": [
     {
@@ -8,13 +8,6 @@
       "type": "Neues Trinkspiel",
       "branch": "spiel/kingscup",
       "detail": "Kartenkreis mit Königsbecher, deine Regeln 2–Ass, Reaktions-Rennen am Handy"
-    },
-    {
-      "title": "Nochmal + Leaderboard",
-      "kind": "",
-      "type": "Feature",
-      "branch": "feature/nochmal-leaderboard",
-      "detail": "Nach Einzelspielen „Nochmal“ (Kart als Grand Prix), Punkte laufen über die Sitzung weiter"
     },
     {
       "title": "Zug überspringen + mehr Ruhe",
@@ -50,6 +43,11 @@
     "Wackel-Prügelei"
   ],
   "done": [
+    {
+      "title": "Nochmal nach Einzelspielen + Leaderboard des Abends",
+      "pr": 33,
+      "date": "2026-11-05"
+    },
     {
       "title": "Fallen-Parcours: kein Zeitlimit, alles quer",
       "pr": 31,
@@ -223,7 +221,7 @@
     },
     {
       "title": "Leaderboard + Nochmal spielen",
-      "status": "in Arbeit"
+      "status": "umgesetzt"
     },
     {
       "title": "Musik passend zu den Spielen",
