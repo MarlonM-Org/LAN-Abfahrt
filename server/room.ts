@@ -324,7 +324,14 @@ export class Room {
       this.changed();
     });
 
+    // Regelkarte: „Bereit!“ vom Handy (Bots sofort)
+    socket.on('intro:ready', () => {
+      if (playerId) this.introReady(playerId);
+    });
+
     socket.on('vip:continue', (action?: string) => {
+      // Regelkarte: VIP kürzt ab
+      if (this.phase === 'intro') return void (isVip() && this.introGo());
       if (!(isVip() || inCouple()) || this.phase !== 'results') return;
       if (this.singleResults()) {
         if (action === 'again') {
@@ -588,7 +595,80 @@ export class Room {
     return out;
   }
 
+  // ---------------------------------------------------------------- Regelkarte (Phase `intro`)
+
+  /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, Ende (Server-Zeit) */
+  private intro: { kind: MiniKind; opts?: { track?: number }; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
+  /** Spiele, die heute (seit Serverstart) schon liefen → Regelkarte nur kurz */
+  private introSeen = new Set<MiniKind>();
+  private static readonly INTRO_MS = 15_000;
+  private static readonly INTRO_SHORT_MS = 5_000;
+
+  /**
+   * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, Übungsfeld, „Bereit!“). Ohne Karte:
+   * Date-Night-Kapitel, Trinkspiele und „Nochmal“ desselben Spiels.
+   */
   private startMini(kind: MiniKind, opts?: { track?: number }) {
+    const again = this.singleResults() && this.lastKind === kind;
+    this.endIntro();
+    if (this.dateRun || this.drinkRun || again) {
+      this.introSeen.add(kind);
+      return this.launchMini(kind, opts);
+    }
+    if (!this.gameIds().length) return this.backToLobby();
+    this.showBoard = false;
+    this.results = null;
+    const short = this.introSeen.has(kind);
+    this.intro = {
+      kind,
+      opts,
+      ready: new Set(),
+      endsAt: Date.now() + (short ? Room.INTRO_SHORT_MS : Room.INTRO_MS),
+      short,
+      timer: setInterval(() => this.introCheck(), 250),
+    };
+    this.phase = 'intro';
+    this.changed();
+  }
+
+  /** Alle (verbundenen) bereit oder Zeit um → los. Bei der kurzen Karte wird nicht auf „Bereit“ gewartet. */
+  private introCheck() {
+    const it = this.intro;
+    if (!it) return;
+    if (this.phase !== 'intro') return this.endIntro();
+    const online = this.gameIds().filter((id) => this.isOnline(id));
+    if (Date.now() >= it.endsAt || (online.length > 0 && online.every((id) => it.ready.has(id)))) this.introGo();
+  }
+
+  /** Regelkarte beenden und das Spiel wirklich starten (auch VIP „Weiter“ bzw. Laptop) */
+  private introGo() {
+    const it = this.intro;
+    if (!it || this.phase !== 'intro') return;
+    this.endIntro();
+    this.introSeen.add(it.kind);
+    this.launchMini(it.kind, it.opts);
+  }
+
+  private endIntro() {
+    if (this.intro) clearInterval(this.intro.timer);
+    this.intro = null;
+  }
+
+  private introReady(id: string) {
+    const it = this.intro;
+    if (this.phase !== 'intro' || !it || it.ready.has(id) || !this.gameIds().includes(id)) return;
+    it.ready.add(id);
+    this.changed();
+    this.introCheck();
+  }
+
+  private introState() {
+    const it = this.intro;
+    if (this.phase !== 'intro' || !it) return null;
+    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short };
+  }
+
+  private launchMini(kind: MiniKind, opts?: { track?: number }) {
     this.mini?.dispose();
     this.showBoard = false;
     // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
@@ -922,6 +1002,7 @@ export class Room {
       return this.continueAfterResults();
     }
     if (this.phase === 'story') return this.storyNext();
+    if (this.phase === 'intro') return this.introGo();
     if (this.phase === 'mini') this.mini?.vipAction?.(this.mini.kind === 'murder' ? 'skip' : 'next');
   }
 
@@ -1008,6 +1089,7 @@ export class Room {
    */
   private waitingStep(): { key: unknown; ms: number | null } | null {
     if (this.phase === 'results' && this.results) return { key: this.results, ms: AUTO_RESULTS_MS };
+    if (this.phase === 'intro' && this.intro) return { key: this.intro, ms: null };
     if (this.phase === 'story' && this.dateRun?.state.card) return { key: this.dateRun.state.card, ms: AUTO_STORY_MS };
     const m = this.phase === 'mini' ? this.mini?.snapshot() : null;
     if (m?.kind === 'stillepost' && (m.state.sub === 'reveal' || m.state.sub === 'tally')) {
@@ -1373,6 +1455,7 @@ export class Room {
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
       skippable: this.skippable(),
       nochmal: this.nochmalState(),
+      intro: this.introState(),
       showBoard: this.phase === 'lobby' && this.showBoard,
     };
   }

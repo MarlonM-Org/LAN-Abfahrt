@@ -49,6 +49,7 @@ import { pickDarts } from './screens/darts';
 import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
+import { pickIntro } from './screens/intro';
 import { buildKicked, initVipPlayersButton } from './players';
 import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
@@ -261,6 +262,8 @@ function pickScreen(): Screen {
       return s.results ? pickResults(s.results, vip || inCouple()) : ['wait', message('Warte ...')];
     case 'story':
       return s.date ? pickStory(s.date, vip || inCouple()) : ['wait', message('Warte ...')];
+    case 'intro':
+      return s.intro ? pickIntro(s.intro, vip) : ['wait', message('Warte ...')];
     case 'mini': {
       const m = s.mini;
       if (!m) return ['wait', message('Warte ...')];
