@@ -8,7 +8,10 @@ import { paintSand, paintShore, paintTiles, paintWater, paintWoodFloor } from '.
 import { basket, buoy, clutter, jellyfish, seaRock, supBoard } from '../art/props2';
 import { bus, getState, playerById } from './store';
 import { figure, playAvatar } from './textures';
-import { BLUE_INK, RED_INK, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { BLUE_INK, NameTags, RED_INK, background, ensureTex, ink, panel, prop, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { foam, gulls } from './ambient';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -21,6 +24,9 @@ export class SupScene extends Phaser.Scene {
   private latest: GameState | null = null;
   private hudKey = '';
   private built = false;
+  private juice!: Juice;
+  private supFx = new Map<number, { fallen: boolean; finished: boolean }>();
+  private finishers = 0;
 
   constructor() {
     super('sup');
@@ -30,6 +36,9 @@ export class SupScene extends Phaser.Scene {
     this.boards.clear();
     this.built = false;
     this.hudKey = '';
+    this.supFx.clear();
+    this.finishers = 0;
+    this.juice = new Juice(this, { depth: 900 });
     const W = SUP.LENGTH + 140;
     const bg = background(this, 'sea', W, WORLD.H, (p) => {
       paintWater(p, 0, 0, W, WORLD.H, 501);
@@ -49,6 +58,10 @@ export class SupScene extends Phaser.Scene {
       prop(this, 'palm', () => O.palm(6), x, SUP.TOP - 6).setScale(0.7);
       prop(this, 'umbrellaB', () => O.umbrella(C.blue), x + 90, WORLD.H + 6).setDepth(300);
     }
+    // Leeres Wasser beleben: Möwen (bildfest), Wellenschaum an beiden Stränden
+    gulls(this, { n: 3, y: [SUP.TOP + 10, SUP.BOTTOM - 10], depth: 950, scroll: 0 });
+    foam(this, { y: SUP.TOP - 11, x: [0, W], n: Math.round(W / 36), depth: -900, spread: 1 });
+    foam(this, { y: SUP.BOTTOM + 11, x: [0, W], n: Math.round(W / 36), depth: -900, spread: 1 });
     this.cameras.main.setBounds(0, 0, W, WORLD.H);
     this.hud = this.add.container(0, 0).setScrollFactor(0).setDepth(1000);
     this.banner = txt(this, WORLD.W / 2, 110, '', { size: 24, color: C.gold }).setScrollFactor(0).setDepth(1001);
@@ -118,28 +131,61 @@ export class SupScene extends Phaser.Scene {
         const sy = a.y + Math.sin(b.heading + (side * Math.PI) / 2) * 9;
         const splash = this.add.circle(sx, sy, 3, 0xeaf8ff, 0.9).setDepth(a.y + 11);
         this.tweens.add({ targets: splash, scale: 2.4, alpha: 0, duration: 380, onComplete: () => splash.destroy() });
+        sfx('splash', { pan: 0, vol: 0.18, pitch: 1.8 });
       }
+      // Umgekippt / im Ziel
+      const fx = this.supFx.get(b.id) ?? { fallen: b.fallen, finished: b.finished };
+      if (b.fallen && !fx.fallen) {
+        sfx('splash', { pitch: 0.7 });
+        this.juice.burst(a.x, a.y, 'splash', 16);
+        this.juice.shake(1);
+      }
+      if (b.finished && !fx.finished) {
+        this.finishers += 1;
+        sfx(this.finishers === 1 ? 'fanfare' : 'coin');
+        this.juice.burst(a.x, a.y - 10, 'confetti', this.finishers === 1 ? 40 : 16);
+      }
+      this.supFx.set(b.id, { fallen: b.fallen, finished: b.finished });
     }
     if (st.sub === 'countdown') this.banner.setText(String(Math.max(1, Math.ceil(st.endsIn / 1000))));
     else if (st.sub === 'race') this.banner.setText('');
     else this.banner.setText('Ziel!');
 
-    const key = JSON.stringify([Math.ceil(st.endsIn / 1000), st.boards.map((b) => [Math.round((b.x / st.length) * 20), b.fallen, b.finished])]);
+    const key = JSON.stringify([Math.ceil(st.endsIn / 1000), st.boards.map((b) => [Math.round((b.x / st.length) * 120), b.fallen, b.finished])]);
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
-    const parts = st.boards.map((b) => {
-      const short = (id: string) => (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, 4);
-      const names = b.left === b.right ? short(b.left) : `${short(b.left)}+${short(b.right)}`;
-      return `${names} ${b.finished ? 'Ziel' : b.fallen ? 'PLATSCH' : `${Math.round((b.x / st.length) * 100)}%`}`;
+    // Fortschrittsbalken statt Textzeile: Strecke von Start bis Ziel, pro Board ein Marker in Boardfarbe
+    const n = st.boards.length;
+    const lanes = n > 3 ? 2 : 1;
+    const h = 30 + (lanes - 1) * 12;
+    this.hud.add(panel(this, 10, 0, 460, h));
+    this.hud.add(ink(this, 22, 8, `${Math.ceil(st.endsIn / 1000)}s`, { origin: [0, 0] }));
+    const x0 = 64;
+    const x1 = 446;
+    const g = this.add.graphics();
+    this.hud.add(g);
+    for (let l = 0; l < lanes; l++) {
+      const y = 13 + l * 12;
+      g.fillStyle(0x2d1b12).fillRect(x0 - 1, y - 1, x1 - x0 + 2, 4);
+      g.fillStyle(0x93d3f3).fillRect(x0, y, x1 - x0, 2);
+    }
+    // Ziel: Schachbrett-Fähnchen
+    for (let k = 0; k < 4; k++) g.fillStyle(k % 2 ? 0xffffff : 0x2d1b12).fillRect(x1 + 2, 6 + k * 3, 3, 3).fillStyle(k % 2 ? 0x2d1b12 : 0xffffff).fillRect(x1 + 5, 6 + k * 3, 3, 3);
+    st.boards.forEach((b, i) => {
+      const lane = lanes > 1 ? i % 2 : 0;
+      const y = 14 + lane * 12;
+      const f = Math.max(0, Math.min(1, b.x / st.length));
+      const x = x0 + f * (x1 - x0);
+      g.fillStyle(0x2d1b12).fillRect(x - 4, y - 5, 8, 9);
+      g.fillStyle(b.finished ? 0xffd25e : b.color).fillRect(x - 3, y - 4, 6, 7);
+      if (b.fallen) g.fillStyle(0xeaf8ff, 0.9).fillRect(x - 3, y - 1, 6, 2);
+      const short = (id: string) => tagName(playerById(id)?.name ?? '?').charAt(0).toUpperCase();
+      const label = b.left === b.right ? short(b.left) : `${short(b.left)}${short(b.right)}`;
+      const t = ink(this, x, y + 4, label, { color: b.fallen ? BLUE_INK : RED_INK }).setScale(0.75);
+      if (lanes === 1 || lane === 1) this.hud.add(t);
+      else t.destroy();
     });
-    // Ab 3 Boards (bis zu 12 Spieler) auf mehrere Zeilen à 3 Boards verteilen, statt abzuschneiden
-    const lines: string[] = [];
-    for (let i = 0; i < parts.length; i += 3) lines.push(parts.slice(i, i + 3).join('  '));
-    lines[0] = `${Math.ceil(st.endsIn / 1000)}s  ${lines[0] ?? ''}`;
-    const wide = parts.length > 2;
-    this.hud.add(panel(this, wide ? 10 : 60, 0, wide ? 460 : 360, 22 + (lines.length - 1) * 12));
-    this.hud.add(ink(this, WORLD.W / 2, 7, lines.map((l) => l.slice(0, wide ? 56 : 44)).join('\n')));
   }
 }
 
@@ -154,12 +200,16 @@ export class TidyScene extends Phaser.Scene {
   private hudKey = '';
   private lastScore = 0;
   private builtBaskets = false;
+  private tags!: NameTags;
+  private names = new Map<string, { name: string; color: string }>();
 
   constructor() {
     super('tidy');
   }
 
   create() {
+    this.tags = new NameTags(this, 900);
+    this.names.clear();
     this.figs.clear();
     this.items.clear();
     this.hudKey = '';
@@ -195,6 +245,7 @@ export class TidyScene extends Phaser.Scene {
   update() {
     const s = this.latest;
     if (s?.mini?.kind !== 'tidy') return;
+    const specs: { id: string; x: number; y: number; name: string; color: string }[] = [];
     for (const [id, p] of Object.entries(s.mini.state.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
@@ -204,7 +255,10 @@ export class TidyScene extends Phaser.Scene {
       img.setFlipX(p.dir < 0);
       playAvatar(img, p.moving ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
+      const n = this.names.get(id);
+      if (n) specs.push({ id, x: a.x, y: a.y - 30, name: n.name, color: n.color });
     }
+    this.tags.update(specs);
   }
 
   private onState(s: GameState) {
@@ -220,8 +274,7 @@ export class TidyScene extends Phaser.Scene {
       const pl = playerById(id);
       if (!pl) continue;
       const f = figure(this, pl.look, p.x, p.y);
-      const tag = txt(this, 0, -36, pl.name.slice(0, 6), { color: TEAM_INFO[p.team].color });
-      f.add(tag);
+      this.names.set(id, { name: pl.name, color: TEAM_INFO[p.team].color });
       this.figs.set(id, { f, x: p.x, y: p.y });
     }
     const alive = new Set(t.items.map((i) => i.id));
@@ -243,7 +296,9 @@ export class TidyScene extends Phaser.Scene {
       this.lastScore = t.lastScore.seq;
       const b = t.baskets.find((bk) => bk.team === t.lastScore!.team);
       if (b) {
+        sfx('coin', { x: b.x, vol: 0.6 });
         const plus = txt(this, b.x, b.y - 24, '+1', { color: TEAM_INFO[b.team].color }).setDepth(2000);
+
         this.tweens.add({ targets: plus, y: plus.y - 16, alpha: 0, duration: 700, onComplete: () => plus.destroy() });
       }
     }

@@ -59,14 +59,186 @@ export function panel(scene: Phaser.Scene, x: number, y: number, w: number, h: n
   return scene.add.image(x, y, key).setOrigin(0, 0);
 }
 
-/** Namensschild unter Figuren */
-export function nameTag(scene: Phaser.Scene, x: number, y: number, name: string, color = INK) {
-  const w = Math.max(20, name.length * 8 + 6);
+/** Anzeigename für Schilder: ohne „Bot “-Präfix (sonst bleibt bei 8 Bots nur „Bot“ ×8 übrig) */
+export const tagName = (name: string) => name.replace(/^Bot\s+/, '');
+
+/**
+ * Text auf eine Breite bringen: erst die Schrift verkleinern (bis `min`), erst danach kürzen.
+ * Ersetzt das harte `name.slice(0, 6)` der Reihen-Szenen.
+ */
+export function fitText<T extends Phaser.GameObjects.Text>(t: T, maxW: number, min = 0.6): T {
+  t.setScale(1);
+  const w = t.width;
+  if (w <= maxW) return t;
+  if (w * min > maxW) {
+    // Monospace-Schrift: 8 px pro Zeichen bei Größe 8 → so viele Zeichen passen bei `min`
+    const per = w / Math.max(1, t.text.length);
+    const n = Math.max(1, Math.floor(maxW / (per * min)) - 1);
+    t.setText(`${t.text.slice(0, n)}.`);
+  }
+  t.setScale(Math.max(min, Math.min(1, maxW / t.width)));
+  return t;
+}
+
+/**
+ * Namensschild unter Figuren. Ohne „Bot “-Präfix; mit `maxW` wird das Schild höchstens so
+ * breit und die Schrift schrumpft auf die Schildbreite statt abgeschnitten zu werden.
+ */
+export function nameTag(scene: Phaser.Scene, x: number, y: number, name: string, color = INK, maxW?: number) {
+  const nm = tagName(name);
+  const natural = Math.max(20, nm.length * 8 + 6);
+  const w = maxW ? Math.max(20, Math.min(natural, Math.floor(maxW))) : natural;
   const key = ensureTex(scene, `tag_${w}`, () => tagPix(w));
   const c = scene.add.container(x, y);
   c.add(scene.add.image(0, 0, key).setOrigin(0.5, 0));
-  c.add(ink(scene, 0, 2, name, { color }));
+  const t = ink(scene, 0, 2, nm, { color });
+  if (w < natural) {
+    fitText(t, w - 4);
+    t.setY(2 + (8 - t.displayHeight) / 2 + 0.5);
+  }
+  c.add(t);
   return c;
+}
+
+// ------------------------------------------------------------------ Namensschilder über Figuren
+
+/** Eingabe für `layoutNameTags`: Anker (Mitte, Oberkante) und Breite voll/kurz */
+export interface TagBox {
+  x: number;
+  y: number;
+  /** Breite mit vollem Namen */
+  w: number;
+  /** Breite in Kurzform (Farbpunkt + Initiale) */
+  ws: number;
+  /** Vorheriges Ergebnis – sorgt für Ruhe (kein Flackern zwischen voll und kurz) */
+  prev?: { dy: number; short: boolean };
+}
+
+const TAG_H = 9;
+const TAG_LIFT = 10;
+
+/**
+ * Namensschilder gegeneinander versetzen: Jedes Schild probiert seinen Platz, dann eine Zeile
+ * höher; kollidiert es dann immer noch, zeigt es nur Farbpunkt + Initiale (wieder erst unten,
+ * dann oben). Gibt pro Schild Versatz nach oben (`dy`, ≤ 0) und Kurzform zurück.
+ */
+export function layoutNameTags(tags: TagBox[]): { dy: number; short: boolean }[] {
+  const placed: { l: number; r: number; t: number; b: number }[] = [];
+  const out: { dy: number; short: boolean }[] = tags.map(() => ({ dy: 0, short: false }));
+  const hits = (l: number, r: number, t: number, b: number) => placed.some((p) => l < p.r && r > p.l && t < p.b && b > p.t);
+  // Von unten nach oben: vordere Figuren (größeres y) zuerst, die hinteren weichen aus
+  const order = tags.map((_, i) => i).sort((a, b) => tags[b].y - tags[a].y || tags[a].x - tags[b].x);
+  for (const i of order) {
+    const g = tags[i];
+    // Hysterese: wer schon kurz war, braucht etwas mehr Platz, um wieder lang zu werden
+    const pad = g.prev?.short ? 3 : 0;
+    const lifts = g.prev && g.prev.dy < 0 ? [-TAG_LIFT, 0] : [0, -TAG_LIFT];
+    let done = false;
+    for (const short of [false, true]) {
+      const w = (short ? g.ws : g.w) + (short ? 0 : pad * 2);
+      for (const dy of lifts) {
+        const l = g.x - w / 2 - 1;
+        const r = g.x + w / 2 + 1;
+        const t = g.y + dy;
+        if (hits(l, r, t, t + TAG_H)) continue;
+        out[i] = { dy, short };
+        placed.push({ l, r, t, b: t + TAG_H });
+        done = true;
+        break;
+      }
+      if (done) break;
+    }
+    if (!done) {
+      out[i] = { dy: 0, short: true };
+      placed.push({ l: g.x - g.ws / 2, r: g.x + g.ws / 2, t: g.y, b: g.y + TAG_H });
+    }
+  }
+  return out;
+}
+
+export interface NameTagSpec {
+  id: string;
+  /** Mitte des Schilds */
+  x: number;
+  /** Oberkante des Schilds (ohne Versatz) */
+  y: number;
+  name: string;
+  /** Textfarbe ('#rrggbb') */
+  color: string;
+  /** Farbe des Punkts in der Kurzform (Standard: Textfarbe) */
+  dot?: number;
+  alpha?: number;
+  scale?: number;
+}
+
+/**
+ * Namensschilder für bewegte Figuren: eigene Ebene über den Figuren, jedes Bild neu verteilt
+ * (`layoutNameTags`). Pro Szene in `create()` neu anlegen, in `update()` mit allen sichtbaren
+ * Figuren füttern (fehlende ids verschwinden).
+ */
+export class NameTags {
+  private tags = new Map<string, { t: Phaser.GameObjects.Text; dot: Phaser.GameObjects.Rectangle; name: string; color: string; last: { dy: number; short: boolean } }>();
+
+  constructor(
+    private scene: Phaser.Scene,
+    private depth = 1040,
+    private layer?: Phaser.GameObjects.Container,
+  ) {}
+
+  update(specs: NameTagSpec[]) {
+    const seen = new Set<string>();
+    const boxes: TagBox[] = [];
+    for (const s of specs) {
+      seen.add(s.id);
+      const k = s.scale ?? 1;
+      let o = this.tags.get(s.id);
+      const nm = tagName(s.name);
+      if (!o) {
+        const t = txt(this.scene, 0, 0, nm, { color: s.color });
+        const dot = this.scene.add.rectangle(0, 0, 5, 5, s.dot ?? parseInt(s.color.slice(1), 16)).setStrokeStyle(1, 0x2d1b12).setOrigin(0.5, 0);
+        if (this.layer) this.layer.add([dot, t]);
+        else (t.setDepth(this.depth + 1), dot.setDepth(this.depth));
+        o = { t, dot, name: nm, color: s.color, last: { dy: 0, short: false } };
+        this.tags.set(s.id, o);
+      }
+      if (o.color !== s.color) {
+        o.color = s.color;
+        o.t.setColor(s.color);
+        o.dot.setFillStyle(s.dot ?? parseInt(s.color.slice(1), 16));
+      }
+      o.name = nm;
+      boxes.push({ x: s.x, y: s.y, w: nm.length * 8 * k, ws: 16 * k, prev: o.last });
+    }
+    const res = layoutNameTags(boxes);
+    specs.forEach((s, i) => {
+      const o = this.tags.get(s.id)!;
+      const r = res[i];
+      o.last = r;
+      const k = s.scale ?? 1;
+      const want = r.short ? o.name.charAt(0).toUpperCase() : o.name;
+      if (o.t.text !== want) o.t.setText(want);
+      o.t.setScale(k).setAlpha(s.alpha ?? 1);
+      if (r.short) {
+        o.t.setPosition(s.x + 4 * k, s.y + r.dy);
+        o.dot.setVisible(true).setScale(k).setAlpha(s.alpha ?? 1).setPosition(s.x - 4 * k, s.y + r.dy + 1.5 * k);
+      } else {
+        o.t.setPosition(s.x, s.y + r.dy);
+        o.dot.setVisible(false);
+      }
+      o.t.setVisible(true);
+    });
+    for (const [id, o] of this.tags) {
+      if (seen.has(id)) continue;
+      o.t.destroy();
+      o.dot.destroy();
+      this.tags.delete(id);
+    }
+  }
+
+  clear() {
+    for (const o of this.tags.values()) (o.t.destroy(), o.dot.destroy());
+    this.tags.clear();
+  }
 }
 
 /** Hintergrund einmalig malen und als Bild einfügen */
@@ -159,3 +331,35 @@ function onCueState(s: GameState) {
 }
 
 bus.on('state', onCueState);
+
+// ------------------------------------------------------------------ Lesehintergrund für Overlay-Texte
+
+/**
+ * Dunkle Plakette hinter Overlay-Texten (Banner + Untertitel über den Figuren): folgt jedes Bild
+ * dem Umriss der sichtbaren, nicht leeren Texte und übernimmt deren Deckkraft. Einmal in
+ * `create()` anlegen – die Szene muss sonst nichts tun.
+ */
+export function backPlate(scene: Phaser.Scene, texts: Phaser.GameObjects.Text[], depth: number, pad = 6) {
+  const rect = scene.add.rectangle(0, 0, 10, 10, 0x2d1b12, 0.92).setStrokeStyle(2, 0x8d5629, 0.9).setOrigin(0, 0).setDepth(depth).setVisible(false);
+  const sync = () => {
+    let l = Infinity;
+    let t = Infinity;
+    let r = -Infinity;
+    let b = -Infinity;
+    let a = 0;
+    for (const x of texts) {
+      if (!x.active || !x.visible || !x.text || x.alpha <= 0.02) continue;
+      const k = x.getBounds();
+      l = Math.min(l, k.left);
+      t = Math.min(t, k.top);
+      r = Math.max(r, k.right);
+      b = Math.max(b, k.bottom);
+      a = Math.max(a, x.alpha);
+    }
+    if (!Number.isFinite(l)) return void rect.setVisible(false);
+    rect.setVisible(true).setPosition(Math.floor(l - pad), Math.floor(t - pad + 2)).setSize(Math.ceil(r - l + pad * 2), Math.ceil(b - t + pad * 2 - 2)).setAlpha(a);
+  };
+  scene.events.on(Phaser.Scenes.Events.POST_UPDATE, sync);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.events.off(Phaser.Scenes.Events.POST_UPDATE, sync));
+  return rect;
+}

@@ -10,9 +10,13 @@ import { offlineLabel } from '../../shared/players';
 import { bus, getState, metaReceivedAt } from './store';
 import { isMusicMenuOpen } from './musicMenu';
 
+/** So lange bleibt der Knopf nach einer Mausbewegung sichtbar (im Spiel) */
+const PEEK_MS = 3500;
+
 const CSS = `
 #pl-toggle { position: fixed; left: 2vh; top: 2vh; z-index: 20; padding: 0.8vh 1.2vh; font: 1.2vh 'Press Start 2P', monospace; color: #3d2414; background: #f7e4b5; border: 0.4vh solid #8d5629; box-shadow: 0 0 0 0.25vh #2d1b12; cursor: pointer; opacity: 0.35; }
 #pl-toggle:hover, #pl-toggle.warn { opacity: 1; }
+#pl-toggle.away { display: none; }
 #pl-toggle.warn { color: #a8342a; }
 #pl-panel { position: fixed; left: 2vh; top: 7vh; z-index: 21; width: min(62vh, 90vw); max-height: 86vh; overflow: auto; padding: 2vh; font: 1.4vh 'Press Start 2P', monospace; line-height: 1.6; color: #3d2414; background: #f7e4b5; border: 0.5vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12, 0 1vh 0 rgba(0,0,0,0.3); }
 #pl-panel[hidden] { display: none; }
@@ -56,6 +60,8 @@ export function initPlayersPanel(socket: Socket) {
 
   let local = true;
   let key = '';
+  let lastMouse = -Infinity;
+
 
   // Der Server sagt nach 'host:hello', ob diese TV-Seite am Laptop selbst läuft (Loopback)
   socket.on('host:info', (r: { local?: boolean }) => ((local = !!r?.local), (key = ''), render()));
@@ -94,6 +100,9 @@ export function initPlayersPanel(socket: Socket) {
     const offline = players.filter((p) => !p.connected).length;
     toggle.textContent = offline ? `Spieler · ${offline} offline (P)` : 'Spieler (P)';
     toggle.classList.toggle('warn', offline > 0);
+    // Nie über dem HUD eines Spiels: nur in der Lobby, bei offenem Panel oder kurz nach einer Mausbewegung
+    const lobby = (getState()?.phase ?? 'lobby') === 'lobby';
+    toggle.classList.toggle('away', !lobby && panel.hidden && performance.now() - lastMouse > PEEK_MS);
     if (panel.hidden) return;
     const k = `${local}|${players.map((p) => `${p.id}${p.name}${p.connected}${p.isVip}${p.bot}${p.connected ? '' : status(p)}`).join('|')}`;
     if (k === key) return;
@@ -122,6 +131,11 @@ export function initPlayersPanel(socket: Socket) {
     if (!local) say('Spieler entfernen geht nur direkt am Laptop (http://localhost:…/tv.html).');
   }
 
+  window.addEventListener('mousemove', () => {
+    const hiddenBefore = toggle.classList.contains('away');
+    lastMouse = performance.now();
+    if (hiddenBefore) render();
+  });
   const setOpen = (open: boolean) => {
     panel.hidden = !open;
     key = '';

@@ -4,9 +4,9 @@ import { WORLD } from '../../shared/flunky';
 import { SUMO, sumoTileX, sumoTileY } from '../../shared/sumo';
 import { paintSumoSea, sumoBoat, sumoBuoy, sumoPlank, sumoPost, sumoRing } from '../art/sumo';
 import { bus, getState, playerById } from './store';
-import { type Figure, ensurePortrait, figure } from './textures';
 import { pcol } from './playerColor';
-import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
+import { ensurePortrait, figure, type Figure } from './textures';
+import { Countdown, backPlate, background, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
 
@@ -88,6 +88,8 @@ export class SumoScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0).setDepth(2000);
     this.banner = txt(this, WORLD.W / 2, 118, '', { size: 16, color: '#ffd25e' }).setDepth(2001);
     this.sub = txt(this, WORLD.W / 2, 142, '', { size: 8 }).setDepth(2001);
+    // Dunkle Plakette, damit die Texte über den Figuren lesbar bleiben
+    backPlate(this, [this.banner, this.sub], 2000);
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));

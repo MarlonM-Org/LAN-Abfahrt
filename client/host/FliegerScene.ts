@@ -7,7 +7,7 @@ import { paintSky, paintWater } from '../art/ground';
 import { cloud, island, plane } from '../art/flieger';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
-import { RED_INK, ensureTex, ink, panel, txt } from './ui';
+import { RED_INK, backPlate, ensureTex, ink, panel, txt } from './ui';
 
 const SEA_Y = 196;
 const PLANE_X = 180;
@@ -95,6 +95,8 @@ export class FliegerScene extends Phaser.Scene {
 
     this.banner = txt(this, WORLD.W / 2, 58, '', { size: 24, color: C.gold }).setDepth(50);
     this.sub = txt(this, WORLD.W / 2, 86, '', { wrap: 420 }).setDepth(50);
+    // Dunkle Plakette, damit Intro-/Etappentexte über Flugzeug und Wolken lesbar bleiben
+    backPlate(this, [this.banner, this.sub], 49);
     this.add.rectangle(0, WORLD.H - 16, WORLD.W, 16, 0x2d1b12, 0.75).setOrigin(0, 0).setDepth(40);
     this.ticker = txt(this, WORLD.W / 2, WORLD.H - 12, '', {}).setDepth(41);
     this.crew = this.add.container(0, 0).setDepth(30);

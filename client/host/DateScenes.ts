@@ -26,7 +26,9 @@ import { figure } from './textures';
 import { duckMusic, playRhythmSong } from './music';
 import { toLocalPerf } from '../timesync';
 import { RHYTHM } from '../../shared/dategames';
-import { RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { NameTags, RED_INK, background, ensureTex, fitText, ink, nameTag, panel, tagName, txt } from './ui';
+import { sfx } from './sfx';
+import { gulls, twinkle } from './ambient';
 
 const PINK_INK = '#b0306a';
 const SHORT: Record<string, string> = { descent: 'Abstieg', rhythm: 'Gespräch', wrap: 'Wraps', stars: 'Sterne' };
@@ -127,7 +129,8 @@ export class StoryScene extends StateScene {
 // ================================================================== Abstieg
 
 export class DescentScene extends StateScene {
-  private runners = new Map<string, { f: Phaser.GameObjects.Container; s: number; tag: Phaser.GameObjects.Container }>();
+  private runners = new Map<string, { f: Phaser.GameObjects.Container; s: number; name: string; hits: number }>();
+  private tags!: NameTags;
   private stones = new Map<number, Phaser.GameObjects.Image>();
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
@@ -142,6 +145,7 @@ export class DescentScene extends StateScene {
     this.runners.clear();
     this.stones.clear();
     this.hudKey = '';
+    this.tags = new NameTags(this, 900);
     background(this, 'descent', WORLD.W, WORLD.H, (p) => {
       paintNightSky(p, 0, 0, WORLD.W, 80);
       paintSkyline(p, 70, 81);
@@ -170,6 +174,7 @@ export class DescentScene extends StateScene {
     const s = this.latest;
     if (s?.mini?.kind !== 'descent') return;
     const d = s.mini.state;
+    const specs: { id: string; x: number; y: number; name: string; color: string }[] = [];
     for (const [id, r] of Object.entries(d.runners)) {
       const a = this.runners.get(id);
       if (!a) continue;
@@ -181,8 +186,10 @@ export class DescentScene extends StateScene {
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setY(-hop).setFlipX(pos.dir < 0).setAngle(r.stunned ? (pos.dir > 0 ? 70 : -70) : 0);
       a.f.setDepth(pos.y + 1);
-      a.tag.setPosition(pos.x, pos.y - 44 - hop).setDepth(900);
+      specs.push({ id, x: pos.x, y: pos.y - 34 - hop, name: a.name, color: '#fff4d6' });
     }
+    // Namensschilder verteilen sich selbst (bei Gedränge Initiale + Farbpunkt statt „BoFoMiBen“)
+    this.tags.update(specs);
   }
 
   protected onState(s: GameState) {
@@ -194,9 +201,13 @@ export class DescentScene extends StateScene {
       const p = playerById(id);
       if (!p) continue;
       const f = figure(this, p.look, 0, 0);
-      // Namen gestaffelt (max. 4 Höhen), damit sie bei vielen Läufern nicht in die Anzeige ragen
-      const tag = this.add.container(0, 0, [txt(this, 0, (this.runners.size % 4) * -9, p.name.slice(0, 8))]);
-      this.runners.set(id, { f, s: r.s, tag });
+      this.runners.set(id, { f, s: r.s, name: p.name, hits: r.hits });
+    }
+    // Getroffen: Plumps
+    for (const [id, r] of Object.entries(d.runners)) {
+      const a = this.runners.get(id);
+      if (a && r.hits > a.hits) sfx('bonk', { pitch: 0.8, vol: 0.6 });
+      if (a) a.hits = r.hits;
     }
     // Steine
     const alive = new Set(d.stones.map((st) => st.id));
@@ -224,7 +235,7 @@ export class DescentScene extends StateScene {
     if (key !== this.hudKey) {
       this.hudKey = key;
       this.hud.removeAll(true);
-      const parts = Object.entries(d.runners).map(([id, r]) => `${playerById(id)?.name.replace(/^Bot\s+/, '').slice(0, 6) ?? '?'} ${r.finished ? 'unten' : `${r.hits}x`}`);
+      const parts = Object.entries(d.runners).map(([id, r]) => `${tagName(playerById(id)?.name ?? '?').slice(0, 6)} ${r.finished ? 'unten' : `${r.hits}x`}`);
       // Viele Läufer (bis 12): auf mehrere Zeilen à 4 verteilen, statt aus dem Bild zu laufen
       const lines: string[] = [];
       for (let i = 0; i < parts.length; i += 4) lines.push(parts.slice(i, i + 4).join('  '));
@@ -362,10 +373,17 @@ export class WrapScene extends StateScene {
     super('wrap');
   }
 
+  private wrapFx = new Map<string, { step: number; mistakes: number }>();
+
   create() {
     this.key = '';
+    this.wrapFx.clear();
     background(this, 'rhine', WORLD.W, WORLD.H, rhineBackground);
     this.add.image(WORLD.W / 2, 262, ensureTex(this, 'blanket', blanket)).setOrigin(0.5, 1).setScale(2.6, 1.6).setDepth(-500);
+    // Obere Bildhälfte beleben: funkelnde Sterne, Lichtreflexe auf dem Rhein, eine Möwe auf Nachtflug
+    twinkle(this, { n: 18, y: [34, 62], depth: -900 });
+    twinkle(this, { n: 16, x: [110, 480], y: [150, 182], color: 0xffd25e, w: 4, depth: -900 });
+    gulls(this, { n: 1, y: [36, 60], depth: -400, alpha: 0.6 });
     this.layer = this.add.container(0, 0);
     this.listen();
   }
@@ -384,10 +402,19 @@ export class WrapScene extends StateScene {
     const n = entries.length;
     const spacing = n <= 2 ? 200 : Math.min(160, 440 / n);
     const small = n > 2;
+    // Töne: richtige Zutat = Plopp, daneben = Fehler-Ton, fertig = Münze
+    for (const [id, p] of entries) {
+      const prev = this.wrapFx.get(id);
+      if (prev && p.step > prev.step) sfx(p.step >= WRAP_RECIPE.length ? 'coin' : 'pop', { pitch: 1 + p.step * 0.06 });
+      if (prev && p.mistakes > prev.mistakes) sfx('error', { vol: 0.6 });
+      this.wrapFx.set(id, { step: p.step, mistakes: p.mistakes });
+    }
+    if (w.sub === 'over' && this.key && !this.wrapFx.has('_over')) (this.wrapFx.set('_over', { step: 0, mistakes: 0 }), sfx('win'));
     entries.forEach(([id, p], i) => {
       const cx = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
-      const name = playerById(id)?.name ?? '?';
-      const forName = playerById(w.forWhom[id])?.name ?? '?';
+
+      const name = tagName(playerById(id)?.name ?? '?');
+      const forName = tagName(playerById(w.forWhom[id])?.name ?? '?');
       const steps = WRAP_RECIPE.slice(0, p.step);
       const stackKey = ensureTex(this, `wrap_${steps.join('-') || 'empty'}`, () => wrapStack(steps));
       // Ab 5 Spielern werden Karten und Teller schmaler, damit sie sich nicht überlappen (bis 12 Spieler)
@@ -395,8 +422,7 @@ export class WrapScene extends StateScene {
       this.layer.add(this.add.image(cx, 236, stackKey).setOrigin(0.5, 1).setScale(small ? (spacing < 60 ? 1 : 2) : 3));
       const pw = small ? Math.max(narrow ? 30 : 90, Math.floor(spacing) - (narrow ? 3 : 6)) : 160;
       this.layer.add(panel(this, Math.round(cx - pw / 2), 70, pw, 52));
-      const shortName = narrow ? name.replace(/^Bot\s+/, '') : name;
-      this.layer.add(ink(this, cx, 78, small ? shortName.slice(0, Math.max(2, Math.floor(pw / 8) - 1)) : `${name.slice(0, 8)} → ${forName.slice(0, 8)}`));
+      this.layer.add(fitText(ink(this, cx, 78, small ? name : `${name} → ${forName}`), pw - 8));
       const next = WRAP_RECIPE[p.step];
       if (next) {
         if (small) this.layer.add(this.add.image(cx, 104, ensureTex(this, `ing_${next}`, () => ingredient(next))).setScale(1.5));

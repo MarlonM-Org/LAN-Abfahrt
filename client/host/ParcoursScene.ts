@@ -5,8 +5,10 @@ import { PARCOURS as P, type ParcoursPart, fanZone, partRect, partSize } from '.
 import * as O from '../art/objects';
 import { coconutPix, paintParcours, partPix } from '../art/parcours';
 import { bus, getState, playerById } from './store';
-import { avatarSprite, playAvatar } from './textures';
-import { GOLD, INK, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { ensureAvatar, avatarSprite, playAvatar } from './textures';
+import { GOLD, INK, NameTags, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const short = (id: string) => (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '');
@@ -43,6 +45,9 @@ export class ParcoursScene extends Phaser.Scene {
   private overlayKey = '';
   private fxSeq = 0;
   private lastSub = '';
+  private juice!: Juice;
+  private tags!: NameTags;
+  private ground = new Map<string, boolean>();
   /** Lokale Uhr für Schwebeplattformen */
   private tBase = 0;
 
@@ -65,6 +70,9 @@ export class ParcoursScene extends Phaser.Scene {
     prop(this, 'palm', () => O.palm(6), 30, 202).setDepth(-500);
     prop(this, 'cocktailP', O.cocktail, 418, 176).setDepth(-400);
     this.wind = this.add.graphics().setDepth(5);
+    this.juice = new Juice(this, { depth: 950 });
+    this.tags = new NameTags(this, 600);
+    this.ground.clear();
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.overlay = this.add.container(0, 0).setDepth(1100);
     this.banner = txt(this, WORLD.W / 2, 96, '', { size: 24, color: GOLD }).setDepth(1200);
@@ -111,16 +119,19 @@ export class ParcoursScene extends Phaser.Scene {
       }
     }
     // Läufer
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string }[] = [];
     for (const [id, r] of Object.entries(st.runners)) {
       const v = this.runners.get(id);
       if (!v) continue;
       v.x += (r.x - v.x) * 0.45;
       v.y += (r.y - v.y) * 0.45;
       v.root.setPosition(Math.round(v.x), Math.round(v.y));
+      if (r.st !== 'dead' && v.root.visible) tagSpecs.push({ id, x: Math.round(v.x), y: Math.round(v.y) - 37, name: short(id), color: hex(P.COLORS[st.colors[id] ?? 0]) });
       v.img.setFlipX(r.face < 0);
       const moving = r.st === 'run' && r.ground && Math.abs(r.x - v.x) > 0.3;
       playAvatar(v.img, r.st === 'dead' ? 'hit' : r.st === 'goal' ? 'cheer' : !r.ground ? 'jump' : moving ? 'walk' : 'idle');
     }
+    this.tags.update(st.sub === 'countdown' || st.sub === 'run' || st.sub === 'score' ? tagSpecs : []);
   }
 
   private onState(s: GameState) {
@@ -254,9 +265,8 @@ export class ParcoursScene extends Phaser.Scene {
         const color = P.COLORS[st.colors[id] ?? 0];
         const img = avatarSprite(this, pl.look).setScale(0.75);
         const mark = this.add.triangle(0, -25, 0, 0, 6, 0, 3, 4, color).setStrokeStyle(1, 0x2d1b12);
-        // Kürzel über dem Kopf, abwechselnd versetzt, damit sie sich am Start nicht überdecken
-        const tag = txt(this, 0, -36 - ((st.colors[id] ?? 0) % 2) * 9, short(id).slice(0, 3).toUpperCase(), { color: hex(color) });
-        const root = this.add.container(r.x, r.y, [img, mark, tag]).setDepth(500);
+        // Namen kommen aus NameTags (verteilt sich selbst, bei Gedränge Initiale + Farbpunkt)
+        const root = this.add.container(r.x, r.y, [img, mark]).setDepth(500);
         v = { root, img, x: r.x, y: r.y, st: r.st };
         this.runners.set(id, v);
       }
@@ -266,9 +276,20 @@ export class ParcoursScene extends Phaser.Scene {
       }
       if (r.st !== v.st) {
         v.st = r.st;
-        if (r.st === 'dead') this.tweens.add({ targets: v.root, alpha: 0, angle: 180, duration: 500 });
+        if (r.st === 'dead') {
+          this.tweens.add({ targets: v.root, alpha: 0, angle: 180, duration: 500 });
+          if (!r.by && !r.zzz) {
+            // ins Wasser gefallen
+            sfx('splash', { x: r.x });
+            this.juice.burst(r.x, Math.min(r.y, 262), 'splash', 12);
+          }
+        }
         if (r.st === 'goal') this.tweens.add({ targets: v.img, scale: 0.9, yoyo: true, duration: 180, repeat: 2 });
       }
+      // Sprung: vom Boden abgehoben
+      const was = this.ground.get(id);
+      if (st.sub === 'run' && r.st === 'run' && was && !r.ground) sfx('jump', { x: r.x, vol: 0.45, pitch: 1.1 });
+      this.ground.set(id, r.ground);
       if (r.st === 'run') v.root.setAlpha(r.away ? 0.4 : 1).setAngle(0); // away = Verbindung weg (eingefroren)
     }
   }
@@ -298,17 +319,31 @@ export class ParcoursScene extends Phaser.Scene {
       if (f.kind === 'boom') {
         const c = this.add.circle(f.x, f.y, 6, 0xffb03a, 0.9).setDepth(900);
         this.tweens.add({ targets: c, scale: P.BOMB_R / 6 + 0.5, alpha: 0, duration: 450, onComplete: () => c.destroy() });
-        this.cameras.main.shake(200, 0.01);
+        this.juice.shake(3);
+        this.juice.burst(f.x, f.y, 'fire', 18);
+        this.juice.burst(f.x, f.y, 'smoke', 8);
+        sfx('boom', { x: f.x });
       } else if (f.kind === 'ko') {
         const t = txt(this, f.x, f.y - 26, 'KO!', { color: '#ff6a5a' }).setDepth(900);
         this.tweens.add({ targets: t, y: t.y - 12, alpha: 0, duration: 900, onComplete: () => t.destroy() });
         const splash = this.add.circle(f.x, f.y - 6, 4, 0xffffff, 0.8).setDepth(899);
         this.tweens.add({ targets: splash, scale: 3, alpha: 0, duration: 400, onComplete: () => splash.destroy() });
+        // Falle hat zugeschnappt
+        sfx('ko', { x: f.x });
+        sfx('bonk', { x: f.x, delay: 0.04 });
+        this.juice.burst(f.x, f.y - 8, 'puff', 8);
+        this.juice.hitStop(60);
+        this.juice.shake(1);
       } else if (f.kind === 'goal') {
+        sfx('coin', { x: f.x });
+        sfx('cheer', { x: f.x, vol: 0.6, delay: 0.1 });
+        this.juice.burst(f.x, f.y - 20, 'confetti', 20);
         const t = txt(this, f.x, f.y - 30, 'PROST!', { color: GOLD }).setDepth(900);
         this.tweens.add({ targets: t, y: t.y - 14, alpha: 0, duration: 1100, onComplete: () => t.destroy() });
       } else if (f.kind === 'place') {
+        sfx('pop', { x: f.x, pitch: 0.8 });
         const c = this.add.circle(f.x, f.y, 4, 0xffffff, 0.6).setDepth(899);
+
         this.tweens.add({ targets: c, scale: 3, alpha: 0, duration: 300, onComplete: () => c.destroy() });
       }
     }

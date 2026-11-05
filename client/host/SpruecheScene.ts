@@ -8,7 +8,8 @@ import { paintSky, paintWoodFloor } from '../art/ground';
 import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
-import { GOLD, GREEN_INK, INK, RED_INK, Countdown, background, ensureTex, ink, nameTag, panel, prop, txt } from './ui';
+import { GOLD, GREEN_INK, INK, RED_INK, Countdown, background, ensureTex, ink, nameTag, panel, prop, tagName, txt } from './ui';
+import { sfx } from './sfx';
 
 const SOFT = '#7a5a3a';
 const LIGHTS = [0xe04a3f, 0xf2c33a, 0x46b04a, 0x3f8fe0, 0xe46e98];
@@ -22,12 +23,17 @@ export class SpruecheScene extends Phaser.Scene {
   private timerKey = '';
   private stateKey = '';
   private timerY = 0;
+  private sndVoted = 0;
+  private sndAnswered = 0;
 
   constructor() {
     super('sprueche');
   }
 
   create() {
+    this.sndVoted = 0;
+    this.sndAnswered = 0;
+
     this.timerKey = '';
     this.stateKey = '';
     this.timerY = 0;
@@ -92,6 +98,7 @@ export class SpruecheScene extends Phaser.Scene {
     const prevSub = this.stateKey ? (JSON.parse(this.stateKey) as string[])[0] : '';
     this.stateKey = key;
     const fresh = prevSub !== tKey;
+    this.sounds(st, fresh);
 
     this.layer.removeAll(true);
     this.timerY = 0;
@@ -149,7 +156,7 @@ export class SpruecheScene extends Phaser.Scene {
       const f = figure(this, p.look, x, y, 2);
       if (!done) f.setAlpha(p.connected ? 0.65 : 0.3);
       this.layer.add(f);
-      this.layer.add(nameTag(this, x, y + 3, p.name.slice(0, Math.max(4, Math.floor(spacing / 8) - 1)), done ? GREEN_INK : INK));
+      this.layer.add(nameTag(this, x, y + 3, p.name, done ? GREEN_INK : INK, spacing - 2));
       const bubbleY = y - 64;
       if (done) {
         const c = this.add.image(x, bubbleY, ensureTex(this, 'sq_check', checkIcon)).setScale(2);
@@ -172,6 +179,24 @@ export class SpruecheScene extends Phaser.Scene {
     const text = st.prompt.replace(/_{2,}/g, '_____');
     const size = text.length <= 26 ? 16 : 8;
     this.layer.add(ink(this, WORLD.W / 2, 50, text, { size, wrap: 428 }).setOrigin(0.5, 0.5));
+  }
+
+  /** Antwort-/Abstimmungs-Tick, Auflösungs-Pling + Lacher-Jingle, Endfanfare */
+  private sounds(st: SpruecheState, fresh: boolean) {
+    const voted = st.voted.length;
+    const answered = Object.values(st.answered).reduce((a, b) => a + b, 0);
+    if (fresh) {
+      if (st.sub === 'answer') sfx('select');
+      if (st.sub === 'vote') sfx('pop', { pitch: 0.9 });
+      if (st.sub === 'reveal') (sfx('drumroll', { vol: 0.7 }), sfx('coin', { delay: 0.55 }), sfx('cheer', { delay: 0.65, vol: 0.7 }));
+      if (st.sub === 'scores') sfx('coin', { pitch: 1.3 });
+      if (st.sub === 'over') sfx('fanfare');
+    } else {
+      if (st.sub === 'vote' && voted > this.sndVoted) sfx('tick', { pitch: 1 + voted * 0.05 });
+      if (st.sub === 'answer' && answered > this.sndAnswered) sfx('tick', { pitch: 1.4, vol: 0.5 });
+    }
+    this.sndVoted = voted;
+    this.sndAnswered = answered;
   }
 
   private renderDuel(st: SpruecheState, fresh: boolean) {
@@ -205,7 +230,7 @@ export class SpruecheScene extends Phaser.Scene {
       if (author) {
         const f = figure(this, author.look, fx, 238, 2);
         this.layer.add(f);
-        this.layer.add(nameTag(this, fx, 241, author.name.slice(0, 10), k === winner ? RED_INK : INK));
+        this.layer.add(nameTag(this, fx, 241, author.name, k === winner ? RED_INK : INK, 90));
         if (k === winner) this.tweens.add({ targets: f.getData('img'), y: -5, duration: 260, yoyo: true, repeat: -1 });
       }
       const info = this.add.container(cx + 28, 192);
@@ -336,7 +361,7 @@ export class SpruecheScene extends Phaser.Scene {
       const p = playerById(id);
       this.layer.add(ink(this, 126, y, `${place}.`, { origin: [0, 0], color: place === 1 ? RED_INK : INK }));
       if (p) this.layer.add(this.add.image(156, y + 3, ensurePortrait(this, p.look)));
-      this.layer.add(ink(this, 170, y, (p?.name ?? '?').slice(0, 10), { origin: [0, 0] }));
+      this.layer.add(ink(this, 170, y, tagName(p?.name ?? '?').slice(0, 10), { origin: [0, 0] }));
       this.layer.add(ink(this, 312, y, String(pts), { origin: [1, 0] }));
       const gain = st.roundGain[id] ?? 0;
       if (gain) {

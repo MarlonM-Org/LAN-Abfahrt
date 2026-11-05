@@ -8,7 +8,8 @@ import { Pix } from '../art/pix';
 import { paintWoodFloor } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { GREEN_INK, INK, RED_INK, Countdown, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { GREEN_INK, INK, RED_INK, Countdown, background, ensureTex, fitText, ink, nameTag, panel, prop, tagName } from './ui';
+import { sfx } from './sfx';
 
 const TASK_TEXT: Record<string, string> = {
   write: 'Schreibt einen Satz!',
@@ -115,6 +116,21 @@ export class StillepostScene extends Phaser.Scene {
     this.stateKey = key;
     // Nur bei neuem Eintrag animieren – nicht, wenn z. B. jemand die Verbindung verliert
     const animate = !!prev && (prev[0] !== st.sub || prev[2] !== st.chain || prev[3] !== st.shown);
+    // Töne: Abgabe-/Abstimmungs-Tick, Auflösungs-Pling pro Eintrag, Lacher-Jingle am Kettenende
+    if (prev) {
+      if (prev[0] !== st.sub) {
+        if (st.sub === 'write' || st.sub === 'draw' || st.sub === 'describe') sfx('select');
+        if (st.sub === 'vote') sfx('pop', { pitch: 0.9 });
+        if (st.sub === 'tally') (sfx('drumroll', { vol: 0.7 }), sfx('coin', { delay: 0.6 }));
+        if (st.sub === 'over') sfx('fanfare');
+      }
+      if (st.sub === 'reveal' && (prev[3] !== st.shown || prev[2] !== st.chain)) {
+        sfx('coin', { pitch: 1 + Math.min(0.8, st.shown * 0.08), vol: 0.6 });
+        if (st.entries.length && st.shown >= st.entries.length) sfx('cheer', { delay: 0.3 });
+      }
+      if (st.sub === 'vote' && st.voted.length > ((prev[5] as string[] | undefined)?.length ?? 0)) sfx('tick', { pitch: 1 + st.voted.length * 0.05 });
+      if ((st.sub === 'write' || st.sub === 'draw' || st.sub === 'describe') && st.done.length > ((prev[4] as string[] | undefined)?.length ?? 0)) sfx('tick', { pitch: 1.4, vol: 0.5 });
+    }
 
     this.clearLayer();
     this.timerY = 0;
@@ -178,7 +194,7 @@ export class StillepostScene extends Phaser.Scene {
       const f = figure(this, p.look, x, y, 2);
       if (!done) f.setAlpha(p.connected ? 0.6 : 0.3);
       this.layer.add(f);
-      this.layer.add(nameTag(this, x, y + 3, p.name.slice(0, Math.max(4, Math.floor(spacing / 8) - 1)), done ? GREEN_INK : INK));
+      this.layer.add(nameTag(this, x, y + 3, p.name, done ? GREEN_INK : INK, spacing - 2));
       const bubbleY = y - 62;
       if (done) {
         const c = this.add.image(x, bubbleY, ensureTex(this, 'sp_check', checkIcon)).setScale(2);
@@ -291,8 +307,9 @@ export class StillepostScene extends Phaser.Scene {
       const cx = WORLD.W / 2 + (col - (inRow - 1) / 2) * (cw + gap);
       const y = top + row * (ch + gap);
       this.layer.add(panel(this, Math.round(cx - cw / 2), y, cw, ch));
-      const who = playerById(e.by)?.name ?? '?';
-      this.layer.add(ink(this, cx, y + 7, `${i + 1}. ${who.slice(0, 9)}`, { color: '#7a5a3a' }));
+      const who = tagName(playerById(e.by)?.name ?? '?');
+      this.layer.add(fitText(ink(this, cx, y + 7, `${i + 1}. ${who}`, { color: '#7a5a3a' }), cw - 8));
+
       if (e.kind === 'drawing') {
         const size = Math.min(cw - 16, ch - (rows === 1 ? 44 : 38));
         this.layer.add(this.add.rectangle(cx, y + 19 + size / 2, size + 4, size + 4, 0x5e3518));

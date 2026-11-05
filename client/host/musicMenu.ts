@@ -17,7 +17,7 @@ const CSS = `
 #musik-menu-root * { box-sizing: border-box; }
 #musik-btn { pointer-events: auto; position: absolute; left: 2vh; bottom: 2vh; padding: 1.1vh 1.6vh; font: 1.4vh 'Press Start 2P', monospace; color: #3d2414; background: #f7e4b5; border: 0.4vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12, 0.4vh 0.4vh 0 0.3vh #2d1b12; cursor: pointer; }
 #musik-btn:hover { background: #fff6dc; }
-#musik-btn.hidden { display: none; }
+#musik-btn.hidden:not(.peek) { display: none; }
 #musik-overlay { pointer-events: auto; position: absolute; inset: 0; background: rgba(45, 27, 18, 0.72); display: flex; align-items: center; justify-content: center; }
 #musik-overlay.hidden { display: none; }
 #musik-panel { width: min(92vw, 1100px); max-height: 92vh; display: flex; flex-direction: column; background: #f7e4b5; color: #3d2414; border: 0.6vh solid #8d5629; box-shadow: 0 0 0 0.4vh #2d1b12, 0 1vh 0 0.4vh #2d1b12; font-size: 15px; line-height: 1.5; }
@@ -80,6 +80,13 @@ export function setupMusicMenu() {
   });
   root.append(btn, overlay);
   document.body.append(root);
+  // Außerhalb der Lobby nur kurz nach einer Mausbewegung zeigen (nie dauerhaft über dem HUD)
+  let peekTimer: number | undefined;
+  window.addEventListener('mousemove', () => {
+    btn?.classList.add('peek');
+    clearTimeout(peekTimer);
+    peekTimer = window.setTimeout(() => btn?.classList.remove('peek'), 3500);
+  });
   onMusicChange((kind) => {
     updateButton();
     if (!isMusicMenuOpen()) return;
@@ -89,7 +96,8 @@ export function setupMusicMenu() {
   updateButton();
 }
 
-/** Knopf nur in der Lobby zeigen (das Menü selbst geht per M überall) */
+/** Knopf nur in der Lobby zeigen, sonst nach Mausbewegung (das Menü selbst geht per M überall) */
+
 export function musicMenuScene(scene: string) {
   btn?.classList.toggle('hidden', scene !== 'lobby');
 }

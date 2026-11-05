@@ -7,6 +7,9 @@ import { paintSand, paintShore, paintWater } from '../art/ground';
 import { FONT, bus, getState, playerById } from './store';
 import { ensureBall, ensureBottle, figure } from './textures';
 import { BLUE_INK, INK, background, ink, panel, prop, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { crowd, foam, gulls } from './ambient';
 
 interface Actor {
   root: Phaser.GameObjects.Container;
@@ -29,6 +32,9 @@ export class FlunkyScene extends Phaser.Scene {
   private overLayer!: Phaser.GameObjects.Container;
   private lastSeq = 0;
   private flying = false;
+  private juice!: Juice;
+  private fans: ReturnType<typeof crowd> | null = null;
+  private runTaps = 0;
 
   constructor() {
     super('flunky');
@@ -38,6 +44,7 @@ export class FlunkyScene extends Phaser.Scene {
     this.actors.clear();
     this.bottleDown = false;
     this.flying = false;
+    this.runTaps = 0;
     const st = getState();
     this.lastSeq = st?.mini?.kind === 'flunky' ? (st.mini.state.lastThrow?.seq ?? 0) : 0;
 
@@ -56,6 +63,12 @@ export class FlunkyScene extends Phaser.Scene {
       const s = this.add.rectangle(Phaser.Math.Between(0, WORLD.W), Phaser.Math.Between(36, 98), 3, 1, 0xffffff).setAlpha(0);
       this.tweens.add({ targets: s, alpha: 0.9, duration: 600, yoyo: true, repeat: -1, delay: i * 230, repeatDelay: 1200 });
     }
+
+    // Leerer Strand: Möwen, Wellenschaum an der Wasserkante, Zuschauer am Handtuch
+    gulls(this, { n: 3, y: [40, 96], depth: 900 });
+    foam(this, { y: 104, n: 16, depth: -900, spread: 2 });
+    this.juice = new Juice(this, { depth: 4000 });
+    this.fans = crowd(this, [[150, 266], [168, 268], [312, 268], [330, 266]], { depth: 262 });
 
     prop(this, 'palm', () => O.palm(6), 18, 150);
     prop(this, 'palm2', () => O.palm(9), 464, 160).setFlipX(true);
@@ -144,6 +157,15 @@ export class FlunkyScene extends Phaser.Scene {
       this.teamText[team]?.setText(`${TEAM_INFO[team].name}\nBier: ${pct}%`);
     }
 
+    // Laufen: jeder Tap ein Tick
+    if ((f.sub === 'chug' || f.sub === 'reset') && f.runProgress > this.runTaps) sfx('tick', { pitch: 0.9 + (f.runProgress / RUN_TAPS) * 0.6, vol: 0.4 });
+    this.runTaps = f.sub === 'chug' || f.sub === 'reset' ? f.runProgress : 0;
+    if (f.sub === 'over' && f.winner && !this.overLayer.length) {
+      sfx('fanfare');
+      this.fans?.cheer();
+      this.juice.burst(WORLD.W / 2, 90, 'confetti', 50);
+    }
+
     if (f.lastThrow && f.lastThrow.seq !== this.lastSeq) {
       this.lastSeq = f.lastThrow.seq;
       this.animateThrow(f);
@@ -205,6 +227,7 @@ export class FlunkyScene extends Phaser.Scene {
     const ball = this.add.image(t.from.x, t.from.y - 22, ensureBall(this));
     const shadow = this.add.ellipse(t.from.x, t.from.y, 7, 3, 0x000000, 0.25);
     this.flying = true;
+    sfx('throw', { x: t.from.x });
     const dur = FLIGHT_MS - 200;
     this.tweens.addCounter({
       from: 0,
@@ -223,9 +246,20 @@ export class FlunkyScene extends Phaser.Scene {
         shadow.destroy();
         if (t.hit) {
           this.setBottleDown(true);
-          this.cameras.main.shake(200, 0.01);
+          // Treffer: Klirren, kurzer Stopp, Sandwolke, Jubel
+          this.juice.shake(2);
+          this.juice.hitStop(80);
+          this.juice.burst(BOTTLE.x, BOTTLE.y - 4, 'sand', 14);
+          this.juice.burst(BOTTLE.x, BOTTLE.y - 10, 'spark', 8);
+          sfx('crack', { x: BOTTLE.x });
+          sfx('hitHard', { x: BOTTLE.x, delay: 0.03 });
+          sfx('cheer', { delay: 0.2 });
+          this.fans?.cheer();
           this.popText(BOTTLE.x, BOTTLE.y - 40, 'TREFFER!', C.gold, '16px');
         } else {
+          this.juice.burst(t.to.x, t.to.y, 'sand', 6);
+          sfx('bonk', { x: t.to.x, pitch: 0.7, vol: 0.5 });
+          sfx('lose', { x: t.to.x, vol: 0.4, delay: 0.1 });
           this.popText(t.to.x, t.to.y - 16, missHint(t.team, t.to), '#ff6b5e', '8px');
         }
         this.tweens.add({ targets: ball, alpha: 0, delay: 400, duration: 300, onComplete: () => ball.destroy() });
@@ -243,6 +277,8 @@ export class FlunkyScene extends Phaser.Scene {
     const now = this.time.now;
     if (now - a.lastGluck < 350) return;
     a.lastGluck = now;
+    sfx('pop', { x: a.root.x, pitch: 0.5 + Math.random() * 0.2, vol: 0.45 });
+
     this.popText(a.root.x + Phaser.Math.Between(-6, 6), a.root.y - 40, 'gluck', C.white, '8px');
   }
 

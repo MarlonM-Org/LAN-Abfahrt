@@ -7,7 +7,9 @@ import type { Pix } from '../art/pix';
 import { addHouse } from './house';
 import { bus, getState, playerById } from './store';
 import { figure, playAvatar } from './textures';
-import { BLUE_INK, Countdown, GOLD, GREEN_INK, INK, RED_INK, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { BLUE_INK, Countdown, GOLD, GREEN_INK, INK, NameTags, RED_INK, ensureTex, ink, nameTag, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 /** Figuren stehen mit den Füßen etwas unter dem Server-Punkt (der ist Körpermitte) */
 const FOOT = 8;
@@ -21,6 +23,7 @@ interface Fig {
   x: number;
   y: number;
   hp: number;
+  name: string;
 }
 
 const ITEM_TEX: Record<string, () => Pix> = { pistol: waterPistol, coconut, medkit };
@@ -30,6 +33,8 @@ export class TttScene extends Phaser.Scene {
   private figs = new Map<string, Fig>();
   private items = new Map<number, Phaser.GameObjects.Image>();
   private bodies = new Map<string, Phaser.GameObjects.Container>();
+  private juice!: Juice;
+  private tags!: NameTags;
   private bodyRole = new Map<string, string | null>();
   private overlay!: Phaser.GameObjects.Container;
   private hud!: Phaser.GameObjects.Container;
@@ -49,6 +54,8 @@ export class TttScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = new Juice(this, { depth: 1450 });
+    this.tags = new NameTags(this, 1300);
     this.figs.clear();
     this.items.clear();
     this.bodies.clear();
@@ -85,6 +92,7 @@ export class TttScene extends Phaser.Scene {
     this.timerText.setText(sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : '');
     const t = this.latest;
     if (!t) return;
+    const specs: { id: string; x: number; y: number; name: string; color: string }[] = [];
     for (const [id, f] of this.figs) {
       const p = t.players[id];
       if (!p) continue;
@@ -94,7 +102,9 @@ export class TttScene extends Phaser.Scene {
       playAvatar(f.img, p.stunned ? 'hit' : p.moving ? 'walk' : 'idle');
       f.img.setAngle(p.stunned ? Math.sin(this.time.now / 60) * 12 : 0);
       f.c.setPosition(Math.round(f.x), Math.round(f.y + FOOT)).setDepth(f.y + FOOT);
+      if (f.c.visible) specs.push({ id, x: Math.round(f.x), y: Math.round(f.y + FOOT) - 45, name: f.name, color: id === t.detective ? '#9cc7ff' : '#fff4d6' });
     }
+    this.tags.update(specs);
   }
 
   // ---------------------------------------------------------------- Zustand
@@ -139,12 +149,11 @@ export class TttScene extends Phaser.Scene {
         const c = figure(this, pl.look, p.x, p.y + FOOT);
         const img = c.getData('img') as Phaser.GameObjects.Image;
         if (id === t.detective) c.add(this.add.image(0, -21, ensureTex(this, 'ttt_hat', detectiveHat)).setOrigin(0.5, 1));
-        const name = txt(this, 0, -45, pl.name.replace(/^Bot\s+/, '').slice(0, 6), { color: id === t.detective ? '#9cc7ff' : undefined });
         const pips = this.add.graphics();
         const held = this.add.image(7, -9, ensureTex(this, 'ttt_pistol', waterPistol)).setVisible(false);
         const stars = this.add.image(0, -30, ensureTex(this, 'ttt_dizzy', dizzy)).setVisible(false);
-        c.add([held, pips, name, stars]);
-        f = { c, img, pips, held, stars, x: p.x, y: p.y, hp: -1 };
+        c.add([held, pips, stars]);
+        f = { c, img, pips, held, stars, x: p.x, y: p.y, hp: -1, name: tagName(pl.name) };
         this.figs.set(id, f);
       }
       f.c.setVisible(true);
@@ -200,6 +209,8 @@ export class TttScene extends Phaser.Scene {
   private syncBodies(t: TttState) {
     for (const b of t.bodies) {
       if (this.bodies.has(b.id) && this.bodyRole.get(b.id) === b.role) continue;
+      // Leiche gefunden (Rolle aufgedeckt): dumpfer Gong
+      if (this.bodies.has(b.id) && b.role) sfx('drumroll', { x: b.x, vol: 0.6 });
       this.bodies.get(b.id)?.destroy();
       this.bodies.set(b.id, this.makeBody(b));
       this.bodyRole.set(b.id, b.role);
@@ -241,6 +252,8 @@ export class TttScene extends Phaser.Scene {
       const peel = this.add.image(tr.x, tr.y + 4, ensureTex(this, 'ttt_banana', bananaPeel)).setDepth(tr.y);
       this.tweens.add({ targets: peel, alpha: 0, delay: 1500, duration: 600, onComplete: () => peel.destroy() });
       this.pop(tr.x, tr.y - 22, 'Ausgerutscht!', GOLD);
+      sfx('whoosh', { x: tr.x, pitch: 1.5 });
+      sfx('bonk', { x: tr.x, delay: 0.15 });
     }
   }
 
@@ -255,9 +268,13 @@ export class TttScene extends Phaser.Scene {
       g.lineStyle(2, color).lineBetween(0, 0, 16, 0);
       g.setPosition(a.x1, y1).setRotation(ang - 0.9);
       this.tweens.add({ targets: g, rotation: ang + 0.9, duration: 140, onComplete: () => this.tweens.add({ targets: g, alpha: 0, duration: 120, onComplete: () => g.destroy() }) });
+      sfx('whoosh', { x: a.x1, vol: 0.5 });
+      if (a.target) sfx(a.ko ? 'hitHard' : 'bonk', { x: a.x2, delay: 0.1 });
       if (a.target) this.pop(a.x2, y2 - 18, a.ko ? 'K.O.!' : 'BONK!', a.ko ? '#ff6b5e' : '#fff4d6');
     } else if (a.kind === 'pistol') {
       const d = Math.hypot(a.x2 - a.x1, y2 - y1);
+      sfx('shoot', { x: a.x1, pitch: 1.3, vol: 0.6 });
+      if (a.target) sfx('splash', { x: a.x2, vol: 0.6, delay: Math.max(80, d * 2) / 1000 });
       for (let k = 0; k < 4; k++) {
         const drop = this.add.circle(a.x1, y1, 1.5, 0x93d3f3).setDepth(900).setStrokeStyle(1, 0x2b6ba6);
         this.tweens.add({ targets: drop, x: a.x2, y: y2, delay: k * 35, duration: Math.max(80, d * 2), onComplete: () => drop.destroy() });
@@ -270,12 +287,20 @@ export class TttScene extends Phaser.Scene {
     } else {
       const nut = this.add.image(a.x1, y1, ensureTex(this, 'ttt_coconut', coconut)).setDepth(900);
       const d = Math.hypot(a.x2 - a.x1, y2 - y1);
+      sfx('throw', { x: a.x1 });
+      if (a.target) sfx('bonk', { x: a.x2, pitch: 0.7, delay: Math.max(150, d * 3) / 1000 });
       this.tweens.add({ targets: nut, x: a.x2, y: y2, angle: 540, duration: Math.max(150, d * 3), onComplete: () => {
         nut.destroy();
         if (a.target) this.pop(a.x2, y2 - 18, a.ko ? 'K.O.!' : 'KLONK!', a.ko ? '#ff6b5e' : '#ffd25e');
       } });
     }
-    if (a.ko) this.cameras.main.shake(180, 0.006);
+    if (a.ko) {
+      // Angriff mit K.O.: kurzer Stopp, Schreck-Ton
+      this.juice.shake(2);
+      this.juice.hitStop(90);
+      this.juice.burst(a.x2, y2 - 6, 'puff', 10);
+      sfx('ko', { x: a.x2, delay: 0.12 });
+    }
   }
 
   private pop(x: number, y: number, text: string, color: string) {
@@ -333,6 +358,12 @@ export class TttScene extends Phaser.Scene {
       }
     } else if (t.sub === 'roundEnd' && t.last) {
       const win = t.last.winner === 'traitor';
+      if (this.overlay.getData('fx') !== `end-${t.round}`) {
+        this.overlay.setData('fx', `end-${t.round}`);
+        sfx(win ? 'lose' : 'win');
+        sfx('drumroll', { vol: 0.5 });
+      }
+
       const y = this.card(win ? 'Die Verräter gewinnen!' : 'Die Unschuldigen gewinnen!', t.last.reason, 190, win ? RED_INK : GREEN_INK);
       this.overlay.add(ink(this, WORLD.W / 2, y + 60, t.last.traitors.length > 1 ? 'Die Verräter waren:' : 'Der Verräter war:', { color: RED_INK }));
       const n = t.last.traitors.length;

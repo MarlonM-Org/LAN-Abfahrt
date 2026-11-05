@@ -7,7 +7,8 @@ import * as O from '../art/objects';
 import { paintSand, paintSky, paintWater } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { BLUE_INK, Countdown, GREEN_INK, RED_INK, background, ink, nameTag, panel, prop, txt } from './ui';
+import { BLUE_INK, Countdown, GREEN_INK, RED_INK, background, ink, nameTag, panel, prop, tagName, txt } from './ui';
+import { sfx } from './sfx';
 
 const clock = (ms: number) => {
   const sec = Math.ceil(ms / 1000);
@@ -25,6 +26,8 @@ export class TouristScene extends Phaser.Scene {
   private countdown = new Countdown();
   private total = 1;
   private phaseKey = '';
+  private votedN = 0;
+  private askSeq = -1;
   private stateKey = '';
   private clockShown = '';
 
@@ -98,7 +101,15 @@ export class TouristScene extends Phaser.Scene {
       this.phaseKey = pk;
       this.countdown.set(t.endsIn);
       this.total = Math.max(1, t.sub === 'play' ? t.roundMs : t.endsIn);
+      // Abstimmung: Gong, Auflösung: Trommelwirbel + Pling, Ende: Fanfare
+      if (t.sub === 'vote') sfx(t.vote?.passed === undefined ? 'select' : t.vote.passed ? 'drumroll' : 'lose', { vol: 0.8 });
+      if (t.sub === 'reveal') (sfx('drumroll'), sfx('coin', { delay: 0.9 }), sfx('cheer', { vol: 0.5, delay: 1 }));
+      if (t.sub === 'over') sfx('fanfare');
     }
+    if (t.sub === 'vote' && (t.vote?.voted.length ?? 0) > this.votedN) sfx('tick', { pitch: 1 + (t.vote?.voted.length ?? 0) * 0.05 });
+    this.votedN = t.sub === 'vote' ? (t.vote?.voted.length ?? 0) : 0;
+    if (t.sub === 'play' && t.askSeq !== this.askSeq && this.askSeq >= 0) sfx('pop', { pitch: 1.2, vol: 0.5 });
+    this.askSeq = t.askSeq;
     const players = s.players.filter((p) => p.id in t.points);
     const sKey = JSON.stringify([t.sub, t.round, t.phaseNo, t.asker, t.askSeq, t.vote, t.reveal?.outcome, t.points, t.accusers, players.map((p) => [p.name, p.connected])]);
     if (sKey === this.stateKey) return;
@@ -189,7 +200,7 @@ export class TouristScene extends Phaser.Scene {
 
   private renderReveal(t: TourState) {
     const r = t.reveal!;
-    const name = (id: string | null) => playerById(id)?.name ?? '?';
+    const name = (id: string | null) => tagName(playerById(id)?.name ?? '?');
     this.layer.add(panel(this, 50, 50, 380, 118));
     const head = tourOutcomeText(r, name);
     this.layer.add(ink(this, WORLD.W / 2, 58, head, { color: RED_INK, wrap: 360 }));
@@ -203,7 +214,7 @@ export class TouristScene extends Phaser.Scene {
       if (!p) return;
       const x = WORLD.W / 2 + (i - (n - 1) / 2) * 90;
       this.layer.add(figure(this, p.look, x - 34, 158, 2));
-      this.layer.add(ink(this, x + 6, 132, `Tourist:\n${p.name}`, { origin: [0, 0], color: RED_INK }));
+      this.layer.add(ink(this, x + 6, 132, `Tourist:\n${tagName(p.name)}`, { origin: [0, 0], color: RED_INK }));
     });
   }
 
@@ -211,7 +222,7 @@ export class TouristScene extends Phaser.Scene {
   private renderRow(t: TourState, players: PlayerPublic[]) {
     const n = players.length;
     const spacing = Math.min(56, 440 / Math.max(1, n));
-    const maxChars = Math.max(4, Math.floor(spacing / 8) - 1);
+    const tagW = spacing - 2;
     players.forEach((p, i) => {
       const x = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
       const y = 232;
@@ -220,7 +231,8 @@ export class TouristScene extends Phaser.Scene {
       this.layer.add(f);
       const isAsker = t.sub === 'play' && t.asker === p.id;
       const accused = t.sub === 'vote' && t.vote?.accused === p.id;
-      this.layer.add(nameTag(this, x, y + 2, p.name.slice(0, maxChars), isAsker ? BLUE_INK : accused ? RED_INK : undefined));
+      this.layer.add(nameTag(this, x, y + 2, p.name, isAsker ? BLUE_INK : accused ? RED_INK : undefined, tagW));
+
       this.layer.add(txt(this, x, y + 16, `${t.points[p.id] ?? 0} P.`, { color: '#fff4d6' }));
       if (isAsker) {
         const arrow = this.add.graphics();

@@ -5,7 +5,9 @@ import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintSand, paintShore, paintSky, paintWater } from '../art/ground';
 import { bus, getState, playerById } from './store';
-import { ensureTex, ink, nameTag, panel, prop, txt, RED_INK, INK } from './ui';
+import { ensureTex, ink, nameTag, panel, prop, tagName, txt, RED_INK, INK } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 import { figure } from './textures';
 import { Pix } from '../art/pix';
 
@@ -27,6 +29,8 @@ export class SprintScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container;
   private lastSub = '';
   private stateKey = '';
+  private juice!: Juice;
+  private seen = new Map<string, number | 'early' | null>();
 
   constructor() {
     super('sprint');
@@ -35,6 +39,8 @@ export class SprintScene extends Phaser.Scene {
   create() {
     this.lastSub = '';
     this.stateKey = '';
+    this.seen.clear();
+    this.juice = new Juice(this, { depth: 400 });
     this.day = this.add.image(0, 0, ensureTex(this, 'bg_sprint_day', () => {
       const p = new Pix(WORLD.W, WORLD.H);
       beach(['#6fb7e8', '#f3a07b', '#ffcf86', '#ffe7b0'])(p);
@@ -76,12 +82,28 @@ export class SprintScene extends Phaser.Scene {
       if (sp.sub === 'go') {
         this.tweens.add({ targets: this.night, alpha: 0, duration: 250 });
         this.tweens.add({ targets: [this.sun, core], y: 104, duration: 400, ease: 'Back.out' });
-        this.cameras.main.flash(150, 255, 230, 160);
+        this.juice.flash(0xffe6a0, 150);
+        // Sonnenaufgang-Ton: heller Aufstieg + Startsignal
+        sfx('powerup', { pitch: 1.2 });
+        sfx('go', { delay: 0.05 });
       } else {
+        if (sp.sub === 'wait') this.seen.clear();
+        if (sp.sub === 'reveal' || sp.sub === 'over') sfx(sp.sub === 'over' ? 'fanfare' : 'drumroll', { vol: 0.7 });
         this.night.setAlpha(isNight ? 1 : 0);
         this.sun.setY(isNight ? 154 : 104);
         core.setY(isNight ? 154 : 104);
       }
+    }
+
+    // Neue Tipps: Fehlstart = Buzzer, sonst Plopp (je schneller, desto höher)
+    for (const [id, t] of Object.entries(sp.times)) {
+      if (t === null || this.seen.get(id) === t) continue;
+      this.seen.set(id, t);
+      if (t === 'early') {
+        sfx('error');
+        sfx('bonk', { pitch: 0.5, delay: 0.05 });
+        this.juice.shake(1);
+      } else if (sp.sub === 'go') sfx('pop', { pitch: Math.max(0.7, 1.8 - t / 600) });
     }
 
     const key = JSON.stringify([sp.sub, sp.round, sp.times, sp.points]);
@@ -119,7 +141,8 @@ export class SprintScene extends Phaser.Scene {
       const f = figure(this, p.look, x, t === 'early' ? 250 : 214);
       if (t === 'early') (f.getData('img') as Phaser.GameObjects.Image).setAngle(90).setTint(0xdddddd);
       this.layer.add(f);
-      this.layer.add(nameTag(this, x, 240, p.name.slice(0, 6)));
+      // Name auf Liegenbreite verkleinern statt hart kürzen
+      this.layer.add(nameTag(this, x, 240, p.name, INK, spacing - 4));
       let label = '';
       if (t === 'early') label = 'früh!';
       else if (typeof t === 'number' && sp.sub !== 'wait') label = `${t}ms`;
@@ -128,7 +151,8 @@ export class SprintScene extends Phaser.Scene {
     });
 
     if ((sp.sub === 'reveal' || sp.sub === 'over') && ranked[0]) {
-      this.layer.add(txt(this, WORLD.W / 2, 46, `${playerById(ranked[0])?.name} hat die beste Liege!`, { color: C.gold }));
+      this.layer.add(txt(this, WORLD.W / 2, 46, `${tagName(playerById(ranked[0])?.name ?? '?')} hat die beste Liege!`, { color: C.gold }));
+
     }
   }
 }
