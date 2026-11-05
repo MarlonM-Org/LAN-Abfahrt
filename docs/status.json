@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 19:20",
+  "updated": "2026-11-05 19:25",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -35,13 +35,6 @@
       "detail": "changed() sofort senden, meta-Event, private nur bei Änderung, 3 s Gnadenfrist statt sofort raus, Stick-Timeout, WebSocket"
     },
     {
-      "title": "Review Phase 0: Fairness + Parcours-Bug",
-      "kind": "parcours",
-      "type": "Review-Umsetzung",
-      "branch": "review/fairness",
-      "detail": "Alle 12 laufen im Parcours, Punkte nach Spielerzahl, Startspieler rotiert, Koop-Münzen Flieger/Grill, Sprint serverseitig"
-    },
-    {
       "title": "Review Phase 1: Ton + Juice am TV",
       "kind": "",
       "type": "Review-Umsetzung",
@@ -65,6 +58,11 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Review Phase 0: Fairness, Parcours für 12 Läufer, Koop-Münzen, Sprint serverseitig",
+      "pr": 43,
+      "date": "2026-11-05"
+    },
     {
       "title": "Süßigkeiten-Klau",
       "pr": 41,
@@ -217,7 +215,7 @@
     },
     "parcours": {
       "status": "umgesetzt",
-      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer"
+      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer; ab 9 Spielern laufen jetzt alle 12 (#43)"
     },
     "turm": {
       "status": "umgesetzt",
