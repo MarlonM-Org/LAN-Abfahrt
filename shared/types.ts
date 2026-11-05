@@ -2,6 +2,7 @@ import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
+import type { WolfPrivate, WolfState } from './werwolf';
 
 export interface Look {
   skin: number;
@@ -56,7 +57,8 @@ export type MiniKind =
   | 'boule'
   | 'sumo'
   | 'tourist'
-  | 'sprueche';
+  | 'sprueche'
+  | 'werwolf';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1536,7 +1538,8 @@ export type MiniSnapshot =
   | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
   | { kind: 'tourist'; state: TourState }
-  | { kind: 'sprueche'; state: SpruecheState };
+  | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'werwolf'; state: WolfState };
 
 export interface GameState {
   phase: Phase;
@@ -1583,6 +1586,7 @@ export type PrivateState =
   | { kind: 'geist'; state: GeistPrivate }
   | { kind: 'tourist'; state: TourPrivate }
   | { kind: 'sprueche'; state: SpruechePrivate }
+  | { kind: 'werwolf'; state: WolfPrivate }
   | null;
 
 export interface JoinRequest {

@@ -956,3 +956,48 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .sq-answer:disabled { opacity: 0.45; }
 .sq-answer.active:disabled { opacity: 1; }
 .sq-next { min-height: 26vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }
+
+/* ---------------------------------------------------------------- Werwölfe im Ferienhaus */
+.ww-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 84px; padding: 10px; text-align: center; cursor: pointer;
+  background: repeating-linear-gradient(45deg, #2b3a72 0 8px, #34458a 8px 16px);
+  color: #fff4d6; text-shadow: 1px 1px 0 var(--outline);
+  border: 3px solid var(--outline); box-shadow: inset 0 0 0 3px #b9c3ff, 0 3px 0 var(--outline);
+}
+.ww-card.big { min-height: 40vh; }
+.ww-card.open { background: var(--paper-light); color: var(--ink); text-shadow: none; box-shadow: inset 0 0 0 3px var(--gold), 0 3px 0 var(--outline); }
+.ww-card-back, .ww-card-front { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ww-card-back b { font-size: 13px; font-weight: normal; }
+.ww-card small { font-size: 8px; opacity: 0.8; }
+.ww-card span { font-size: 9px; line-height: 1.6; }
+.ww-role { font-size: 16px; font-weight: normal; }
+.ww-card b, .ww-death b, .ww-list b, .ww-rolerow b { font-weight: normal; }
+.ww-red { color: var(--red); }
+.ww-green { color: #2f7d32; }
+
+/* Nacht: dunkle Fläche – alle Handys sehen gleich aus */
+.ww-night {
+  display: flex; flex-direction: column; gap: 10px;
+  margin: -8px -6px; padding: 10px 8px;
+  background: #141a45; border: 3px solid var(--outline);
+}
+.ww-night .top-row { color: #b9c3ff; }
+.ww-night .ww-prompt { background: #1f2a5e; border-color: #0b1030; box-shadow: inset 0 0 0 2px #2b3a72; }
+.ww-night .ww-prompt h2 { color: #ffd25e; }
+.ww-night .ww-prompt p { color: #d6dcff; font-size: 9px; line-height: 1.6; }
+.ww-night .ww-prompt .ww-red { color: #ff8a7a; }
+.ww-night .ww-prompt .ww-green { color: #7fd47f; }
+.ww-night .player-btn { background: #2b3a72; color: #e6eaff; border-color: #0b1030; box-shadow: inset 0 -3px 0 #1f2a5e, 0 3px 0 #0b1030; }
+.ww-night .player-btn.picked { background: #ffd25e; color: var(--ink); box-shadow: inset 0 -3px 0 #d99a2b, 0 3px 0 #0b1030; }
+.ww-night .player-btn:disabled { opacity: 0.3; }
+.ww-grid .player-btn { position: relative; }
+.ww-mark { position: absolute; top: 3px; right: 4px; font-style: normal; font-size: 7px; color: #ff8a7a; }
+.ww-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ww-actions button { padding: 16px 4px; font-size: 10px; background: #4a3f8a; border-color: #0b1030; box-shadow: inset 0 3px 0 #6a5fb0, inset 0 -4px 0 #2e2660, 0 3px 0 #0b1030; }
+.ww-death { align-items: center; text-align: center; }
+.ww-death b { font-size: 13px; }
+.ww-list p { text-align: left; }
+.ww-names { color: var(--ink); line-height: 1.8; }
+.ww-allroles, .ww-rolerow { width: 100%; }
+.ww-rolerow { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; padding: 3px 0; border-bottom: 1px dashed var(--paper-dark); }
