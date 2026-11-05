@@ -4,6 +4,7 @@ import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_R
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
+import { sessionPanel } from './leaderboard';
 
 /** Avatar-Editor. `onDone` tritt dem Spiel bei bzw. aktualisiert den Charakter. */
 export function buildEdit(onDone: () => void) {
@@ -75,6 +76,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     <h2 class="hello"></h2>
     <p class="count"></p>
     <div class="menu"></div>
+    <div class="session-slot"></div>
     <div class="panel q-panel">
       <p class="label-left">${mode === 'drink' ? 'Eigene Frage / Aussage' : 'Eigener Startsatz / Spruch'}</p>
       <div class="mode-tabs q-kind"></div>
@@ -138,7 +140,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     menu.append(leaderboardPanel());
     if (vip) {
       const reset = el(`<button class="secondary small">Leaderboard zurücksetzen</button>`).firstElementChild as HTMLButtonElement;
-      reset.addEventListener('click', () => confirm('Alle Arcade-Punkte löschen?') && socket.emit('vip:resetLeaderboard'));
+      reset.textContent = 'Ewige Tabelle zurücksetzen';
+      reset.addEventListener('click', () => confirm('Ewige Arcade-Tabelle (alle Abende) löschen?') && socket.emit('vip:resetLeaderboard'));
       menu.append(reset);
     }
   } else if (vip && mode === 'date') {
@@ -172,6 +175,22 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   } else {
     const label = mode === 'date' ? 'Date Night ♥' : mode === 'drink' ? 'Trinkspiel' : 'Party-Abfahrt';
     menu.append(el(`<div class="center"><h2>${label}</h2><p>Warte, bis der VIP ein Spiel startet ...</p></div>`));
+  }
+
+  // Leaderboard des Abends (alle Modi): Tabelle auf Wunsch, VIP: auf dem TV zeigen + zurücksetzen
+  const ses = sessionPanel({ open: (store.state?.session.games ?? 0) > 0 });
+  const slot = q(root, '.session-slot');
+  slot.append(ses.root);
+  let tvBtn: HTMLButtonElement | null = null;
+  let resetSes: HTMLButtonElement | null = null;
+  if (vip) {
+    const row = el(`<div class="btn-row lb-vip"></div>`).firstElementChild as HTMLElement;
+    tvBtn = el(`<button class="secondary small"></button>`).firstElementChild as HTMLButtonElement;
+    tvBtn.addEventListener('click', () => socket.emit('vip:showBoard', !store.state?.showBoard));
+    resetSes = el(`<button class="secondary small">Zurücksetzen</button>`).firstElementChild as HTMLButtonElement;
+    resetSes.addEventListener('click', () => confirm('Leaderboard des Abends löschen? Alle Punkte von heute gehen verloren.') && socket.emit('vip:resetSession'));
+    row.append(tvBtn, resetSes);
+    ses.root.append(row);
   }
 
   // Bots zum Testen
@@ -246,6 +265,9 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`
         : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen`;
     arcadeUpdate?.(n);
+    ses.update();
+    if (tvBtn) tvBtn.textContent = st?.showBoard ? 'TV: Lobby zeigen' : 'Auf dem TV zeigen';
+    if (resetSes) resetSes.disabled = !st?.session.games;
     for (const g of gated) {
       const tooMany = g.max !== undefined && n > g.max;
       g.btn.disabled = n < g.min || tooMany;
@@ -342,7 +364,7 @@ function leaderboardPanel() {
     : '';
   return el(`
     <div class="panel">
-      <p class="label-left">Leaderboard (Punkte · Siege)</p>
+      <p class="label-left">Ewige Tabelle (alle Abende · Punkte · Siege)</p>
       ${rows ? `<table class="lb"><tbody>${rows}</tbody></table>` : '<p>Noch keine Punkte – spielt los!</p>'}
       ${mine ? `<p class="label-left">Deine Punkte pro Spiel</p><table class="lb"><tbody>${per}</tbody></table>` : ''}
     </div>

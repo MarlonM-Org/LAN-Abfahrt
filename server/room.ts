@@ -9,6 +9,7 @@ import type {
   MiniKind,
   Phase,
   PlayerPublic,
+  NochmalState,
   ResultsState,
   ServerHello,
   StartRequest,
@@ -16,6 +17,7 @@ import type {
 import { sanitizeLook } from '../shared/avatar';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
+import { KingsCupGame } from './kingscup';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
 import { KurveGame } from './kurve';
@@ -30,7 +32,9 @@ import { TurmGame } from './turm';
 import { IgelGame } from './igel';
 import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
-import { ARCADE_POINTS, ARCADE_RANDOM, fitsPlayers } from '../shared/games';
+import { SessionBoard } from './session';
+import { ARCADE_POINTS, ARCADE_RANDOM, fitsPlayers, seriesLabel } from '../shared/games';
+import { KART_TRACKS } from '../shared/kart';
 import { WasserGame } from './wasser';
 import { GrillGame } from './grill';
 import { FangenGame } from './fangen';
@@ -81,7 +85,7 @@ const AUTO_RESULTS_MS = Number(process.env.AUTO_CONTINUE_MS ?? 12_000);
 const AUTO_STORY_MS = 10_000;
 const AUTO_MINI_MS = 5_000;
 
-export type HostCommand = 'abort' | 'continue' | 'removeBots';
+export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board';
 
 interface Player extends PlayerPublic {
   socketId: string | null;
@@ -113,8 +117,18 @@ export class Room {
   private flushTimer: NodeJS.Timeout | null = null;
 
   private bots: Bot[] = [];
+  /** Ewige Tabelle (data/arcade.json) */
   private leaderboard = new Leaderboard();
+  /** Leaderboard des Abends (nur im Speicher) */
+  private session = new SessionBoard();
+  /** Lobby: Leaderboard des Abends groß auf dem TV zeigen (VIP-Handy oder Laptop-Taste L) */
+  private showBoard = false;
+  /** Laufendes/letztes Spiel ist ein Einzelspiel aus der Lobby (Arcade, Laptop-Auswahl, Einzelspiel-Liste) → Punkte + „Nochmal“ */
+  private singleActive = false;
+  /** Einzelspiel im Arcade-Modus gestartet (VIP-Handy bietet zusätzlich „Zufälliges Spiel“ an) */
   private arcadeActive = false;
+  /** Kart-Rennen: zuletzt gefahrene Strecke – „Nochmal“ fährt die nächste (wie ein Grand Prix) */
+  private lastKartTrack: number | null = null;
   /** Arcade „Alle dürfen wählen“: Spieler-ID → Wunschspiel (null = Abstimmung aus, nur der VIP wählt) */
   private arcadeVotes: Map<string, MiniKind> | null = null;
   private lastKind: MiniKind | null = null;
@@ -177,7 +191,8 @@ export class Room {
         return reply({ ok: false, kicked: true, error: 'Du wurdest aus der Runde entfernt.' });
       }
       if (!p) {
-        if (this.phase !== 'lobby') {
+        // Im Ergebnis eines Einzelspiels darf man dazukommen – bei „Nochmal“ geht es sonst nie zurück in die Lobby
+        if (this.phase !== 'lobby' && !(this.phase === 'results' && this.singleActive)) {
           return reply({ ok: false, error: 'Gerade läuft ein Spiel – du bist ab der nächsten Runde dabei!' });
         }
         // Gleicher Name, alte ID offline (z. B. Browserdaten gelöscht) → alten grauen Eintrag ersetzen
@@ -213,11 +228,12 @@ export class Room {
       const req = asRecord(raw);
       const ids = this.connectedIds();
       if (req.mode === 'random') {
-        this.arcadeActive = this.mode === 'arcade';
+        this.markSingle();
         return this.startRandom();
       }
       if (req.mode === 'drink') {
         if (ids.length < 2) return socket.emit('toast', 'Mindestens 2 Spieler nötig.');
+        this.session.endSeries();
         this.drinkRun = { totals: Object.fromEntries(ids.map((id) => [id, 0])), last: null, rounds: 0 };
         this.nextDrinkRound();
       } else if (req.mode === 'date') {
@@ -258,9 +274,15 @@ export class Room {
 
     socket.on('vip:continue', (action?: string) => {
       if (!(isVip() || inCouple()) || this.phase !== 'results') return;
-      if (this.arcadeActive && !this.board && (action === 'random' || action === 'again')) {
-        if (action === 'again' && this.lastKind) return this.startMini(this.lastKind);
-        return this.startRandom();
+      if (this.singleResults()) {
+        if (action === 'again') {
+          const err = this.nochmal();
+          if (err) socket.emit('toast', err);
+          return;
+        }
+        if (action === 'random') return this.startRandom();
+        // sonst („Anderes Spiel“): zurück zur Auswahl in der Lobby
+        return this.backToLobby();
       }
       this.continueAfterResults(action === 'end');
     });
@@ -276,9 +298,23 @@ export class Room {
       this.bots.push(new Bot(name, { url: this.localUrl }));
     });
 
+    // Ewige Tabelle (alle Abende) löschen
     socket.on('vip:resetLeaderboard', () => {
       if (!isVip() || this.phase !== 'lobby') return;
       this.leaderboard.reset();
+      this.changed();
+    });
+
+    // Leaderboard des Abends zurücksetzen (Lobby oder Ergebnis – nicht mitten im Spiel)
+    socket.on('vip:resetSession', () => {
+      if (!isVip() || (this.phase !== 'lobby' && this.phase !== 'results')) return;
+      this.resetSession();
+    });
+
+    // Leaderboard des Abends auf dem TV ein-/ausblenden (Lobby)
+    socket.on('vip:showBoard', (on: unknown) => {
+      if (!isVip() || this.phase !== 'lobby') return;
+      this.showBoard = !!on;
       this.changed();
     });
 
@@ -372,6 +408,7 @@ export class Room {
   // ---------------------------------------------------------------- Ablauf
 
   private startParty(ids: string[], rounds: number) {
+    this.session.endSeries();
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
       onChange: () => this.changed(),
@@ -388,6 +425,7 @@ export class Room {
 
   private startDate(version: string, couple: [string, string]) {
     const def = DATE_VERSIONS.find((v) => v.id === version) ?? DATE_VERSIONS[0];
+    this.session.endSeries();
     this.dateRun = new DateRun(def, couple, [this.nameOf(couple[0]), this.nameOf(couple[1])]);
     this.results = null;
     this.phase = 'story';
@@ -416,9 +454,53 @@ export class Room {
     if (this.phase !== 'lobby') return 'Gerade läuft schon ein Spiel.';
     const err = this.fitError(kind);
     if (err) return err;
-    this.arcadeActive = this.mode === 'arcade';
+    this.markSingle();
     this.startMini(kind);
     return null;
+  }
+
+  /** Ab jetzt läuft ein Einzelspiel aus der Lobby: Punkte fürs Leaderboard, im Ergebnis „Nochmal“ */
+  private markSingle() {
+    this.singleActive = true;
+    this.arcadeActive = this.mode === 'arcade';
+  }
+
+  /** Ergebnis eines Einzelspiels (kein Spielbrett, keine Date Night, keine Trinkspiel-Runde)? */
+  private singleResults() {
+    return this.phase === 'results' && this.singleActive && !this.board && !this.dateRun && !this.drinkRun && !!this.results && !this.results.final;
+  }
+
+  /** „Nochmal“: dasselbe Spiel mit allen, die gerade da sind (Kart: nächste Strecke). Fehlermeldung oder null. */
+  private nochmal(): string | null {
+    const info = this.nochmalState();
+    if (!info) return 'Gerade gibt es nichts zum Wiederholen.';
+    if (info.disabled) return `Nochmal geht nicht: ${info.disabled}`;
+    this.startMini(info.kind, info.kind === 'kart' ? { track: this.nextKartTrack() } : undefined);
+    return null;
+  }
+
+  private nextKartTrack() {
+    return this.lastKartTrack === null ? undefined : (this.lastKartTrack + 1) % KART_TRACKS.length;
+  }
+
+  /** Für VIP-Handy und Laptop: Was „Nochmal“ startet und ob es gerade geht */
+  private nochmalState(): NochmalState | null {
+    const kind = this.lastKind;
+    if (!kind || !this.singleResults()) return null;
+    const track = kind === 'kart' ? this.nextKartTrack() : undefined;
+    return {
+      kind,
+      next: seriesLabel(kind, this.session.nextRound(kind)),
+      ...(track !== undefined ? { detail: `Strecke: ${KART_TRACKS[track].name}` } : {}),
+      ...(this.fitError(kind) ? { disabled: this.fitError(kind)! } : {}),
+      random: this.arcadeActive,
+    };
+  }
+
+  private resetSession() {
+    this.session.reset();
+    if (this.results) delete this.results.points;
+    this.changed();
   }
 
   /**
@@ -444,8 +526,9 @@ export class Room {
     return out;
   }
 
-  private startMini(kind: MiniKind) {
+  private startMini(kind: MiniKind, opts?: { track?: number }) {
     this.mini?.dispose();
+    this.showBoard = false;
     // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
     this.arcadeVotes?.clear();
     this.lastKind = kind;
@@ -497,6 +580,9 @@ export class Room {
       case 'bomb':
         this.mini = new BombGame(ids, ctx);
         break;
+      case 'kingscup':
+        this.mini = new KingsCupGame(ids, ctx);
+        break;
       case 'sup':
         this.mini = new SupGame(ids, ctx);
         break;
@@ -528,7 +614,7 @@ export class Room {
         this.mini = new ParcoursGame(ids, ctx);
         break;
       case 'kart':
-        this.mini = new KartGame(ids, ctx, undefined, (id) => this.players.get(id)?.kartView === 'phone');
+        this.mini = new KartGame(ids, ctx, opts?.track, (id) => this.players.get(id)?.kartView === 'phone');
         break;
       case 'turm':
         this.mini = new TurmGame(ids, ctx);
@@ -606,6 +692,8 @@ export class Room {
   }
 
   private finishMini(kind: MiniKind, r: MiniResult) {
+    const snap = this.mini?.snapshot();
+    if (snap?.kind === 'kart') this.lastKartTrack = snap.state.track;
     this.mini?.dispose();
     this.mini = null;
     this.miniIds = null;
@@ -625,28 +713,31 @@ export class Room {
       Object.assign(hearts, { sips: r.sips });
     }
     this.results = { title: MINI_INFO[kind].title, subtitle: r.subtitle, rows, final: false, ...hearts };
-    if (this.arcadeActive) this.scoreArcade(kind, r);
+    if (this.singleActive && !this.board && !this.dateRun && !this.drinkRun) this.scoreSingle(kind, r);
     this.phase = 'results';
     this.changed();
   }
 
-  /** Arcade: Punkte nach Platzierung verteilen und dauerhaft speichern */
-  private scoreArcade(kind: MiniKind, r: MiniResult) {
+  /**
+   * Einzelspiel: Punkte nach Platzierung verteilen – ins Leaderboard des Abends (pro Spieler-ID, mit Serie)
+   * und in die ewige Tabelle (pro Name, ohne Bots, data/arcade.json).
+   */
+  private scoreSingle(kind: MiniKind, r: MiniResult) {
     // Trinkspiele: wer am wenigsten trinken musste, gewinnt
     const groups = r.sips ? [...r.groups].reverse() : r.groups;
     // Gemeinsame Spiele (nur eine Gruppe): Herzen bzw. feste Punkte für alle
     const coop = groups.length === 1;
     const points: Record<string, number> = {};
     groups.forEach((g, gi) => {
-      for (const id of g) points[id] = coop ? (r.hearts ?? ARCADE_POINTS[1]) : ARCADE_POINTS[Math.min(gi, ARCADE_POINTS.length - 1)];
+      // Entfernte Spieler bekommen für dieses Spiel nichts mehr (ihre bisherigen Punkte bleiben)
+      for (const id of g) if (this.players.has(id) && !this.players.get(id)!.removed) points[id] = coop ? (r.hearts ?? ARCADE_POINTS[1]) : ARCADE_POINTS[Math.min(gi, ARCADE_POINTS.length - 1)];
     });
-    for (const [id, pts] of Object.entries(points)) {
-      const won = !coop && groups[0].includes(id);
-      this.leaderboard.add(this.nameOf(id), kind, pts, won);
-    }
+    const winners = new Set(coop ? [] : (groups[0] ?? []));
+    for (const [id, pts] of Object.entries(points)) this.leaderboard.add(this.nameOf(id), kind, pts, winners.has(id));
     this.leaderboard.save();
+    this.session.score(kind, points, winners, this.present());
     if (this.results) {
-      this.results.arcade = points;
+      this.results.points = points;
       // Reihenfolge und Plätze nach Arcade-Punkten (wichtig bei Trinkspielen)
       const place = new Map<string, number>();
       groups.forEach((g, gi) => g.forEach((id) => place.set(id, gi + 1)));
@@ -722,6 +813,7 @@ export class Room {
     this.board = null;
     this.dateRun = null;
     this.drinkRun = null;
+    this.singleActive = false;
     this.arcadeActive = false;
     this.results = null;
     this.phase = 'lobby';
@@ -765,6 +857,28 @@ export class Room {
       this.advance();
       return { ok: true, msg: 'Weiter!' };
     }
+    if (cmd === 'again') {
+      if (!this.singleResults()) return { ok: false, msg: 'Nochmal geht nur im Ergebnis eines Einzelspiels.' };
+      const err = this.nochmal();
+      return err ? { ok: false, msg: err } : { ok: true, msg: 'Nochmal!' };
+    }
+    if (cmd === 'menu') {
+      if (this.phase === 'lobby') return { ok: true };
+      if (!this.singleResults()) return { ok: false, msg: 'Erst das laufende Spiel abbrechen (Esc 2×).' };
+      this.backToLobby();
+      return { ok: true, msg: 'Anderes Spiel wählen' };
+    }
+    if (cmd === 'resetSession') {
+      if (this.phase !== 'lobby' && this.phase !== 'results') return { ok: false, msg: 'Nicht mitten im Spiel – erst in der Lobby oder im Ergebnis.' };
+      this.resetSession();
+      return { ok: true, msg: 'Leaderboard des Abends zurückgesetzt.' };
+    }
+    if (cmd === 'board') {
+      if (this.phase !== 'lobby') return { ok: false, msg: 'Leaderboard-Ansicht gibt es in der Lobby (im Ergebnis läuft sie automatisch).' };
+      this.showBoard = !this.showBoard;
+      this.changed();
+      return { ok: true, msg: this.showBoard ? 'Leaderboard des Abends' : 'Lobby' };
+    }
     if (cmd === 'removeBots') {
       if (this.phase !== 'lobby') return { ok: false, msg: 'Bots nur in der Lobby entfernen (erst abbrechen).' };
       if (!this.bots.length) return { ok: false, msg: 'Keine Bots da.' };
@@ -780,7 +894,7 @@ export class Room {
     if (this.phase !== 'lobby') return { ok: false, msg: 'Erst das laufende Spiel abbrechen (Esc 2×).' };
     if (!this.connectedIds().length) return { ok: false, msg: 'Noch keine Spieler da.' };
     if (what === 'random') {
-      this.arcadeActive = this.mode === 'arcade';
+      this.markSingle();
       this.startRandom();
       return { ok: true, msg: 'Zufallsspiel!' };
     }
@@ -1030,6 +1144,11 @@ export class Room {
     return this.players.get(id)?.name ?? '?';
   }
 
+  /** Für das Leaderboard des Abends: wer gerade im Raum ist */
+  private present() {
+    return [...this.players.values()].map(({ id, name, look, connected, removed, isBot }) => ({ id, name, look, connected, removed, isBot }));
+  }
+
   snapshot(): GameState {
     return {
       phase: this.phase,
@@ -1062,6 +1181,9 @@ export class Room {
       inGame: this.phase === 'mini' ? this.miniIds : null,
       customQuipCount: this.quips.all.length,
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
+      session: this.session.state(this.present()),
+      nochmal: this.nochmalState(),
+      showBoard: this.phase === 'lobby' && this.showBoard,
     };
   }
 

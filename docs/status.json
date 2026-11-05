@@ -1,72 +1,86 @@
 {
-  "updated": "2026-11-05 16:55",
+  "updated": "2026-11-05 18:15",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "inProgress": [
     {
-      "title": "Angeln",
-      "kind": "angeln",
-      "type": "Neues Spiel",
-      "branch": "spiel/angeln",
-      "detail": "Auswerfen per Schwung/Wischen, Anbiss, Schnurspannung beim Einholen"
-    },
-    {
-      "title": "Wasserpistolen-Duell",
-      "kind": "wpistole",
-      "type": "Neues Spiel",
-      "branch": "spiel/wasserpistole",
-      "detail": "Western-Duell: auf „ZIEHT!“ Handy hochreißen, Fehlstart wird bestraft"
-    },
-    {
-      "title": "Zauber-Arena",
-      "kind": "zauber",
-      "type": "Neues Spiel",
-      "branch": "spiel/zauber",
-      "detail": "à la Spellsworn: Zielsuch-Feuerball + Eilzauber, Lava-Arena schrumpft"
-    },
-    {
-      "title": "Kings Cup",
-      "kind": "kingscup",
-      "type": "Neues Trinkspiel",
-      "branch": "spiel/kingscup",
-      "detail": "Kartenkreis mit Königsbecher, deine Regeln 2–Ass, Reaktions-Rennen am Handy"
-    },
-    {
-      "title": "Fallen-Parcours: kein Zeitlimit + Querformat",
-      "kind": "parcours",
-      "type": "Feedback-Fix",
-      "branch": "fix/parcours-quer",
-      "detail": "Runden so lang wie nötig; Auswählen/Platzieren auch quer"
-    },
-    {
-      "title": "Wackelturm: Raster + Reinschieben",
-      "kind": "turm",
-      "type": "Feedback-Fix",
-      "branch": "fix/turm-raster",
-      "detail": "Teile bis ganz an den Nachbarn schieben, seitlich in Lücken stecken, Fall-Hilfslinie"
-    },
-    {
-      "title": "Sensor-Rückmeldung",
+      "title": "Zug überspringen + mehr Ruhe",
       "kind": "",
       "type": "Feature",
-      "branch": "feature/sensor-feedback",
-      "detail": "Handy zeigt nach jedem Wurf/Schwung, was erkannt wurde, + Tipp"
+      "branch": "feature/skip-und-ruhe",
+      "detail": "Kleines VIP-Menü + Laptop-Taste S zum Überspringen; Timer nur noch wo Zeit zum Spiel gehört"
     },
     {
-      "title": "Nochmal + Leaderboard",
+      "title": "Kofferpacken",
       "kind": "",
-      "type": "Feature",
-      "branch": "feature/nochmal-leaderboard",
-      "detail": "Nach Einzelspielen „Nochmal“ (Kart als Grand Prix), Punkte laufen über die Sitzung weiter"
+      "type": "Neues Spiel",
+      "branch": "spiel/kofferpacken",
+      "detail": "Gepäck in den Kofferraum stapeln, mit Physik – Sachen fallen raus"
+    },
+    {
+      "title": "Süßigkeiten-Klau",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/suessigkeiten",
+      "detail": "à la Sweet Day: Naschkatzen sammeln, Wächter jagen, schwer beladen = langsam"
+    },
+    {
+      "title": "Spion unter Gästen",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/spion",
+      "detail": "Spieler verstecken sich unter vielen gleichen NPC-Gästen, Aufgaben erfüllen, andere enttarnen"
     }
   ],
   "queue": [
-    "Kofferpacken",
-    "Süßigkeiten-Klau",
-    "Spion unter Gästen",
     "Umzugschaos",
     "Wackel-Prügelei"
   ],
   "done": [
+    {
+      "title": "Kings Cup (Trinkspiel)",
+      "pr": 35,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Nochmal nach Einzelspielen + Leaderboard des Abends",
+      "pr": 33,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Fallen-Parcours: kein Zeitlimit, alles quer",
+      "pr": 31,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Wackelturm: Raster, Hilfslinie, Reinschieben",
+      "pr": 30,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Wasserpistolen-Duell",
+      "pr": 29,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Sensor-Rückmeldung auf dem Handy",
+      "pr": 28,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Zauber-Arena (à la Spellsworn)",
+      "pr": 27,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Angeln am Steg",
+      "pr": 26,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Status-Seite aktualisiert",
+      "pr": 25,
+      "date": "2026-11-05"
+    },
     {
       "title": "Musik passend zu den Spielen (8 neue Songs)",
       "pr": 24,
@@ -158,20 +172,20 @@
       "notes": "„Entenschießen mit Neigen – sehr cool“"
     },
     "parcours": {
-      "status": "in Arbeit",
-      "notes": "Zeit lief am Ende aus → kein Zeitlimit; Item-Auswahl/Platzieren quer"
+      "status": "umgesetzt",
+      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer"
     },
     "turm": {
-      "status": "in Arbeit",
-      "notes": "Teile lassen sich nicht ganz heranschieben; seitlich in Lücken stecken wie bei Tricky Towers"
+      "status": "umgesetzt",
+      "notes": "Kanten-Raster, Landevorschau, seitlich unter Überhänge schieben, Lock-Delay"
     },
     "bowling": {
-      "status": "in Arbeit",
-      "notes": "Sensor: Handy soll zeigen, welche Bewegung erkannt wurde"
+      "status": "umgesetzt",
+      "notes": "Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
     },
     "boule": {
-      "status": "in Arbeit",
-      "notes": "Sensor: Handy soll zeigen, welche Bewegung erkannt wurde"
+      "status": "umgesetzt",
+      "notes": "Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
     }
   },
   "general": [
@@ -205,10 +219,22 @@
     },
     {
       "title": "Leaderboard + Nochmal spielen",
-      "status": "in Arbeit"
+      "status": "umgesetzt"
     },
     {
       "title": "Musik passend zu den Spielen",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Zug überspringen (VIP-Menü + Laptop)",
+      "status": "in Arbeit"
+    },
+    {
+      "title": "Timer zu knapp – mehr Ruhe",
+      "status": "in Arbeit"
+    },
+    {
+      "title": "Sensor-Rückmeldung für Bewegungsspiele",
       "status": "umgesetzt"
     }
   ]

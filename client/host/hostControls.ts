@@ -10,13 +10,14 @@ import { installArcadePicker } from './arcadePicker';
  * Der Server nimmt die Befehle nur von Verbindungen an, die vom Laptop selbst (localhost) kommen.
  *
  *   Esc (2×)        Spiel abbrechen → Lobby
- *   Enter / Leertaste  Weiter (wie „Weiter“ des VIP)
- *   A               Arcade-Auswahl: beliebiges Spiel per Maus/Tastatur starten
+ *   Enter / Leertaste  Weiter (wie „Weiter“ des VIP) – im Ergebnis eines Einzelspiels: Nochmal
+ *   A               Arcade-Auswahl: beliebiges Spiel per Maus/Tastatur starten (im Ergebnis: anderes Spiel)
+ *   L               Lobby: Leaderboard des Abends groß ein-/ausblenden
  */
 const HIDE_MS = 3500;
 const ARM_MS = 3000;
 
-type Cmd = 'abort' | 'continue' | 'removeBots' | 'pick';
+type Cmd = 'abort' | 'continue' | 'removeBots' | 'pick' | 'again' | 'menu' | 'board' | 'resetSession';
 
 /** Eigenes Stylesheet, damit tv.html unangetastet bleibt */
 const CSS = `
@@ -24,7 +25,10 @@ body.hc-idle { cursor: none; }
 #host-ctl { position: fixed; right: 2vh; bottom: 2vh; z-index: 10; padding: 1.2vh 1.4vh; font: 1.2vh 'Press Start 2P', monospace; color: #fff4d6; background: rgba(45, 27, 18, 0.72); border: 0.3vh solid rgba(247, 228, 181, 0.5); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 #host-ctl.show { opacity: 1; pointer-events: auto; }
 #host-ctl .hc-title { color: #f7c948; margin-bottom: 1vh; }
-#host-ctl .hc-row { display: flex; gap: 0.8vh; }
+#host-ctl .hc-row { display: flex; gap: 0.8vh; flex-wrap: wrap; max-width: 62vh; }
+#host-ctl .hc-row + .hc-row { margin-top: 0.8vh; }
+#host-ctl button.hc-again:not(:disabled) { background: #f0973a; color: #fff4d6; }
+#host-ctl button[hidden] { display: none; }
 #host-ctl button { font: inherit; color: #3d2414; background: #f7e4b5; border: 0.3vh solid #8d5629; padding: 0.8vh 1vh; cursor: pointer; }
 #host-ctl button:hover:not(:disabled) { background: #fff4d6; }
 #host-ctl button:disabled { opacity: 0.35; cursor: default; }
@@ -48,7 +52,13 @@ export function installHostControls(socket: Socket) {
       <button data-cmd="removeBots" tabindex="-1">Bots entfernen</button>
       <button data-cmd="pick" tabindex="-1">Spiel wählen (A)</button>
     </div>
-    <div class="hc-keys">Esc 2× = abbrechen · Enter/Leertaste = weiter · A = Spiel wählen</div>
+    <div class="hc-row">
+      <button data-cmd="again" class="hc-again" tabindex="-1" hidden>Nochmal (Enter)</button>
+      <button data-cmd="menu" tabindex="-1" hidden>Anderes Spiel (A)</button>
+      <button data-cmd="board" tabindex="-1">Leaderboard (L)</button>
+      <button data-cmd="resetSession" tabindex="-1">Leaderboard zurücksetzen</button>
+    </div>
+    <div class="hc-keys">Esc 2× = abbrechen · Enter = weiter / nochmal · A = Spiel wählen · L = Leaderboard</div>
     <div class="hc-msg"></div>
   `;
   document.body.append(root);
@@ -106,8 +116,31 @@ export function installHostControls(socket: Socket) {
     }, ARM_MS);
   };
   const cont = () => {
+    const st = getState();
+    // Ergebnis eines Einzelspiels: Enter = Nochmal (gleiches Spiel, gleiche Leute)
+    if (st?.phase === 'results' && st.nochmal) return again();
     if (btn('continue').disabled) return say('Gerade gibt es nichts zum Weiterschalten.');
     send('continue');
+  };
+  const again = () => {
+    const n = getState()?.nochmal;
+    if (!n) return say('Nochmal gibt es nur im Ergebnis eines Einzelspiels.');
+    if (n.disabled) return say(`Nochmal geht nicht: ${n.disabled}`);
+    send('again');
+  };
+
+  // Leaderboard des Abends zurücksetzen: zweimal klicken
+  let resetArmedUntil = 0;
+  const resetSession = () => {
+    if (resetArmedUntil > Date.now()) {
+      resetArmedUntil = 0;
+      update();
+      return send('resetSession');
+    }
+    resetArmedUntil = Date.now() + ARM_MS;
+    update();
+    say('Nochmal klicken: Punkte des Abends löschen');
+    window.setTimeout(() => update(), ARM_MS + 50);
   };
 
   btn('abort').addEventListener('click', abort);
@@ -115,6 +148,10 @@ export function installHostControls(socket: Socket) {
   btn('removeBots').addEventListener('click', () => send('removeBots'));
   const picker = installArcadePicker(socket, say);
   btn('pick').addEventListener('click', () => picker.toggle());
+  btn('again').addEventListener('click', again);
+  btn('menu').addEventListener('click', () => picker.toggle(true));
+  btn('board').addEventListener('click', () => send('board'));
+  btn('resetSession').addEventListener('click', resetSession);
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
@@ -127,6 +164,11 @@ export function installHostControls(socket: Socket) {
       e.preventDefault();
       show();
       cont();
+    } else if (e.key === 'l' || e.key === 'L') {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      e.preventDefault();
+      send('board');
     }
   });
 
@@ -143,7 +185,20 @@ export function installHostControls(socket: Socket) {
     btn('abort').classList.toggle('armed', armedUntil > Date.now());
     btn('continue').disabled = !waits;
     btn('removeBots').disabled = phase !== 'lobby' || !s?.botCount;
+    const single = phase === 'results' && !!s?.nochmal;
     btn('pick').disabled = phase !== 'lobby';
+    btn('pick').hidden = single;
+    btn('again').hidden = !single;
+    btn('menu').hidden = !single;
+    btn('again').disabled = !!s?.nochmal?.disabled;
+    btn('again').title = s?.nochmal?.disabled ?? '';
+    btn('again').textContent = s?.nochmal ? `Nochmal: ${s.nochmal.next} (Enter)` : 'Nochmal (Enter)';
+    btn('continue').hidden = single;
+    btn('board').disabled = phase !== 'lobby';
+    btn('board').textContent = s?.showBoard ? 'Lobby zeigen (L)' : 'Leaderboard (L)';
+    btn('resetSession').disabled = (phase !== 'lobby' && phase !== 'results') || !s?.session.games;
+    btn('resetSession').textContent = resetArmedUntil > Date.now() ? 'Wirklich zurücksetzen?' : 'Leaderboard zurücksetzen';
+    btn('resetSession').classList.toggle('armed', resetArmedUntil > Date.now());
   }
   bus.on('state', (s: GameState) => update(s));
   update();
