@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { GameState, TurmLane, TurmState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { TURM, turmCom } from '../../shared/games';
+import { TURM, turmCellOffsets, turmCom } from '../../shared/games';
 import { C } from '../art/palette';
 import { heart } from '../art/objects';
 import { paintSky, paintWater } from '../art/ground';
@@ -36,7 +36,10 @@ function layout(n: number): { s: number; lanes: LaneLayout[] } {
     const s = Math.min((laneW - 6) / (VIEW_W * B), (rowH - LABEL - 4) / ((TURM.VIEW_TOP + TURM.VIEW_BOTTOM) * B));
     if (s > best.s + 0.01) best = { s, rows };
   }
-  const { s, rows } = best;
+  const { rows } = best;
+  // Ganzzahlige Pixel pro Block: Teile werden unskaliert gezeichnet, Kanten benachbarter Teile treffen
+  // sich exakt (bei krummen Faktoren entstehen sonst 1-px-Lücken, obwohl die Teile anliegen)
+  const s = best.s * B >= 4 ? Math.floor(best.s * B) / B : best.s;
   const perRow = Math.ceil(n / rows);
   const laneW = WORLD.W / perRow;
   const rowH = (WORLD.H - HUD) / rows;
@@ -85,6 +88,8 @@ export class TurmScene extends Phaser.Scene {
   private views = new Map<string, LaneView>();
   private geo: { s: number; lanes: LaneLayout[] } | null = null;
   private g!: Phaser.GameObjects.Graphics;
+  /** Über den Teilen: Umriss des aufgesetzten, noch steuerbaren Teils */
+  private fg!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
   private latest: TurmState | null = null;
@@ -101,6 +106,7 @@ export class TurmScene extends Phaser.Scene {
     this.latest = null;
     this.hudKey = '';
     this.g = this.add.graphics().setDepth(5);
+    this.fg = this.add.graphics().setDepth(12);
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.banner = txt(this, WORLD.W / 2, 110, '', { size: 24, color: GOLD }).setDepth(1001);
     const fn = (s: GameState) => this.onState(s);
@@ -264,6 +270,88 @@ export class TurmScene extends Phaser.Scene {
     void s;
   }
 
+  /**
+   * Sprite setzen. Fast gerade Teile (Winkel bis ~1,5° neben einem Vielfachen von 90°) werden gerade
+   * und mit der Ecke aufs Pixelraster gezeichnet – so liegen bündige Teile auch optisch ohne Spalt an.
+   */
+  private place(sp: Sprite, x: number, y: number) {
+    const q = Math.round(sp.a / (Math.PI / 2));
+    if (Math.abs(sp.a - (q * Math.PI) / 2) > 0.025) {
+      sp.img.setPosition(x, y).setRotation(sp.a);
+      return;
+    }
+    const rot = (q * Math.PI) / 2;
+    const c = Math.round(Math.cos(rot));
+    const sn = Math.round(Math.sin(rot));
+    const ox = sp.img.originX * sp.img.displayWidth;
+    const oy = sp.img.originY * sp.img.displayHeight;
+    // Linke obere Ecke der Textur relativ zum Drehpunkt (gedreht)
+    const dx = -ox * c + oy * sn;
+    const dy = -ox * sn - oy * c;
+    sp.img.setPosition(Math.round(x + dx) - dx, Math.round(y + dy) - dy).setRotation(rot);
+  }
+
+  private drawGuide(a: NonNullable<TurmLane['active']>, sp: Sprite, lay: LaneLayout, s: number) {
+    const g = this.g;
+    const offs = turmCellOffsets(a.shape, (a.rot * Math.PI) / 2);
+    // Zellspalten des Teils (Bildschirm-Offsets, y nach unten)
+    const cols = new Map<number, { top: number; bottom: number }>();
+    for (const o of offs) {
+      const k = Math.round(o.x);
+      const c = cols.get(k) ?? { top: Infinity, bottom: -Infinity };
+      c.top = Math.min(c.top, o.y);
+      c.bottom = Math.max(c.bottom, o.y);
+      cols.set(k, c);
+    }
+    const px = lay.cx + sp.x * s;
+    const py = lay.baseY - sp.y * s;
+    const gy = a.gy === null ? null : lay.baseY - a.gy * s;
+    const sea = gy === null;
+    const sx = (ox: number, edge: number) => Math.round(px + (ox + edge * (B / 2)) * s);
+    for (const [ox, c] of cols) {
+      const x0 = sx(ox, -1);
+      const x1 = sx(ox, 1);
+      const yTop = Math.round(py + (c.bottom + B / 2) * s);
+      const yEnd = sea ? lay.labelY : Math.round(gy + (c.top - B / 2) * s);
+      if (yEnd - yTop < 1) continue;
+      g.fillStyle(sea ? 0xff6b5a : 0xffffff, sea ? 0.16 : 0.14);
+      g.fillRect(x0, yTop, x1 - x0, yEnd - yTop);
+      // Kanten der Spalte etwas kräftiger – zum Ausrichten an Nachbarn
+      g.fillStyle(sea ? 0xff6b5a : 0xffffff, sea ? 0.3 : 0.24);
+      g.fillRect(x0, yTop, 1, yEnd - yTop);
+      g.fillRect(x1 - 1, yTop, 1, yEnd - yTop);
+    }
+    if (!sea && !a.rest && gy - py > B * s * 0.5) {
+      for (const o of offs) {
+        const x0 = sx(o.x, -1);
+        const x1 = sx(o.x, 1);
+        g.fillStyle(0xffffff, 0.28).fillRect(x0, Math.round(gy + (o.y - B / 2) * s), x1 - x0, Math.round(gy + (o.y + B / 2) * s) - Math.round(gy + (o.y - B / 2) * s));
+      }
+      this.outline(g, offs, (ox, e) => sx(ox, e), (oy, e) => Math.round(gy + (oy + (e * B) / 2) * s), 0.75);
+    }
+    // Aufgesetzt, aber noch steuerbar (Lock-Delay): pulsierender Umriss
+    if (a.rest) {
+      const alpha = 0.5 + 0.35 * Math.sin(this.time.now / 60);
+      this.outline(this.fg, offs, (ox, e) => sx(ox, e), (oy, e) => Math.round(py + (oy + (e * B) / 2) * s), alpha);
+    }
+  }
+
+  /** Außenkontur einer Form (nur Zellkanten ohne Nachbarzelle), 1 px breit */
+  private outline(g: Phaser.GameObjects.Graphics, offs: { x: number; y: number }[], X: (ox: number, e: number) => number, Y: (oy: number, e: number) => number, alpha: number) {
+    const has = (x: number, y: number) => offs.some((o) => Math.abs(o.x - x) < 1 && Math.abs(o.y - y) < 1);
+    g.fillStyle(0xffffff, alpha);
+    for (const o of offs) {
+      const x0 = X(o.x, -1);
+      const x1 = X(o.x, 1);
+      const y0 = Y(o.y, -1);
+      const y1 = Y(o.y, 1);
+      if (!has(o.x, o.y - B)) g.fillRect(x0, y0, x1 - x0, 1);
+      if (!has(o.x, o.y + B)) g.fillRect(x0, y1 - 1, x1 - x0, 1);
+      if (!has(o.x - B, o.y)) g.fillRect(x0, y0, 1, y1 - y0);
+      if (!has(o.x + B, o.y)) g.fillRect(x1 - 1, y0, 1, y1 - y0);
+    }
+  }
+
   update(_t: number, dtMs: number) {
     const st = this.latest;
     const geo = this.geo;
@@ -272,6 +360,7 @@ export class TurmScene extends Phaser.Scene {
     const k = 1 - Math.pow(0.0005, dtMs / 1000);
     const g = this.g;
     g.clear();
+    this.fg.clear();
     st.lanes.forEach((lane, i) => {
       const view = this.views.get(lane.id);
       const lay = geo.lanes[i];
@@ -280,7 +369,7 @@ export class TurmScene extends Phaser.Scene {
         sp.x += (sp.tx - sp.x) * k;
         sp.y += (sp.ty - sp.y) * k;
         sp.a += Phaser.Math.Angle.Wrap(sp.ta - sp.a) * k;
-        sp.img.setPosition(lay.cx + sp.x * s, lay.baseY - sp.y * s).setRotation(sp.a);
+        this.place(sp, lay.cx + sp.x * s, lay.baseY - sp.y * s);
       }
       // Bestmarke
       const color = TURM.COLORS[i % TURM.COLORS.length];
@@ -290,15 +379,11 @@ export class TurmScene extends Phaser.Scene {
         g.fillStyle(color, 0.9);
         for (let x = lay.cx - half; x < lay.cx + half; x += 4) g.fillRect(Math.round(x), by, 2, 1);
       }
-      // Führungslinie unter dem fallenden Teil
+      // Fall-Vorschau (wie der Schatten bei Tricky Towers): blasse Spalten unter jeder Zellspalte bis zur
+      // Landestelle + Umriss des Teils dort. Fällt es ins Meer, sind die Spalten rötlich.
       const a = lane.active;
       const sp = a && view.sprites.get(a.id);
-      if (a && sp) {
-        const b = sp.img.getBounds();
-        const top = Math.round(b.bottom);
-        g.fillStyle(0xffffff, 0.16);
-        g.fillRect(Math.round(b.left) + 1, top, Math.round(b.width) - 2, Math.max(0, lay.baseY - top));
-      }
+      if (a && sp && st.sub === 'play') this.drawGuide(a, sp, lay, s);
       // "Halten!"-Balken
       if (lane.hold > 0 && !lane.place) {
         const w = Math.round((lay.laneW - 16) * lane.hold);

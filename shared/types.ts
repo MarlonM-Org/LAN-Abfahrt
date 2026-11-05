@@ -946,6 +946,10 @@ export interface ParcoursRunner {
   by: string | null;
   /** Ziel-Platz (1 = Erster) */
   place: number | null;
+  /** > 0: so viele ms noch ohne Eingabe, dann scheidet der Spieler aus (nur in der Warnzeit gesetzt) */
+  afk: number;
+  /** Wegen Untätigkeit ausgeschieden */
+  zzz: boolean;
 }
 
 export interface ParcoursBuilder {
@@ -956,6 +960,10 @@ export interface ParcoursBuilder {
   gy: number;
   rot: number;
   ok: boolean;
+  /** > 0: so viele ms noch ohne Eingabe, dann wird der Spieler übersprungen (nur in der Warnzeit gesetzt) */
+  afk: number;
+  /** Wegen Untätigkeit übersprungen (kein Teil eingebaut) */
+  skipped: boolean;
 }
 
 export interface ParcoursGain {
@@ -966,6 +974,7 @@ export interface ParcoursGain {
 
 export interface ParcoursState {
   sub: 'intro' | 'build' | 'countdown' | 'run' | 'score' | 'over';
+  /** Restzeit nur für Intro/Countdown/Wertung – Bauen und Laufen haben kein Zeitlimit (dann 0) */
   endsIn: number;
   round: number;
   rounds: number;
@@ -1063,6 +1072,10 @@ export interface TurmActive {
   y: number;
   /** Anzahl 90°-Drehungen im Uhrzeigersinn */
   rot: number;
+  /** Landehöhe des Schwerpunkts (wie y), wenn es jetzt gerade nach unten fiele; null = fällt ins Meer */
+  gy: number | null;
+  /** Hat aufgesetzt, ist aber noch steuerbar (Lock-Delay) */
+  rest: boolean;
 }
 
 export interface TurmLane {

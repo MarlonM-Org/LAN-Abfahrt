@@ -314,14 +314,28 @@ export class ParcoursScene extends Phaser.Scene {
 
   private drawHud(st: ParcoursState) {
     const ids = Object.keys(st.points);
-    const key = JSON.stringify([st.sub, st.round, Math.ceil(st.endsIn / 1000), st.points, ids.map((id) => st.builders[id]?.stage)]);
+    // Kein Zeitlimit beim Bauen/Laufen – nur wer lange nichts tut, bekommt einen AFK-Hinweis (mit Restzeit)
+    const afk =
+      st.sub === 'build'
+        ? Object.entries(st.builders).filter(([, b]) => b.stage !== 'done' && b.afk > 0).map(([id, b]) => [id, b.afk] as const)
+        : st.sub === 'run'
+          ? Object.entries(st.runners).filter(([, r]) => r.st === 'run' && r.afk > 0).map(([id, r]) => [id, r.afk] as const)
+          : [];
+    const afkText = afk.length ? ` ZZZ ${short(afk[0][0]).slice(0, 6)} ${Math.ceil(afk[0][1] / 1000)}s` : '';
+    const key = JSON.stringify([st.sub, st.round, afkText, st.points, ids.map((id) => st.builders[id]?.stage)]);
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
     this.hud.add(panel(this, 0, 0, WORLD.W, 24));
     const phase = { intro: 'GLEICH GEHT’S LOS', build: 'BAUEN', countdown: 'BEREIT', run: 'LAUFEN', score: 'WERTUNG', over: 'ENDE' }[st.sub];
-    const secs = st.sub === 'build' || st.sub === 'run' ? ` ${Math.ceil(st.endsIn / 1000)}s` : '';
-    this.hud.add(ink(this, 8, 8, `R${Math.max(1, st.round)}/${st.rounds} ${phase}${secs}`, { origin: [0, 0] }));
+    this.hud.add(ink(this, 8, 8, `R${Math.max(1, st.round)}/${st.rounds} ${phase}`, { origin: [0, 0] }));
+    if (afkText) {
+      // eigener kleiner Kasten unter der Kopfzeile (überdeckt nichts Wichtiges)
+      const t = ink(this, 8, 29, afkText.trim(), { origin: [0, 0], color: '#a8342a' });
+      const w = Math.ceil(t.width) + 10;
+      this.hud.add(panel(this, 3, 25, w, 17));
+      this.hud.add(t);
+    }
     // Punkte rechts: Farbpunkt + Kurzname + Punkte
     const sorted = [...ids].sort((a, b) => st.points[b] - st.points[a]);
     const slot = Math.min(60, 250 / Math.max(1, sorted.length));

@@ -11,7 +11,7 @@ import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { KURVE, ROOMS, TTT, TURM, turmCellOffsets } from '../shared/games';
+import { KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lineFree, nextWaypoint, roomInner } from '../shared/house';
 import { SMASH_STAGES, mainPlatform } from '../shared/smash';
@@ -864,7 +864,7 @@ export class Bot {
             const a = cur();
             if (!a || a.id !== act.id) return;
             const dx = plan.x - a.x;
-            if (Math.abs(dx) < TURM.BLOCK / 4) break;
+            if (Math.abs(dx) < 1) break;
             this.send('shift', { dir: Math.sign(dx) });
             await sleep(rand(100, 170));
           }
@@ -2007,7 +2007,9 @@ export function planTurm(lane: TurmLane): { rot: number; x: number } {
     const offs = turmCellOffsets(act.shape, (rot * Math.PI) / 2);
     const minOx = Math.min(...offs.map((o) => o.x));
     const maxOx = Math.max(...offs.map((o) => o.x));
-    for (let x = -platHalf; x <= platHalf; x += half) {
+    for (let x0 = -platHalf; x0 <= platHalf; x0 += half) {
+      // Das Teil bewegt sich im Raster der Zellkanten – nur dort erreichbare Positionen planen
+      const x = turmSnapX(act.shape, rot, x0);
       // Nur Positionen, bei denen das Teil komplett über der Plattform liegt
       if (x + minOx - B / 2 < -platHalf - 0.5 || x + maxOx + B / 2 > platHalf + 0.5) continue;
       // Landehöhe des Schwerpunkts: höchster Kontakt unter irgendeiner Zelle

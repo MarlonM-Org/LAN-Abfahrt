@@ -38,11 +38,14 @@ interface Runner extends ParcoursRunner {
   bufferUntil: number;
   held: boolean;
   lockUntil: number;
+  /** Letzte Eingabe (für die AFK-Erkennung) */
+  lastInput: number;
 }
 
 interface Builder extends ParcoursBuilder {
   sx: number;
   sy: number;
+  lastInput: number;
 }
 
 interface Solid {
@@ -78,6 +81,7 @@ export class ParcoursGame implements MiniGame {
   private kills: Record<string, number> = {};
   private goalCount = 0;
   private runStart = 0;
+  private buildStart = 0;
   private t = 0;
   private timers = new Timers();
 
@@ -107,21 +111,34 @@ export class ParcoursGame implements MiniGame {
   private startBuild() {
     this.round += 1;
     this.sub = 'build';
-    this.deadline = Date.now() + P.BUILD_MS;
+    // Kein Zeitlimit: die Bauphase endet, wenn alle (verbundenen) Spieler fertig sind – AFK siehe tickBuild()
+    this.buildStart = Date.now();
+    this.deadline = this.buildStart;
     this.builders.clear();
     this.runners.clear();
     this.active().forEach((id, i) => {
       const pool = PART_TYPES_FOR(this.parts.length > 0);
       const g = ghostStart(i);
-      this.builders.set(id, { stage: 'pick', choice: pickChoice(pool), pick: null, gx: g.x, gy: g.y, rot: 0, ok: false, sx: 0, sy: 0 });
+      this.builders.set(id, {
+        stage: 'pick',
+        choice: pickChoice(pool),
+        pick: null,
+        gx: g.x,
+        gy: g.y,
+        rot: 0,
+        ok: false,
+        afk: 0,
+        skipped: false,
+        sx: 0,
+        sy: 0,
+        lastInput: this.buildStart,
+      });
     });
     this.ctx.onChange();
   }
 
   private endBuild() {
     if (this.sub !== 'build') return;
-    // Wer noch einen gültigen Geist hat, baut ihn automatisch ein
-    for (const [id, b] of this.builders) if (b.stage === 'place' && b.pick && b.ok) this.placePart(id, b);
     this.sub = 'countdown';
     this.deadline = Date.now() + P.COUNTDOWN_MS;
     this.runners.clear();
@@ -147,6 +164,9 @@ export class ParcoursGame implements MiniGame {
           bufferUntil: 0,
           held: false,
           lockUntil: 0,
+          lastInput: 0,
+          afk: 0,
+          zzz: false,
         });
       });
     this.nuts = [];
@@ -159,7 +179,9 @@ export class ParcoursGame implements MiniGame {
   private startRun() {
     this.sub = 'run';
     this.runStart = Date.now();
-    this.deadline = this.runStart + P.RUN_MS;
+    // Kein Zeitlimit: die Runde läuft, bis alle im Ziel oder raus sind (AFK siehe tickAfk())
+    this.deadline = this.runStart;
+    for (const r of this.runners.values()) r.lastInput = this.runStart;
     this.nextFire.clear();
     this.parts
       .filter((p) => p.type === 'cannon')
@@ -219,15 +241,17 @@ export class ParcoursGame implements MiniGame {
     if (this.sub === 'over') return;
     if (this.sub === 'build') {
       this.tickBuild(dt);
+      this.tickBuildAfk(now);
       const allDone = [...this.builders.values()].every((b) => b.stage === 'done');
-      if (allDone || now >= this.deadline) return this.endBuild();
+      if (allDone) return this.endBuild();
     } else if (this.sub === 'countdown') {
       if (now >= this.deadline) this.startRun();
     } else if (this.sub === 'run') {
       const h = dt / SUBSTEPS;
       for (let i = 0; i < SUBSTEPS; i++) this.step(now - (SUBSTEPS - 1 - i) * h * 1000, h);
+      this.tickRunAfk(now);
       const running = [...this.runners.values()].some((r) => r.st === 'run');
-      if (!running || now >= this.deadline) return this.endRun();
+      if (!running) return this.endRun();
     } else if (this.sub === 'score') {
       if (now >= this.deadline) return this.afterScore();
       return; // nichts bewegt sich
@@ -235,6 +259,53 @@ export class ParcoursGame implements MiniGame {
       return;
     }
     this.ctx.onChange();
+  }
+
+  /** Wie lange darf dieser Spieler noch nichts tun? (Menschen: seit der letzten Eingabe; Bots: Phase gesamt) */
+  private afkLeft(id: string, lastInput: number, phaseStart: number, botMs: number, now: number) {
+    if (this.ctx.isBot?.(id)) return Math.min(phaseStart + botMs, lastInput + P.AFK_MS) - now;
+    return lastInput + P.AFK_MS - now;
+  }
+
+  /** AFK in der Bauphase: nach langer Untätigkeit wird der Spieler übersprungen
+   *  (ein gültig gesetzter Geist wird noch eingebaut). Offline-Spieler erledigt playerDisconnected(). */
+  private tickBuildAfk(now: number) {
+    for (const [id, b] of this.builders) {
+      if (b.stage === 'done') continue;
+      if (!this.ctx.isConnected(id)) {
+        b.stage = 'done';
+        continue;
+      }
+      if (b.sx !== 0 || b.sy !== 0) b.lastInput = now; // Stick gehalten = aktiv
+      const left = this.afkLeft(id, b.lastInput, this.buildStart, P.BOT_BUILD_MS, now);
+      b.afk = left <= P.AFK_WARN_MS ? Math.max(1, left) : 0;
+      if (left > 0) continue;
+      b.afk = 0;
+      if (b.stage === 'place' && b.pick && b.ok) this.placePart(id, b);
+      if ((b.stage as ParcoursBuilder['stage']) !== 'done') {
+        b.stage = 'done';
+        b.skipped = true;
+        b.sx = b.sy = 0;
+      }
+    }
+  }
+
+  /** AFK beim Laufen: wer lange gar nichts eingibt, schläft ein und scheidet aus. Wer aktiv spielt,
+   *  kann sich beliebig Zeit lassen – die Runde endet nie über die Uhr. */
+  private tickRunAfk(now: number) {
+    for (const [id, r] of this.runners) {
+      if (r.st !== 'run') {
+        r.afk = 0;
+        continue;
+      }
+      if (r.sx !== 0 || r.held) r.lastInput = now; // Stick/Sprungknopf gehalten = aktiv
+      const left = this.afkLeft(id, r.lastInput, this.runStart, P.BOT_RUN_MS, now);
+      r.afk = left <= P.AFK_WARN_MS ? Math.max(1, left) : 0;
+      if (left > 0) continue;
+      r.afk = 0;
+      r.zzz = true;
+      this.knockOut(id, r, null);
+    }
   }
 
   private tickBuild(dt: number) {
@@ -461,6 +532,7 @@ export class ParcoursGame implements MiniGame {
     if (this.sub === 'build') {
       const b = this.builders.get(id);
       if (!b) return;
+      if (b.stage !== 'done') b.lastInput = Date.now();
       if (action === 'pick' && b.stage === 'pick') {
         const type = String(pl.type) as PartType;
         if (!b.choice.includes(type)) return;
@@ -484,6 +556,7 @@ export class ParcoursGame implements MiniGame {
     }
     const r = this.runners.get(id);
     if (!r) return;
+    if (this.sub === 'run') r.lastInput = Date.now();
     if (action === 'stick') r.sx = clamp(Number(pl.x) || 0, -1, 1);
     else if (action === 'jump') {
       const down = pl.down !== false;
@@ -505,7 +578,7 @@ export class ParcoursGame implements MiniGame {
       kind: 'parcours',
       state: {
         sub: this.sub,
-        endsIn: Math.max(0, this.deadline - Date.now()),
+        endsIn: this.sub === 'build' || this.sub === 'run' ? 0 : Math.max(0, this.deadline - Date.now()),
         round: this.round,
         rounds: P.ROUNDS,
         target: P.TARGET,
@@ -514,10 +587,10 @@ export class ParcoursGame implements MiniGame {
         t: Math.round(this.t),
         nuts: this.nuts.map((n) => ({ id: n.id, x: rnd(n.x), y: rnd(n.y) })),
         runners: Object.fromEntries(
-          [...this.runners.entries()].map(([id, r]) => [id, { x: rnd(r.x), y: rnd(r.y), face: r.face, st: r.st, ground: r.ground, by: r.by, place: r.place }]),
+          [...this.runners.entries()].map(([id, r]) => [id, { x: rnd(r.x), y: rnd(r.y), face: r.face, st: r.st, ground: r.ground, by: r.by, place: r.place, afk: r.afk, zzz: r.zzz }]),
         ),
         builders: Object.fromEntries(
-          [...this.builders.entries()].map(([id, b]) => [id, { stage: b.stage, choice: b.choice, pick: b.pick, gx: snap(b.gx), gy: snap(b.gy), rot: b.rot, ok: b.ok }]),
+          [...this.builders.entries()].map(([id, b]) => [id, { stage: b.stage, choice: b.choice, pick: b.pick, gx: snap(b.gx), gy: snap(b.gy), rot: b.rot, ok: b.ok, afk: b.afk, skipped: b.skipped }]),
         ),
         colors: this.colors,
         points: this.points,
