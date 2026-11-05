@@ -54,11 +54,15 @@ body {
   gap: 14px;
   padding: 16px 14px;
   background: var(--paper);
-  border: 4px solid var(--wood-dark);
+  /* Rahmen in der eigenen Spielerfarbe des Abends (core.ts setzt --me-color) */
+  border: 4px solid var(--me-color, var(--wood-dark));
   box-shadow: 0 0 0 2px var(--outline), inset 0 0 0 3px var(--wood), inset 0 0 0 5px var(--wood-darker), 0 6px 0 2px rgba(0, 0, 0, 0.25);
   background-image: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px);
   background-size: 9px 9px;
 }
+
+/* „Du bist ORANGE“ – Farbmarke der eigenen Spielerfarbe */
+.me-color { display: inline-block; padding: 2px 5px; border: 2px solid var(--outline); }
 
 h1 { font-size: 17px; color: var(--red); margin: 6px 0 0; text-align: center; line-height: 1.4; }
 h2 { font-size: 12px; margin: 0; text-align: center; color: var(--ink); line-height: 1.6; }
@@ -567,8 +571,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pc-rank li { display: flex; align-items: center; padding: 5px 8px; background: var(--paper-light); border: 2px solid var(--paper-dark); font-size: 9px; }
 .pc-rank li.me { border-color: var(--wood-dark); }
 .pc-rank li b { margin-left: auto; color: var(--red); }
-.pcq .stick-area { min-height: 0; }
-.pcq .stick-pad { width: 150px; height: 150px; }
 .pcq .big-btn { min-height: 0; }
 
 /* Wählen: drei Karten nebeneinander */
@@ -578,8 +580,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pcq-cards .pc-card-text { align-items: center; }
 .pcq-pick .pcq-hint { min-height: 1.6em; }
 
-/* Platzieren: Stick links, Infos Mitte, Knöpfe rechts (PLATZIEREN unter dem rechten Daumen) */
-.pcq-place .pcq-body { grid-template-columns: 1fr minmax(120px, 0.8fr) 1fr; align-items: stretch; }
+/* Platzieren: Infos + Knöpfe (PLATZIEREN unter dem rechten Daumen) */
 .pcq-info { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
 .pcq-info .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
 .pcq-info b { font-size: 10px; }
@@ -591,11 +592,15 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pcq-row button:only-child { grid-column: 1 / -1; }
 .big-btn.pc-place { flex: 1; font-size: 14px; background: var(--green); box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
 
-/* Laufen: Stick links, SPRINGEN rechts */
-.pcq-run .pcq-body { grid-template-columns: 1fr minmax(100px, 0.6fr) 1fr; align-items: stretch; }
-.pcq-run .pc-run-hint { align-self: center; }
 .big-btn.pc-jump { font-size: 13px; }
 .big-btn.pc-jump.down { transform: translateY(2px); filter: brightness(0.9); }
+
+/* Platzieren + Laufen im gemeinsamen Querlayout .lx (Stick links per stickZone, Knöpfe rechts) */
+.lx.pc-lx { --lx-l: 40%; --lx-r: 32%; }
+.lx.pc-place .lx-right { grid-template-rows: auto minmax(0, 1fr); grid-auto-rows: auto; }
+.lx.pc-lx .pc-pts { color: var(--red); }
+.lx.pc-lx .pc-dot { width: 8px; height: 8px; margin-right: 4px; }
+.lx.pc-run .pc-run-hint { align-self: center; }
 
 /* Warten/Wertung */
 .pcq-wait .pcq-body { grid-template-columns: 1fr; }
@@ -607,14 +612,9 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .pcq-cards { grid-template-columns: 1fr; }
   .pcq-cards .pc-card { flex-direction: row; text-align: left; }
   .pcq-cards .pc-card-text { align-items: flex-start; }
-  .pcq-place .pcq-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
-  .pcq-place .pcq-info { order: -1; }
-  .pcq-run .pcq-body { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; }
-  .pcq-run .pc-run-hint { grid-column: 1 / -1; grid-row: 1; }
   .pcq-score .pcq-body { grid-template-columns: 1fr; }
 }
 @media (orientation: landscape) and (max-height: 360px) {
-  .pcq .stick-pad { width: 128px; height: 128px; }
   .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
 }
 
@@ -1682,3 +1682,59 @@ table.lb tr.off td { opacity: 0.55; }
 .big-btn.su-drop small, .big-btn.su-sprint small { font-size: 8px; }
 .big-btn.su-sprint { min-height: 160px; font-size: 15px; background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
 .big-btn.su-drop:disabled, .big-btn.su-sprint:disabled { filter: saturate(0.4) brightness(0.85); }
+
+/* ================================================================ Zuschauer-Leiste (spectator.ts): Live-Stand, Wetten, Emotes */
+.spec-bar { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: var(--paper-light); border: 3px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--paper-dark); touch-action: manipulation; }
+.spec-stand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.spec-stand.off { display: none; }
+.spec-title { font-size: 8px; line-height: 1.5; color: var(--ink); }
+.spec-bar.betting .spec-title { color: var(--red); animation: pulse-soft 0.8s infinite alternate; }
+@keyframes pulse-soft { to { opacity: 0.6; } }
+.spec-avs { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+button.spec-av { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; width: 46px; padding: 3px 2px 2px; font-size: 6px; line-height: 1.3; color: var(--ink); text-shadow: none; background: var(--paper); border: 2px solid var(--wood-dark); box-shadow: 0 2px 0 var(--outline); touch-action: manipulation; }
+button.spec-av span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.spec-av canvas { height: 27px; width: auto; }
+button.spec-av:disabled { opacity: 1; filter: none; }
+.spec-bar.betting button.spec-av:not(:disabled) { background: #ffe9a8; border-color: var(--gold); animation: spec-wiggle 0.9s infinite alternate; }
+@keyframes spec-wiggle { to { transform: translateY(-2px); } }
+button.spec-av.out { opacity: 0.4; filter: grayscale(1); }
+button.spec-av.me { border-style: dashed; }
+button.spec-av.pick { background: var(--sun); border-color: var(--wood-darker); outline: 2px solid var(--red); }
+button.spec-av.win { background: var(--green); color: #fff4d6; }
+.spec-team, .spec-pts { padding: 3px 6px 2px; font-size: 8px; border: 2px solid var(--wood-darker); background: var(--paper); color: var(--ink); }
+.spec-team { background: var(--team, var(--paper)); }
+.spec-emotes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+button.spec-emote { padding: 6px 0 4px; font-size: 24px; line-height: 1.2; font-family: system-ui, sans-serif; background: var(--paper); border: 3px solid var(--wood-dark); box-shadow: inset 0 3px 0 #fff, 0 3px 0 var(--outline); touch-action: manipulation; }
+button.spec-emote.sent { transform: scale(1.15); }
+.spec-bar.cooling button.spec-emote:disabled { opacity: 0.4; }
+/* In schmalen Spalten (Querlayout-Mitte): Emotes 2 × 2, kleinere Avatare */
+.lx-mid .spec-bar, .lx-left .spec-bar { margin-top: 0; padding: 5px; gap: 5px; }
+.lx-mid .spec-emotes, .lx-left .spec-emotes { gap: 4px; }
+.lx-mid button.spec-emote, .lx-left button.spec-emote { font-size: 18px; padding: 3px 0 2px; }
+.lx-mid button.spec-av, .lx-left button.spec-av { width: 38px; font-size: 5px; }
+.lx-mid button.spec-av canvas, .lx-left button.spec-av canvas { height: 20px; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #app > .spec-bar { flex-direction: row; align-items: center; padding: 5px 8px; }
+  #app > .spec-bar .spec-stand { flex: 1; }
+  #app > .spec-bar .spec-emotes { flex: none; width: 46%; }
+  #app > .spec-bar button.spec-emote { font-size: 20px; padding: 3px 0 2px; }
+  #app > .spec-bar button.spec-av { width: 40px; }
+  #app > .spec-bar button.spec-av canvas { height: 20px; }
+  #app:has(> .spec-bar) .center { gap: 6px; }
+}
+
+/* Geister: Bomben-Arena (Stick + Zielkarte + WERFEN) und Sumo-Steg (WELLE) */
+.lx.ar-ghost { --lx-l: 30%; --lx-r: 24%; }
+.lx.su-ghost { --lx-l: 38%; --lx-r: 30%; }
+.ghost-map { display: block; width: 100%; max-height: 40%; object-fit: contain; image-rendering: pixelated; border: 2px solid var(--wood-darker); background: #2d1b12; }
+.lx .big-btn.ghost-throw, .lx .big-btn.ghost-wave { position: relative; overflow: hidden; font-size: 13px; background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
+.big-btn.ghost-throw .cd, .big-btn.ghost-wave .cd { position: absolute; inset: 0; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
+.big-btn.ghost-throw:disabled, .big-btn.ghost-wave:disabled { opacity: 0.7; }
+.lx-left.su-ghost-info { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+/* Kurven-Duell: wer raus ist, bekommt mehr Platz in der Mitte für die Zuschauer-Leiste */
+.lx.kv-lx.out { --lx-l: 22%; --lx-r: 22%; }
+.kv-lx:not(.out) .spec-bar { display: none; }
+@media (orientation: portrait) {
+  /* Geister hochkant: Hinweis, Knopf, darunter die Zuschauer-Leiste in voller Breite */
+  .lx.su-ghost { grid-template-areas: "head" "mid" "right" "left"; grid-template-columns: 1fr; grid-template-rows: auto auto minmax(110px, 30vh) auto; align-content: start; }
+}

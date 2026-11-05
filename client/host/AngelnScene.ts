@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { SHIRTS } from '../../shared/avatar';
 import { ANGELN, type AngelCatch, type AngelLost, type AngelnState, type AngelPlayer, FISH, fmtKg, laneW, laneX } from '../../shared/angeln';
 import { LAKE, baitBox, bobber, catchSprite, fishShadow, paintLake, rod, rowBoat } from '../art/angeln';
 import * as O from '../art/objects';
 import { reeds } from '../art/lagoon';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
+import { pcol } from './playerColor';
 import { GOLD, LIGHT, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const FEET = ANGELN.FEET_Y;
 const LOST_TEXT: Record<Exclude<AngelLost, null>, string> = {
@@ -51,6 +53,7 @@ export class AngelnScene extends Phaser.Scene {
   private lines!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Container;
+  private juice!: Juice;
   private ticker!: Phaser.GameObjects.Text;
   private latest: AngelnState | null = null;
   private lastCatch = 0;
@@ -63,6 +66,7 @@ export class AngelnScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = new Juice(this, { depth: 1455 });
     this.anglers.clear();
     this.latest = null;
     this.lastCatch = -1;
@@ -152,7 +156,7 @@ export class AngelnScene extends Phaser.Scene {
     const pl = playerById(id);
     if (!pl) return undefined;
     const x = Math.round(laneX(p.lane, n));
-    const color = SHIRTS[pl.look.shirt] ?? '#ffffff';
+    const color = pcol(id).hex;
     const fig = figure(this, pl.look, x, FEET).setDepth(300);
     const rodImg = this.add.image(x + 3, FEET - 9, ensureTex(this, 'an_rod', rod)).setOrigin(0, 1).setDepth(301);
     const bob = this.add.image(x, LAKE.JETTY_TOP, ensureTex(this, `an_bob_${color}`, () => bobber(color))).setOrigin(0.5, 0.8).setDepth(30).setVisible(false);
@@ -201,6 +205,7 @@ export class AngelnScene extends Phaser.Scene {
 
   private onSt(a: Angler, from: AngelPlayer['st'], p: AngelPlayer) {
     if (p.st === 'bite') {
+      sfx('select', { x: a.x, pitch: 1.4 });
       a.mark.setText('!').setColor('#e0503f').setScale(0.4);
       this.tweens.add({ targets: a.mark, scale: 1, duration: 160, ease: 'Back.out' });
       this.ripple(a.bx, a.by + 1, 1.4);
@@ -214,9 +219,11 @@ export class AngelnScene extends Phaser.Scene {
       const len = 10 + p.size * 5;
       a.shadow.setTexture(ensureTex(this, `an_shadow_${len}`, () => fishShadow(len)));
       this.splash(a.bx, a.by, 0.8);
+      sfx('splash', { x: a.bx, vol: 0.5, pitch: 1.3 });
     } else if (p.st === 'lost') {
       a.mark.setText('');
       if (from === 'reel') this.splash(a.sx, a.sy, 0.7);
+      sfx(p.lost === 'snap' ? 'crack' : 'lose', { x: a.x, vol: 0.6 });
       a.bob.setVisible(false);
       a.shadow.setVisible(false);
       if (p.lost) this.popText(a.x, FEET - 50, LOST_TEXT[p.lost], p.lost === 'snap' ? '#e0503f' : LIGHT);
@@ -324,12 +331,15 @@ export class AngelnScene extends Phaser.Scene {
 
   private castFx(a: Angler) {
     a.castT0 = this.time.now;
+    sfx('whoosh', { x: a.x, pitch: 1.2, vol: 0.5 });
+    sfx('splash', { x: a.x, vol: 0.25, pitch: 1.6, delay: 0.35 });
     a.bob.setVisible(true);
     this.tweens.add({ targets: a.rod, angle: { from: -40, to: 12 }, duration: 220, yoyo: true, ease: 'Quad.out' });
   }
 
   private nibbleFx(a: Angler) {
     this.ripple(a.bx, a.by + 1, 0.5);
+    sfx('tick', { x: a.bx, pitch: 1.5, vol: 0.3 });
     this.tweens.add({ targets: a.bob, y: a.bob.y + 2, duration: 80, yoyo: true });
     a.mark.setText('?').setColor(LIGHT).setScale(0.6).setAlpha(1);
     this.tweens.add({ targets: a.mark, alpha: 0, delay: 400, duration: 300, onComplete: () => a.mark.setText('').setAlpha(1) });
@@ -370,6 +380,10 @@ export class AngelnScene extends Phaser.Scene {
     const fromX = a.sx || a.x;
     const fromY = a.sy || LAKE.JETTY_TOP - 10;
     this.splash(fromX, fromY, 1.2);
+    // Fang: Platsch, Münze (seltener Fisch: Fanfare + Konfetti)
+    sfx('splash', { x: fromX });
+    sfx(f.junk ? 'bonk' : 'coin', { x: a.x, delay: 0.5 });
+    this.juice.burst(fromX, fromY, 'splash', 14);
     const img = this.add.image(fromX, fromY, ensureTex(this, `an_fish_${c.kind}`, () => catchSprite(c.kind))).setDepth(1400);
     const toY = FEET - 50;
     this.tweens.addCounter({
@@ -404,7 +418,10 @@ export class AngelnScene extends Phaser.Scene {
         const ang = (i / 10) * Math.PI * 2;
         this.tweens.add({ targets: s, x: a.x + Math.cos(ang) * 22, y: toY + Math.sin(ang) * 14, alpha: 0, angle: 180, delay: 600, duration: 700, onComplete: () => s.destroy() });
       }
-      this.cameras.main.flash(150, 255, 230, 140);
+      this.juice.flash(0xffe68c, 150);
+      this.juice.burst(a.x, toY, 'confetti', 30);
+      sfx('fanfare', { delay: 0.55 });
+
     }
     // Ticker oben
     const who = (playerById(c.pid)?.name ?? '?').replace(/^Bot\s+/, '');

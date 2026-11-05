@@ -2,14 +2,13 @@ import Phaser from 'phaser';
 import type { GameState, KartState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { getTrack, wrapAngle } from '../../shared/kart';
-import { SHIRTS } from '../../shared/avatar';
-import { C } from '../art/palette';
 import { paintKartTrack } from '../art/kart';
 import { bananaPeel, coconut, itemBox, itemIcon, kartSprite, seagull } from '../art/kartsprites';
 import { Mode7Renderer } from '../kart3d/render';
 import { KartWorld } from '../kart3d/world';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, GOLD, background, ensureTex, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -149,7 +148,7 @@ export class KartScene extends Phaser.Scene {
     const pl = playerById(id);
     const car = this.latest?.mini?.kind === 'kart' ? this.latest.mini.state.karts[id] : undefined;
     if (!pl || !car) return undefined;
-    const color = SHIRTS[pl.look.shirt] ?? C.red;
+    const color = pcol(id).hex;
     const body = this.add.image(0, 0, ensureTex(this, `kart_${color}`, () => kartSprite(color)));
     const head = this.add.image(0, -3, ensurePortrait(this, pl.look)).setScale(0.62).setOrigin(0.5, 0.6);
     const shadow = this.add.ellipse(1, 3, 15, 8, 0x000000, 0.25);
@@ -194,7 +193,7 @@ export class KartScene extends Phaser.Scene {
       const img = this.add.image(c.x, c.y, key).setOrigin(0, 0);
       this.paneLayer.add(img);
       const pl = playerById(id);
-      const name = txt(this, c.x + 4, c.y + 3, (pl?.name ?? '?').toUpperCase(), { size: 8, origin: [0, 0] }).setDepth(502);
+      const name = txt(this, c.x + 4, c.y + 3, (pl?.name ?? '?').toUpperCase(), { size: 8, origin: [0, 0], color: pcol(id).hex }).setDepth(502);
       const place = txt(this, c.x + c.w - 4, c.y + 2, '', { size: 16, color: GOLD, origin: [1, 0] }).setDepth(502);
       const lap = txt(this, c.x + 4, c.y + 14, '', { size: 8, color: '#ffd25e', origin: [0, 0] }).setDepth(502);
       const item = this.add.image(c.x + c.w - 4, c.y + c.h - 4, ensureTex(this, 'kitem_none', () => itemIcon(null))).setOrigin(1, 1).setDepth(502).setVisible(false);
@@ -219,8 +218,7 @@ export class KartScene extends Phaser.Scene {
       root.add(txt(this, c.x + c.w / 2, c.y + 4, 'ÜBERSICHT', { size: 8, color: GOLD }));
       const dots = new Map<string, Phaser.GameObjects.Arc>();
       for (const id of Object.keys(st.karts)) {
-        const pl = playerById(id);
-        const col = Phaser.Display.Color.HexStringToColor(pl ? (SHIRTS[pl.look.shirt] ?? C.red) : C.red).color;
+        const col = pcol(id).num;
         const dot = this.add.circle(0, 0, 3, col).setStrokeStyle(1, 0x2d1b12);
         dots.set(id, dot);
         root.add(dot);
@@ -236,11 +234,12 @@ export class KartScene extends Phaser.Scene {
     const t0 = performance.now();
     const poses = world.poses();
     const lookOf = (id: string) => playerById(id)?.look;
+    const colorOf = (id: string) => pcol(id).hex;
     for (const p of this.panes) {
       const mine = poses.find((k) => k.id === p.id);
       if (!mine) continue;
       p.camA += wrapAngle(mine.angle - p.camA) * (1 - Math.exp(-dms / 160));
-      p.renderer.render(Mode7Renderer.chase(mine, p.camA), st, poses, { lookOf, now });
+      p.renderer.render(Mode7Renderer.chase(mine, p.camA), st, poses, { lookOf, colorOf, now });
       p.tex.context.drawImage(p.renderer.canvas, 0, 0);
       p.tex.refresh();
       p.place.setText(`${mine.place}.`);
@@ -508,6 +507,7 @@ export class KartScene extends Phaser.Scene {
       const pl = playerById(id);
       const x = 104 + i * slot;
       this.hud.add(txt(this, x + 7, 6, String(i + 1), { size: 8, color: i === 0 ? GOLD : car.finished ? '#b9e39a' : '#fff4d6', origin: [1, 0] }));
+      if (pl) this.hud.add(this.add.rectangle(x + 8, 2, 16, 15, pcol(id).num).setOrigin(0, 0));
       if (pl) this.hud.add(this.add.image(x + 9, 3, ensurePortrait(this, pl.look)).setOrigin(0, 0).setScale(0.9));
     });
   }

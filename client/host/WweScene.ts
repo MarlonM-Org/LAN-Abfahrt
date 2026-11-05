@@ -6,7 +6,9 @@ import * as O from '../art/objects';
 import { paintSky, paintWoodFloor } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { GREEN_INK, RED_INK, Countdown, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { GREEN_INK, RED_INK, Countdown, background, ensureTex, fitText, ink, nameTag, panel, prop, tagName } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 /** Gemütlicher Hütten-Abend am Kamin */
 export class WweScene extends Phaser.Scene {
@@ -16,6 +18,8 @@ export class WweScene extends Phaser.Scene {
   private total = 1;
   private renderedKey = '';
   private stateKey = '';
+  private votedN = 0;
+  private juice!: Juice;
 
   constructor() {
     super('wwe');
@@ -24,6 +28,8 @@ export class WweScene extends Phaser.Scene {
   create() {
     this.renderedKey = '';
     this.stateKey = '';
+    this.votedN = 0;
+    this.juice = new Juice(this, { depth: 900 });
     background(this, 'cabin', WORLD.W, WORLD.H, (p) => {
       // Rückwand aus dunklen Brettern
       p.rect(0, 0, WORLD.W, 110, C.woodDark);
@@ -83,10 +89,24 @@ export class WweScene extends Phaser.Scene {
     const w = s.mini.state;
     const key = `${w.round}-${w.sub}`;
     if (key !== this.renderedKey) {
+      const first = this.renderedKey === '';
       this.renderedKey = key;
       this.countdown.set(w.endsIn);
       this.total = Math.max(1, w.endsIn);
+      if (!first) {
+        // Neue Frage: Gong · Auflösung: Trommelwirbel, Pling, Lacher · Ende: Fanfare
+        if (w.sub === 'question') sfx('select');
+        else if (w.sub === 'over') sfx('fanfare');
+        else {
+          sfx('drumroll', { vol: 0.7 });
+          sfx('coin', { delay: 0.6 });
+          sfx('cheer', { delay: 0.7, vol: 0.7 });
+          this.time.delayedCall(600, () => this.juice.burst(WORLD.W / 2, 120, 'confetti', 36));
+        }
+      }
     }
+    if (w.sub === 'question' && w.voted.length > this.votedN) sfx('tick', { pitch: 1 + w.voted.length * 0.05 });
+    this.votedN = w.sub === 'question' ? w.voted.length : 0;
     const sKey = JSON.stringify([w.sub, w.round, w.voted, w.tally]);
     if (sKey === this.stateKey) return;
     this.stateKey = sKey;
@@ -110,7 +130,7 @@ export class WweScene extends Phaser.Scene {
       const f = figure(this, p.look, x, 226, 2);
       if (!voted) f.setAlpha(0.6);
       this.layer.add(f);
-      this.layer.add(nameTag(this, x, 230, p.name.slice(0, Math.max(4, Math.floor(spacing / 8) - 1)), voted ? GREEN_INK : undefined));
+      this.layer.add(nameTag(this, x, 230, p.name, voted ? GREEN_INK : undefined, spacing - 2));
       if (voted) this.layer.add(ink(this, x, 160, 'OK!', { color: GREEN_INK }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
     });
   }
@@ -133,13 +153,14 @@ export class WweScene extends Phaser.Scene {
       const f = figure(this, p.look, x, 186, 3);
       this.layer.add(f);
       this.tweens.add({ targets: f.getData('img'), y: -6, duration: 260, yoyo: true, repeat: -1 });
-      this.layer.add(nameTag(this, x, 190, p.name, RED_INK));
+      this.layer.add(nameTag(this, x, 190, p.name, RED_INK, 68));
     });
     // Stimmen-Liste rechts
     const top = entries.slice(0, 6);
     this.layer.add(panel(this, 352, 96, 122, 20 + top.length * 14));
     top.forEach(([id, count], i) => {
-      this.layer.add(ink(this, 362, 106 + i * 14, (playerById(id)?.name ?? '?').slice(0, 8), { origin: [0, 0], color: count === max ? RED_INK : undefined }));
+      this.layer.add(fitText(ink(this, 362, 106 + i * 14, tagName(playerById(id)?.name ?? '?'), { origin: [0, 0], color: count === max ? RED_INK : undefined }), 84));
+
       this.layer.add(ink(this, 464, 106 + i * 14, String(count), { origin: [1, 0] }));
     });
     if (w.drinking && w.sips) {

@@ -4,11 +4,14 @@ import { WORLD, TEAM_INFO } from '../../shared/flunky';
 import { VOLLEY as V, type VollBall, vollStepBall, vollWon } from '../../shared/volley';
 import { paintVolleyBeach, volleyArrow, volleyBall, volleyNet } from '../art/volley';
 import { bus, getState, playerById } from './store';
-import { ensureAvatar, ensurePortrait } from './textures';
+import { avatarSprite, ensurePortrait, playAvatar } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 interface Fig {
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
   shadow: Phaser.GameObjects.Ellipse;
   x: number;
   y: number;
@@ -26,6 +29,7 @@ export class VolleyScene extends Phaser.Scene {
   private arrow!: Phaser.GameObjects.Image;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
+  private juice!: Juice;
   private sub!: Phaser.GameObjects.Text;
   private latest: VolleyState | null = null;
   /** Zeitpunkt (scene time), zu dem `latest` ankam */
@@ -52,6 +56,7 @@ export class VolleyScene extends Phaser.Scene {
     this.hitSeq = 0;
     this.pointSeq = 0;
     this.trailAt = 0;
+    this.juice = new Juice(this, { depth: 1700 });
 
     background(this, 'volley', WORLD.W, WORLD.H, (p) => paintVolleyBeach(p, WORLD.W, WORLD.H));
     // Wellen am Horizont glitzern
@@ -132,8 +137,8 @@ export class VolleyScene extends Phaser.Scene {
       a.x += (tx - a.x) * 0.6;
       a.y += (ty - a.y) * 0.6;
       const running = p.vx !== 0 && !p.air;
-      const bob = running ? -Math.abs(Math.sin(now / 65)) * 2 : 0;
-      a.img.setPosition(a.x, a.y + bob).setFlipX(p.dir < 0);
+      a.img.setPosition(a.x, a.y).setFlipX(p.dir < 0);
+      playAvatar(a.img, p.air ? 'jump' : running ? 'walk' : 'idle');
       if (p.spike) a.img.setAngle((p.team === 'A' ? 1 : -1) * 22).setScale(1.12, 0.95);
       else if (p.air) a.img.setAngle(0).setScale(0.94, 1.08);
       else a.img.setAngle(running ? Math.sin(now / 65) * 4 : 0).setScale(1);
@@ -165,8 +170,8 @@ export class VolleyScene extends Phaser.Scene {
       const pl = playerById(id);
       if (!pl) continue;
       const color = TEAM_INFO[p.team].colorNum;
-      const shadow = this.add.ellipse(p.x, V.GROUND + 1, 16, 5, color, 0.75).setStrokeStyle(1, 0x2d1b12, 0.6).setDepth(45);
-      const img = this.add.image(p.x, p.y, ensureAvatar(this, pl.look)).setOrigin(0.5, 1).setDepth(p.team === 'A' ? 120 : 110);
+      const shadow = this.add.ellipse(p.x, V.GROUND + 1, 16, 5, color, 0.75).setStrokeStyle(1, pcol(id).num, 1).setDepth(45);
+      const img = avatarSprite(this, pl.look, p.x, p.y).setDepth(p.team === 'A' ? 120 : 110);
       this.figs.set(id, { img, shadow, x: p.x, y: p.y, air: p.air, court: p.court });
     }
 
@@ -212,6 +217,8 @@ export class VolleyScene extends Phaser.Scene {
       const mb = this.matchball(st);
       const head = st.golden ? 'GOLDEN POINT!' : mb ? 'MATCHBALL!' : 'AUFSCHLAG';
       this.banner.setText(head).setColor(st.golden || mb ? '#ff9a6a' : '#ffd25e');
+      sfx('whistle', { vol: 0.6 });
+      if (st.golden || mb) sfx('drumroll', { vol: 0.6, delay: 0.3 });
       this.sub.setText(`${name} · ${TEAM_INFO[st.serving].name}`);
       this.tweens.add({ targets: [this.banner, this.sub], alpha: 0, delay: 1100, duration: 350 });
     } else if (st.sub === 'rally') {
@@ -222,6 +229,8 @@ export class VolleyScene extends Phaser.Scene {
       this.banner.setText(w ? `${TEAM_INFO[w].name.toUpperCase()} GEWINNT!` : 'UNENTSCHIEDEN').setColor(w ? TEAM_INFO[w].color : '#ffd25e');
       this.sub.setText(`${st.score.A} : ${st.score.B}`);
       if (w) this.confetti(w);
+      sfx('fanfare');
+      sfx('cheer', { delay: 0.3 });
     }
   }
 
@@ -242,7 +251,11 @@ export class VolleyScene extends Phaser.Scene {
         onComplete: () => d.destroy(),
       });
     }
-    this.cameras.main.shake(140, 0.005);
+    this.juice.shake(2);
+    this.juice.burst(x, V.GROUND - 2, 'sand', 16);
+    sfx('bonk', { x, pitch: 0.7 });
+    sfx('coin', { x, delay: 0.12 });
+    sfx('cheer', { x, vol: 0.6, delay: 0.15 });
     if (st.sub === 'over') return;
     this.tweens.killTweensOf([this.banner, this.sub]);
     this.banner.setAlpha(1).setText(`PUNKT ${info.name.toUpperCase()}!`).setColor(info.color);
@@ -256,14 +269,22 @@ export class VolleyScene extends Phaser.Scene {
     if (spike) {
       const t = txt(this, x, y - 26, 'ZACK!', { color: '#ff9a6a' }).setDepth(1700);
       this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 650, onComplete: () => t.destroy() });
-      this.cameras.main.shake(90, 0.006);
+      // Schmettern: kurzer Hit-Stop + Zoom-Stoß
+      this.juice.hitStop(70);
+      this.juice.shake(2);
+      this.juice.zoomPunch(0.04, 200);
+      this.juice.burst(x, y, 'spark', 10);
+      sfx('hitHard', { x });
+      sfx('whoosh', { x, pitch: 1.3, delay: 0.04 });
       for (let i = 0; i < 6; i++) {
         const ang = (i / 6) * Math.PI * 2;
         const l = this.add.rectangle(x, y, 6, 1, 0xffffff, 0.95).setRotation(ang).setDepth(320);
         this.tweens.add({ targets: l, x: x + Math.cos(ang) * 14, y: y + Math.sin(ang) * 14, alpha: 0, duration: 240, onComplete: () => l.destroy() });
       }
     } else {
+      sfx('hit', { x, vol: 0.7, pitch: st.sub === 'serve' ? 1.2 : 1 });
       const ring = this.add.circle(x, y, 5).setStrokeStyle(1, 0xffffff, 0.9).setDepth(320);
+
       this.tweens.add({ targets: ring, scale: 2.2, alpha: 0, duration: 220, onComplete: () => ring.destroy() });
     }
     void st;
@@ -314,6 +335,7 @@ export class VolleyScene extends Phaser.Scene {
         if (!pl) return;
         const p = st.players[id];
         const cx = left ? 24 + i * slot : 456 - i * slot;
+        this.hud.add(this.add.rectangle(cx, 3, 17, 17, pcol(id).num).setOrigin(0.5, 0).setAlpha(p.court ? 1 : 0.35));
         this.hud.add(this.add.image(cx, 4, ensurePortrait(this, pl.look)).setOrigin(0.5, 0).setAlpha(p.court ? 1 : 0.35));
         if (id === st.server && st.serving === t && (st.sub === 'serve' || st.sub === 'rally')) {
           this.hud.add(this.add.image(cx + 6, 16, ensureTex(this, 'vb_ball', volleyBall)).setScale(0.5));

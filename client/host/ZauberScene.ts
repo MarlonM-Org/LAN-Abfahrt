@@ -7,6 +7,8 @@ import { paintZauberLava, zauberBolt, zauberGlow, zauberPuffIcon, zauberStone, z
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
 import { Countdown, background, ensureTex, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const T = ZAUBER.TILE;
 const hexNum = (h: string) => parseInt(h.slice(1), 16);
@@ -50,6 +52,7 @@ export class ZauberScene extends Phaser.Scene {
   private arenaKey = '';
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
+  private juice!: Juice;
   private sub!: Phaser.GameObjects.Text;
   private latest: ZauberState | null = null;
   private recvAt = 0;
@@ -64,6 +67,7 @@ export class ZauberScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = new Juice(this, { depth: 1690 });
     this.tiles.clear();
     this.figs.clear();
     this.bolts.clear();
@@ -256,6 +260,7 @@ export class ZauberScene extends Phaser.Scene {
           img.setTint(0xff7a3a);
           this.tweens.add({ targets: img, y: img.y + 5, alpha: 0, duration: 480, ease: 'Quad.in', onComplete: () => img.destroy() });
           this.sizzle(img.x + T / 2, img.y + T / 2);
+          sfx('crack', { x: img.x, pitch: 0.6, vol: 0.25 });
         }
       }
     }
@@ -278,6 +283,7 @@ export class ZauberScene extends Phaser.Scene {
         v = { img, glow, x: b.x, y: b.y, a: b.a, trailAt: 0, color };
         this.bolts.set(b.id, v);
         if (owner) this.castFlash(b.x, b.y, owner.color);
+        sfx('shoot', { x: b.x, pitch: 0.8, vol: 0.55 });
       }
       v.x = b.x;
       v.y = b.y;
@@ -307,7 +313,9 @@ export class ZauberScene extends Phaser.Scene {
     if (st.sudden && !this.suddenShown) {
       this.suddenShown = true;
       this.flash('EINSTURZ!', 'Die letzte Insel zerfällt …');
-      this.cameras.main.shake(320, 0.004);
+      this.juice.shake(3);
+      sfx('boom', { pitch: 0.6 });
+      sfx('drumroll', { delay: 0.3 });
     }
     this.drawHud(st);
   }
@@ -322,6 +330,8 @@ export class ZauberScene extends Phaser.Scene {
     } else if (st.sub === 'play') {
       this.flash('LOS!', 'ANGRIFF = Zielsuch-Feuerball · EILE = Sprint');
     } else if (st.sub === 'roundOver' || st.sub === 'over') {
+      sfx(st.sub === 'over' ? 'fanfare' : st.roundWinner ? 'win' : 'lose');
+      if (st.roundWinner) this.juice.burst(WORLD.W / 2, 100, 'confetti', 40);
       const w = st.roundWinner ? playerById(st.roundWinner)?.name ?? '?' : null;
       this.banner.setText(w ? `${w} gewinnt!` : 'Alle verpufft!');
       this.sub.setText(st.sub === 'over' ? 'Zauber-Arena vorbei!' : w ? 'Rundensieg – als Letzte(r) übrig!' : 'Unentschieden – diese Runde zählt nicht.');
@@ -355,12 +365,20 @@ export class ZauberScene extends Phaser.Scene {
         a.img.setTintFill(0xffffff);
         this.time.delayedCall(70, () => a.img.clearTint());
       }
-      this.cameras.main.shake(80, 0.003);
+      this.juice.shake(1);
+      this.juice.hitStop(45);
+      this.juice.burst(f.x, f.y, 'fire', 10);
+      sfx('boom', { x: f.x, vol: 0.6, pitch: 1.3 });
+      sfx('hit', { x: f.x, delay: 0.02 });
     } else if (f.type === 'clash') {
       this.boom(f.x, f.y, 0.8, 0xc79bff);
+      this.juice.burst(f.x, f.y, 'spark', 12);
+      sfx('crack', { x: f.x, pitch: 1.4 });
     } else if (f.type === 'fizzle') {
       this.smoke(f.x, f.y);
       this.smoke(f.x + 2, f.y - 1);
+      sfx('pop', { x: f.x, pitch: 0.6, vol: 0.4 });
+
     } else if (f.type === 'puff' && f.by && st.players[f.by]) {
       const killer = playerById(f.by)?.name ?? '';
       if (killer) {
@@ -444,6 +462,10 @@ export class ZauberScene extends Phaser.Scene {
     const y = a.y - 10;
     a.ring.setVisible(false);
     a.aim.clear().setVisible(false);
+    // In die Lava geschleudert: Zischen + Puff
+    sfx('ko', { x });
+    sfx('splash', { x, pitch: 0.5, vol: 0.6, delay: 0.05 });
+    this.juice.hitStop(80);
     this.tweens.killTweensOf([a.root, a.img]);
     this.tweens.add({ targets: a.root, scaleX: 1.3, scaleY: 0.2, alpha: 0, duration: 260, ease: 'Back.in', onComplete: () => a.root.setVisible(false).setScale(1).setAlpha(1) });
     const cols = [0x9b5fc0, 0xc79bff, 0xb9a6cf, 0x7a5a9a];

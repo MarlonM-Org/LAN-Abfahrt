@@ -7,7 +7,9 @@ import * as O from '../art/objects';
 import { addHouse } from './house';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { Countdown, GREEN_INK, RED_INK, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { Countdown, GREEN_INK, RED_INK, ensureTex, ink, nameTag, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 export class MurderScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container;
@@ -18,6 +20,8 @@ export class MurderScene extends Phaser.Scene {
   private renderedKey = '';
   private stateKey = '';
   private lastScream = 0;
+  private juice!: Juice;
+  private votedN = 0;
 
   constructor() {
     super('murder');
@@ -26,6 +30,8 @@ export class MurderScene extends Phaser.Scene {
   create() {
     this.renderedKey = '';
     this.stateKey = '';
+    this.votedN = 0;
+    this.juice = new Juice(this, { depth: 4000 });
     const st = getState();
     this.lastScream = st?.mini?.kind === 'murder' ? st.mini.state.screamSeq : 0;
 
@@ -56,7 +62,16 @@ export class MurderScene extends Phaser.Scene {
     if (key !== this.renderedKey) {
       this.renderedKey = key;
       this.countdown.set(m.endsIn);
+      // Phasen-Jingles: Besprechung, Abstimmung, Rauswurf, Ende
+      if (m.sub === 'meeting') (sfx('whistle'), sfx(m.deaths.length ? 'ko' : 'drumroll', { delay: 0.3, vol: 0.6 }));
+      if (m.sub === 'vote') sfx('select');
+      if (m.sub === 'ejected') (sfx('whoosh', { delay: 0.9 }), sfx(m.ejected ? (m.ejectedWasMurderer ? 'win' : 'lose') : 'tick', { delay: 1.2 }));
+      if (m.sub === 'over') sfx('fanfare');
+      this.votedN = 0;
     }
+    // Abstimmung: Tick pro neuer Stimme
+    if (m.sub === 'vote' && m.voted.length > this.votedN) sfx('tick', { pitch: 1 + m.voted.length * 0.05 });
+    this.votedN = m.sub === 'vote' ? m.voted.length : 0;
     if (m.screamSeq !== this.lastScream) {
       this.lastScream = m.screamSeq;
       this.scream();
@@ -156,7 +171,7 @@ export class MurderScene extends Phaser.Scene {
       const y = rows === 2 ? 146 + row * 64 : 190;
       const voted = m.voted.includes(p.id);
       this.layer.add(figure(this, p.look, x, y, 2));
-      this.layer.add(nameTag(this, x, y + 4, p.name.slice(0, 5), voted ? GREEN_INK : undefined));
+      this.layer.add(nameTag(this, x, y + 4, p.name, voted ? GREEN_INK : undefined, spacing - 2));
     });
   }
 
@@ -166,12 +181,12 @@ export class MurderScene extends Phaser.Scene {
       this.card('Niemand fliegt raus.', 'Gleichstand oder übersprungen ...');
       return;
     }
-    this.card(`${p.name} fliegt raus!`, '', 190);
+    this.card(`${tagName(p.name)} fliegt raus!`, '', 190);
     const f = figure(this, p.look, WORLD.W / 2, 170, 3);
     this.layer.add(f);
     this.tweens.add({ targets: f, x: WORLD.W + 60, angle: 360, duration: 2400, delay: 900, ease: 'Quad.in' });
     this.layer.add(
-      ink(this, WORLD.W / 2, 196, m.ejectedWasMurderer ? `${p.name} WAR der Mörder!` : `${p.name} war unschuldig ...`, {
+      ink(this, WORLD.W / 2, 196, m.ejectedWasMurderer ? `${tagName(p.name)} WAR der Mörder!` : `${tagName(p.name)} war unschuldig ...`, {
         size: 8,
         color: m.ejectedWasMurderer ? GREEN_INK : RED_INK,
       }),
@@ -193,8 +208,13 @@ export class MurderScene extends Phaser.Scene {
   }
 
   private scream() {
-    this.cameras.main.flash(250, 200, 30, 40);
-    this.cameras.main.shake(300, 0.01);
+    // Angriff: roter Blitz, Schrei, kurzer Stopp
+    this.juice.flash(0xc81e28, 250);
+    this.juice.shake(3);
+    this.juice.hitStop(120);
+    sfx('ko');
+    sfx('crack', { pitch: 0.6, delay: 0.05 });
+
     const t = txt(this, WORLD.W / 2, 120, 'Ein Schrei!', { size: 24, color: '#ff6b5e' }).setDepth(5000);
     this.tweens.add({ targets: t, alpha: 0, scale: 1.4, duration: 1600, onComplete: () => t.destroy() });
   }

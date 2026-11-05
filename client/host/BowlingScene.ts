@@ -2,12 +2,15 @@ import Phaser from 'phaser';
 import type { BowlingRoll, BowlingState, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { BOWL, PIN_POS, scoreFrames } from '../../shared/bowling';
-import { SHIRTS } from '../../shared/avatar';
+import { playerColor } from '../../shared/players';
 import { bowlingBall, bowlingPin, paintBeachAlley, tikiTorch } from '../art/bowling';
 import { crown } from '../art/objects';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
-import { GOLD, INK, LIGHT, RED_INK, background, ensureTex, ink, panel, txt } from './ui';
+import { pcol } from './playerColor';
+import { GOLD, INK, LIGHT, RED_INK, background, ensureTex, fitText, ink, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 // ------------------------------------------------------------------ Pseudo-3D-Projektion
 
@@ -30,6 +33,8 @@ interface Playback {
   roll: BowlingRoll;
   t0: number;
   bannerShown: boolean;
+  /** schon umgefallene Pins (für den Ton) */
+  down: number;
 }
 
 export class BowlingScene extends Phaser.Scene {
@@ -43,6 +48,7 @@ export class BowlingScene extends Phaser.Scene {
   private rackG!: Phaser.GameObjects.Graphics;
   private board!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
+  private juice!: Juice;
   private bannerSub!: Phaser.GameObjects.Text;
   private intro!: Phaser.GameObjects.Container;
   private latest: GameState | null = null;
@@ -61,6 +67,7 @@ export class BowlingScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = new Juice(this, { depth: 20009 });
     this.pins = [];
     this.torches = [];
     this.play = null;
@@ -88,7 +95,7 @@ export class BowlingScene extends Phaser.Scene {
     const pinKey = ensureTex(this, 'bowlpin', bowlingPin);
     for (let i = 0; i < 10; i++) this.pins.push(this.add.image(0, 0, pinKey).setOrigin(0.5, 1));
     this.ballShadow = this.add.ellipse(0, 0, 10, 3, 0x000000, 0.25);
-    this.ball = this.add.image(0, 0, ensureTex(this, 'bowlball_0', () => bowlingBall(SHIRTS[0])));
+    this.ball = this.add.image(0, 0, ensureTex(this, 'bowlball_0', () => bowlingBall(playerColor(0).hex)));
     this.sign = txt(this, 0, 0, 'STRANDBAHN', { color: GOLD }).setOrigin(0.5, 0.5);
 
     // Anzeigetafel + HUD
@@ -132,7 +139,9 @@ export class BowlingScene extends Phaser.Scene {
 
     if (st.sub === 'roll' && st.last?.track && st.last.seq !== this.lastSeq) {
       this.lastSeq = st.last.seq;
-      this.play = { roll: st.last, t0: this.time.now, bannerShown: false };
+      this.play = { roll: st.last, t0: this.time.now, bannerShown: false, down: 0 };
+      sfx('throw', { pitch: 0.7 });
+      sfx('whoosh', { pitch: 0.45, vol: 0.5, delay: 0.15 });
       this.setBallColor(st.last.playerId);
       this.hideBanner();
     }
@@ -158,7 +167,7 @@ export class BowlingScene extends Phaser.Scene {
   }
 
   private setBallColor(id: string) {
-    const col = SHIRTS[playerById(id)?.look.shirt ?? 0] ?? SHIRTS[0];
+    const col = pcol(id).hex;
     if (col === this.ballColor) return;
     this.ballColor = col;
     this.ball.setTexture(ensureTex(this, `bowlball_${col}`, () => bowlingBall(col)));
@@ -227,6 +236,15 @@ export class BowlingScene extends Phaser.Scene {
       const f = ((time - this.play.t0) / 1000) / tr.dt;
       frame = Math.min(tr.frames - 1, f);
       ballPos = this.sampleBall(tr.ball, frame);
+      // Pins fallen: erster Einschlag laut, danach leises Klackern
+      const down = tr.downAt.filter((d, i) => tr.pins[i] && d >= 0 && frame >= d).length;
+      if (down > this.play.down) {
+        if (this.play.down === 0) {
+          sfx(down >= 6 || this.play.roll.mark === 'strike' ? 'strike' : 'hitHard', { vol: 0.8 });
+          this.juice.shake(down >= 6 ? 2 : 1);
+        } else sfx('tick', { pitch: 0.6 + Math.random() * 0.3, vol: 0.4 });
+        this.play.down = down;
+      }
       if (f >= tr.frames - 1 && !this.play.bannerShown) {
         this.play.bannerShown = true;
         this.showResult(this.play.roll);
@@ -420,9 +438,21 @@ export class BowlingScene extends Phaser.Scene {
     if (roll.mark === 'strike') {
       this.showBanner(roll.streak >= 2 ? STREAK[Math.min(roll.streak, STREAK.length - 1)] : 'STRIKE!', name, GOLD);
       this.confetti();
-    } else if (roll.mark === 'spare') this.showBanner('SPARE!', `${name} räumt ab`, '#7fe0d0');
-    else if (roll.mark === 'pins') this.showBanner(`${roll.knocked} ${roll.knocked === 1 ? 'Pin' : 'Pins'}`, name, LIGHT);
-    else this.showBanner(MARKS[roll.mark], name, '#b8c4d6');
+      this.juice.burst(CX, 120, 'confetti', 50);
+      this.juice.flash(0xfff1b0, 140);
+      this.juice.zoomPunch(0.05, 260);
+      sfx(roll.streak >= 2 ? 'fanfare' : 'win');
+      sfx('cheer', { delay: 0.2 });
+    } else if (roll.mark === 'spare') {
+      this.showBanner('SPARE!', `${name} räumt ab`, '#7fe0d0');
+      this.juice.burst(CX, 120, 'confetti', 24);
+      sfx('coin');
+      sfx('cheer', { vol: 0.6, delay: 0.15 });
+    } else if (roll.mark === 'pins') this.showBanner(`${roll.knocked} ${roll.knocked === 1 ? 'Pin' : 'Pins'}`, name, LIGHT);
+    else {
+      this.showBanner(MARKS[roll.mark], name, '#b8c4d6');
+      sfx('lose', { vol: 0.6 });
+    }
   }
 
   private showBanner(text: string, sub: string, color: string) {
@@ -484,8 +514,9 @@ export class BowlingScene extends Phaser.Scene {
     if (st.sub === 'intro' || st.sub === 'over') return;
     const p = playerById(who);
     this.hud.add(panel(this, 3, 3, 150, 32));
+    if (p) this.hud.add(this.add.rectangle(17, 28, 18, 17, pcol(who).num).setOrigin(0.5, 1));
     if (p) this.hud.add(this.add.image(17, 27, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
-    this.hud.add(ink(this, 30, 9, (p?.name ?? '?').slice(0, 12), { origin: [0, 0], color: RED_INK }));
+    this.hud.add(fitText(ink(this, 30, 9, tagName(p?.name ?? '?'), { origin: [0, 0], color: RED_INK }), 12 * 8));
     const status = st.sub === 'aim' ? `Frame ${st.frame + 1}/${st.frames} · Wurf ${st.ball + 1}` : 'wirft …';
     this.hud.add(ink(this, 30, 21, status, { origin: [0, 0] }));
   }
@@ -520,9 +551,12 @@ export class BowlingScene extends Phaser.Scene {
       const bg = this.add.rectangle(x0, y, w, rowH - 2, isActive ? 0xf7e4b5 : 0xe6c88a, isActive ? 1 : 0.85).setOrigin(0, 0);
       bg.setStrokeStyle(1, 0x2d1b12);
       this.board.add(bg);
+      this.board.add(this.add.rectangle(x0 + 1, y + 1, 3, rowH - 4, pcol(id).num).setOrigin(0, 0));
       if (pl) this.board.add(this.add.image(x0 + 10, y + rowH - 3, ensurePortrait(this, pl.look)).setOrigin(0.5, 1));
-      const nm = (pl?.name ?? '?').replace(/^Bot\s+/, '').slice(0, 4);
-      this.board.add(ink(this, x0 + 20, y + (rowH - 2) / 2, nm, { origin: [0, 0.5], color: isActive ? RED_INK : INK }));
+      // Name auf Spaltenbreite verkleinern statt auf 4 Zeichen kürzen
+      const nm = tagName(pl?.name ?? '?');
+      this.board.add(fitText(ink(this, x0 + 20, y + (rowH - 2) / 2, nm, { origin: [0, 0.5], color: isActive ? RED_INK : INK }), nameW - 1, 0.5));
+
       sc.frames.forEach((f, k) => {
         const last = k === st.frames - 1;
         const bx = fx0 + k * boxW;

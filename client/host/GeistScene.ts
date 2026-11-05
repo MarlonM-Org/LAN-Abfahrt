@@ -8,8 +8,10 @@ import { candle, cobweb, ghostSprite, wardrobe } from '../art/geist';
 import { paintTiles, paintWoodFloor } from '../art/ground';
 import type { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
-import { GREEN_INK, RED_INK, background, ensureTex, ink, panel, txt } from './ui';
+import { figure, playAvatar } from './textures';
+import { GREEN_INK, NameTags, RED_INK, background, ensureTex, ink, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const A = GEIST.AREA;
 const DARK = 0x060818;
@@ -58,10 +60,17 @@ const FURN: Record<string, () => Pix> = {
   wardrobe,
 };
 
+interface GhostView {
+  img: Phaser.GameObjects.Image;
+  x: number;
+  y: number;
+  shown: boolean;
+}
+
 interface HunterView {
   f: Phaser.GameObjects.Container;
   img: Phaser.GameObjects.Image;
-  tag: Phaser.GameObjects.Text;
+  name: string;
   status: Phaser.GameObjects.Text;
   x: number;
   y: number;
@@ -73,10 +82,12 @@ export class GeistScene extends Phaser.Scene {
   private eraser!: Phaser.GameObjects.Graphics;
   private glow!: Phaser.GameObjects.Graphics;
   private ui!: Phaser.GameObjects.Graphics;
-  private ghost!: Phaser.GameObjects.Image;
-  private ghostPos = { x: 0, y: 0 };
-  private ghostShown = false;
+  private ghosts = new Map<string, GhostView>();
   private hunters = new Map<string, HunterView>();
+  private juice!: Juice;
+  private tags!: NameTags;
+  private banishSeq = 0;
+  private lastSub = '';
   private hud!: Phaser.GameObjects.Container;
   private card!: Phaser.GameObjects.Container;
   private latest: GeistState | null = null;
@@ -97,7 +108,8 @@ export class GeistScene extends Phaser.Scene {
     this.hudKey = '';
     this.cardKey = '';
     this.hunterKey = '';
-    this.ghostShown = false;
+    this.ghosts.clear();
+    this.lastSub = '';
     this.darkAlpha = 1;
     this.latest = null;
     const st0 = getState();
@@ -105,6 +117,7 @@ export class GeistScene extends Phaser.Scene {
     this.flashSeq = g0?.flashSeq ?? 0;
     this.scareSeq = g0?.lastScare?.seq ?? 0;
     this.reviveSeq = g0?.lastRevive?.seq ?? 0;
+    this.banishSeq = g0?.lastBanish?.seq ?? 0;
 
     background(this, 'geisthouse', WORLD.W, WORLD.H, paintHouse);
     for (const f of GEIST_FURNITURE) {
@@ -131,12 +144,14 @@ export class GeistScene extends Phaser.Scene {
       txt(this, r.x + r.w / 2, r.y + (i < 3 ? 5 : r.h - 13), name.toUpperCase(), { color: '#8f86b8', shadow: false }).setDepth(650).setAlpha(0.45);
     });
 
-    this.ghost = this.add.image(0, 0, ensureTex(this, 'g_ghost_idle', () => ghostSprite('idle'))).setOrigin(0.5, 0.75).setDepth(800).setAlpha(0);
+    ensureTex(this, 'g_ghost_idle', () => ghostSprite('idle'));
     ensureTex(this, 'g_ghost_hit', () => ghostSprite('hit'));
     ensureTex(this, 'g_ghost_boo', () => ghostSprite('boo'));
 
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.card = this.add.container(0, 0).setDepth(1100);
+    this.juice = new Juice(this, { depth: 1060 });
+    this.tags = new NameTags(this, 740);
 
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
@@ -162,11 +177,28 @@ export class GeistScene extends Phaser.Scene {
         if (!p) continue;
         const f = figure(this, p.look, h.x, h.y + 6);
         const img = f.getData('img') as Phaser.GameObjects.Image;
-        const tag = txt(this, 0, -36, p.name.replace(/^Bot\s+/, '').slice(0, 6), { color: '#e8e2ff' });
-        const status = txt(this, 0, -46, '', { color: C.gold });
-        f.add([tag, status]);
-        this.hunters.set(id, { f, img, tag, status, x: h.x, y: h.y, angle: h.angle });
+        const status = txt(this, 0, -48, '', { color: C.gold });
+        f.add(status);
+        this.hunters.set(id, { f, img, name: p.name, status, x: h.x, y: h.y, angle: h.angle });
       }
+      for (const v of this.ghosts.values()) v.img.destroy();
+      this.ghosts.clear();
+    }
+    for (const id of g.ghostIds ?? [g.ghostId]) {
+      if (this.ghosts.has(id)) continue;
+      const img = this.add.image(0, 0, 'g_ghost_idle').setOrigin(0.5, 0.75).setDepth(800).setAlpha(0);
+      this.ghosts.set(id, { img, x: 0, y: 0, shown: false });
+    }
+
+    // Pfiff zum Start der Jagd, Jingle am Rundenende
+    if (g.sub !== this.lastSub) {
+      if (this.lastSub && g.sub === 'play') sfx('whistle');
+      if (g.sub === 'roundEnd') {
+        sfx(g.roundWinner === 'hunters' ? 'win' : 'lose');
+        if (g.roundWinner === 'hunters') this.juice.burst(WORLD.W / 2, 150, 'confetti', 50);
+      }
+      if (g.sub === 'over') sfx('fanfare');
+      this.lastSub = g.sub;
     }
 
     if (g.flashSeq !== this.flashSeq) {
@@ -176,26 +208,55 @@ export class GeistScene extends Phaser.Scene {
     if (g.lastScare && g.lastScare.seq !== this.scareSeq) {
       this.scareSeq = g.lastScare.seq;
       const h = g.hunters[g.lastScare.victim];
-      if (h) this.popText(h.x, h.y - 30, 'BUH!', '#ff9fc4', 16);
-      this.cameras.main.shake(260, 0.008);
+      if (h) {
+        this.popText(h.x, h.y - 30, 'BUH!', '#ff9fc4', 16);
+        this.juice.burst(h.x, h.y - 6, 'smoke', 10);
+        sfx('ko', { x: h.x });
+        sfx('whoosh', { x: h.x, pitch: 0.7, delay: 0.05 });
+      }
+      this.juice.shake(2);
+      this.juice.hitStop(90);
+    }
+    if (g.lastBanish && g.lastBanish.seq !== this.banishSeq) {
+      this.banishSeq = g.lastBanish.seq;
+      const v = this.ghosts.get(g.lastBanish.id);
+      const at = g.ghosts?.find((o) => o.id === g.lastBanish!.id) ?? v;
+      if (at) {
+        this.popText(at.x, at.y - 26, 'GEBANNT!', '#ffd25e', 16);
+        this.juice.burst(at.x, at.y - 6, 'spark', 24);
+      }
+      this.juice.flash(0xfff1b0, 160);
+      sfx('powerup');
     }
     if (g.lastRevive && g.lastRevive.seq !== this.reviveSeq) {
       this.reviveSeq = g.lastRevive.seq;
       const h = g.hunters[g.lastRevive.id];
-      if (h) this.popText(h.x, h.y - 30, 'Gerettet!', '#9be37f', 8);
+      if (h) {
+        this.popText(h.x, h.y - 30, 'Gerettet!', '#9be37f', 8);
+        this.juice.burst(h.x, h.y - 4, 'spark', 8);
+        sfx('powerup', { x: h.x, vol: 0.7 });
+      }
     }
 
-    if (g.ghost) {
-      if (!this.ghostShown) {
-        this.ghostShown = true;
-        this.ghostPos = { x: g.ghost.x, y: g.ghost.y };
-        this.tweens.killTweensOf(this.ghost);
-        this.ghost.setAlpha(1);
+    const seen = g.ghosts ?? (g.ghost ? [{ id: g.ghostId, ...g.ghost }] : []);
+    for (const [id, v] of this.ghosts) {
+      const o = seen.find((s2) => s2.id === id);
+      if (o) {
+        if (!v.shown) {
+          v.shown = true;
+          v.x = o.x;
+          v.y = o.y;
+          this.tweens.killTweensOf(v.img);
+          v.img.setAlpha(1);
+        }
+        const out = (g.ghostHp?.[id] ?? 1) <= 0 && g.sub === 'play';
+        v.img.setTexture(o.why === 'light' ? 'g_ghost_hit' : o.why === 'touch' ? 'g_ghost_boo' : 'g_ghost_idle');
+        if (out) v.img.setAlpha(0.45).setTint(0x9d9ab8);
+        else v.img.clearTint();
+      } else if (v.shown) {
+        v.shown = false;
+        this.tweens.add({ targets: v.img, alpha: 0, duration: 350 });
       }
-      this.ghost.setTexture(g.ghost.why === 'light' ? 'g_ghost_hit' : g.ghost.why === 'touch' ? 'g_ghost_boo' : 'g_ghost_idle');
-    } else if (this.ghostShown) {
-      this.ghostShown = false;
-      this.tweens.add({ targets: this.ghost, alpha: 0, duration: 350 });
     }
 
     this.renderHud(g);
@@ -215,6 +276,7 @@ export class GeistScene extends Phaser.Scene {
     this.glow.clear();
     this.ui.clear();
 
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; dot?: number }[] = [];
     for (const [id, h] of Object.entries(g.hunters)) {
       const v = this.hunters.get(id);
       if (!v) continue;
@@ -226,11 +288,14 @@ export class GeistScene extends Phaser.Scene {
       v.img.setFlipX(Math.cos(v.angle) < 0);
       if (h.down) {
         v.img.setAngle(90).setTint(0x9d9ab8).setY(-2);
+        playAvatar(v.img, 'hit');
       } else {
-        v.img.setAngle(0).clearTint().setY(h.moving ? -Math.abs(Math.sin(this.time.now / 80)) * 2 : 0);
+        v.img.setAngle(0).clearTint().setY(0);
+        playAvatar(v.img, h.moving ? 'walk' : 'idle');
       }
       v.status.setText(h.down ? 'HILFE!' : h.empty ? 'Akku leer' : '');
       v.status.setColor(h.down ? '#ff9fc4' : C.gold);
+      tagSpecs.push({ id, x: v.x, y: v.y - 30, name: v.name, color: h.down ? '#b9b3d6' : '#e8e2ff', dot: 0xffd25e });
       // Kleiner Lichthof um jede Figur, damit man sich selbst findet
       this.eraser.fillStyle(0xffffff, 0.5).fillCircle(v.x, v.y, 15);
       if (h.light && !h.down) {
@@ -258,21 +323,29 @@ export class GeistScene extends Phaser.Scene {
       }
     }
     this.dark.erase(this.eraser);
+    this.tags.update(tagSpecs);
 
-    // Geist (nur wenn enthüllt)
-    if (g.ghost) {
-      this.ghostPos.x += (g.ghost.x - this.ghostPos.x) * k;
-      this.ghostPos.y += (g.ghost.y - this.ghostPos.y) * k;
+    // Geister (nur wenn enthüllt)
+    const seen = g.ghosts ?? (g.ghost ? [{ id: g.ghostId, ...g.ghost }] : []);
+    let i = 0;
+    for (const [id, v] of this.ghosts) {
+      const o = seen.find((s2) => s2.id === id);
+      if (o) {
+        v.x += (o.x - v.x) * k;
+        v.y += (o.y - v.y) * k;
+      }
+      v.img.setPosition(v.x, v.y + Math.sin(this.time.now / 220 + i++ * 2) * 1.5).setDepth(800);
     }
-    this.ghost.setPosition(this.ghostPos.x, this.ghostPos.y + Math.sin(this.time.now / 220) * 1.5);
-    this.ghost.setDepth(800);
   }
 
   // ---------------------------------------------------------------- Effekte
 
   private lightning() {
     this.darkAlpha = 0;
-    this.cameras.main.flash(260, 235, 240, 255);
+    this.juice.flash(0xebf0ff, 260);
+    this.juice.shake(1);
+    sfx('crack');
+    sfx('boom', { vol: 0.5, pitch: 0.6, delay: 0.25 });
     const t = txt(this, WORLD.W / 2, 120, 'BLITZ!', { size: 16, color: '#eef0ff' }).setDepth(1050);
     this.tweens.add({ targets: t, alpha: 0, y: 108, duration: 900, onComplete: () => t.destroy() });
   }
@@ -285,23 +358,36 @@ export class GeistScene extends Phaser.Scene {
   // ---------------------------------------------------------------- HUD + Karten
 
   private renderHud(g: GeistState) {
-    const key = JSON.stringify([g.round, g.sub, g.ghostId, Math.ceil(g.endsIn / 1000), Math.round((g.health / g.maxHealth) * 60)]);
+    const key = JSON.stringify([g.round, g.sub, g.ghostIds, Math.ceil(g.endsIn / 1000), Object.values(g.ghostHp ?? {}).map((v) => Math.round((v / (g.ghostMax || 1)) * 40)), Math.round((g.health / g.maxHealth) * 60)]);
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
     this.hud.add(panel(this, 0, 0, WORLD.W, 26));
     this.hud.add(ink(this, 10, 9, `Runde ${g.round}/${g.rounds}`, { origin: [0, 0] }));
-    const name = (playerById(g.ghostId)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, 8);
-    this.hud.add(this.add.image(146, 13, 'g_ghost_idle').setScale(1));
-    this.hud.add(ink(this, 158, 9, name, { origin: [0, 0], color: '#6b4fa8' }));
-    const bx = 240;
-    const bw = 150;
+    const ids = g.ghostIds?.length ? g.ghostIds : [g.ghostId];
     const gfx = this.add.graphics();
-    gfx.fillStyle(0x2d1b12).fillRect(bx - 1, 8, bw + 2, 10);
-    gfx.fillStyle(0xe6c88a).fillRect(bx, 9, bw, 8);
-    const frac = Math.max(0, g.health / g.maxHealth);
-    gfx.fillStyle(frac < 0.3 ? 0xe04a3f : 0x9b5fc0).fillRect(bx, 9, bw * frac, 8);
     this.hud.add(gfx);
+    // Pro Geist: Symbol, Name und Lebensbalken (bei zwei Geistern nebeneinander, kürzer)
+    const slotW = ids.length > 1 ? 140 : 250;
+    ids.forEach((id, i) => {
+      const x0 = 120 + i * (slotW + 6);
+      const name = tagName(playerById(id)?.name ?? '?');
+      const bw = ids.length > 1 ? 56 : 150;
+      const tx = this.add.image(x0 + 6, 13, 'g_ghost_idle');
+      this.hud.add(tx);
+      const label = ink(this, x0 + 16, 9, name, { origin: [0, 0], color: '#6b4fa8' });
+      const maxNameW = slotW - bw - 22;
+      if (label.width > maxNameW) label.setScale(Math.max(0.6, maxNameW / label.width)).setY(10);
+      this.hud.add(label);
+      const bx = x0 + slotW - bw;
+      const hp = g.ghostHp?.[id] ?? g.health;
+      const max = g.ghostMax ?? g.maxHealth;
+      const frac = Math.max(0, hp / max);
+      gfx.fillStyle(0x2d1b12).fillRect(bx - 1, 8, bw + 2, 10);
+      gfx.fillStyle(0xe6c88a).fillRect(bx, 9, bw, 8);
+      gfx.fillStyle(frac < 0.3 ? 0xe04a3f : 0x9b5fc0).fillRect(bx, 9, bw * frac, 8);
+      if (hp <= 0) tx.setTint(0x9d9ab8);
+    });
     if (g.sub === 'play') {
       const sec = Math.ceil(g.endsIn / 1000);
       this.hud.add(ink(this, WORLD.W - 10, 9, `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`, { origin: [1, 0], color: sec <= 10 ? RED_INK : undefined }));
@@ -313,7 +399,8 @@ export class GeistScene extends Phaser.Scene {
     if (key === this.cardKey) return;
     this.cardKey = key;
     this.card.removeAll(true);
-    const ghostName = playerById(g.ghostId)?.name ?? '?';
+    const gIds = g.ghostIds?.length ? g.ghostIds : [g.ghostId];
+    const ghostName = gIds.map((id) => tagName(playerById(id)?.name ?? '?')).join(' und ');
     const box = (h: number) => {
       const y = 148 - h / 2;
       this.card.add(panel(this, 70, y, 340, h));
@@ -323,7 +410,8 @@ export class GeistScene extends Phaser.Scene {
       const y = box(150);
       this.card.add(ink(this, WORLD.W / 2, y + 12, g.round === 1 ? 'Stromausfall im Ferienhaus!' : `Runde ${g.round} von ${g.rounds}`, { color: '#6b4fa8' }));
       this.card.add(this.add.image(WORLD.W / 2, y + 44, 'g_ghost_boo').setScale(2));
-      this.card.add(ink(this, WORLD.W / 2, y + 70, `${ghostName} ist der Geist!`, { size: 8, color: RED_INK, wrap: 310 }));
+      this.card.add(ink(this, WORLD.W / 2, y + 70, `${ghostName} ${gIds.length > 1 ? 'sind die Geister!' : 'ist der Geist!'}`, { size: 8, color: RED_INK, wrap: 310 }));
+
       this.card.add(
         ink(this, WORLD.W / 2, y + 90, 'Jäger: Licht an und den Geist anleuchten!\nHandy brummt = Geist in der Nähe.\nGeist: Von hinten anschleichen – BUH!', { wrap: 320 }),
       );
@@ -343,7 +431,7 @@ export class GeistScene extends Phaser.Scene {
       this.card.add(ink(this, WORLD.W / 2, y + 12, 'Geisterjagd vorbei!', { size: 16, color: '#6b4fa8' }));
       const ranked = Object.entries(g.points).sort((a, b) => b[1] - a[1]).slice(0, 4);
       ranked.forEach(([id, pts], i) => {
-        this.card.add(ink(this, WORLD.W / 2, y + 42 + i * 16, `${i + 1}. ${(playerById(id)?.name ?? '?').slice(0, 10)}  ${pts} Pkt`));
+        this.card.add(ink(this, WORLD.W / 2, y + 42 + i * 16, `${i + 1}. ${tagName(playerById(id)?.name ?? '?')}  ${pts} Pkt`));
       });
     } else {
       this.card.setAlpha(1);

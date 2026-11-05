@@ -6,8 +6,10 @@ import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { bucket, hedge, hoseReel, nozzle, paintGarden, waterBalloon, waterPistol } from '../art/garden';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
-import { BLUE_INK, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { figure, type Figure } from './textures';
+import { BLUE_INK, NameTags, background, ensureTex, fitText, ink, panel, prop, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const SUN_INK = '#b06d00';
@@ -18,7 +20,7 @@ const mmss = (ms: number) => {
 };
 
 interface Fig {
-  f: Phaser.GameObjects.Container;
+  f: Figure;
   img: Phaser.GameObjects.Image;
   bar: Phaser.GameObjects.Graphics;
   gun: Phaser.GameObjects.Image;
@@ -42,6 +44,9 @@ export class WasserScene extends Phaser.Scene {
   private latest: WasserState | null = null;
   private hudKey = '';
   private lastSoak = 0;
+  private juice!: Juice;
+  private tags!: NameTags;
+  private names = new Map<string, string>();
 
   constructor() {
     super('wasser');
@@ -54,6 +59,9 @@ export class WasserScene extends Phaser.Scene {
     this.latest = null;
     this.hudKey = '';
     this.lastSoak = 0;
+    this.names.clear();
+    this.juice = new Juice(this, { depth: 1900 });
+    this.tags = new NameTags(this, 1020);
 
     background(this, 'wassergarden', WORLD.W, WORLD.H, (p) => paintGarden(p, W.AREA, WASSER_POOL, WASSER_HOSE));
 
@@ -133,10 +141,10 @@ export class WasserScene extends Phaser.Scene {
       if (!pl) continue;
       const f = figure(this, pl.look, p.x, p.y);
       const img = f.getData('img') as Phaser.GameObjects.Image;
-      const tag = txt(this, 0, -38, pl.name.replace(/^Bot\s+/, '').slice(0, 6), { color: hex(p.c) });
+      this.names.set(id, pl.name);
       const bar = this.add.graphics();
       const gun = this.add.image(7, -9, ensureTex(this, 'w_pistol', waterPistol)).setScale(0.75).setVisible(false);
-      f.add([bar, tag, gun]);
+      f.add([bar, gun]);
       this.figs.set(id, { f, img, bar, gun, x: p.x, y: p.y, barKey: '', dripAt: 0 });
     }
 
@@ -156,6 +164,7 @@ export class WasserScene extends Phaser.Scene {
         continue;
       }
       const img = this.add.image(b.fx, b.fy, ensureTex(this, `w_balloon_${b.c}`, () => waterBalloon(hex(b.c)))).setDepth(950);
+      sfx('throw', { x: b.fx, vol: 0.5 });
       const shadow = this.add.ellipse(b.fx, b.fy + 8, 6, 2, 0x000000, 0.25).setDepth(5);
       this.balloons.set(b.id, { img, shadow, b, recv: now });
     }
@@ -165,6 +174,9 @@ export class WasserScene extends Phaser.Scene {
       if (this.seenSplash.has(sp.id)) continue;
       this.seenSplash.add(sp.id);
       this.splash(sp.x, sp.y, sp.big, sp.cover, sp.c);
+      sfx('splash', { x: sp.x, vol: sp.big ? 0.9 : 0.55, pitch: sp.big ? 0.9 : 1.2 });
+      this.juice.burst(sp.x, sp.y - 2, 'splash', sp.big ? 12 : 6);
+      if (sp.big) this.juice.shake(1);
     }
     if (this.seenSplash.size > 400) this.seenSplash = new Set([...this.seenSplash].slice(-100));
 
@@ -181,7 +193,14 @@ export class WasserScene extends Phaser.Scene {
       this.feed.setText(`${name} ist klatschnass!${by ? ` (${by})` : ''}`).setAlpha(1);
       this.tweens.killTweensOf(this.feed);
       this.tweens.add({ targets: this.feed, alpha: 0, delay: 2200, duration: 500 });
+      // Klatschnass: lauter Platscher, kurzer Stopp, Gejohle
+      sfx('splash', { x: v?.x, pitch: 0.7 });
+      sfx('ko', { x: v?.x, vol: 0.5, delay: 0.08 });
+      sfx('cheer', { vol: 0.5, delay: 0.15 });
+      this.juice.hitStop(70);
+      this.juice.shake(2);
       if (v) {
+        this.juice.burst(v.x, v.y - 12, 'splash', 18);
         const t = txt(this, v.x, v.y - 48, 'PLATSCH!', { color: '#9fe0ff' }).setDepth(2000);
         this.tweens.add({ targets: t, y: t.y - 14, alpha: 0, duration: 1100, onComplete: () => t.destroy() });
       }
@@ -198,6 +217,7 @@ export class WasserScene extends Phaser.Scene {
       this.banner.setText('');
       this.help.setText('');
     } else {
+      if (this.banner.text !== 'Zeit um!') sfx('whistle');
       this.banner.setText('Zeit um!');
       this.help.setText('');
     }
@@ -210,8 +230,8 @@ export class WasserScene extends Phaser.Scene {
     this.hud.add(panel(this, 120, 1, 240, 26));
     if (st.ffa) {
       Object.entries(st.players).forEach(([id, p], i) => {
-        const name = (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, 4);
-        this.hud.add(ink(this, 130 + i * 62, 10, `${name} ${p.k}`, { color: hex(p.c), origin: [0, 0] }));
+        const name = tagName(playerById(id)?.name ?? '?');
+        this.hud.add(fitText(ink(this, 130 + i * 62, 10, `${name} ${p.k}`, { color: hex(p.c), origin: [0, 0] }), 58, 0.5));
       });
       this.hud.add(ink(this, 350, 10, mmss(st.endsIn), { origin: [1, 0] }));
     } else {
@@ -263,13 +283,16 @@ export class WasserScene extends Phaser.Scene {
     const g = this.aimG;
     g.clear();
 
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; alpha?: number }[] = [];
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
       a.x += (p.x - a.x) * 0.35;
       a.y += (p.y - a.y) * 0.35;
+      tagSpecs.push({ id, x: a.x, y: a.y - 36, name: this.names.get(id) ?? '?', color: hex(p.c), alpha: p.s === 'ok' ? 1 : 0.75 });
+
       a.img.setFlipX(p.d < 0);
-      a.img.setY(p.m ? -Math.abs(Math.sin(now / 80)) * 2 : 0);
+      a.f.play(p.s === 'soaked' ? 'hit' : p.m ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 4).setDepth(a.y + 4);
       // Nass = bläulich, Abtrocknen = gelblich
       if (p.s === 'soaked') a.img.setTint(0x8fc4ff);
@@ -336,6 +359,7 @@ export class WasserScene extends Phaser.Scene {
       g.fillStyle(col, 0.18).fillEllipse(tx, ty, W.SPLASH_R * 2, W.SPLASH_R);
       g.lineStyle(1, 0x2d1b12, 0.8).strokeEllipse(tx, ty, W.DIRECT_R * 2, W.DIRECT_R);
     }
+    this.tags.update(tagSpecs);
 
     // Wasserbomben fliegen (lokal weitergerechnet)
     for (const a of this.balloons.values()) {

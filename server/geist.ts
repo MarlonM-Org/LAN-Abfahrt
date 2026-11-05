@@ -12,6 +12,23 @@ interface Hunter extends GeistHunter {
   reviveMs: number;
 }
 
+interface Ghost {
+  x: number;
+  y: number;
+  sx: number;
+  sy: number;
+  health: number;
+  /** Gebannt (Leben 0) – nur bei zwei Geistern, sonst endet die Runde */
+  out: boolean;
+  revealUntil: number;
+  revealWhy: 'light' | 'flash' | 'touch';
+  lit: boolean;
+  scareReady: number;
+}
+
+/** Ab so vielen Spielern spuken zwei Geister gleichzeitig */
+const TWO_GHOSTS_FROM = 7;
+
 interface Stats {
   scares: number;
   damage: number;
@@ -29,6 +46,8 @@ interface Stats {
  * Licht auf dem Geist kostet ihn Lebenspunkte; erwischt der Geist einen Jäger von
  * außerhalb des Lichts, liegt der vor Schreck am Boden, bis ihn jemand rettet.
  * Der Geist wird kurz sichtbar: im Lichtkegel, bei Blitzen und wenn er jemanden erschreckt.
+ * Ab 7 Spielern spuken zwei Geister gleichzeitig (jeder mit eigenem Leben); die Jäger
+ * gewinnen erst, wenn beide gebannt sind.
  */
 export class GeistGame implements MiniGame {
   readonly kind = 'geist' as const;
@@ -37,19 +56,15 @@ export class GeistGame implements MiniGame {
   private rounds: number;
   private sub: GeistState['sub'] = 'intro';
   private deadline = 0;
-  private ghostId = '';
-  private ghost = { x: 0, y: 0, sx: 0, sy: 0 };
-  private health = 100;
+  private ghostCount: number;
+  private ghostMap = new Map<string, Ghost>();
   private maxHealth = 100;
   private hunters = new Map<string, Hunter>();
-  private revealUntil = 0;
-  private revealWhy: 'light' | 'flash' | 'touch' = 'light';
-  private lit = false;
-  private scareReady = 0;
   private flashSeq = 0;
   private nextFlash = 0;
   private lastScare: GeistState['lastScare'] = null;
   private lastRevive: GeistState['lastRevive'] = null;
+  private lastBanish: GeistState['lastBanish'] = null;
   private seq = 0;
   private roundWinner: GeistState['roundWinner'] = null;
   private roundReason: string | null = null;
@@ -67,7 +82,8 @@ export class GeistGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     this.order = shuffle(ids);
-    this.rounds = Math.min(ids.length, 3);
+    this.ghostCount = ids.length >= TWO_GHOSTS_FROM ? 2 : 1;
+    this.rounds = Math.min(Math.ceil(ids.length / this.ghostCount), 3);
     this.points = Object.fromEntries(ids.map((id) => [id, 0]));
     this.ghostPts = Object.fromEntries(ids.map((id) => [id, 0]));
     this.huntedRounds = Object.fromEntries(ids.map((id) => [id, 0]));
@@ -85,12 +101,13 @@ export class GeistGame implements MiniGame {
 
   private startRound() {
     this.round += 1;
-    this.ghostId = this.order[(this.round - 1) % this.order.length];
-    const hunterIds = this.ids.filter((id) => id !== this.ghostId);
+    const gids: string[] = [];
+    for (let j = 0; j < this.ghostCount; j++) gids.push(this.order[((this.round - 1) * this.ghostCount + j) % this.order.length]);
+    const hunterIds = this.ids.filter((id) => !gids.includes(id));
     for (const id of hunterIds) this.huntedRounds[id] += 1;
-    if (!this.ghosts.includes(this.ghostId)) this.ghosts.push(this.ghostId);
-    this.maxHealth = GEIST.HEALTH_BASE + GEIST.HEALTH_PER_HUNTER * hunterIds.length;
-    this.health = this.maxHealth;
+    for (const id of gids) if (!this.ghosts.includes(id)) this.ghosts.push(id);
+    // Zwei Geister teilen sich die Jäger-Wucht: jeder hat ungefähr die Hälfte der Leben
+    this.maxHealth = Math.round(GEIST.HEALTH_BASE + (GEIST.HEALTH_PER_HUNTER * hunterIds.length) / gids.length);
     // Jäger starten im Flur (unten Mitte), der Geist in Küche oder Bad (oben, weit weg)
     this.hunters.clear();
     const start = roomRect(4);
@@ -115,11 +132,15 @@ export class GeistGame implements MiniGame {
         reviveMs: 0,
       });
     });
-    const gc = roomCenter(Math.random() < 0.5 ? 0 : 2);
-    this.ghost = { x: gc.x, y: gc.y - 20, sx: 0, sy: 0 };
-    this.revealUntil = 0;
-    this.lit = false;
+    // Geister starten in Küche bzw. Bad (oben, weit weg von den Jägern)
+    const first = Math.random() < 0.5 ? 0 : 2;
+    this.ghostMap.clear();
+    gids.forEach((id, j) => {
+      const gc = roomCenter(j === 0 ? first : 2 - first);
+      this.ghostMap.set(id, { x: gc.x, y: gc.y - 20, sx: 0, sy: 0, health: this.maxHealth, out: false, revealUntil: 0, revealWhy: 'light', lit: false, scareReady: 0 });
+    });
     this.lastScare = null;
+    this.lastBanish = null;
     this.lastRevive = null;
     this.roundWinner = null;
     this.roundReason = null;
@@ -133,7 +154,7 @@ export class GeistGame implements MiniGame {
     const now = Date.now();
     this.sub = 'play';
     this.setDeadline(GEIST.ROUND_MS);
-    this.scareReady = now + 1500;
+    for (const g of this.ghostMap.values()) g.scareReady = now + 1500;
     this.scheduleFlash(now);
     this.ctx.onChange();
   }
@@ -143,7 +164,6 @@ export class GeistGame implements MiniGame {
   }
 
   private tick(now: number, dt: number) {
-    const ghostConnected = this.ctx.isConnected(this.ghostId);
     // --- Jäger bewegen + Akku
     for (const h of this.hunters.values()) {
       if (h.down) {
@@ -199,49 +219,61 @@ export class GeistGame implements MiniGame {
       }
     }
 
-    // --- Licht auf dem Geist?
-    const g = this.ghost;
-    const cones = [...this.hunters.entries()].filter(([, h]) => !h.down && h.light && inCone(h.x, h.y, h.angle, g.x, g.y));
-    this.lit = cones.length > 0;
-    if (this.lit) {
-      const total = GEIST.DMG * Math.pow(cones.length, GEIST.STACK) * dt;
-      this.health = Math.max(0, this.health - total);
-      for (const [id] of cones) this.stats.get(id)!.damage += total / cones.length;
-      this.reveal(now, 'light', GEIST.LIGHT_REVEAL_MS);
-    }
-
-    // --- Geist bewegen
-    if (ghostConnected) {
-      const len = Math.hypot(g.sx, g.sy);
-      if (len > 0.15) {
-        const k = Math.min(1, len) / Math.max(1, len);
-        const speed = GEIST.GHOST_SPEED * (this.lit ? GEIST.GHOST_LIT_SLOW : 1);
-        g.x += g.sx * k * speed * dt;
-        g.y += g.sy * k * speed * dt;
-        collide(g);
+    // --- Pro Geist: Licht, Bewegung, Erschrecken
+    for (const [gid, g] of this.ghostMap) {
+      if (g.out) continue;
+      const cones = [...this.hunters.entries()].filter(([, h]) => !h.down && h.light && inCone(h.x, h.y, h.angle, g.x, g.y));
+      g.lit = cones.length > 0;
+      if (g.lit) {
+        const total = Math.min(g.health, GEIST.DMG * Math.pow(cones.length, GEIST.STACK) * dt);
+        g.health = Math.max(0, g.health - total);
+        for (const [id] of cones) this.stats.get(id)!.damage += total / cones.length;
+        this.reveal(g, now, 'light', GEIST.LIGHT_REVEAL_MS);
+        if (g.health <= 0 && this.ghostMap.size > 1) {
+          // Einer von zwei Geistern gebannt: bleibt sichtbar liegen, die Runde geht weiter
+          g.out = true;
+          g.lit = false;
+          g.sx = 0;
+          g.sy = 0;
+          g.revealWhy = 'light';
+          g.revealUntil = Number.MAX_SAFE_INTEGER;
+          this.lastBanish = { id: gid, seq: ++this.seq };
+          continue;
+        }
       }
-    }
 
-    // --- Erschrecken (nur von außerhalb des Lichts)
-    if (!this.lit && now >= this.scareReady) {
-      for (const [id, h] of this.hunters) {
-        if (h.down || Math.hypot(h.x - g.x, h.y - g.y) > GEIST.SCARE_DIST) continue;
-        h.down = true;
-        h.light = false;
-        h.revive = 0;
-        h.reviveMs = 0;
-        this.stats.get(this.ghostId)!.scares += 1;
-        this.points[this.ghostId] += 1;
-        this.ghostPts[this.ghostId] += 1;
-        this.lastScare = { victim: id, seq: ++this.seq };
-        this.scareReady = now + GEIST.SCARE_COOLDOWN;
-        this.reveal(now, 'touch', GEIST.TOUCH_REVEAL_MS);
-        break;
+      if (this.ctx.isConnected(gid)) {
+        const len = Math.hypot(g.sx, g.sy);
+        if (len > 0.15) {
+          const k = Math.min(1, len) / Math.max(1, len);
+          const speed = GEIST.GHOST_SPEED * (g.lit ? GEIST.GHOST_LIT_SLOW : 1);
+          g.x += g.sx * k * speed * dt;
+          g.y += g.sy * k * speed * dt;
+          collide(g);
+        }
       }
-    } else if (this.lit) {
-      // Berührung im Licht: nur sichtbar
-      for (const h of this.hunters.values()) {
-        if (!h.down && Math.hypot(h.x - g.x, h.y - g.y) <= GEIST.SCARE_DIST) this.reveal(now, 'touch', 600);
+
+      // Erschrecken (nur von außerhalb des Lichts)
+      if (!g.lit && now >= g.scareReady) {
+        for (const [id, h] of this.hunters) {
+          if (h.down || Math.hypot(h.x - g.x, h.y - g.y) > GEIST.SCARE_DIST) continue;
+          h.down = true;
+          h.light = false;
+          h.revive = 0;
+          h.reviveMs = 0;
+          this.stats.get(gid)!.scares += 1;
+          this.points[gid] += 1;
+          this.ghostPts[gid] += 1;
+          this.lastScare = { victim: id, seq: ++this.seq, by: gid };
+          g.scareReady = now + GEIST.SCARE_COOLDOWN;
+          this.reveal(g, now, 'touch', GEIST.TOUCH_REVEAL_MS);
+          break;
+        }
+      } else if (g.lit) {
+        // Berührung im Licht: nur sichtbar
+        for (const h of this.hunters.values()) {
+          if (!h.down && Math.hypot(h.x - g.x, h.y - g.y) <= GEIST.SCARE_DIST) this.reveal(g, now, 'touch', 600);
+        }
       }
     }
 
@@ -268,22 +300,28 @@ export class GeistGame implements MiniGame {
     // --- Blitz
     if (now >= this.nextFlash) {
       this.flashSeq += 1;
-      this.reveal(now, 'flash', GEIST.FLASH_MS);
+      for (const g of this.ghostMap.values()) if (!g.out) this.reveal(g, now, 'flash', GEIST.FLASH_MS);
       this.scheduleFlash(now);
     }
 
     // --- Rundenende?
     const hunters = [...this.hunters.values()];
-    if (this.health <= 0) return this.endRound('hunters', 'Der Geist ist erschöpft – die Jäger gewinnen!');
+    if ([...this.ghostMap.values()].every((g) => g.out || g.health <= 0)) {
+      return this.endRound('hunters', this.ghostMap.size > 1 ? 'Beide Geister sind gebannt – die Jäger gewinnen!' : 'Der Geist ist erschöpft – die Jäger gewinnen!');
+    }
     if (hunters.length && hunters.every((h) => h.down)) return this.endRound('ghost', 'Alle Jäger liegen vor Schreck am Boden!');
     if (now >= this.deadline) return this.endRound('ghost', 'Zeit um – der Geist hat durchgehalten!');
     this.ctx.onChange();
   }
 
-  private reveal(now: number, why: 'light' | 'flash' | 'touch', ms: number) {
+  private reveal(g: Ghost, now: number, why: 'light' | 'flash' | 'touch', ms: number) {
     // Ein Blitz oder Schreck überschreibt kurzes Licht-Nachleuchten, nicht umgekehrt
-    if (why !== 'light' || this.revealUntil <= now || this.revealWhy === 'light') this.revealWhy = why;
-    this.revealUntil = Math.max(this.revealUntil, now + ms);
+    if (why !== 'light' || g.revealUntil <= now || g.revealWhy === 'light') g.revealWhy = why;
+    g.revealUntil = Math.max(g.revealUntil, now + ms);
+  }
+
+  private get ghostIds() {
+    return [...this.ghostMap.keys()];
   }
 
   private endRound(winner: 'ghost' | 'hunters', reason: string) {
@@ -293,9 +331,11 @@ export class GeistGame implements MiniGame {
     this.roundReason = reason;
     const hunterIds = [...this.hunters.keys()];
     if (winner === 'ghost') {
-      this.points[this.ghostId] += 5;
-      this.ghostPts[this.ghostId] += 5;
-      this.stats.get(this.ghostId)!.wins += 1;
+      for (const gid of this.ghostIds) {
+        this.points[gid] += 5;
+        this.ghostPts[gid] += 5;
+        this.stats.get(gid)!.wins += 1;
+      }
     } else {
       for (const id of hunterIds) {
         this.points[id] += 3;
@@ -309,9 +349,13 @@ export class GeistGame implements MiniGame {
       this.points[id] += total - st.paid;
       st.paid = total;
     }
-    // Zum Schluss den Geist zeigen
-    this.revealWhy = 'touch';
-    this.revealUntil = Number.MAX_SAFE_INTEGER;
+    // Zum Schluss die Geister zeigen
+    for (const g of this.ghostMap.values()) {
+      g.revealWhy = 'touch';
+      g.revealUntil = Number.MAX_SAFE_INTEGER;
+      g.sx = 0;
+      g.sy = 0;
+    }
     for (const h of this.hunters.values()) (h.sx = 0), (h.sy = 0), (h.light = false);
     this.setDeadline(GEIST.END_MS);
     this.ctx.onChange();
@@ -349,9 +393,9 @@ export class GeistGame implements MiniGame {
     if (action === 'stick') {
       const x = clamp(Number(pl.x) || 0, -1, 1);
       const y = clamp(Number(pl.y) || 0, -1, 1);
-      if (id === this.ghostId) {
-        this.ghost.sx = x;
-        this.ghost.sy = y;
+      const g = this.ghostMap.get(id);
+      if (g) {
+        if (!g.out) (g.sx = x), (g.sy = y);
       } else {
         const h = this.hunters.get(id);
         if (h) (h.sx = x), (h.sy = y);
@@ -366,7 +410,8 @@ export class GeistGame implements MiniGame {
   }
 
   playerDisconnected(id: string) {
-    if (id === this.ghostId) (this.ghost.sx = 0), (this.ghost.sy = 0);
+    const g = this.ghostMap.get(id);
+    if (g) (g.sx = 0), (g.sy = 0);
     const h = this.hunters.get(id);
     if (h) (h.sx = 0), (h.sy = 0), (h.light = false);
   }
@@ -379,7 +424,12 @@ export class GeistGame implements MiniGame {
 
   snapshot(): MiniSnapshot {
     const now = Date.now();
-    const visible = now < this.revealUntil;
+    const ghosts = [...this.ghostMap.entries()]
+      .filter(([, g]) => now < g.revealUntil)
+      .map(([id, g]) => ({ id, x: Math.round(g.x), y: Math.round(g.y), why: g.revealWhy }));
+    const first = this.ghostIds[0] ?? '';
+    const firstSeen = ghosts.find((g) => g.id === first);
+    const ghostHp = Object.fromEntries([...this.ghostMap.entries()].map(([id, g]) => [id, Math.round(g.health)]));
     return {
       kind: 'geist',
       state: {
@@ -387,20 +437,25 @@ export class GeistGame implements MiniGame {
         endsIn: Math.max(0, this.deadline - now),
         round: this.round,
         rounds: this.rounds,
-        ghostId: this.ghostId,
-        health: Math.round(this.health),
-        maxHealth: this.maxHealth,
+        ghostId: first,
+        ghostIds: this.ghostIds,
+        health: Object.values(ghostHp).reduce((a, b) => a + b, 0),
+        maxHealth: this.maxHealth * Math.max(1, this.ghostMap.size),
+        ghostHp,
+        ghostMax: this.maxHealth,
         hunters: Object.fromEntries(
           [...this.hunters.entries()].map(([id, { x, y, angle, moving, light, battery, empty, down, revive }]) => [
             id,
             { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, angle: Math.round(angle * 100) / 100, moving, light, battery: Math.round(battery * 100) / 100, empty, down, revive: Math.round(revive * 100) / 100 },
           ]),
         ),
-        // Die Position des Geists steht NUR während einer Enthüllung im öffentlichen Zustand
-        ghost: visible ? { x: Math.round(this.ghost.x), y: Math.round(this.ghost.y), why: this.revealWhy } : null,
+        // Die Position eines Geists steht NUR während einer Enthüllung im öffentlichen Zustand
+        ghost: firstSeen ? { x: firstSeen.x, y: firstSeen.y, why: firstSeen.why } : null,
+        ghosts,
         flashSeq: this.flashSeq,
         lastScare: this.lastScare,
         lastRevive: this.lastRevive,
+        lastBanish: this.lastBanish,
         roundWinner: this.roundWinner,
         roundReason: this.roundReason,
         points: { ...this.points },
@@ -411,13 +466,20 @@ export class GeistGame implements MiniGame {
   privateFor(id: string): PrivateState {
     if (!this.ids.includes(id)) return null;
     let state: GeistPrivate;
-    if (id === this.ghostId) {
-      state = { role: 'ghost', x: Math.round(this.ghost.x), y: Math.round(this.ghost.y), lit: this.lit, cooldown: Math.max(0, this.scareReady - Date.now()) };
+    const me = this.ghostMap.get(id);
+    if (me) {
+      const mates = [...this.ghostMap.entries()].filter(([gid]) => gid !== id).map(([, g]) => ({ x: Math.round(g.x), y: Math.round(g.y), out: g.out }));
+      state = {
+        role: 'ghost', x: Math.round(me.x), y: Math.round(me.y), lit: me.lit, cooldown: Math.max(0, me.scareReady - Date.now()),
+        hp: Math.round((me.health / this.maxHealth) * 100) / 100, out: me.out, mates,
+      };
     } else {
       const h = this.hunters.get(id);
       let fear = 0;
       if (h && this.sub === 'play') {
-        const d = Math.hypot(h.x - this.ghost.x, h.y - this.ghost.y);
+        // Gänsehaut vom nächsten Geist, der noch spukt
+        const d = Math.min(Infinity, ...[...this.ghostMap.values()].filter((g) => !g.out).map((g) => Math.hypot(h.x - g.x, h.y - g.y)));
+
         fear = Math.round(clamp(1 - d / GEIST.FEAR_DIST, 0, 1) * 100) / 100;
       }
       state = { role: 'hunter', fear };

@@ -16,6 +16,7 @@ import type {
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
+import { freePlayerColor } from '../shared/players';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, placeCoins } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
@@ -45,7 +46,7 @@ import { DescentGame } from './descent';
 import { RhythmGame } from './rhythm';
 import { WrapGame } from './wrap';
 import { StarsGame } from './stars';
-import { Board } from './board';
+import { Board, type PartySave, partyResumeInfo, resumeSave } from './board';
 import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
 import { SumoGame } from './sumo';
@@ -76,6 +77,7 @@ import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
+import { EmoteFeed } from './spectator';
 
 const MAX_PLAYERS = 12;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -179,6 +181,8 @@ export class Room {
   private miniIds: string[] | null = null;
   /** Gekickte Spieler-IDs (Handy mit alter ID bekommt „Du wurdest entfernt“) */
   private kicks = new KickList();
+  /** Zuschauer-Emotes (😂 😱 👏 🍅) – für alle Spiele, unabhängig vom Minispiel */
+  private emotes = new EmoteFeed();
   private offlineBucket = '';
   /** Gastgeber = erster Mensch, der beigetreten ist. Kommt er zurück, ist er wieder VIP. */
   private hostId: string | null = null;
@@ -243,7 +247,8 @@ export class Room {
       }
       if (!p) {
         // Im Ergebnis eines Einzelspiels darf man dazukommen – bei „Nochmal“ geht es sonst nie zurück in die Lobby
-        if (this.phase !== 'lobby' && !(this.phase === 'results' && this.singleActive)) {
+        // Party: Nachzügler dürfen jederzeit rein und steigen zur nächsten Brett-Runde ein
+        if (this.phase !== 'lobby' && !(this.phase === 'results' && this.singleActive) && !this.board) {
           return reply({ ok: false, error: 'Gerade läuft ein Spiel – du bist ab der nächsten Runde dabei!' });
         }
         // Gleicher Name, alte ID offline (z. B. Browserdaten gelöscht) → alten grauen Eintrag ersetzen
@@ -255,7 +260,9 @@ export class Room {
         // Bekannte ID vom Handy weiterverwenden (z. B. nach langer Pause) – so erkennt der Raum den Gastgeber wieder
         const reuse = msg.bot !== true && typeof msg.playerId === 'string' && /^[0-9a-f-]{36}$/i.test(msg.playerId);
         const id = reuse ? msg.playerId! : randomUUID();
-        p = { id, name, look: sanitizeLook(msg.look), connected: false, isVip: false, socketId: null, joinedAt: now, connectedSince: now, disconnectedAt: 0 };
+        // Spielerfarbe des Abends: erste freie – bleibt an der ID, solange der Spieler im Raum ist
+        const color = freePlayerColor([...this.players.values()].map((o) => o.color));
+        p = { id, name, look: sanitizeLook(msg.look), color, connected: false, isVip: false, socketId: null, joinedAt: now, connectedSince: now, disconnectedAt: 0 };
         this.players.set(p.id, p);
       }
       p.name = name;
@@ -294,8 +301,11 @@ export class Room {
         this.startDate(def.id, [ids[0], ids[1]]);
       } else if (req.mode === 'party') {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
+        // Gespeicherten Brettstand (data/party.json) fortsetzen – Spieler werden über ID bzw. Namen wiedererkannt
+        const from = req.resume === true ? resumeSave(ids.map((id) => ({ id, name: this.nameOf(id) }))) : undefined;
+        if (from === null) return socket.emit('toast', 'Keine passende gespeicherte Party gefunden.');
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
-        this.startParty(ids, rounds, req.longGames === true);
+        this.startParty(ids, rounds, req.longGames === true, from ?? undefined);
       } else if (req.mode === 'top' || req.mode === 'favorites') {
         const kind = this.votedKind(req.mode);
         if (!kind) return socket.emit('toast', 'Noch keine (passenden) Stimmen.');
@@ -324,7 +334,14 @@ export class Room {
       this.changed();
     });
 
+    // Regelkarte: „Bereit!“ vom Handy (Bots sofort)
+    socket.on('intro:ready', () => {
+      if (playerId) this.introReady(playerId);
+    });
+
     socket.on('vip:continue', (action?: string) => {
+      // Regelkarte: VIP kürzt ab
+      if (this.phase === 'intro') return void (isVip() && this.introGo());
       if (!(isVip() || inCouple()) || this.phase !== 'results') return;
       if (this.singleResults()) {
         if (action === 'again') {
@@ -424,6 +441,11 @@ export class Room {
       this.mini.input(playerId, action, payload);
     });
 
+    // Zuschauer-Emotes: generisch für alle Spiele (das Minispiel merkt davon nichts), 2 s Abklingzeit pro Spieler
+    socket.on('emote', (i: unknown) => {
+      if (playerId && this.players.has(playerId) && this.emotes.add(playerId, i)) this.changed();
+    });
+
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
       const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : this.questions;
@@ -469,7 +491,7 @@ export class Room {
 
   // ---------------------------------------------------------------- Ablauf
 
-  private startParty(ids: string[], rounds: number, longGames = false) {
+  private startParty(ids: string[], rounds: number, longGames = false, from?: PartySave) {
     this.session.endSeries();
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
@@ -479,7 +501,15 @@ export class Room {
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
       isGone: (id) => !!this.players.get(id)?.removed,
-    }, longGames);
+      // Nachzügler steigen zur nächsten Brett-Runde ein
+      present: () => this.connectedIds(),
+      // Nach den Bonus-Cocktails: Endstand
+      onFinish: () => {
+        this.results = this.finalResults();
+        this.phase = 'results';
+        this.changed();
+      },
+    }, longGames, from);
     this.results = null;
     this.phase = 'board';
     this.changed();
@@ -588,7 +618,80 @@ export class Room {
     return out;
   }
 
+  // ---------------------------------------------------------------- Regelkarte (Phase `intro`)
+
+  /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, Ende (Server-Zeit) */
+  private intro: { kind: MiniKind; opts?: { track?: number }; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
+  /** Spiele, die heute (seit Serverstart) schon liefen → Regelkarte nur kurz */
+  private introSeen = new Set<MiniKind>();
+  private static readonly INTRO_MS = 15_000;
+  private static readonly INTRO_SHORT_MS = 5_000;
+
+  /**
+   * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, Übungsfeld, „Bereit!“). Ohne Karte:
+   * Date-Night-Kapitel, Trinkspiele und „Nochmal“ desselben Spiels.
+   */
   private startMini(kind: MiniKind, opts?: { track?: number }) {
+    const again = this.singleResults() && this.lastKind === kind;
+    this.endIntro();
+    if (this.dateRun || this.drinkRun || again) {
+      this.introSeen.add(kind);
+      return this.launchMini(kind, opts);
+    }
+    if (!this.gameIds().length) return this.backToLobby();
+    this.showBoard = false;
+    this.results = null;
+    const short = this.introSeen.has(kind);
+    this.intro = {
+      kind,
+      opts,
+      ready: new Set(),
+      endsAt: Date.now() + (short ? Room.INTRO_SHORT_MS : Room.INTRO_MS),
+      short,
+      timer: setInterval(() => this.introCheck(), 250),
+    };
+    this.phase = 'intro';
+    this.changed();
+  }
+
+  /** Alle (verbundenen) bereit oder Zeit um → los. Bei der kurzen Karte wird nicht auf „Bereit“ gewartet. */
+  private introCheck() {
+    const it = this.intro;
+    if (!it) return;
+    if (this.phase !== 'intro') return this.endIntro();
+    const online = this.gameIds().filter((id) => this.isOnline(id));
+    if (Date.now() >= it.endsAt || (online.length > 0 && online.every((id) => it.ready.has(id)))) this.introGo();
+  }
+
+  /** Regelkarte beenden und das Spiel wirklich starten (auch VIP „Weiter“ bzw. Laptop) */
+  private introGo() {
+    const it = this.intro;
+    if (!it || this.phase !== 'intro') return;
+    this.endIntro();
+    this.introSeen.add(it.kind);
+    this.launchMini(it.kind, it.opts);
+  }
+
+  private endIntro() {
+    if (this.intro) clearInterval(this.intro.timer);
+    this.intro = null;
+  }
+
+  private introReady(id: string) {
+    const it = this.intro;
+    if (this.phase !== 'intro' || !it || it.ready.has(id) || !this.gameIds().includes(id)) return;
+    it.ready.add(id);
+    this.changed();
+    this.introCheck();
+  }
+
+  private introState() {
+    const it = this.intro;
+    if (this.phase !== 'intro' || !it) return null;
+    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short };
+  }
+
+  private launchMini(kind: MiniKind, opts?: { track?: number }) {
     this.mini?.dispose();
     this.showBoard = false;
     // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
@@ -607,6 +710,7 @@ export class Room {
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
       lookOf: (id) => this.players.get(id)?.look,
+      colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
@@ -656,7 +760,7 @@ export class Room {
         this.mini = new FliegerGame(ids, ctx);
         break;
       case 'kurve':
-        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.look.shirt));
+        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.color));
         break;
       case 'arena':
         this.mini = new ArenaGame(ids, ctx);
@@ -783,6 +887,9 @@ export class Room {
         coins: r.coins ? r.coins[Math.min(gi, r.coins.length - 1)] : placeCoins(ranks[gi], ranked),
       })),
     );
+    // Party-Finale (Mord/Verräter): Sieger bekommen zusätzlich Cocktails – das Brett bucht sie in afterMini
+    const finaleCocktails = this.board?.finaleCocktails(kind) ?? 0;
+    if (finaleCocktails) for (const row of rows) if (row.place === 1) row.detail = [row.detail, `+${finaleCocktails} Cocktails`].filter(Boolean).join(' · ');
     const hearts = r.hearts !== undefined ? { hearts: r.hearts, maxHearts: HEARTS_PER_CHAPTER } : {};
     if (r.hearts !== undefined || r.sips) for (const row of rows) row.coins = 0;
     if (r.sips && this.drinkRun) {
@@ -859,14 +966,10 @@ export class Room {
       return this.changed();
     }
     if (!res || res.final || !this.board) return this.backToLobby();
-    this.board.afterMini(Object.fromEntries(res.rows.map((row) => [row.playerId, row.coins])));
-    if (this.board.finished) {
-      this.results = this.finalResults();
-      this.phase = 'results';
-    } else {
-      this.results = null;
-      this.phase = 'board';
-    }
+    // Nach dem Finale zeigt das Brett erst die Bonus-Cocktails und meldet sich dann über onFinish (→ Endstand)
+    this.board.afterMini(res.rows);
+    this.results = null;
+    this.phase = 'board';
     this.changed();
   }
 
@@ -922,6 +1025,7 @@ export class Room {
       return this.continueAfterResults();
     }
     if (this.phase === 'story') return this.storyNext();
+    if (this.phase === 'intro') return this.introGo();
     if (this.phase === 'mini') this.mini?.vipAction?.(this.mini.kind === 'murder' ? 'skip' : 'next');
   }
 
@@ -1008,6 +1112,7 @@ export class Room {
    */
   private waitingStep(): { key: unknown; ms: number | null } | null {
     if (this.phase === 'results' && this.results) return { key: this.results, ms: AUTO_RESULTS_MS };
+    if (this.phase === 'intro' && this.intro) return { key: this.intro, ms: null };
     if (this.phase === 'story' && this.dateRun?.state.card) return { key: this.dateRun.state.card, ms: AUTO_STORY_MS };
     const m = this.phase === 'mini' ? this.mini?.snapshot() : null;
     if (m?.kind === 'stillepost' && (m.state.sub === 'reveal' || m.state.sub === 'tally')) {
@@ -1336,10 +1441,11 @@ export class Room {
     return {
       players: [...this.players.values()]
         .sort((a, b) => a.joinedAt - b.joinedAt)
-        .map(({ id, name, look, connected, isVip, disconnectedAt, removed, isBot }) => ({
+        .map(({ id, name, look, color, connected, isVip, disconnectedAt, removed, isBot }) => ({
           id,
           name,
           look,
+          color,
           connected,
           isVip,
           ...(!connected && disconnectedAt ? { offlineMs: now - disconnectedAt } : {}),
@@ -1373,7 +1479,10 @@ export class Room {
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
       skippable: this.skippable(),
       nochmal: this.nochmalState(),
+      intro: this.introState(),
       showBoard: this.phase === 'lobby' && this.showBoard,
+      partyResume: this.phase === 'lobby' ? partyResumeInfo() : null,
+      emotes: this.emotes.state(),
     };
   }
 

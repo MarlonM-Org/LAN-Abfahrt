@@ -26,6 +26,8 @@ export interface PlayerPublic {
   id: string;
   name: string;
   look: Look;
+  /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) – bleibt, solange der Spieler im Raum ist */
+  color: number;
   connected: boolean;
   isVip: boolean;
   /** Offline: seit wie vielen ms (Stand dieses Snapshots) */
@@ -508,6 +510,8 @@ export interface KurveState {
   deaths: { id: string; x: number; y: number; seq: number }[];
   pickup: { id: string; type: KurvePower; x: number; y: number; seq: number } | null;
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Bomben-Arena
@@ -546,6 +550,10 @@ export interface ArenaState {
   players: Record<string, ArenaPlayer>;
   /** Nur in roundOver/over: Rundensieger (null = Unentschieden) */
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+  /** Geister (Ausgeschiedene): Zielkreuz in Kacheln + Abklingzeit der Wasserbombe (ms) */
+  ghosts?: Record<string, { x: number; y: number; cd: number }>;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Bowling
@@ -1323,6 +1331,8 @@ export interface SmashState {
   items: { id: number; type: import('./smash').ItemKind; x: number; y: number }[];
   fx: SmashFx[];
   winner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 // ------------------------------------------------------------------ Stille Post mit Bildern
@@ -1536,13 +1546,17 @@ export interface FangenState {
   endsIn: number;
   round: number;
   rounds: number;
-  /** Wer gerade Flüchtling ist (die Position bleibt geheim!) */
+  /** Wer gerade Flüchtling ist (die Position bleibt geheim!); bei zwei Animateuren der erste */
   runner: string;
+  /** Alle Animateure der Runde (ab 7 Spielern zwei) */
+  runners: string[];
   hunters: Record<string, FangenHunter>;
   prints: FangenPrint[];
   points: Record<string, number>;
-  /** Nur in "roundEnd" / "over" */
+  /** Nur in "roundEnd" / "over" (der erste Animateur) */
   outcome: FangenOutcome | null;
+  /** Ergebnisse pro Animateur – Gefangene erscheinen schon während der Jagd (dann ist die Position egal) */
+  outcomes: FangenOutcome[];
 }
 
 /** Nur an den Flüchtling: die eigene Position (die Fänger stehen öffentlich im GameState) */
@@ -1553,7 +1567,12 @@ export interface FangenPrivate {
   dir: 1 | -1;
   decoyLeft: number;
   decoyActive: boolean;
+  /** Schon gefangen (bei zwei Animateuren läuft die Runde weiter) */
+  caught?: boolean;
+  /** Der andere Animateur (ab 7 Spielern) */
+  mate?: { x: number; y: number; caught: boolean } | null;
 }
+
 
 // ------------------------------------------------------------------ Spion unter Gästen
 
@@ -1643,17 +1662,28 @@ export interface GeistState {
   endsIn: number;
   round: number;
   rounds: number;
-  /** Wer in dieser Runde der Geist ist (öffentlich – nur die Position ist geheim) */
+  /** Wer in dieser Runde der Geist ist (öffentlich – nur die Position ist geheim); bei zwei Geistern der erste */
   ghostId: string;
+  /** Alle Geister der Runde (ab 7 Spielern zwei) */
+  ghostIds: string[];
+  /** Summe der Geister-Leben (HUD) */
   health: number;
   maxHealth: number;
+  /** Leben pro Geist (0 = gebannt) */
+  ghostHp: Record<string, number>;
+  /** Startleben pro Geist */
+  ghostMax: number;
   hunters: Record<string, GeistHunter>;
-  /** Nur gesetzt, solange der Geist sichtbar ist (Licht, Blitz, Berührung) */
+  /** Nur gesetzt, solange der (erste) Geist sichtbar ist (Licht, Blitz, Berührung) */
   ghost: { x: number; y: number; why: 'light' | 'flash' | 'touch' } | null;
+  /** Alle gerade sichtbaren Geister */
+  ghosts: { id: string; x: number; y: number; why: 'light' | 'flash' | 'touch' }[];
   /** Zählt hoch bei jedem Blitz */
   flashSeq: number;
   /** Letzte Schreck-Aktion */
-  lastScare: { victim: string; seq: number } | null;
+  lastScare: { victim: string; seq: number; by?: string } | null;
+  /** Zuletzt gebannter Geist (Leben auf 0, bei zwei Geistern) */
+  lastBanish: { id: string; seq: number } | null;
   lastRevive: { id: string; seq: number } | null;
   roundWinner: 'ghost' | 'hunters' | null;
   roundReason: string | null;
@@ -1740,6 +1770,12 @@ export interface SumoState {
   sudden: boolean;
   players: Record<string, SumoPlayer>;
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+  /** Geister (Ausgeschiedene): Abklingzeit der Welle (ms) */
+  ghosts?: Record<string, { cd: number }>;
+  /** Laufende Geister-Wellen: Start (x, y), Richtung (dx, dy), zurückgelegte Strecke d (px) */
+  waves?: { seq: number; by: string; x: number; y: number; dx: number; dy: number; d: number }[];
 }
 
 // ------------------------------------------------------------------ Zauber-Arena
@@ -1883,11 +1919,13 @@ export interface BogenState {
   chest: { x: number; y: number } | null;
   fx: BogenFx[];
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 /** Nur an den jeweiligen Spieler */
 export type GeistPrivate =
-  | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number }
+  | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number; hp?: number; out?: boolean; mates?: { x: number; y: number; out: boolean }[] }
   | { role: 'hunter'; fear: number };
 
 // ------------------------------------------------------------------ Date Night: Ablauf
@@ -1923,17 +1961,55 @@ export interface BoardRoll {
   path: number[];
 }
 
+/** Statistik pro Spieler über die ganze Party (für die Bonus-Cocktails am Ende) */
+export interface BoardStats {
+  /** Münzen aus Minispielen */
+  miniCoins: number;
+  /** Auf roten Feldern gelandet */
+  red: number;
+  /** Felder gelaufen */
+  steps: number;
+}
+
+/** Bonus-Cocktail am Ende („Minispiel-Star“, „Pechvogel“, „Wanderer“) */
+export interface BoardAward {
+  key: 'star' | 'pech' | 'wander';
+  title: string;
+  /** z. B. „Meiste Münzen aus Minispielen“ */
+  desc: string;
+  winners: string[];
+  /** Wert der Gewinner, z. B. 38 (Münzen) */
+  value: number;
+  /** Einheit zum Wert, z. B. „Münzen“ */
+  unit: string;
+}
+
 export interface BoardState {
   round: number;
   maxRounds: number;
   order: string[];
+  /** Im Schnelldurchlauf: wer gerade läuft (Index in `order`) */
   turnIdx: number;
-  sub: 'roll' | 'moving' | 'intro';
+  /** roll = Würfelfenster (alle gleichzeitig), moving = Züge nacheinander, intro = Minispiel-Ansage, bonus = Bonus-Cocktails am Ende */
+  sub: 'roll' | 'moving' | 'intro' | 'bonus';
   pos: Record<string, number>;
   coins: Record<string, number>;
   cocktails: Record<string, number>;
   barField: number;
   lastRoll: BoardRoll | null;
+  /** Würfelfenster: Augenzahl pro Spieler, der schon gewürfelt hat (selbst oder automatisch) */
+  rolls: Record<string, number>;
+  /** Restzeit des Würfelfensters in ms (Stand beim Senden, wird ~1×/s aktualisiert; 0 außerhalb) */
+  rollMs: number;
+  /** Endspurt: blaue/rote Felder zählen doppelt */
+  double: boolean;
+  /** Tageszeit für den TV: 0 = Morgen, ~0.8 = Sonnenuntergang (letzte Runde), 1 = Nacht (Finale, Bonus) */
+  timeOfDay: number;
+  stats: Record<string, BoardStats>;
+  /** Bonus-Cocktails am Ende: `shown` Karten aufgedeckt, `revealed` = Gewinner der aktuellen Karte steht fest */
+  bonus: { awards: BoardAward[]; shown: number; revealed: boolean } | null;
+  /** Nachzügler, die diese Runde eingestiegen sind */
+  joined: string[];
   /** Ereignistext für TV + Handys */
   message: string;
   messageSeq: number;
@@ -1965,7 +2041,20 @@ export interface ResultsState {
 
 // ------------------------------------------------------------------ Gesamtzustand
 
-export type Phase = 'lobby' | 'board' | 'mini' | 'results' | 'story';
+/** `intro` = Regelkarte vor einem Minispiel (Ziel, Steuerung, Übungsfeld, „Bereit!“) */
+export type Phase = 'lobby' | 'board' | 'intro' | 'mini' | 'results' | 'story';
+
+/** Regelkarte vor dem Minispiel: Start, sobald alle bereit sind – spätestens bei `endsAt` (Server-Zeit, ms) */
+export interface IntroState {
+  kind: MiniKind;
+  /** Wer gleich mitspielt */
+  ids: string[];
+  /** Wer „Bereit!“ gedrückt hat (Bots sofort) */
+  ready: string[];
+  endsAt: number;
+  /** Spiel lief heute schon: nur 5 s, ohne Bereit-Pflicht */
+  short: boolean;
+}
 
 export type MiniSnapshot =
   | { kind: 'flunky'; state: FlunkyState }
@@ -2060,8 +2149,22 @@ export interface GameLive {
   skippable?: SkipInfo | null;
   /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
   nochmal: NochmalState | null;
+  /** Regelkarte (nur in Phase `intro`) */
+  intro?: IntroState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
   showBoard: boolean;
+  /** Lobby: gespeicherte Party (data/party.json), die der VIP fortsetzen kann */
+  partyResume?: PartyResumeInfo | null;
+  /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */
+  emotes?: import('./spectator').EmoteEntry[];
+}
+
+/** Kurzinfo zur gespeicherten Party für den „Party fortsetzen?“-Knopf */
+export interface PartyResumeInfo {
+  round: number;
+  maxRounds: number;
+  names: string[];
+  savedAt: number;
 }
 
 /** Was TV, Handy und Bots lesen: `meta` + `state` zusammengeführt ({ ...meta, ...live }). */
@@ -2193,5 +2296,7 @@ export interface StartRequest {
   rounds?: number;
   /** Party-Modus: auch lange Minispiele (> 4 min) aufs Brett */
   longGames?: boolean;
+  /** Party-Modus: gespeicherten Brettstand (data/party.json) fortsetzen */
+  resume?: boolean;
   version?: string;
 }

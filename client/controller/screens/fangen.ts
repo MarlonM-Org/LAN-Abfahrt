@@ -11,14 +11,27 @@ const HEAT_CSS = ['#5aa0e8', '#f2e05a', '#f0973a', '#e0402f'];
 const HEAT_TEXT = ['Kalt ... hier ist niemand.', 'Lau – irgendwo in der Nähe?', 'Warm! Er ist ganz nah!', 'HEISS! Direkt neben dir!'];
 
 const cur = () => (store.state?.mini?.kind === 'fangen' ? store.state.mini.state : null);
+const runnersOf = (s: FangenState) => (s.runners?.length ? s.runners : [s.runner]);
+const runnerNames = (s: FangenState) => runnersOf(s).map((id) => nameOf(id)).join(' + ');
 
 export function pickFangen(s: FangenState): Screen {
   const id = store.playerId!;
-  const isRunner = s.runner === id;
+  const isRunner = runnersOf(s).includes(id);
   if (!isRunner && !s.hunters[id]) return ['spectate', message('Du schaust zu')];
   if (s.sub === 'over') return ['fg-over', message('Fangen vorbei!', 'Schau auf den Fernseher!')];
+  const myOutcome = (s.outcomes ?? []).find((o) => o.runner === id);
+  if (s.sub === 'chase' && myOutcome?.caught) {
+    return [`fg-caught-${s.round}`, message('Du wurdest geschnappt!', `${nameOf(myOutcome.by)} hat dich nach ${Math.round(myOutcome.survivedMs / 1000)}s erwischt. Dein Kollege läuft noch – Daumen drücken!`)];
+  }
   if (s.sub === 'roundEnd' && s.outcome) {
-    const o = s.outcome;
+    const o = (isRunner ? myOutcome : null) ?? s.outcome;
+    const all = s.outcomes ?? [o];
+    if (!isRunner && all.length > 1) {
+      const caught = all.filter((x) => x.caught);
+      const mine = caught.some((x) => x.by === id) ? 'Du hast einen Animateur gefangen!' : caught.length === all.length ? 'Beide geschnappt!' : caught.length ? 'Einer ist euch entwischt!' : 'Beide sind euch entwischt!';
+      const detail = all.map((x) => (x.caught ? `${nameOf(x.by)} fängt ${nameOf(x.runner)}` : `${nameOf(x.runner)} entkommt`)).join(' · ');
+      return [`fg-end-${s.round}`, message(mine, `${detail}. Gleich: nächste Runde.`)];
+    }
     const mine = isRunner ? (o.caught ? 'Du wurdest geschnappt!' : 'Du bist entkommen!') : o.caught ? (o.by === id ? 'Du hast den Animateur gefangen!' : 'Euer Team hat ihn!') : 'Er ist euch entwischt!';
     const detail = o.caught ? `${nameOf(o.by)} hat ${nameOf(o.runner)} nach ${Math.round(o.survivedMs / 1000)}s gefangen.` : `${nameOf(o.runner)} war ${Math.round(o.survivedMs / 1000)}s unsichtbar.`;
     return [`fg-end-${s.round}`, message(mine, `${detail} Gleich: nächste Runde.`)];
@@ -77,7 +90,7 @@ function buildRunner() {
     const priv = store.priv?.kind === 'fangen' ? store.priv.state : null;
     if (!st) return;
     q(root, '.timer').textContent = st.sub === 'intro' ? `Vorsprung ${Math.ceil(st.endsIn / 1000)}s` : `${Math.ceil(st.endsIn / 1000)}s`;
-    q(root, '.fg-round').textContent = `Runde ${st.round}/${st.rounds}`;
+    q(root, '.fg-round').textContent = `Runde ${st.round}/${st.rounds}${runnersOf(st).length > 1 ? ' · zu zweit' : ''}`;
     const heat = Math.max(0, ...Object.values(st.hunters).map((h) => h.heat));
     q(root, '.fg-hint').textContent =
       st.sub === 'intro' ? 'Lauf los! Die Fänger warten noch. Nur DU siehst die Karte.' : heat >= 3 ? 'Achtung – ein Fänger ist ganz nah!' : heat === 2 ? 'Ein Fänger wird warm ...' : 'Bleib in Bewegung – deine Spuren sind kurz zu sehen!';
@@ -111,6 +124,23 @@ function buildRunner() {
       ctx.lineWidth = 2;
       ctx.stroke();
       if (pl) ctx.drawImage(avatarImg(pl.look), Math.round(h.x - AV_W / 2), Math.round(h.y - oy + 6 - AV_H));
+    }
+    // Der andere Animateur (ab 7 Spielern): grauer Ring, durchgestrichen wenn gefangen
+    if (priv?.mate) {
+      const mx = priv.mate.x;
+      const my = priv.mate.y - oy;
+      ctx.strokeStyle = priv.mate.caught ? 'rgba(125,120,150,0.8)' : 'rgba(255,244,214,0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(mx, my, 9, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.drawImage(hatCache!.canvas, Math.round(mx - 10), Math.round(my - 16));
+      if (priv.mate.caught) {
+        ctx.beginPath();
+        ctx.moveTo(mx - 8, my - 8);
+        ctx.lineTo(mx + 8, my + 8);
+        ctx.stroke();
+      }
     }
     if (priv) {
       const x = priv.x;
@@ -162,13 +192,15 @@ function buildHunter() {
     const me = st?.hunters[store.playerId!];
     if (!st || !me) return;
     q(root, '.timer').textContent = `${Math.ceil(st.endsIn / 1000)}s`;
-    q(root, '.fg-round').textContent = `${st.round}/${st.rounds} · Jagd auf ${nameOf(st.runner).slice(0, 10)}`;
+    const free = runnersOf(st).filter((rid) => !(st.outcomes ?? []).some((o) => o.runner === rid && o.caught));
+    q(root, '.fg-round').textContent = `${st.round}/${st.rounds} · Jagd auf ${free.map((rid) => nameOf(rid)).join(' + ') || runnerNames(st)}`;
     const box = q(root, '.fg-heat');
     if (st.sub === 'intro') {
       box.style.background = '#3b3b4f';
       box.style.color = '#fff4d6';
       q(box, 'b').textContent = `Augen zu! ${Math.max(1, Math.ceil(st.endsIn / 1000))}`;
-      q(box, 'small').textContent = `${nameOf(st.runner)} versteckt sich ...`;
+      q(box, 'small').textContent = `${runnerNames(st)} ${runnersOf(st).length > 1 ? 'verstecken sich' : 'versteckt sich'} ...`;
+
     } else {
       box.style.background = HEAT_CSS[me.heat];
       box.style.color = '';

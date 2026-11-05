@@ -6,6 +6,8 @@ import { paintSky } from '../art/ground';
 import { kofferPiece, paintCar, paintRoad } from '../art/koffer';
 import { bus, getState, playerById } from './store';
 import { GOLD, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const B = KOFFER.BLOCK;
 const HUD = 22;
@@ -96,6 +98,9 @@ export class KofferScene extends Phaser.Scene {
   private hatch!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
+  private juice!: Juice;
+  private activeIds = new Map<number, number>();
+  private lastSub = '';
   private latest: KofferState | null = null;
   private hudKey = '';
   private cell = 8;
@@ -107,6 +112,9 @@ export class KofferScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = new Juice(this, { depth: 900 });
+    this.activeIds.clear();
+    this.lastSub = '';
     this.views.clear();
     this.geo = null;
     this.latest = null;
@@ -201,6 +209,16 @@ export class KofferScene extends Phaser.Scene {
         seen.add(p[k]);
       }
       const a = car.active;
+      // Landung: das zuletzt gesteuerte Teil liegt jetzt im Kofferraum
+      const prev = this.activeIds.get(i);
+      if (prev !== undefined && prev !== (a?.id ?? -1) && st.sub === 'play') {
+        const sp = view.sprites.get(prev);
+        if (sp && seen.has(prev)) {
+          sfx('bonk', { x: sp.tx, pitch: 0.9 + Math.random() * 0.4, vol: 0.45 });
+          this.juice.burst(sp.tx, sp.ty + 3, 'puff', 3);
+        }
+      }
+      this.activeIds.set(i, a?.id ?? -1);
       if (a) {
         this.sprite(view, a.id, a.item, a.v, a.x, a.y, (a.rot * Math.PI) / 2);
         seen.add(a.id);
@@ -218,12 +236,21 @@ export class KofferScene extends Phaser.Scene {
         this.tweens.add({ targets: puff, scale: 3, alpha: 0, duration: 500, onComplete: () => puff.destroy() });
         const t = txt(this, rx, lay.baseY - 4 * B * geo.s, 'RUMS!', { color: '#e04a3f' }).setDepth(40);
         this.tweens.add({ targets: t, y: t.y - 14, alpha: 0, duration: 900, onComplete: () => t.destroy() });
-        this.cameras.main.shake(100, 0.002);
+        this.juice.shake(1);
+        this.juice.burst(rx, ry, 'wood', 6);
+        sfx('crack', { x: rx, pitch: 0.7 });
+        sfx('bonk', { x: rx, pitch: 0.5, delay: 0.1 });
       }
       this.updateLabel(car, view, lay, st);
     });
 
+    if (st.sub !== this.lastSub) {
+      if (st.sub === 'settle') sfx('whistle');
+      if (st.sub === 'over') sfx('fanfare');
+      this.lastSub = st.sub;
+    }
     if (st.sub === 'countdown') this.banner.setText(String(Math.max(1, Math.ceil(st.endsIn / 1000))));
+
     else if (st.sub === 'settle' && st.cars.length <= 3) this.banner.setText('Zeit um!');
     else this.banner.setText('');
 

@@ -213,6 +213,8 @@ interface Billboard {
 
 export interface RenderOpts {
   lookOf: (id: string) => Look | undefined;
+  /** Kart-Farbe (Spielerfarbe des Abends, '#rrggbb') – ohne: Shirt-Farbe */
+  colorOf?: (id: string) => string | undefined;
   /** performance.now() für Animationen */
   now: number;
 }
@@ -392,7 +394,7 @@ export class Mode7Renderer {
   ) {
     const g = this.ctx;
     const look = o.lookOf(k.id);
-    const color = look ? (SHIRTS[look.shirt] ?? C.red) : C.red;
+    const color = o.colorOf?.(k.id) ?? (look ? (SHIRTS[look.shirt] ?? C.red) : C.red);
     let rel = wrapAngle(k.angle - cam.angle);
     if (k.spin > 0) rel += (o.now / 55) % TWO_PI;
     else if (k.drift) rel += k.drift * 0.35;

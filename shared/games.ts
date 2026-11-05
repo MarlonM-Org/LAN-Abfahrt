@@ -82,6 +82,89 @@ export const miniLabel = (kind: MiniKind) => `${MINI_INFO[kind].icon} ${MINI_INF
 /** „à la Mario Kart“ (leer, wenn kein Vorbild eingetragen ist) */
 export const miniInspired = (kind: MiniKind) => (MINI_INFO[kind].inspiredBy ? `à la ${MINI_INFO[kind].inspiredBy}` : '');
 
+// ------------------------------------------------------------------ Regelkarte (Phase `intro`)
+
+/** Ein Steuer-Piktogramm der Regelkarte: Emoji + kurzer Text */
+export interface HowToControl {
+  icon: string;
+  text: string;
+}
+
+/**
+ * Regelkarte vor jedem Minispiel (TV + Handy, Raum-Phase `intro`): ein Satz Ziel und 2–3 Steuer-Piktogramme.
+ * Das Übungsfeld am Handy liest die Bedienung direkt aus diesen Zeilen:
+ *   - Icon 🕹️ = schwebender Stick (zweimal 🕹️ = zwei Sticks: laufen + zielen)
+ *   - Text „KNOPF: …“ (vor dem Doppelpunkt nur Großbuchstaben/Symbole) = echter Knopf, „A / B: …“ = zwei Knöpfe;
+ *     ◀ ▶ LINKS RECHTS bewegen die Mini-Figur, solange man sie hält
+ *   - sonst (Sensor, Listen, Text) zeigt das Handy nur einen Hinweis
+ * Pflicht für jedes neue Minispiel – Texte kurz halten (TV-Kachel ≈ 2 × 17 Zeichen).
+ */
+export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl[] }> = {
+  flunky: { goal: 'Trefft die Flasche – dann trinkt, bis die anderen sie wieder aufgestellt haben.', controls: [{ icon: '🎯', text: 'Wischen: Ball werfen (Wind!)' }, { icon: '🍺', text: 'TRINKEN!: schnell tippen' }, { icon: '🏃', text: 'LAUFEN!: Flasche aufstellen' }] },
+  wwe: { goal: 'Wer würde eher …? Stimmt geheim ab – Punkte gibt’s für die Mehrheit.', controls: [{ icon: '🗳️', text: 'Spieler antippen = Stimme' }, { icon: '🤫', text: 'Geheim – niemand sieht es' }, { icon: '📺', text: 'Auflösung auf dem TV' }] },
+  sprint: { goal: 'Sobald die Sonne aufgeht: als Erster das Handtuch auf den Liegestuhl!', controls: [{ icon: '🌙', text: 'Warten, bis die Sonne kommt' }, { icon: '👆', text: 'JETZT!: so schnell wie möglich' }, { icon: '⚠️', text: 'Zu früh = Fehlstart' }] },
+  murder: { goal: 'Erledigt Aufgaben im Ferienhaus – und entlarvt den Mörder, bevor er alle erwischt.', controls: [{ icon: '🤫', text: 'Rolle geheim (gedrückt halten)' }, { icon: '🚪', text: 'Raum antippen = hingehen' }, { icon: '🚨', text: 'Leiche melden, dann abstimmen' }] },
+  descent: { goal: 'Springt gemeinsam den Abhang zum Rhein hinunter – Steinen ausweichen!', controls: [{ icon: '↔️', text: 'LINKS / RECHTS: laufen' }, { icon: '⤴️', text: 'SPRINGEN!: über Steine' }] },
+  rhythm: { goal: 'Tippt im Takt, wenn die Noten unten ankommen – dann funkt es!', controls: [{ icon: '🔊', text: 'Ton am TV aufdrehen' }, { icon: '🥁', text: 'LINKS / RECHTS: im Takt tippen' }] },
+  wrap: { goal: 'Greift die Zutaten in der richtigen Reihenfolge vom Rad.', controls: [{ icon: '📺', text: 'Reihenfolge steht auf dem TV' }, { icon: '✋', text: 'GREIFEN!: wenn die Zutat oben ist' }] },
+  stars: { goal: 'Verbindet die Sterne gemeinsam zu Sternbildern.', controls: [{ icon: '✨', text: 'Wischen: von Stern zu Stern' }, { icon: '📺', text: 'Vorlage auf dem TV' }] },
+  nhie: { goal: 'Ich hab noch nie … – wer es schon getan hat, trinkt!', controls: [{ icon: '👆', text: '„Noch nie!“ oder „Hab ich schon!“' }, { icon: '🍻', text: 'Als Einziger? Doppelt trinken' }] },
+  hilo: { goal: 'Ist die nächste Karte höher oder tiefer? Falsch geraten = Schluck.', controls: [{ icon: '🃏', text: 'HÖHER / TIEFER: tippen' }, { icon: '🍻', text: 'Falsch geraten = trinken' }] },
+  bomb: { goal: 'Sagt einen Begriff zur Kategorie und gebt die Bombe weiter – bevor sie knallt!', controls: [{ icon: '🗣️', text: 'Begriff laut sagen' }, { icon: '💣', text: 'WEITERGEBEN!: Bombe abgeben' }, { icon: '💥', text: 'Knall bei dir = 3 Schlücke' }] },
+  kingscup: { goal: 'Reihum Karte ziehen und die Regel befolgen – auf den König!', controls: [{ icon: '🃏', text: 'Du bist dran: Karte ziehen' }, { icon: '📺', text: 'Die Regel steht auf dem TV' }, { icon: '⚡', text: 'Knopf-Rennen: schnell sein!' }] },
+  sup: { goal: 'Paddelt zu zweit ins Ziel – gleichmäßig, sonst kippt das Board!', controls: [{ icon: '🚣', text: 'LINKS / RECHTS: paddeln' }, { icon: '⚖️', text: 'Gleichmäßig – sonst PLATSCH' }, { icon: '🪨', text: 'Felsen und Quallen ausweichen' }] },
+  tidy: { goal: 'Schiebt das Chaos in den Korb eures Teams!', controls: [{ icon: '🕹️', text: 'Stick: laufen und schieben' }, { icon: '💨', text: 'SPRINT: kurz schneller' }, { icon: '🧺', text: 'Alles in euren Korb' }] },
+  flieger: { goal: 'Ruft euch die Anweisungen zu – sie betreffen meist ein anderes Handy!', controls: [{ icon: '📣', text: 'Anweisung oben laut vorlesen' }, { icon: '🎛️', text: 'Eigene Knöpfe und Schalter' }, { icon: '⛽', text: 'Verpasst = weniger Sprit' }] },
+  kurve: { goal: 'Zieht eure Spur und rammt weder Rand noch fremde Spuren!', controls: [{ icon: '↩️', text: 'LINKS / RECHTS: halten = lenken' }, { icon: '⭐', text: 'Power-ups einsammeln' }, { icon: '🏆', text: 'Wer überlebt, punktet' }] },
+  arena: { goal: 'Sprengt euch den Weg frei und erwischt die anderen – wer trocken bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💣', text: 'BOMBE: Kokosnuss legen' }, { icon: '🌊', text: 'Nach 60 s kommt die Flut' }] },
+  bowling: { goal: 'Räumt alle Pins ab – Strike!', controls: [{ icon: '📱', text: 'Knopf halten, Handy schwingen, loslassen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }, { icon: '🎳', text: 'Reihum – zwei Würfe pro Frame' }] },
+  enten: { goal: 'Schießt Enten, Möwen und Flamingos – aber keine Badegäste!', controls: [{ icon: '📱', text: 'Handy auf den TV richten' }, { icon: '👆', text: 'Tippen = schießen' }, { icon: '🔄', text: 'Nach unten wischen = laden' }] },
+  ttt: { goal: 'Findet die Verräter – oder knockt als Verräter heimlich alle aus.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🏊', text: 'ANGRIFF: Poolnudel & Co.' }, { icon: '🔍', text: 'BENUTZEN: aufheben, untersuchen' }] },
+  verstecken: { goal: 'Verstecker werden zu Möbeln – Sucher prüfen alles, was verdächtig aussieht.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🪴', text: 'VERWANDELN / EINRASTEN: Möbel werden' }, { icon: '🔍', text: 'PRÜFEN: Sucher testet Möbel' }] },
+  parcours: { goal: 'Baut Fallen in die Strecke – und schafft es selbst zur Cocktailbar.', controls: [{ icon: '🕹️', text: 'Stick: Teil setzen, laufen' }, { icon: '🧱', text: 'PLATZIEREN: Teil einbauen' }, { icon: '⤴️', text: 'SPRINGEN: länger = höher' }] },
+  kart: { goal: 'Drei Runden mit Items aus den ?-Boxen – wer kommt zuerst ins Ziel?', controls: [{ icon: '🕹️', text: 'Stick: lenken' }, { icon: '🏎️', text: 'GAS / BREMSE: halten' }, { icon: '✨', text: 'DRIFT: halten + lenken = Turbo' }] },
+  turm: { goal: 'Stapelt euer Gepäck bis zum Gipfelkreuz und haltet den Turm 2 s.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = schneller fallen' }] },
+  igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel?', controls: [{ icon: '🦔', text: '◀ / ▶ / SPRUNG: laufen' }, { icon: '🎯', text: 'Ziel-Pad: in Schussrichtung ziehen' }, { icon: '🔥', text: 'FEUER: abschießen' }] },
+  smash: { goal: 'Haut die anderen von der Bühne – je höher die Prozente, desto weiter fliegen sie.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Richtung = Schlag' }, { icon: '🥊', text: 'SCHLAG / SPEZIAL: hauen' }, { icon: '🛡️', text: 'SPRUNG / SCHILD: springen, blocken' }] },
+  wasser: { goal: 'Werft Wasserbomben auf die anderen – wer am trockensten bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Linker Stick: laufen' }, { icon: '🕹️', text: 'Rechter Stick: zielen, loslassen = Wurf' }, { icon: '💦', text: 'Treffer machen nass' }] },
+  stillepost: { goal: 'Schreiben, malen, raten – reihum wandert alles weiter. Am Ende wird gelacht.', controls: [{ icon: '✍️', text: 'Satz schreiben' }, { icon: '🖍️', text: 'Das Bild dazu malen' }, { icon: '🤔', text: 'Bild beschreiben' }] },
+  fangen: { goal: 'Der Animateur ist unsichtbar – fangt ihn gemeinsam (oder entkommt als Animateur)!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💨', text: 'SPRINT / ABLENKUNG: Spezialknopf' }, { icon: '👣', text: 'Auf Fußspuren achten, rufen!' }] },
+  geist: { goal: 'Ein unsichtbarer Geist spukt – leuchtet ihn an, bevor er euch erschreckt.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Lampe zeigt nach vorn' }, { icon: '🔦', text: 'LICHT AN: Geist anleuchten' }, { icon: '👻', text: 'Als Geist: unsichtbar schweben' }] },
+  grill: { goal: 'Arbeitet die Bestellungen ab: schnippeln, grillen, servieren!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🥕', text: 'NEHMEN: aufheben, ablegen' }, { icon: '🔪', text: 'AKTION: halten = schneiden, löschen' }] },
+  boule: { goal: 'Bringt eure Kugeln am nächsten ans Schweinchen.', controls: [{ icon: '🥥', text: 'Legen oder Schießen wählen' }, { icon: '📱', text: 'Knopf halten, Handy schwingen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }] },
+  sumo: { goal: 'Schubst die anderen vom Steg – wer zuletzt steht, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💥', text: 'REMPELN: kurzer Sprint' }, { icon: '🌊', text: 'Der Steg bricht weg!' }] },
+  volley: { goal: 'Team Sonne gegen Team Meer – der Ball darf nicht in eurem Sand landen.', controls: [{ icon: '↔️', text: '◀ / ▶: laufen' }, { icon: '⤴️', text: 'SPRUNG: Ball treffen' }, { icon: '💥', text: 'SCHMETTERN: nur in der Luft' }] },
+  tourist: { goal: 'Alle kennen den Urlaubsort – nur der Tourist nicht. Findet ihn durch Fragen!', controls: [{ icon: '🃏', text: 'Karte zeigt Ort + Rolle (geheim)' }, { icon: '🗣️', text: 'Reihum fragen: Spieler antippen' }, { icon: '☝️', text: 'Verdacht? Anklagen!' }] },
+  sprueche: { goal: 'Schreibt die lustigste Antwort – die anderen stimmen ab.', controls: [{ icon: '✍️', text: 'Lücke lustig füllen' }, { icon: '🗳️', text: 'Lieblingsantwort wählen' }, { icon: '🏆', text: 'Stimmen = Punkte' }] },
+  pixel: { goal: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage stimmt ab.', controls: [{ icon: '🎨', text: 'Farbe wählen, tippen oder wischen' }, { icon: '🪣', text: 'Eimer, Radierer, Zurück' }, { icon: '🗳️', text: 'Lieblingsbild wählen' }] },
+  bogen: { goal: 'Ein Treffer und du bist raus – verschossene Pfeile wieder einsammeln!', controls: [{ icon: '🕹️', text: 'Stick: laufen und zielen' }, { icon: '🏹', text: 'SCHUSS: Pfeil abfeuern' }, { icon: '⤴️', text: 'SPRUNG / DASH: springen, ausweichen' }] },
+  darts: { goal: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', controls: [{ icon: '🎯', text: 'Ziehen: Fadenkreuz setzen' }, { icon: '✋', text: 'Ruhig halten = ruhiger' }, { icon: '👆', text: 'Wischen oder schnippen: werfen' }] },
+  golf: { goal: 'Alle putten gleichzeitig – wer braucht die wenigsten Schläge?', controls: [{ icon: '⛳', text: 'Zurückziehen wie eine Schleuder' }, { icon: '📏', text: 'Ziehweg = Kraft' }, { icon: '📱', text: 'Mit Sensor: Handy pendeln' }] },
+  autoball: { goal: 'Team Sonne gegen Team Meer: schiebt den Wasserball ins gegnerische Tor!', controls: [{ icon: '🕹️', text: 'Stick: lenken' }, { icon: '🏎️', text: 'GAS / BREMSE: fahren' }, { icon: '🚀', text: 'BOOST / HÜPFER: Turbo, Sprung' }] },
+  wpistole: { goal: 'Wer nach „ZIEHT!“ zuerst trifft, bleibt trocken – wer zuckt, kriegt den Eimer.', controls: [{ icon: '✋', text: 'Hand ans Holster, warten' }, { icon: '📣', text: 'Erst bei „ZIEHT!“ ziehen' }, { icon: '💦', text: 'Zielen und spritzen' }] },
+  zauber: { goal: 'Schleudert die anderen in die Lava – wer zuletzt steht, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🔥', text: 'ANGRIFF: Feuerball' }, { icon: '💨', text: 'EILE: kurzer Sprint' }] },
+  angeln: { goal: 'Wer zieht den dicksten Fisch aus dem See?', controls: [{ icon: '🎣', text: 'Auswerfen: halten und schwingen' }, { icon: '❗', text: 'ANSCHLAGEN: beim Biss sofort' }, { icon: '🌀', text: 'Drill: halten = kurbeln' }] },
+  spion: { goal: 'Erledige unauffällig deine vier Aufträge – und enttarne die anderen Spione.', controls: [{ icon: '🗺️', text: 'Karte antippen = hinschlendern' }, { icon: '✋', text: 'PLAUDERN / ERLEDIGEN: Aufträge' }, { icon: '🎈', text: 'Wasserballon: Spion enttarnen' }] },
+  wackel: { goal: 'Werft die anderen labbrigen Puppen vom Steg ins Meer!', controls: [{ icon: '🕹️', text: 'Stick: torkeln und lehnen' }, { icon: '👊', text: 'HAUEN / SPRINGEN: in Stick-Richtung' }, { icon: '🤲', text: 'GREIFEN: halten = festkleben' }] },
+  koffer: { goal: 'Packt den Kofferraum voll – was über die Kante hängt, fällt raus.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = rein damit' }] },
+  suess: { goal: 'Plündert die Minibar und bringt die Beute ins Versteck – der Wächter jagt euch!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🍬', text: 'ABLEGEN / SPRINT: Beute, Tempo' }, { icon: '🐢', text: 'Volle Taschen = langsam' }] },
+  umzug: { goal: 'Alles muss in den Laster, bevor der Vermieter klingelt!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '📦', text: 'GREIFEN: halten = tragen' }, { icon: '💨', text: 'SPRINT: ohne Teil (sonst werfen)' }] },
+  werwolf: { goal: 'Dorf gegen Werwölfe: Findet die Wölfe, bevor sie euch fressen.', controls: [{ icon: '🃏', text: 'Rolle geheim (verdeckte Karte)' }, { icon: '🌙', text: 'Nachts: alle tippen jemanden an' }, { icon: '🗳️', text: 'Tags: diskutieren, abstimmen' }] },
+};
+
+/** Übungsfeld-Bedienung aus der Regelkarte (siehe `MINI_HOWTO`): Anzahl Sticks und Knopf-Beschriftungen */
+export function howToPractice(kind: MiniKind): { sticks: number; buttons: string[] } {
+  const controls = MINI_HOWTO[kind]?.controls ?? [];
+  const sticks = Math.min(2, controls.filter((c) => c.icon === '🕹️').length);
+  const buttons: string[] = [];
+  for (const c of controls) {
+    const m = /^([^:]+):\s/.exec(c.text);
+    if (!m || /[a-zäöüß]/.test(m[1])) continue;
+    for (const b of m[1].split('/').map((x) => x.trim())) if (b && !buttons.includes(b)) buttons.push(b);
+  }
+  return { sticks, buttons };
+}
+
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup'];
 
@@ -168,18 +251,30 @@ export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 export const BOARD_SIZE = 24;
 
 /**
- * Zeiten auf dem Spielbrett. `null` = kein Zeitlimit – der VIP kann im Menü „Für … würfeln“,
- * offline gegangene Spieler würfeln nach OFFLINE_ROLL_MS automatisch.
+ * Zeiten auf dem Spielbrett. Alle würfeln gleichzeitig im Würfelfenster (wer nicht würfelt, für den würfelt
+ * am Ende der Server), danach laufen die Züge nacheinander im Schnelldurchlauf.
  */
 export const BOARD_TIMING = {
-  STEP_MS: 280,
+  /** Ein Feld weiterhüpfen (vorher 280) */
+  STEP_MS: 160,
+  /** Würfel über der Figur, bevor sie losläuft */
+  MOVE_LEAD_MS: 150,
+  /** Pause nach einem Zug (vorher 1800) – nach Ereignis oder Cocktail etwas länger zum Lesen */
+  PAUSE_MS: 700,
+  EVENT_PAUSE_MS: 1100,
   /** Ansage des nächsten Minispiels (VIP kann sie überspringen) */
   INTRO_MS: 6000,
-  /** vorher 45 s */
-  ROLL_IDLE_MS: null as number | null,
-  OFFLINE_ROLL_MS: 5000,
+  /** Würfelfenster: so lange dürfen alle gleichzeitig würfeln */
+  ROLL_WINDOW_MS: 10000,
+  /** Bonus-Cocktails am Ende: Trommelwirbel, dann Auflösung pro Karte */
+  BONUS_DRUM_MS: 1600,
+  BONUS_SHOW_MS: 3600,
 };
 export const COCKTAIL_PRICE = 10;
+/** Finale (Mord/Verräter) im Party-Modus: Sieger bekommen so viele Cocktails (zusätzlich zu den Münzen) */
+export const FINALE_COCKTAILS = 2;
+/** In den letzten Runden zählen blaue/rote Felder doppelt („Endspurt“) */
+export const DOUBLE_ROUNDS = 2;
 export const PARTY_ROUND_OPTIONS = [3, 5, 8];
 
 /** Feldpositionen: Rundweg am Rand der 480 × 270-Welt */

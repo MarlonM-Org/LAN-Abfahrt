@@ -2,11 +2,11 @@ import Phaser from 'phaser';
 import type { GameState, SumoState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { SUMO, sumoTileX, sumoTileY } from '../../shared/sumo';
-import { SHIRTS } from '../../shared/avatar';
 import { paintSumoSea, sumoBoat, sumoBuoy, sumoPlank, sumoPost, sumoRing } from '../art/sumo';
 import { bus, getState, playerById } from './store';
-import { ensurePortrait, figure } from './textures';
-import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
+import { pcol } from './playerColor';
+import { ensurePortrait, figure, type Figure } from './textures';
+import { Countdown, backPlate, background, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
 
@@ -16,7 +16,7 @@ const hexNum = (h: string) => parseInt(h.slice(1), 16);
 const figDepth = (y: number) => 100 + y;
 
 interface Fig {
-  f: Phaser.GameObjects.Container;
+  f: Figure;
   ring: Phaser.GameObjects.Ellipse;
   swim: Phaser.GameObjects.Container;
   x: number;
@@ -88,6 +88,8 @@ export class SumoScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0).setDepth(2000);
     this.banner = txt(this, WORLD.W / 2, 118, '', { size: 16, color: '#ffd25e' }).setDepth(2001);
     this.sub = txt(this, WORLD.W / 2, 142, '', { size: 8 }).setDepth(2001);
+    // Dunkle Plakette, damit die Texte über den Figuren lesbar bleiben
+    backPlate(this, [this.banner, this.sub], 2000);
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));
@@ -116,10 +118,13 @@ export class SumoScene extends Phaser.Scene {
       img.setFlipX(p.f < 0);
       if (p.stun) {
         img.setAngle(Math.sin(now / 40) * 14).setY(0);
+        a.f.play('hit');
       } else if (p.dash) {
         img.setAngle(p.f * 14).setY(-1);
+        a.f.play('walk', 2);
       } else {
-        img.setAngle(0).setY(moving ? -Math.abs(Math.sin(now / 70)) * 2 : 0);
+        img.setAngle(0).setY(0);
+        a.f.play(moving ? 'walk' : 'idle');
       }
       a.f.setPosition(a.x, a.y + 3).setDepth(figDepth(a.y)).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
       a.ring.setPosition(a.x, a.y + 2);
@@ -154,7 +159,7 @@ export class SumoScene extends Phaser.Scene {
       if (!a) {
         const pl = playerById(id);
         if (!pl) continue;
-        const color = SHIRTS[pl.look.shirt] ?? '#ffffff';
+        const color = pcol(id).hex;
         const ring = this.add.ellipse(p.x, p.y + 2, 15, 6).setStrokeStyle(1, hexNum(color)).setDepth(50);
         const f = figure(this, pl.look, p.x, p.y + 3);
         const swim = this.add.container(p.x, p.y).setDepth(60);
@@ -380,6 +385,7 @@ export class SumoScene extends Phaser.Scene {
       const p = st.players[id];
       if (!pl) return;
       const cx = x0 + i * slot + slot / 2;
+      this.hud.add(this.add.rectangle(cx, 4, 18, 17, pcol(id).num).setOrigin(0.5, 0).setAlpha(p.alive ? 1 : 0.35));
       this.hud.add(this.add.image(cx, 5, ensurePortrait(this, pl.look)).setOrigin(0.5, 0).setAlpha(p.alive ? 1 : 0.35));
       if (!p.alive && st.sub !== 'countdown') this.hud.add(ink(this, cx, 8, 'x', { color: '#2d64a8' }));
       for (let w = 0; w < st.winRounds; w++) {

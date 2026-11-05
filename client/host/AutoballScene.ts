@@ -7,7 +7,10 @@ import { ballShine, beachBall, paintAutoballPitch } from '../art/autoball';
 import { kartSprite } from '../art/kartsprites';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, GOLD, LIGHT, background, ensureTex, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 interface CarView {
   root: Phaser.GameObjects.Container;
@@ -53,6 +56,12 @@ export class AutoballScene extends Phaser.Scene {
   private lastRound = -1;
   private scoreKey = '';
   private bannerUntil = 0;
+  private juice!: Juice;
+  /** Anstoß-Countdown ohne Tafel (die Tafel lag sonst über dem Feld) */
+  private kick!: Phaser.GameObjects.Text;
+  /** Tor-Wiederholung light: bis dahin Zeitlupe + Zoom */
+  private replayUntil = 0;
+  private carFx = new Map<string, { bo: boolean; hop: boolean }>();
   private cd = new Countdown();
   private clockCd = new Countdown();
 
@@ -71,7 +80,10 @@ export class AutoballScene extends Phaser.Scene {
     this.lastRound = -1;
     this.scoreKey = '';
     this.bannerUntil = 0;
+    this.replayUntil = 0;
+    this.carFx.clear();
     this.ballSnap = { x: 0, y: 0, vx: 0, vy: 0, at: 0 };
+    this.juice = new Juice(this, { depth: 1500 });
 
     // Ball
     const shadow = this.add.ellipse(2, 7, 20, 8, 0x000000, 0.22);
@@ -89,6 +101,7 @@ export class AutoballScene extends Phaser.Scene {
     this.bannerBg = panel(this, 70, 96, 340, 62, 'dark').setDepth(2000).setVisible(false);
     this.banner = txt(this, WORLD.W / 2, 104, '', { size: 24, color: GOLD }).setDepth(2001);
     this.sub = txt(this, WORLD.W / 2, 136, '', { size: 8, wrap: 320 }).setDepth(2001);
+    this.kick = txt(this, WORLD.W / 2, AFB_CY - 44, '', { size: 24, color: GOLD }).setDepth(2001).setAlpha(0.9);
     this.intro = this.add.container(0, 0).setDepth(2002).setVisible(false);
     this.small = {
       bg: panel(this, 140, 46, 200, 46, 'dark').setDepth(2000).setVisible(false),
@@ -123,7 +136,8 @@ export class AutoballScene extends Phaser.Scene {
     const pl = playerById(id);
     if (!car || !pl) return undefined;
     const color = TEAM_INFO[car.t].color;
-    const shadow = this.add.ellipse(1, 3, 15, 8, 0x000000, 0.25);
+    // Ring in der Spielerfarbe des Abends (Kart selbst in Teamfarbe)
+    const shadow = this.add.ellipse(1, 3, 15, 8, 0x000000, 0.25).setStrokeStyle(1, pcol(id).num);
     const body = this.add.image(0, 0, ensureTex(this, `afb_kart_${car.t}`, () => kartSprite(color)));
     const head = this.add.image(0, -3, ensurePortrait(this, pl.look)).setScale(0.62).setOrigin(0.5, 0.6);
     const lift = this.add.container(0, 0, [body, head]);
@@ -143,7 +157,9 @@ export class AutoballScene extends Phaser.Scene {
     for (const [id, car] of Object.entries(st.cars)) {
       const v = this.carView(id, st);
       if (!v) continue;
-      const k = st.sub === 'countdown' ? 1 : 0.45;
+      // Tor-Wiederholung: Figuren laufen in Zeitlupe nach
+      const slow = now < this.replayUntil ? 0.3 : 1;
+      const k = st.sub === 'countdown' ? 1 : 0.45 * slow;
       v.x += (car.x - v.x) * k;
       v.y += (car.y - v.y) * k;
       v.a += wrapAngle(car.a - v.a) * k;
@@ -175,7 +191,7 @@ export class AutoballScene extends Phaser.Scene {
     const el = Math.min(0.08, (performance.now() - this.ballSnap.at) / 1000);
     const tx = this.ballSnap.x + this.ballSnap.vx * el;
     const ty = this.ballSnap.y + this.ballSnap.vy * el;
-    const k = st.sub === 'countdown' ? 1 : 0.5;
+    const k = st.sub === 'countdown' ? 1 : now < this.replayUntil ? 0.12 : 0.5;
     const ox = b.x;
     const oy = b.y;
     b.x += (tx - b.x) * k;
@@ -229,8 +245,15 @@ export class AutoballScene extends Phaser.Scene {
       return;
     }
     this.hideBanner();
-    if (st.overtime && secs > 3) this.showSmall('GOLDEN GOAL', 'Nächstes Tor gewinnt!', GOLD, 16);
-    else this.showSmall(String(Math.max(1, secs)), st.overtime ? 'Golden Goal!' : 'Gleich ist Anstoß');
+    // Anstoß: Zahl frei über dem Mittelkreis, Text in der Anzeigetafel – keine Tafel über dem Feld
+    const n = Math.max(1, secs);
+    if (st.overtime && secs > 3) {
+      this.kick.setText('GOLDEN GOAL').setFontSize(16);
+      this.clock.setText('Nächstes Tor gewinnt!');
+    } else {
+      this.kick.setText(String(n)).setFontSize(24);
+      this.clock.setText(st.overtime ? `GOLDEN GOAL · ${n}` : `ANSTOSS IN ${n}`);
+    }
   }
 
   private buildIntro() {
@@ -290,11 +313,23 @@ export class AutoballScene extends Phaser.Scene {
         if (v) Object.assign(v, { x: car.x, y: car.y, a: car.a });
       }
     }
-    // Ballkontakt: kleiner Staub-Ring am Ball
+    // Ballkontakt: kleiner Staub-Ring am Ball + Plopp; Boost und Hüpfer mit Ton
     for (const [id, car] of Object.entries(st.cars)) {
       const v = this.cars.get(id);
+      const fx = this.carFx.get(id) ?? { bo: false, hop: false };
+      if (v && st.sub === 'play') {
+        if (car.bo && !fx.bo) sfx('powerup', { x: car.x, vol: 0.45, pitch: 1.4 });
+        if (car.hop > 0 && !fx.hop) sfx('jump', { x: car.x, vol: 0.6 });
+      }
+      this.carFx.set(id, { bo: !!car.bo, hop: car.hop > 0 });
       if (v && car.k !== v.touches) {
         v.touches = car.k;
+        if (st.sub === 'play') {
+          const sp = Math.hypot(st.ball.vx, st.ball.vy);
+          sfx(sp > 200 ? 'hitHard' : 'bonk', { x: st.ball.x, vol: 0.6, pitch: 0.9 + Math.min(0.5, sp / 600) });
+          this.juice.burst(st.ball.x, st.ball.y + 4, 'sand', sp > 200 ? 10 : 5);
+          if (sp > 260) this.juice.shake(1);
+        }
         const ring = this.add.circle(st.ball.x, st.ball.y, AFB.BALL_R + 2).setStrokeStyle(1, 0xfdf7ea, 0.9).setDepth(1400);
         this.tweens.add({ targets: ring, scale: 1.8, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
       }
@@ -316,11 +351,25 @@ export class AutoballScene extends Phaser.Scene {
       this.lastGoal = g.seq;
       const name = g.scorer ? (playerById(g.scorer)?.name ?? '?') : '';
       const sub = g.own ? `Eigentor von ${name} – Punkt für ${TEAM_INFO[g.team].name}` : name ? `${name} trifft für ${TEAM_INFO[g.team].name}!` : `Punkt für ${TEAM_INFO[g.team].name}!`;
-      this.showBanner(g.own ? 'EIGENTOR!' : 'TOR!', sub, g.own ? '#ff8a7a' : GOLD);
       const gx = g.team === 'A' ? AFB.X1 + 6 : AFB.X0 - 6;
       this.confetti(gx, AFB_CY, g.team);
-      this.time.delayedCall(250, () => this.confetti(WORLD.W / 2, 110, g.team));
-      this.cameras.main.shake(260, 0.006);
+      sfx('goal', { x: gx });
+      sfx(g.own ? 'lose' : 'cheer', { x: gx, delay: 0.25 });
+      this.juice.flash(0xffffff, 140);
+      this.juice.shake(2);
+      // Tor-Wiederholung light: 1 s Zeitlupe + Zoom aufs Tor, danach das große Banner
+      this.replayUntil = this.time.now + 1000;
+      this.juice.slowMo(0.3, 1000);
+      const cam = this.cameras.main;
+      cam.pan(Phaser.Math.Linear(WORLD.W / 2, gx, 0.6), AFB_CY, 250, 'Quad.easeOut');
+      cam.zoomTo(1.35, 250, 'Quad.easeOut');
+      window.setTimeout(() => {
+        if (!this.sys.isActive()) return;
+        cam.pan(WORLD.W / 2, WORLD.H / 2, 300, 'Quad.easeInOut');
+        cam.zoomTo(1, 300, 'Quad.easeInOut');
+        this.showBanner(g.own ? 'EIGENTOR!' : 'TOR!', sub, g.own ? '#ff8a7a' : GOLD);
+        this.confetti(WORLD.W / 2, 110, g.team);
+      }, 1000);
     }
 
     if (st.sub === 'countdown') {
@@ -328,15 +377,20 @@ export class AutoballScene extends Phaser.Scene {
       this.countdownBanner(st);
     } else {
       this.intro.setVisible(false);
+      if (this.lastSub === 'countdown') this.kick.setText('');
       if (st.sub === 'play' && this.lastSub === 'countdown') {
         this.hideBanner();
-        this.showSmall('LOS!', '', '#b9e39a');
+        this.kick.setText('LOS!').setFontSize(24).setColor('#b9e39a');
+        this.time.delayedCall(700, () => this.kick.setText('').setColor(GOLD));
         this.bannerUntil = this.time.now + 700;
       } else if (st.sub === 'play' && this.lastSub !== 'play' && !this.bannerUntil) this.hideBanner();
       if (st.sub === 'over' && this.lastSub !== 'over') {
         if (st.winner) {
           this.showBanner('ABPFIFF!', `${TEAM_INFO[st.winner].name} gewinnt ${st.score[st.winner]}:${st.score[st.winner === 'A' ? 'B' : 'A']}!`);
           this.confetti(WORLD.W / 2, 120, st.winner);
+          sfx('whistle');
+          sfx('fanfare', { delay: 0.4 });
+
         } else this.showBanner('ABPFIFF!', `Unentschieden ${st.score.A}:${st.score.B}`);
       }
     }

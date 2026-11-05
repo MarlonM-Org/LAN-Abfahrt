@@ -9,6 +9,8 @@ import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
 import { ensureAvatar } from './textures';
 import { GOLD, LIGHT, RED_INK, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const short = (name: string) => name.replace(/^Bot\s+/, '').slice(0, 8);
@@ -82,6 +84,7 @@ export class WpistoleScene extends Phaser.Scene {
   private drawSeq = 0;
   private drawLocal = 0;
   private lastShot = 0;
+  private juice!: Juice;
 
   constructor() {
     super('wpistole');
@@ -99,6 +102,7 @@ export class WpistoleScene extends Phaser.Scene {
     this.drawSeq = 0;
     this.drawLocal = 0;
     this.lastShot = 0;
+    this.juice = new Juice(this, { depth: 1400 });
 
     this.fx = this.add.graphics().setDepth(500);
     this.header = this.add.container(0, 0).setDepth(900);
@@ -253,6 +257,7 @@ export class WpistoleScene extends Phaser.Scene {
     const ty = sv.target.y + y * s;
     const fx = sv.gun.x + (sv.left ? 6 : -6) * s;
     const fy = sv.gun.y - 2 * s;
+    sfx('shoot', { x: fx, pitch: 1.2, vol: 0.6 });
     // Wasserstrahl: Tropfenkette im Bogen
     const n = 12;
     for (let i = 0; i < n; i++) {
@@ -274,7 +279,12 @@ export class WpistoleScene extends Phaser.Scene {
         const dr = this.add.rectangle(tx, ty, 2, 2, i % 3 === 0 ? color : 0xeaf8ff).setDepth(711);
         this.tweens.add({ targets: dr, x: tx + Math.cos(a) * 12 * s, y: ty + Math.sin(a) * 8 * s + 6, alpha: 0, duration: 420, onComplete: () => dr.destroy() });
       }
+      sfx('splash', { x: tx, vol: hit ? 0.9 : 0.4, pitch: hit ? 1 : 1.4 });
       if (hit) {
+        this.juice.burst(tx, ty, 'splash', 10);
+        this.juice.hitStop(60);
+        this.juice.shake(1);
+        sfx('cheer', { x: tx, vol: 0.4, delay: 0.1 });
         const t = txt(this, tx, ty - 14 * s, 'PLATSCH!', { color: '#9fe0ff' }).setDepth(720);
         this.tweens.add({ targets: t, y: t.y - 12, alpha: 0, delay: 300, duration: 800, onComplete: () => t.destroy() });
       }
@@ -284,6 +294,8 @@ export class WpistoleScene extends Phaser.Scene {
   private bucketDump(sv: SideView) {
     const s = Math.max(1, this.layout.s);
     const b = this.add.image(sv.fig.x, sv.box.y - 20, ensureTex(this, 'wp_bucket', () => bucket(C.blue))).setScale(s).setDepth(800);
+    sfx('whoosh', { x: sv.fig.x, pitch: 0.6 });
+    sfx('splash', { x: sv.fig.x, pitch: 0.6, delay: 0.3 });
     this.tweens.add({
       targets: b,
       y: sv.fig.y - 18 * this.layout.s,
@@ -307,8 +319,12 @@ export class WpistoleScene extends Phaser.Scene {
     if (real) {
       this.tweens.add({ targets: this.callBox, scale: 1, duration: 140, ease: 'Back.easeOut' });
       this.tweens.add({ targets: this.callBox, alpha: 0, delay: 900, duration: 300, onComplete: () => this.callBox.setVisible(false) });
-      this.cameras.main.shake(120, 0.004);
+      this.juice.shake(1);
+      sfx('go');
     } else {
+      // Finte: nur ein leises Räuspern
+      sfx('tick', { pitch: 0.7 });
+
       this.tweens.add({ targets: this.callBox, alpha: 0, delay: WP.FAKE_MS - 150, duration: 150, onComplete: () => this.callBox.setVisible(false) });
     }
   }

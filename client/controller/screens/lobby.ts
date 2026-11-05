@@ -2,7 +2,7 @@ import type { Look, MiniKind } from '../../../shared/types';
 import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
 import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, fitsPlayers, miniInspired } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
-import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
+import { LS, app, avatarCanvas, el, escapeHtml, myColor, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
 import { sessionPanel } from './leaderboard';
 
@@ -166,6 +166,15 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     singles(DRINK_KINDS);
   } else if (vip) {
     menu.append(el(`<h2>Party-Modus</h2><p>Spielbrett + Minispiele, Finale: Mord oder Verräter im Ferienhaus</p>`));
+    // Gespeicherter Brettstand (data/party.json, z. B. nach einem Server-Neustart) → fortsetzen
+    const saved = store.state?.partyResume;
+    if (saved) {
+      const names = saved.names.slice(0, 4).join(', ') + (saved.names.length > 4 ? ' …' : '');
+      const b = el(`<button class="drink-btn">Party fortsetzen? Runde ${saved.round}/${saved.maxRounds}</button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:start', { mode: 'party', resume: true }));
+      menu.append(b, el(`<p>Mit ${escapeHtml(names)}</p>`));
+      gated.push({ btn: b, min: 2 });
+    }
     const roundRow = el(`<div class="btn-row"></div>`);
     for (const r of PARTY_ROUND_OPTIONS) {
       const b = el(`<button>${r} Runden</button>`).firstElementChild as HTMLButtonElement;
@@ -269,7 +278,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     const st = store.state;
     const n = st?.players.filter((p) => p.connected && !p.removed).length ?? 0;
     const off = st?.players.filter((p) => !p.connected && !p.removed).length ?? 0;
-    q(root, '.hello').textContent = `Hi ${store.name}!`;
+    q(root, '.hello').innerHTML = `Hi ${escapeHtml(store.name)}!` + ((c) => (c ? ` Du bist <span class="me-color" style="background:${c.hex};color:${c.ink}">${c.name.toUpperCase()}</span>` : ''))(myColor());
     q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}${off ? ` · ${off} offline` : ''}`;
     plist.update();
     q(root, '.q-count').textContent =

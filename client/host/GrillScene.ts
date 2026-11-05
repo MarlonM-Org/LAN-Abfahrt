@@ -17,8 +17,10 @@ import {
 import { C } from '../art/palette';
 import { flameIcon, grillIngPix, grillItemKey, grillItemPix, knifeIcon, paintGrillGarden, smokePuff, starPix } from '../art/grill';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
-import { BLUE_INK, INK, background, ensureTex, ink, panel, txt } from './ui';
+import { figure, playAvatar } from './textures';
+import { BLUE_INK, INK, NameTags, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const SUN_INK = '#b06d00';
@@ -67,6 +69,9 @@ export class GrillScene extends Phaser.Scene {
   private hudKey = '';
   private built = false;
   private overShown = false;
+  private juice!: Juice;
+  private tags!: NameTags;
+  private names = new Map<string, string>();
 
   constructor() {
     super('grill');
@@ -85,6 +90,9 @@ export class GrillScene extends Phaser.Scene {
     this.hudKey = '';
     this.built = false;
     this.overShown = false;
+    this.names.clear();
+    this.juice = new Juice(this, { depth: 1045 });
+    this.tags = new NameTags(this, 1030);
 
     this.bars = this.add.graphics().setDepth(960);
     this.hi = this.add.graphics().setDepth(940);
@@ -179,9 +187,9 @@ export class GrillScene extends Phaser.Scene {
       if (!pl) continue;
       const f = figure(this, pl.look, p.x, p.y);
       const img = f.getData('img') as Phaser.GameObjects.Image;
-      const tag = txt(this, 0, -38, pl.name.replace(/^Bot\s+/, '').slice(0, 6), { color: hex(p.c) });
+      this.names.set(id, pl.name);
       const held = this.add.image(0, -9, '__DEFAULT').setVisible(false);
-      f.add([tag, held]);
+      f.add(held);
       this.figs.set(id, { f, img, held, heldKey: '', x: p.x, y: p.y, no: p.no });
     }
 
@@ -200,6 +208,11 @@ export class GrillScene extends Phaser.Scene {
           if (cur.key !== key) {
             cur.img.setTexture(tex);
             cur.key = key;
+            // Fertig gegrillt (Stufe gewechselt, noch nicht angebrannt): Pling + Funken
+            if (st.sub === 'play' && grillGrid(k.layout, k.mirror)[sl.r][sl.c] === 'G' && sl.i.g < 0.1 && sl.i.u < 0.15 && !sl.f) {
+              sfx('pop', { x: c.x, pitch: 1.3 });
+              this.juice.burst(c.x, c.y - 6, 'spark', 6);
+            }
           }
         } else {
           const img = this.add.image(c.x, c.y + 5, tex).setOrigin(0.5, 1).setDepth(c.y + 9);
@@ -293,23 +306,37 @@ export class GrillScene extends Phaser.Scene {
       const x = Math.max(kit.x0 + 52, Math.min(e.x, midX + 40));
       const tip = e.tip ?? 0;
       this.float(x, e.y - 30 - lift, `+${(e.pts ?? 0) - tip}`, C.gold, 1, 1500);
-      if (tip) this.float(x, e.y - 20 - lift, `+${tip} Trinkgeld`, '#c8f0c0', 1, 1500);
+      sfx('coin', { x: e.x });
+      this.juice.burst(e.x, e.y - 10, 'confetti', 14);
+      if (tip) {
+        this.float(x, e.y - 20 - lift, `+${tip} Trinkgeld`, '#c8f0c0', 1, 1500);
+        sfx('coin', { x: e.x, pitch: 1.5, delay: 0.12 });
+        sfx('cheer', { x: e.x, vol: 0.5, delay: 0.1 });
+      }
     } else if (e.kind === 'expire') {
       const reg = this.ticketRegion(st, e.k);
       this.float(reg.x + reg.w / 2, TICKET_Y + 18, `Verpasst! -${-(e.pts ?? 0)}`, '#ff8a7a', 1, 1800);
+      sfx('lose', { x: reg.x + reg.w / 2, vol: 0.7 });
+      this.juice.shake(1);
     } else if (e.kind === 'fire') {
       this.float(e.x, e.y - 24, 'FEUER!', '#ff6b4a', 1, 1600);
-      this.cameras.main.shake(180, 0.004);
+      this.juice.shake(2);
+      this.juice.burst(e.x, e.y - 6, 'fire', 18);
+      this.juice.flash(0xff6b4a, 120);
+      sfx('boom', { x: e.x, vol: 0.7 });
     } else if (e.kind === 'out') {
       this.float(e.x, e.y - 22, 'Gelöscht!', '#9fe0ff', 1, 1200);
       for (let i = 0; i < 10; i++) this.puff(e.x - 8 + Math.random() * 16, e.y - 4, 0xffffff, 700);
+      sfx('splash', { x: e.x, vol: 0.6 });
     } else if (e.kind === 'trash') {
       for (let i = 0; i < 4; i++) this.puff(e.x - 4 + Math.random() * 8, e.y - 6, 0xcfcbc1, 450);
+      sfx('bonk', { x: e.x, vol: 0.5 });
     }
   }
 
   private showOver(st: GrillState) {
     this.overShown = true;
+    sfx(st.teams || st.stars >= 2 ? 'fanfare' : 'win');
     const L = this.overLayer;
     L.add(panel(this, 110, 92, 260, 92));
     if (!st.teams) {
@@ -320,6 +347,7 @@ export class GrillScene extends Phaser.Scene {
         const img = this.add.image(WORLD.W / 2 - 34 + i * 34, 136, ensureTex(this, `g_star_${on}`, () => starPix(on))).setScale(0);
         L.add(img);
         this.tweens.add({ targets: img, scale: 2, delay: 300 + i * 450, duration: 300, ease: 'Back.easeOut' });
+        if (on) sfx('coin', { pitch: 1 + i * 0.25, delay: 0.3 + i * 0.45 });
       }
       L.add(ink(this, WORLD.W / 2, 160, `${k.score} Punkte · ${k.served} Gerichte`, { color: '#7a5a3a' }));
     } else {
@@ -351,14 +379,17 @@ export class GrillScene extends Phaser.Scene {
 
     // Figuren
     this.hi.clear();
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string }[] = [];
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
       a.x += (p.x - a.x) * 0.4;
       a.y += (p.y - a.y) * 0.4;
       if (Math.abs(p.fx) > 0.2) a.img.setFlipX(p.fx < 0);
-      a.img.setY(p.m ? -Math.abs(Math.sin(now / 80)) * 2 : p.w ? -Math.abs(Math.sin(now / 45)) * 1.5 : 0);
+      a.img.setY(!p.m && p.w ? -Math.abs(Math.sin(now / 45)) * 1.5 : 0);
+      playAvatar(a.img, p.m ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 4).setDepth(a.y + 4);
+      tagSpecs.push({ id, x: a.x, y: a.y - 34, name: this.names.get(id) ?? '?', color: hex(p.c) });
       // Getragenes
       if (p.h) {
         const key = grillItemKey(p.h);
@@ -390,12 +421,15 @@ export class GrillScene extends Phaser.Scene {
           const c = tileCenter(st.kitchens[p.k], p.tc, p.tr);
           if (p.h?.x) this.puff(c.x - 6 + Math.random() * 12, c.y - 2, 0xffffff, 500);
           else {
+            sfx('tick', { x: c.x, vol: 0.3, pitch: 1.8 });
             const chip = this.add.rectangle(c.x - 3 + Math.random() * 6, c.y - 2, 2, 2, 0x86cc55).setDepth(c.y + 12);
             this.tweens.add({ targets: chip, y: chip.y - 6, x: chip.x + (Math.random() - 0.5) * 10, alpha: 0, duration: 300, onComplete: () => chip.destroy() });
           }
         }
       }
     }
+
+    this.tags.update(tagSpecs);
 
     // Fortschritt, Rauch, Feuer
     const g = this.bars;

@@ -21,6 +21,7 @@ import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint a
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
+import { spectatorBot } from './spectatorbot';
 import { umzugBot } from './umzugbot';
 import { golfBot } from './golfbot';
 import { spionBot } from './spionbot';
@@ -61,6 +62,10 @@ export interface BotOptions {
   count?: number;
   /** Einzelspiel: so oft drückt der VIP-Bot im Ergebnis „Nochmal“ (Leaderboard des Abends testen) */
   nochmal?: number;
+  /** Party: Rundenzahl (3, 5, 8) */
+  rounds?: number;
+  /** Party: gespeicherten Brettstand fortsetzen (data/party.json) statt neu zu starten */
+  resume?: boolean;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
@@ -73,6 +78,8 @@ export class Bot {
   socket: Socket;
   id = '';
   state: GameState | null = null;
+  /** Brett: schon entschiedene Würfelfenster / geloggte Bonus-Karten */
+  private boardSeen = new Set<string>();
   priv: PrivateState = null;
   busy = new Set<string>();
   phasesSeen = new Set<string>();
@@ -667,6 +674,7 @@ export class Bot {
 
   react(s: GameState) {
     if (!this.id) return;
+    if (s.phase === 'lobby') this.boardSeen.clear();
     const me = s.players.find((p) => p.id === this.id);
     const tag = s.phase === 'mini' ? `mini:${s.mini?.kind}` : s.phase;
     if (s.phase !== this.lastPhase) {
@@ -681,7 +689,7 @@ export class Bot {
     if (s.phase === 'lobby' && this.leader && me?.isVip && s.players.filter((p) => p.connected).length >= (this.opts.count ?? 1)) {
       this.once('start', async () => {
         await sleep(1500);
-        this.socket.emit('vip:start', this.opts.date ? { mode: 'date' } : this.opts.game ? { mode: this.opts.game } : { mode: 'party', rounds: 3 });
+        this.socket.emit('vip:start', this.opts.date ? { mode: 'date' } : this.opts.game ? { mode: this.opts.game } : { mode: 'party', rounds: this.opts.rounds ?? 3, resume: this.opts.resume && !!this.state?.partyResume });
       });
     }
     if (s.phase === 'results' && this.leader && me?.isVip) {
@@ -726,11 +734,21 @@ export class Bot {
         this.socket.emit('story:next');
       });
     }
-    if (s.phase === 'board' && s.board?.sub === 'roll' && s.board.order[s.board.turnIdx] === this.id) {
-      this.once(`roll-${s.board.round}-${s.board.turnIdx}`, async () => {
-        await sleep(rand(600, 1500));
-        this.socket.emit('board:roll');
-      });
+    // Würfelfenster: alle gleichzeitig – meist nach 1–5 s, ab und zu verpennt ein Bot (dann würfelt der Server am Ende)
+    if (s.phase === 'board' && s.board?.sub === 'roll' && s.board.order.includes(this.id) && !(this.id in s.board.rolls)) {
+      const key = `roll-${s.board.round}`;
+      if (!this.boardSeen.has(key)) {
+        this.boardSeen.add(key);
+        if (Math.random() > 0.1) setTimeout(() => this.socket.emit('board:roll'), rand(1000, 5000));
+      }
+    }
+    if (s.phase === 'board' && s.board?.sub === 'bonus' && this.leader && s.board.bonus?.revealed) {
+      const b = s.board.bonus;
+      const a = b.awards[b.shown - 1];
+      if (!this.boardSeen.has(`bonus-${b.shown}`)) {
+        this.boardSeen.add(`bonus-${b.shown}`);
+        this.opts.log?.(`Bonus ${a.title}: ${a.winners.map((id) => s.players.find((p) => p.id === id)?.name).join(', ')} (${a.value} ${a.unit})`);
+      }
     }
     // Bot als VIP (nur, wenn kein Mensch da ist): Info-Screens (Auflösung, Intro, Zwischenstand) nach ~2 s weiterschalten –
     // so wie ein Mensch „Weiter“ im VIP-Menü drücken würde. Züge/Abstimmungen überspringt er nicht (die Bots spielen sie).
@@ -744,9 +762,21 @@ export class Bot {
       });
     }
 
+    // Regelkarte vor dem Spiel: Bots sind sofort bereit
+    if (s.phase === 'intro' && s.intro && !s.intro.ready.includes(this.id)) {
+      const it = s.intro;
+      this.once(`intro-${it.kind}-${it.endsAt}`, async () => {
+        if (this.leader) this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (kurz, 5 s)' : ' (15 s)'}`);
+        await sleep(rand(150, 500));
+        this.socket.emit('intro:ready');
+      });
+    }
+
     if (s.phase !== 'mini' || !s.mini) return;
 
     const m = s.mini;
+    // Zuschauer: Emotes, Wetten, Geister-Aktionen (Arena/Sumo)
+    spectatorBot(this, s);
     if (m.kind === 'flunky') {
       const f = m.state;
       if (f.sub === 'aim' && f.throwerId === this.id) {
@@ -1178,7 +1208,7 @@ export class Bot {
       this.once('fangen', async () => {
         await sleep(100);
         if (st.round !== this.fg.round) this.fg = { round: st.round, seen: new Set(), goal: null, until: 0 };
-        if (st.runner === this.id) fangenRunner(this, st);
+        if ((st.runners ?? [st.runner]).includes(this.id)) fangenRunner(this, st);
         else if (st.hunters[this.id] && st.sub === 'chase') fangenHunter(this, st, this.fg);
       });
     }
@@ -1437,8 +1467,11 @@ export class Bot {
     if (!me || me.down || me.empty) return me?.down || me?.empty ? { x: 0, y: 0 } : null;
     const ids = Object.keys(g.hunters).sort();
     const now = Date.now();
+    // Nächster sichtbarer Geist (ab 7 Spielern gibt es zwei; gebannte zählen nicht)
+    const seen = (g.ghosts ?? []).filter((o) => (g.ghostHp?.[o.id] ?? 1) > 0).sort((p, q) => Math.hypot(p.x - me.x, p.y - me.y) - Math.hypot(q.x - me.x, q.y - me.y))[0];
+    const ghost = seen ? { x: seen.x, y: seen.y, why: seen.why } : g.ghost;
     // Licht schalten
-    const ghostNear = g.ghost && g.ghost.why !== 'flash' ? Math.hypot(g.ghost.x - me.x, g.ghost.y - me.y) < GEIST.LIGHT_LEN + 30 : false;
+    const ghostNear = ghost && ghost.why !== 'flash' ? Math.hypot(ghost.x - me.x, ghost.y - me.y) < GEIST.LIGHT_LEN + 30 : false;
     const wantLight = (ghostNear || fear > 0.3) && me.battery > 0.12;
     if (wantLight !== me.light && (wantLight || fear < 0.15 || me.battery < 0.12)) {
       this.once('geist-light', async () => {
@@ -1459,7 +1492,7 @@ export class Bot {
       return this.geistSteer(me, help);
     }
     // Sichtbarer Geist → hinterher
-    if (g.ghost && g.ghost.why !== 'touch') return this.geistSteer(me, g.ghost);
+    if (ghost && ghost.why !== 'touch') return this.geistSteer(me, ghost);
     // Gänsehaut → umsehen (Leuchtturm)
     if (fear > 0.45) {
       const a = now / 380 + ids.indexOf(this.id);
@@ -2063,7 +2096,7 @@ const randomTileNear = (col: number, row: number, radius: number) => {
 /** Flüchtling: kennt alle Positionen (privat) und flieht per Breitensuche von den Fängern weg */
 function fangenRunner(bot: Bot, st: FangenState) {
   const p = bot.priv?.kind === 'fangen' ? bot.priv.state : null;
-  if (!p) return;
+  if (!p || p.caught) return;
   const me = tileOf(p.x, p.y);
   const hunters = Object.values(st.hunters).map((h) => tileOf(h.x, h.y));
   const dh = hunters.length ? bfsFrom(hunters) : null;
