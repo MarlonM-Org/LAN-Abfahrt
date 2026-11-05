@@ -135,7 +135,7 @@ export class UmzugGame implements MiniGame {
   private stars = 0;
   private winner: Team | null = null;
   /** Tick-Zeit messen: UMZUG_PROF=1 npm run dev */
-  private prof = process.env.UMZUG_PROF ? { n: 0, sum: 0, max: 0 } : null;
+  private prof = process.env.UMZUG_PROF ? { n: 0, sum: 0, max: 0, slow: 0 } : null;
 
   constructor(
     private ids: string[],
@@ -340,7 +340,8 @@ export class UmzugGame implements MiniGame {
         this.prof.n++;
         this.prof.sum += ms;
         this.prof.max = Math.max(this.prof.max, ms);
-        if (this.prof.n % 100 === 0) console.log(`[umzug] tick ø ${(this.prof.sum / this.prof.n).toFixed(2)} ms, max ${this.prof.max.toFixed(2)} ms, ${this.items.filter((i) => !i.gone).length} Teile`);
+        if (ms > 10) this.prof.slow++;
+        if (this.prof.n % 100 === 0) console.log(`[umzug] tick ø ${(this.prof.sum / this.prof.n).toFixed(2)} ms, max ${this.prof.max.toFixed(2)} ms, ${this.prof.slow}× >10 ms, ${this.players.size} Spieler, ${this.items.filter((i) => !i.gone).length} Teile`);
       }
     });
     this.ctx.onChange();
