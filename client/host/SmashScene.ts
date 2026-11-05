@@ -455,7 +455,7 @@ export class SmashScene extends Phaser.Scene {
     const S = SMASH.SCALE;
     const img = g.img;
     img.setFlipX(f.face < 0).setOrigin(0.5, 1).setPosition(0, 0).setScale(S).setAngle(0).clearTint();
-    g.root.setAlpha(f.inv ? (Math.floor(time / 80) % 2 ? 0.45 : 0.9) : 1);
+    g.root.setAlpha(f.away ? 0.4 : f.inv ? (Math.floor(time / 80) % 2 ? 0.45 : 0.9) : 1); // away = Verbindung weg
     g.shield.setVisible(f.anim === 'shield');
     g.prop.setVisible(false);
     g.swoosh.clear();

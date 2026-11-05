@@ -281,7 +281,7 @@ export class KartScene extends Phaser.Scene {
       const driftTilt = car.drift ? car.drift * 0.35 : 0;
       v.body.setRotation(v.a + v.spinA + driftTilt);
       v.head.setY(-3 + (car.offroad && !car.finished ? Math.sin(now / 40) * 0.8 : 0));
-      v.root.setPosition(Math.round(v.x), Math.round(v.y)).setDepth(10 + v.y).setAlpha(car.finished ? 0.65 : 1);
+      v.root.setPosition(Math.round(v.x), Math.round(v.y)).setDepth(10 + v.y).setAlpha(car.ghost ? 0.4 : car.finished ? 0.65 : 1); // ghost = Verbindung weg
       if (now - v.lastPuff > 70 && st.sub === 'race') {
         v.lastPuff = now;
         const bx = v.x - Math.cos(v.a) * 8;

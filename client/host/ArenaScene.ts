@@ -115,7 +115,7 @@ export class ArenaScene extends Phaser.Scene {
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       if (p.dir === 'l' || p.dir === 'r') img.setFlipX(p.dir === 'l');
       img.setY(p.moving ? -Math.abs(Math.sin(now / 70)) * 2 : 0);
-      a.f.setPosition(px(a.x), py(a.y) + 7).setDepth(py(a.y) + 7);
+      a.f.setPosition(px(a.x), py(a.y) + 7).setDepth(py(a.y) + 7).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
       a.ring.setPosition(px(a.x), py(a.y) + 6);
     }
     for (const b of st.bombs) {

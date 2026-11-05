@@ -267,7 +267,7 @@ export class ParcoursScene extends Phaser.Scene {
         if (r.st === 'dead') this.tweens.add({ targets: v.root, alpha: 0, angle: 180, duration: 500 });
         if (r.st === 'goal') this.tweens.add({ targets: v.img, scale: 0.6, yoyo: true, duration: 180, repeat: 2 });
       }
-      if (r.st === 'run') v.root.setAlpha(1).setAngle(0);
+      if (r.st === 'run') v.root.setAlpha(r.away ? 0.4 : 1).setAngle(0); // away = Verbindung weg (eingefroren)
     }
   }
 
