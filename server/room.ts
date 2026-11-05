@@ -77,6 +77,7 @@ import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
+import { SchaetzGame } from './schaetz';
 import { MaexGame } from './maexchen';
 import { WerwarsGame } from './werwars';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
@@ -877,6 +878,9 @@ export class Room {
         break;
       case 'umzug':
         this.mini = new UmzugGame(ids, ctx);
+        break;
+      case 'schaetz':
+        this.mini = new SchaetzGame(ids, ctx);
         break;
       case 'maexchen':
         this.mini = new MaexGame(ids, ctx);
