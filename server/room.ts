@@ -111,6 +111,8 @@ export class Room {
   private bots: Bot[] = [];
   private leaderboard = new Leaderboard();
   private arcadeActive = false;
+  /** Arcade „Alle dürfen wählen“: Spieler-ID → Wunschspiel (null = Abstimmung aus, nur der VIP wählt) */
+  private arcadeVotes: Map<string, MiniKind> | null = null;
   private lastKind: MiniKind | null = null;
   /** Wer im laufenden Minispiel mitspielt */
   private miniIds: string[] | null = null;
@@ -145,6 +147,13 @@ export class Room {
       socket.join('hosts');
       socket.emit('host:info', { local });
       socket.emit('state', this.snapshot());
+    });
+
+    // Laptop: Spiel aus der Arcade-Auswahl (Taste A) starten – gleiche Rechte wie die übrige Laptop-Steuerung
+    socket.on('host:start', (kind: unknown, ack?: (r: { ok: boolean; msg?: string }) => void) => {
+      const reply = (r: { ok: boolean; msg?: string }) => typeof ack === 'function' && ack(r);
+      if (!local) return reply({ ok: false, msg: 'Nur direkt am Laptop erlaubt.' });
+      reply(this.hostStart(String(kind ?? '')));
     });
 
     socket.on('host:cmd', (cmd: string, ack?: (r: { ok: boolean; msg?: string }) => void) => {
@@ -215,15 +224,32 @@ export class Room {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
         this.startParty(ids, rounds);
+      } else if (req.mode === 'top' || req.mode === 'favorites') {
+        const kind = this.votedKind(req.mode);
+        if (!kind) return socket.emit('toast', 'Noch keine (passenden) Stimmen.');
+        const err = this.startSingle(kind);
+        if (err) socket.emit('toast', err);
       } else if (MINI_KINDS.includes(req.mode as MiniKind)) {
-        const kind = req.mode as MiniKind;
-        const min = MINI_INFO[kind].minPlayers;
-        if (ids.length < min) return socket.emit('toast', `${MINI_INFO[kind].title}: mindestens ${min} Spieler.`);
-        const max = MINI_INFO[kind].maxPlayers;
-        if (max !== undefined && ids.length > max) return socket.emit('toast', `${MINI_INFO[kind].title}: höchstens ${max} Spieler.`);
-        this.arcadeActive = this.mode === 'arcade';
-        this.startMini(kind);
+        const err = this.startSingle(req.mode as MiniKind);
+        if (err) socket.emit('toast', err);
       }
+    });
+
+    // Arcade: VIP schaltet „Alle dürfen wählen“ an/aus
+    socket.on('vip:arcadeVote', (on: unknown) => {
+      if (!isVip() || this.phase !== 'lobby') return;
+      this.arcadeVotes = on ? (this.arcadeVotes ?? new Map()) : null;
+      this.changed();
+    });
+
+    // Arcade: Spieler stimmt für ein Spiel (nochmal dasselbe / null = Stimme zurückziehen)
+    socket.on('arcade:vote', (raw: unknown) => {
+      if (!playerId || this.phase !== 'lobby' || this.mode !== 'arcade' || !this.arcadeVotes) return;
+      const kind = typeof raw === 'string' && MINI_KINDS.includes(raw as MiniKind) ? (raw as MiniKind) : null;
+      if (!kind || this.arcadeVotes.get(playerId) === kind) this.arcadeVotes.delete(playerId);
+      else if (!fitsPlayers(kind, this.connectedIds().length)) return socket.emit('toast', this.fitError(kind) ?? 'Passt gerade nicht.');
+      else this.arcadeVotes.set(playerId, kind);
+      this.changed();
     });
 
     socket.on('vip:continue', (action?: string) => {
@@ -261,6 +287,7 @@ export class Room {
     socket.on('vip:mode', (mode: string) => {
       if (isVip() && this.phase === 'lobby' && (mode === 'party' || mode === 'date' || mode === 'drink' || mode === 'arcade')) {
         this.mode = mode;
+        this.arcadeVotes?.clear();
         this.changed();
       }
     });
@@ -371,8 +398,52 @@ export class Room {
     this.startMini(kind);
   }
 
+  /** Passt die Spielerzahl nicht? → Fehlermeldung, sonst null */
+  private fitError(kind: MiniKind): string | null {
+    const n = this.connectedIds().length;
+    const { title, minPlayers: min, maxPlayers: max } = MINI_INFO[kind];
+    if (n < min) return `${title}: mindestens ${min} Spieler.`;
+    if (max !== undefined && n > max) return `${title}: höchstens ${max} Spieler.`;
+    return null;
+  }
+
+  /** Einzelspiel aus der Lobby starten (VIP-Handy, Abstimmung, Laptop). Liefert eine Fehlermeldung oder null. */
+  private startSingle(kind: MiniKind): string | null {
+    if (this.phase !== 'lobby') return 'Gerade läuft schon ein Spiel.';
+    const err = this.fitError(kind);
+    if (err) return err;
+    this.arcadeActive = this.mode === 'arcade';
+    this.startMini(kind);
+    return null;
+  }
+
+  /**
+   * Arcade-Abstimmung auswerten (nur Spiele, die zur Spielerzahl passen):
+   * 'top' = meiste Stimmen (Gleichstand → Zufall), 'favorites' = Zufall unter allen Stimmen (mehr Stimmen = höhere Chance).
+   */
+  private votedKind(how: 'top' | 'favorites'): MiniKind | null {
+    const n = this.connectedIds().length;
+    const votes = [...this.currentVotes().values()].filter((k) => fitsPlayers(k, n));
+    if (!votes.length) return null;
+    if (how === 'favorites') return votes[Math.floor(Math.random() * votes.length)];
+    const counts = new Map<MiniKind, number>();
+    for (const k of votes) counts.set(k, (counts.get(k) ?? 0) + 1);
+    const best = Math.max(...counts.values());
+    const top = [...counts].filter(([, c]) => c === best).map(([k]) => k);
+    return top[Math.floor(Math.random() * top.length)];
+  }
+
+  /** Stimmen nur von Spielern, die gerade da sind */
+  private currentVotes(): Map<string, MiniKind> {
+    const out = new Map<string, MiniKind>();
+    for (const [id, k] of this.arcadeVotes ?? []) if (this.isOnline(id)) out.set(id, k);
+    return out;
+  }
+
   private startMini(kind: MiniKind) {
     this.mini?.dispose();
+    // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
+    this.arcadeVotes?.clear();
     this.lastKind = kind;
     const ids = this.gameIds();
     this.miniIds = ids;
@@ -688,6 +759,21 @@ export class Room {
     return { ok: false, msg: 'Unbekannter Befehl.' };
   }
 
+  /** Laptop-Arcade-Auswahl: Spiel, 'random' (Zufall) oder 'top' (meiste Stimmen) starten */
+  private hostStart(what: string): { ok: boolean; msg?: string } {
+    if (this.phase !== 'lobby') return { ok: false, msg: 'Erst das laufende Spiel abbrechen (Esc 2×).' };
+    if (!this.connectedIds().length) return { ok: false, msg: 'Noch keine Spieler da.' };
+    if (what === 'random') {
+      this.arcadeActive = this.mode === 'arcade';
+      this.startRandom();
+      return { ok: true, msg: 'Zufallsspiel!' };
+    }
+    const kind = what === 'top' ? this.votedKind('top') : MINI_KINDS.includes(what as MiniKind) ? (what as MiniKind) : null;
+    if (!kind) return { ok: false, msg: what === 'top' ? 'Noch keine (passenden) Stimmen.' : 'Unbekanntes Spiel.' };
+    const err = this.startSingle(kind);
+    return err ? { ok: false, msg: err } : { ok: true, msg: `${MINI_INFO[kind].title} startet!` };
+  }
+
   /**
    * Wartet der aktuelle Schritt auf einen Knopf des VIP? Liefert einen Schlüssel für genau diesen Schritt
    * und nach wie vielen ms der Server von selbst weiterschaltet (null = der Schritt hat schon einen eigenen Timer).
@@ -959,6 +1045,7 @@ export class Room {
       customPostCount: this.posts.all.length,
       inGame: this.phase === 'mini' ? this.miniIds : null,
       customQuipCount: this.quips.all.length,
+      arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
     };
   }
 

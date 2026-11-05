@@ -15,7 +15,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - **Server ist autoritativ.** Clients senden nur Eingaben; Spiellogik und Zufall leben in `server/`.
 - Gemeinsame Konstanten/Geometrie/Typen gehören nach `shared/` (wird von Server, TV und Handy importiert – keine Node- oder DOM-spezifischen Imports dort, außer Canvas-Zeichenfunktionen).
 - Zustand wird komplett als `GameState` gebroadcastet (gedrosselt auf ~25/s in `Room.changed()`).
-- Neues Minispiel = Klasse in `server/` die `MiniGame` implementiert (siehe `server/minigame.ts`), neuer `MiniKind` + Eintrag in `MINI_INFO` (`shared/games.ts`), Zweig in `Room.startMini()`, Phaser-Szene in `client/host/` (in `main.ts` registrieren), Screen-Modul in `client/controller/screens/` (in `controller/main.ts` einhängen) und Bot-Verhalten in `scripts/bots.ts`.
+- Neues Minispiel = Klasse in `server/` die `MiniGame` implementiert (siehe `server/minigame.ts`), neuer `MiniKind` + Eintrag in `MINI_INFO` (`shared/games.ts`, inkl. Pflichtfeld `icon` (Emoji) und optional `inspiredBy` – Vorbild nur als „à la …“-Untertitel, Spiel nie nach dem Original benennen) + in `ARCADE_GROUPS` einsortieren, Zweig in `Room.startMini()`, Phaser-Szene in `client/host/` (in `main.ts` registrieren), Screen-Modul in `client/controller/screens/` (in `controller/main.ts` einhängen) und Bot-Verhalten in `scripts/bots.ts`.
 - Minispiele melden ihr Ende über `ctx.finish({ groups, details, subtitle })` – Münzen/Ergebnis-Screen macht der Raum.
 - Geheime Infos nur über `privateFor()` → Event `private`, nie in `GameState`.
 - Handy-UI: Screens nur neu bauen, wenn sich der Screen-Key ändert (`pickScreen()`), sonst nur Werte updaten – sonst gehen Taps/Wischgesten verloren.

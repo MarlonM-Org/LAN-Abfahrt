@@ -1,5 +1,5 @@
 import type { BoardState } from '../../../shared/types';
-import { MINI_INFO } from '../../../shared/games';
+import { MINI_INFO, miniInspired } from '../../../shared/games';
 import { type Screen, app, el, escapeHtml, nameOf, q, socket, store, tapButton } from '../core';
 
 function stats(b: BoardState) {
@@ -13,7 +13,8 @@ export function pickBoard(b: BoardState): Screen {
   if (b.sub === 'intro' && b.nextMini) {
     const info = MINI_INFO[b.nextMini];
     return [`board-intro-${b.round}`, () => {
-      app.append(el(`<div class="center"><p>Gleich geht's los:</p><h1>${escapeHtml(info.title)}</h1><p>${escapeHtml(info.tagline)}</p></div>`));
+      const insp = miniInspired(b.nextMini!);
+      app.append(el(`<div class="center"><p>Gleich geht's los:</p><div class="intro-icon">${info.icon}</div><h1>${escapeHtml(info.title)}</h1>${insp ? `<p class="insp">${escapeHtml(insp)}</p>` : ''}<p>${escapeHtml(info.tagline)}</p></div>`));
       return null;
     }];
   }

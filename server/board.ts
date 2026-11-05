@@ -1,5 +1,5 @@
 import type { BoardState, MiniKind } from '../shared/types';
-import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, MINI_INFO, fitsPlayers } from '../shared/games';
+import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, fitsPlayers, miniLabel } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
 const STEP_MS = 280;
@@ -215,7 +215,7 @@ export class Board {
     this.lastMini = kind;
     s.sub = 'intro';
     s.nextMini = kind;
-    this.say(isFinale ? `FINALE: ${MINI_INFO[kind].title}!` : `Minispiel: ${MINI_INFO[kind].title}!`);
+    this.say(isFinale ? `FINALE: ${miniLabel(kind)}!` : `Minispiel: ${miniLabel(kind)}!`);
     this.ctx.onChange();
     this.timers.later(INTRO_MS, () => this.ctx.startMini(kind));
   }

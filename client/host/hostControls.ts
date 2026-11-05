@@ -2,6 +2,7 @@ import type { Socket } from 'socket.io-client';
 import { isMusicMenuOpen } from './musicMenu';
 import type { GameState } from '../../shared/types';
 import { bus, getState } from './store';
+import { installArcadePicker } from './arcadePicker';
 
 /**
  * Steuerung direkt am Laptop (Maus + Tastatur), falls kein Handy-VIP mehr da ist.
@@ -10,11 +11,12 @@ import { bus, getState } from './store';
  *
  *   Esc (2×)        Spiel abbrechen → Lobby
  *   Enter / Leertaste  Weiter (wie „Weiter“ des VIP)
+ *   A               Arcade-Auswahl: beliebiges Spiel per Maus/Tastatur starten
  */
 const HIDE_MS = 3500;
 const ARM_MS = 3000;
 
-type Cmd = 'abort' | 'continue' | 'removeBots';
+type Cmd = 'abort' | 'continue' | 'removeBots' | 'pick';
 
 /** Eigenes Stylesheet, damit tv.html unangetastet bleibt */
 const CSS = `
@@ -44,8 +46,9 @@ export function installHostControls(socket: Socket) {
       <button data-cmd="abort" tabindex="-1">Spiel abbrechen</button>
       <button data-cmd="continue" tabindex="-1">Weiter</button>
       <button data-cmd="removeBots" tabindex="-1">Bots entfernen</button>
+      <button data-cmd="pick" tabindex="-1">Spiel wählen (A)</button>
     </div>
-    <div class="hc-keys">Esc 2× = abbrechen · Enter/Leertaste = weiter</div>
+    <div class="hc-keys">Esc 2× = abbrechen · Enter/Leertaste = weiter · A = Spiel wählen</div>
     <div class="hc-msg"></div>
   `;
   document.body.append(root);
@@ -110,6 +113,8 @@ export function installHostControls(socket: Socket) {
   btn('abort').addEventListener('click', abort);
   btn('continue').addEventListener('click', cont);
   btn('removeBots').addEventListener('click', () => send('removeBots'));
+  const picker = installArcadePicker(socket, say);
+  btn('pick').addEventListener('click', () => picker.toggle());
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
@@ -138,6 +143,7 @@ export function installHostControls(socket: Socket) {
     btn('abort').classList.toggle('armed', armedUntil > Date.now());
     btn('continue').disabled = !waits;
     btn('removeBots').disabled = phase !== 'lobby' || !s?.botCount;
+    btn('pick').disabled = phase !== 'lobby';
   }
   bus.on('state', (s: GameState) => update(s));
   update();

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { BoardState, GameState, Point } from '../../shared/types';
-import { FIELD_POS, FIELD_TYPES, FINALE_KINDS, MINI_INFO } from '../../shared/games';
+import { FIELD_POS, FIELD_TYPES, FINALE_KINDS, MINI_INFO, miniInspired } from '../../shared/games';
 import { WORLD } from '../../shared/flunky';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
@@ -188,8 +188,16 @@ export class BoardScene extends Phaser.Scene {
     const card = this.add.container(WORLD.W / 2, WORLD.H / 2);
     card.add(panel(this, -170, -70, 340, 140));
     card.add(ink(this, 0, -54, isFinale ? '~ FINALE ~' : '~ Minispiel ~', { color: RED_INK }));
-    card.add(ink(this, 0, -30, info.title, { size: 16, wrap: 300 }));
-    card.add(ink(this, 0, 10, info.tagline, { wrap: 290 }));
+    const title = ink(this, 0, -36, `${info.icon} ${info.title}`, { size: 16, wrap: 310 });
+    card.add(title);
+    // Lange Titel brechen um → „à la …“ und Tagline darunter anordnen
+    let y = title.y + title.height + 3;
+    const insp = miniInspired(b.nextMini);
+    if (insp) {
+      card.add(ink(this, 0, y, insp, { color: '#7a5a3a' }));
+      y += 13;
+    }
+    card.add(ink(this, 0, Math.max(y + 4, 10), info.tagline, { wrap: 290 }));
     card.add(ink(this, 0, 46, 'Schaut auf eure Handys!', { color: '#7a5a3a' }));
     this.introLayer.add([bg, card]);
     card.setScale(0.2);
