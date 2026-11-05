@@ -4,6 +4,7 @@ import type {
   GameLive,
   GameMeta,
   GameMode,
+  HostInfo,
   JoinRequest,
   JoinResponse,
   KickResponse,
@@ -65,7 +66,7 @@ import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
 import { SpionGame } from './spion';
 import { StillepostGame } from './stillepost';
-import { isLoopback } from './net';
+import { isLaptop, viaProxy } from './net';
 import { TouristGame } from './tourist';
 import { WerwolfGame } from './werwolf';
 import { SpruecheGame } from './sprueche';
@@ -77,6 +78,7 @@ import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { MaexGame } from './maexchen';
+import { WerwarsGame } from './werwars';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 import { EmoteFeed } from './spectator';
 
@@ -151,6 +153,7 @@ export class Room {
   private questions = new QuestionStore();
   private posts = new QuestionStore('stillepost.json', 'post');
   private quips = new QuestionStore('sprueche.json', 'quip');
+  private werwarsQ = new QuestionStore('werwars.json', 'werwars');
   private flushTimer: NodeJS.Timeout | null = null;
   private lastFlush = 0;
   /** Zuletzt gesendetes `meta` (als Vergleichs-Schlüssel) – neu senden nur bei Änderung */
@@ -193,6 +196,8 @@ export class Room {
   /** Dasselbe für überspringbare Schritte (Zug, Phase, Info-Screen), wenn kein Mensch überspringen kann */
   private skipKey = '';
   private skipSince = 0;
+  /** Online-Adresse (Cloudflare-Tunnel), sobald bekannt – Handys bieten sie in der Lobby zum Teilen an */
+  private onlineUrl: string | null = null;
 
   constructor(
     private io: Server,
@@ -201,6 +206,13 @@ export class Room {
   ) {
     setInterval(() => this.tick(), 1000).unref();
     setInterval(() => this.releaseStaleHolds(), 100).unref();
+  }
+
+  /** Tunnel steht (bzw. ist weg) → per `meta` an alle */
+  setOnlineUrl(url: string | null) {
+    if (url === this.onlineUrl) return;
+    this.onlineUrl = url;
+    this.changed();
   }
 
   handle(socket: Socket) {
@@ -214,11 +226,12 @@ export class Room {
     socket.emit('meta', this.meta());
     socket.emit('state', this.live());
 
-    // Steuerung am Laptop (TV-Seite): nur von Verbindungen, die vom Laptop selbst kommen
-    const local = isLoopback(socket.handshake.address);
+    // Steuerung am Laptop (TV-Seite): nur von Verbindungen, die vom Laptop selbst kommen – nicht über den Online-Tunnel
+    const local = isLaptop(socket.handshake);
+    const online = viaProxy(socket.handshake.headers);
     socket.on('host:hello', () => {
       socket.join('hosts');
-      socket.emit('host:info', { local });
+      socket.emit('host:info', { local, online } satisfies HostInfo);
       socket.emit('meta', this.meta());
       socket.emit('state', this.live());
     });
@@ -449,7 +462,7 @@ export class Room {
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
-      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : this.questions;
+      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : kind === 'werwars' ? this.werwarsQ : this.questions;
       const q = store.add(String(text ?? ''));
       if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
       this.changed();
@@ -867,6 +880,8 @@ export class Room {
         break;
       case 'maexchen':
         this.mini = new MaexGame(ids, ctx);
+      case 'werwars':
+        this.mini = new WerwarsGame(ids, ctx, this.werwarsQ.all);
         break;
     }
     this.results = null;
@@ -1246,7 +1261,7 @@ export class Room {
   private handleKicks(socket: Socket, myId: () => string | null) {
     const reply = (ack: unknown, r: KickResponse) => typeof ack === 'function' && (ack as (r: KickResponse) => void)(r);
     const isVip = () => !!this.players.get(myId() ?? '')?.isVip;
-    const isHost = () => isLoopback(socket.handshake.address);
+    const isHost = () => isLaptop(socket.handshake);
 
     // VIP-Handy: einzelnen Spieler entfernen (nicht sich selbst)
     socket.on('vip:kick', (id: unknown, ack?: unknown) => {
@@ -1264,7 +1279,7 @@ export class Room {
       reply(ack, { ok: true, removed: n });
     });
 
-    // Laptop/TV: nur von Loopback-Verbindungen (127.0.0.1 / ::1) – die TV-Seite erfährt das über 'host:info'
+    // Laptop/TV: nur von Loopback-Verbindungen (127.0.0.1 / ::1) ohne Tunnel – die TV-Seite erfährt das über 'host:info'
     socket.on('host:kick', (id: unknown, ack?: unknown) => {
       if (!isHost()) return reply(ack, { ok: false, error: 'Nur direkt am Laptop (localhost) erlaubt.' });
       const n = this.kickPlayers([String(id ?? '')]);
@@ -1457,12 +1472,14 @@ export class Room {
           ...(isBot ? { bot: true } : {}),
         })),
       joinUrl: this.joinUrl,
+      onlineUrl: this.onlineUrl,
       customNhieCount: this.nhie.all.length,
       botCount: this.bots.length,
       leaderboard: this.leaderboard.list,
       customQuestionCount: this.questions.all.length,
       customPostCount: this.posts.all.length,
       customQuipCount: this.quips.all.length,
+      customWerwarsCount: this.werwarsQ.all.length,
       session: this.session.state(this.present()),
     };
   }

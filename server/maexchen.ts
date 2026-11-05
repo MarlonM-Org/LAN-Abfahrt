@@ -38,7 +38,8 @@ export class MaexGame implements MiniGame {
       phaseNo: 0,
       endsIn: 0,
       round: 1,
-      rounds: drink ? MAEX.ROUNDS_DRINK : MAEX.ROUNDS,
+      // Runden um den Tisch nach Spielerzahl, damit es bei 12 Leuten nicht 8 Minuten dauert
+      rounds: drink ? MAEX.ROUNDS_DRINK : ids.length <= 6 ? MAEX.ROUNDS : ids.length <= 9 ? 4 : 3,
       claim: null,
       chain: [],
       rollSeq: 0,

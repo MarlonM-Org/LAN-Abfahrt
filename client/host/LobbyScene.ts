@@ -6,7 +6,7 @@ import { WORLD } from '../../shared/flunky';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintGrass, paintPath } from '../art/ground';
-import { bus, getState } from './store';
+import { bus, getState, joinUrlOf } from './store';
 import { ensurePortrait, figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 import { drawSessionBoard } from './sessionBoard';
@@ -15,10 +15,25 @@ import { drawSessionBoard } from './sessionBoard';
 const SLOTS = 8;
 const SLOTS_MAX = 12;
 
+/** So viele Zeichen (8 px, Festbreite) passen auf das Schild unten (316 px breit) */
+const URL_CHARS = 38;
+
+/** Adresse in höchstens zwei Zeilen à `max` Zeichen – umbrechen vor „.“ oder nach „-“/„:“, notfalls hart */
+function fitLines(text: string, max: number): string[] {
+  if (text.length <= max) return [text];
+  let cut = -1;
+  for (let i = 1; i <= max; i++) if (text[i] === '.' || text[i - 1] === '-' || text[i - 1] === ':') cut = i;
+  if (cut < 8) cut = max;
+  const rest = text.slice(cut);
+  return [text.slice(0, cut), rest.length > max ? `${rest.slice(0, max - 1)}…` : rest];
+}
+
 export class LobbyScene extends Phaser.Scene {
   private playerLayer!: Phaser.GameObjects.Container;
   private qrLayer!: Phaser.GameObjects.Container;
   private urlText!: Phaser.GameObjects.Text;
+  private urlPanel!: Phaser.GameObjects.Image;
+  private urlPanelTall!: Phaser.GameObjects.Image;
   private hintText!: Phaser.GameObjects.Text;
   private renderedUrl = '';
   private renderedPlayers = '';
@@ -63,7 +78,9 @@ export class LobbyScene extends Phaser.Scene {
 
     this.playerLayer = this.add.container(0, 0).setDepth(300);
 
-    panel(this, 150, 232, 316, 36).setDepth(500);
+    this.urlPanel = panel(this, 150, 232, 316, 36).setDepth(500);
+    // Höheres Schild für Adressen auf zwei Zeilen (TV bei Freunden über den Online-Tunnel)
+    this.urlPanelTall = panel(this, 150, 225, 316, 43).setDepth(500).setVisible(false);
     this.urlText = ink(this, 308, 240, '').setDepth(501);
     this.hintText = ink(this, 308, 252, '', { color: RED_INK }).setDepth(501);
 
@@ -76,7 +93,8 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private render(s: GameState) {
-    if (s.joinUrl !== this.renderedUrl) this.renderQr(s.joinUrl);
+    const url = joinUrlOf(s);
+    if (url !== this.renderedUrl) this.renderQr(url);
 
     this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
@@ -168,7 +186,13 @@ export class LobbyScene extends Phaser.Scene {
   private renderQr(url: string) {
     this.renderedUrl = url;
     this.qrLayer.removeAll(true);
-    this.urlText.setText(url.replace(/^https?:\/\//, '').replace(/\/$/, ''));
+    // Lange Adressen (Online-Tunnel: …trycloudflare.com) auf zwei Zeilen, der Hinweis rutscht darunter
+    const lines = fitLines(url.replace(/^https?:\/\//, '').replace(/\/$/, ''), URL_CHARS);
+    const two = lines.length > 1;
+    this.urlPanel.setVisible(!two);
+    this.urlPanelTall.setVisible(two);
+    this.urlText.setText(lines.join('\n')).setY(two ? 231 : 240);
+    this.hintText.setY(two ? 255 : 252);
 
     const qr = QRCode.create(url, { errorCorrectionLevel: 'M' });
     const size = qr.modules.size;

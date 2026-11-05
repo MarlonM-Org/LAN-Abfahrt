@@ -12,6 +12,7 @@ import { figure, playAvatar } from './textures';
 import { GREEN_INK, NameTags, RED_INK, background, ensureTex, ink, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { pcol } from './playerColor';
 
 const A = GEIST.AREA;
 const DARK = 0x060818;
@@ -276,7 +277,7 @@ export class GeistScene extends Phaser.Scene {
     this.glow.clear();
     this.ui.clear();
 
-    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; dot?: number }[] = [];
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; alpha?: number }[] = [];
     for (const [id, h] of Object.entries(g.hunters)) {
       const v = this.hunters.get(id);
       if (!v) continue;
@@ -295,7 +296,7 @@ export class GeistScene extends Phaser.Scene {
       }
       v.status.setText(h.down ? 'HILFE!' : h.empty ? 'Akku leer' : '');
       v.status.setColor(h.down ? '#ff9fc4' : C.gold);
-      tagSpecs.push({ id, x: v.x, y: v.y - 30, name: v.name, color: h.down ? '#b9b3d6' : '#e8e2ff', dot: 0xffd25e });
+      tagSpecs.push({ id, x: v.x, y: v.y - 30, name: v.name, color: pcol(id).hex, alpha: h.down ? 0.6 : 1 });
       // Kleiner Lichthof um jede Figur, damit man sich selbst findet
       this.eraser.fillStyle(0xffffff, 0.5).fillCircle(v.x, v.y, 15);
       if (h.light && !h.down) {

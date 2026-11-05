@@ -26,6 +26,7 @@ import { umzugBot } from './umzugbot';
 import { golfBot } from './golfbot';
 import { spionBot } from './spionbot';
 import { maexBot } from './maexchenbot';
+import { werwarsBot } from './werwarsbot';
 import { WACKEL, type WackelPlatform, type WackelState, wackelPlatformUnder, wackelStage, wackelSurfaceY } from '../shared/wackel';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
@@ -1251,6 +1252,7 @@ export class Bot {
     if (m.kind === 'zauber') zaubBot(this, m.state);
 
     if (m.kind === 'maexchen') maexBot(this, m.state, () => (this.state?.mini?.kind === 'maexchen' ? this.state.mini.state : null));
+    if (m.kind === 'werwars') werwarsBot(this, m.state, !!me?.isVip);
 
     if (m.kind === 'murder') {
       const ms = m.state;

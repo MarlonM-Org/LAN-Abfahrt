@@ -29,6 +29,7 @@ import { RHYTHM } from '../../shared/dategames';
 import { NameTags, RED_INK, background, ensureTex, fitText, ink, nameTag, panel, tagName, txt } from './ui';
 import { sfx } from './sfx';
 import { gulls, twinkle } from './ambient';
+import { pcol } from './playerColor';
 
 const PINK_INK = '#b0306a';
 const SHORT: Record<string, string> = { descent: 'Abstieg', rhythm: 'Gespräch', wrap: 'Wraps', stars: 'Sterne' };
@@ -186,7 +187,7 @@ export class DescentScene extends StateScene {
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setY(-hop).setFlipX(pos.dir < 0).setAngle(r.stunned ? (pos.dir > 0 ? 70 : -70) : 0);
       a.f.setDepth(pos.y + 1);
-      specs.push({ id, x: pos.x, y: pos.y - 34 - hop, name: a.name, color: '#fff4d6' });
+      specs.push({ id, x: pos.x, y: pos.y - 34 - hop, name: a.name, color: pcol(id).hex });
     }
     // Namensschilder verteilen sich selbst (bei Gedränge Initiale + Farbpunkt statt „BoFoMiBen“)
     this.tags.update(specs);

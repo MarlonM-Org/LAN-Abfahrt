@@ -1,7 +1,7 @@
 import '@fontsource/press-start-2p/400.css';
 import Phaser from 'phaser';
 import { io } from 'socket.io-client';
-import type { GameLive, GameMeta, GameState } from '../../shared/types';
+import type { GameLive, GameMeta, GameState, HostInfo } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { LobbyScene } from './LobbyScene';
 import { BoardScene } from './BoardScene';
@@ -11,7 +11,7 @@ import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
-import { mergeLive, mergeMeta, setState } from './store';
+import { mergeLive, mergeMeta, setState, setViaTunnel } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
@@ -59,9 +59,10 @@ import { SpionScene } from './SpionScene';
 import { UmzugScene } from './UmzugScene';
 import { WackelScene } from './WackelScene';
 import { MaexScene } from './MaexScene';
+import { WerwarsScene } from './WerwarsScene';
 import { IntroScene } from './IntroScene';
 
-const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'maexchen'];
+const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -86,7 +87,7 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, MaexScene],
+    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, WerwarsScene, MaexScene],
   });
 
   let currentKey = '';
@@ -126,7 +127,8 @@ async function start() {
   socket.on('connect', () => socket.emit('host:hello'));
   // Steuer-Overlay nur, wenn die TV-Seite direkt am Laptop läuft (der Server prüft das)
   let controls = false;
-  socket.on('host:info', (info: { local?: boolean }) => {
+  socket.on('host:info', (info: Partial<HostInfo>) => {
+    setViaTunnel(!!info?.online);
     if (info?.local && !controls) {
       controls = true;
       installHostControls(socket);
@@ -149,22 +151,33 @@ async function start() {
     showOrientBanner(s);
   }
 
-  // Beim Start eines Minispiels 6 s „📱↔ Handys QUER halten“ bzw. hochkant – auch ohne Brett-Intro (Arcade, Trinkspiel, Date)
+  // „📱↔ Handys QUER halten“ bzw. hochkant, 4 s unten mittig – nur wenn ein Minispiel OHNE Regelkarte startet
+  // (Trinkspiel, Date Night, „Nochmal“); nach der Phase `intro` hat die IntroScene die Haltung schon gezeigt
   const orientTv = document.getElementById('orient-tv');
   let orientKind = '';
+  let orientPrev = '';
   let orientTimer: number | undefined;
+  const hideOrient = (now: boolean) => {
+    clearTimeout(orientTimer);
+    orientTv?.classList.toggle('now', now);
+    orientTv?.classList.add('off');
+  };
   function showOrientBanner(s: GameState) {
+    const prev = orientPrev;
+    orientPrev = s.phase;
+    if (s.phase === 'results' || s.phase === 'board' || s.phase === 'lobby') hideOrient(true);
     const kind = s.phase === 'mini' && s.mini ? s.mini.kind : '';
     if (kind === orientKind) return;
     orientKind = kind;
-    const info = kind ? MINI_INFO[kind as keyof typeof MINI_INFO] : undefined;
+    if (!kind || prev === 'intro') return;
+    const info = MINI_INFO[kind as keyof typeof MINI_INFO];
     if (!orientTv || !info) return;
     const text = ORIENT_TEXT[info.orientation].replace('Handy ', 'Handys ').replace('Halte das Handy, wie du magst', 'Haltet die Handys, wie ihr mögt');
     orientTv.textContent = `${info.icon} ${info.title} · ${text}`;
     orientTv.classList.toggle('landscape', info.orientation === 'landscape');
-    orientTv.classList.remove('off');
+    orientTv.classList.remove('off', 'now');
     clearTimeout(orientTimer);
-    orientTimer = window.setTimeout(() => orientTv.classList.add('off'), 6000);
+    orientTimer = window.setTimeout(() => hideOrient(false), 4000);
   }
 }
 

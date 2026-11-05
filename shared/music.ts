@@ -195,6 +195,8 @@ export function defaultSongForScene(scene: string): string {
       return 'wasser';
     case 'maexchen':
       return 'poolparty';
+    case 'werwars':
+      return 'bar';
     default: // descent, wrap, parcours, …
       return 'action';
   }

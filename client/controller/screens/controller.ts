@@ -1,7 +1,6 @@
 import type { ArenaState, SupState, TidyState } from '../../../shared/types';
 import { TEAM_INFO } from '../../../shared/flunky';
-import { SHIRTS } from '../../../shared/avatar';
-import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
+import { type Screen, app, avatarCanvas, colorOfId, el, me, message, myColor, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
 import { stickZone } from '../stick';
 import { haptic } from '../haptic';
 import { spectatorBar } from '../spectator';
@@ -151,7 +150,7 @@ export function pickArena(s: ArenaState): Screen {
   if (!mine.alive && (s.sub === 'play' || s.sub === 'roundOver')) return [`ar-dead-${s.round}`, buildArenaGhost];
   return ['ar-ctl', () => {
     const look = me()?.look;
-    const color = look ? SHIRTS[look.shirt] : '#f2c33a';
+    const color = myColor()?.hex ?? '#f2c33a';
     // Quer wie Bomberman am Gamepad: links Stick, rechts BOMBE
     const root = el(`
       <div class="lx ar-lx" style="--ar-color:${color}">
@@ -239,8 +238,7 @@ function buildArenaGhost() {
     for (const b of st.bombs) ctx.fillRect(b.x * T + 1, b.y * T + 1, T - 2, T - 2);
     for (const [pid, p] of Object.entries(st.players)) {
       if (!p.alive) continue;
-      const look = store.state?.players.find((x) => x.id === pid)?.look;
-      ctx.fillStyle = look ? SHIRTS[look.shirt] : '#fff';
+      ctx.fillStyle = colorOfId(pid).hex;
       ctx.fillRect(Math.round(p.x * T) + 1, Math.round(p.y * T) + 1, T - 2, T - 2);
     }
     if (g) {

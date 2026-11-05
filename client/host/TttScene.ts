@@ -10,6 +10,7 @@ import { figure, playAvatar } from './textures';
 import { BLUE_INK, Countdown, GOLD, GREEN_INK, INK, NameTags, RED_INK, ensureTex, ink, nameTag, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { pcol } from './playerColor';
 
 /** Figuren stehen mit den Füßen etwas unter dem Server-Punkt (der ist Körpermitte) */
 const FOOT = 8;
@@ -102,7 +103,7 @@ export class TttScene extends Phaser.Scene {
       playAvatar(f.img, p.stunned ? 'hit' : p.moving ? 'walk' : 'idle');
       f.img.setAngle(p.stunned ? Math.sin(this.time.now / 60) * 12 : 0);
       f.c.setPosition(Math.round(f.x), Math.round(f.y + FOOT)).setDepth(f.y + FOOT);
-      if (f.c.visible) specs.push({ id, x: Math.round(f.x), y: Math.round(f.y + FOOT) - 45, name: f.name, color: id === t.detective ? '#9cc7ff' : '#fff4d6' });
+      if (f.c.visible) specs.push({ id, x: Math.round(f.x), y: Math.round(f.y + FOOT) - 45, name: f.name, color: pcol(id).hex });
     }
     this.tags.update(specs);
   }

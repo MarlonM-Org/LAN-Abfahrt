@@ -10,10 +10,11 @@
       canvas { image-rendering: pixelated; }
       #sound { position: fixed; left: 50%; bottom: 3vh; transform: translateX(-50%); padding: 1.2vh 2vh; font: 1.6vh 'Press Start 2P', monospace; color: #3d2414; background: #f7e4b5; border: 0.5vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12; animation: pulse 1.2s infinite alternate; cursor: pointer; }
       @keyframes pulse { to { opacity: 0.6; } }
-      /* Ausrichtungs-Ansage beim Start eines Minispiels (host/main.ts) – gleicher Stil wie #sound, aber oben */
-      #orient-tv { position: fixed; left: 50%; top: 3vh; transform: translateX(-50%); z-index: 5; padding: 1.4vh 2.4vh; font: 2vh 'Press Start 2P', monospace; line-height: 1.6; white-space: nowrap; color: #3d2414; background: #f7e4b5; border: 0.5vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12; pointer-events: none; transition: opacity 0.4s; }
+      /* Ausrichtungs-Ansage beim Start eines Minispiels ohne Regelkarte (host/main.ts) – Stil wie #sound, knapp darüber (HUD oben bleibt frei) */
+      #orient-tv { position: fixed; left: 50%; bottom: 10vh; transform: translateX(-50%); z-index: 5; padding: 1vh 1.8vh; font: 1.5vh 'Press Start 2P', monospace; line-height: 1.6; white-space: nowrap; color: #3d2414; background: #f7e4b5; border: 0.5vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12; pointer-events: none; transition: opacity 0.4s; }
       #orient-tv.landscape { background: #ffd25e; animation: pulse 0.6s infinite alternate; }
-      #orient-tv.off { opacity: 0; }
+      #orient-tv.off { opacity: 0; animation: none; }
+      #orient-tv.now { transition: none; }
       /* Zuschauer-Overlay (host/emotes.ts): Emotes mit Porträt, Wett-Anzeige, Konfetti – unabhängig von der Phaser-Szene */
       #spec-layer { position: fixed; inset: 0; z-index: 4; pointer-events: none; overflow: hidden; font-family: 'Press Start 2P', monospace; }
       .spec-emote { position: absolute; bottom: 1vh; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; animation: spec-rise 3.4s ease-out forwards; }

@@ -1,7 +1,6 @@
 import type { SumoState } from '../../../shared/types';
 import { SUMO } from '../../../shared/sumo';
-import { SHIRTS } from '../../../shared/avatar';
-import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
+import { type Screen, app, avatarCanvas, el, me, message, myColor, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
 import { stickZone } from '../stick';
 import { haptic } from '../haptic';
 import { spectatorBar } from '../spectator';
@@ -17,7 +16,7 @@ export function pickSumo(s: SumoState): Screen {
   if (!mine.alive && (s.sub === 'play' || s.sub === 'roundOver')) return [`su-dead-${s.round}`, buildSumoGhost, 'any'];
   return ['su-ctl', () => {
     const look = me()?.look;
-    const color = look ? SHIRTS[look.shirt] : '#f2c33a';
+    const color = myColor()?.hex ?? '#f2c33a';
     const root = el(`
       <div class="lx ar-lx su-lx" style="--ar-color:${color}">
         <div class="lx-head"><span class="arena-av"></span><span class="arena-round su-round"></span><span class="arena-stats su-stats grow"></span></div>

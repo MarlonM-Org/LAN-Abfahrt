@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import type { Server } from 'socket.io';
 import { type Assignment, type Song, type SongInfo, SONG_ID_RE, songInfo, validateAssignment, validateSong } from '../shared/music';
 import { BUILTIN_IDS, BUILTIN_INFOS } from '../shared/musicBuiltin';
+import { viaProxy } from './net';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 /** Größte erlaubte Anfrage (ein Song mit 4096 Noten liegt weit darunter) */
@@ -124,6 +125,13 @@ export function musicRouter(store: MusicStore, io: Server): Router {
     if (e?.type === 'entity.too.large') return res.status(413).json({ error: 'Song zu groß (max. 256 KB)' });
     if (e?.type === 'entity.parse.failed') return res.status(400).json({ error: 'Kein gültiges JSON' });
     next(err);
+  });
+  // Über den Online-Tunnel nur anhören: Speichern/Löschen/Zuordnen bleibt dem Heimnetz vorbehalten
+  r.use((req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD' && viaProxy(req.headers)) {
+      return res.status(403).json({ error: 'Über den Online-Link lässt sich die Musik nur anhören – speichern geht im Heimnetz.' });
+    }
+    next();
   });
   const pushSongs = () => io.to('hosts').emit('music:songs', store.list());
   const pushAssign = () => io.to('hosts').emit('music:assign', store.assignment);
