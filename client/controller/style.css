@@ -1196,3 +1196,36 @@ table.lb tr.off td { opacity: 0.55; }
 .lb-same { color: var(--ink-soft); }
 .lb-new { color: var(--sea); font-size: 7px; }
 .lb-off { color: var(--ink-soft); font-size: 7px; }
+
+/* ------------------------------------------------------------------ Angeln */
+.an-steps { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 12px; font-size: 10px; }
+.an-green { color: var(--green); }
+.an-cast { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.an-pad { min-height: 50vh; justify-content: flex-start; padding-top: 18px; background: linear-gradient(#2b6ba6, #3f95d0 55%, #5fb4e2 80%, #c99a5e 80%, #b8783f); color: #fff4d6; }
+.swipe-pad.an-pad .pad-text { color: #fff4d6; text-align: center; text-shadow: 1px 1px 0 var(--outline); pointer-events: none; }
+.an-lure { position: absolute; left: 50%; top: 88%; width: 14px; height: 20px; margin: -10px 0 0 -7px; border: 3px solid var(--outline); border-radius: 50% 50% 45% 45%; background: linear-gradient(#e0503f 0 50%, #fdf7ea 50%); pointer-events: none; }
+.an-depth { margin: 0; color: var(--ink-soft); text-align: center; min-height: 1.7em; }
+.an-head { text-align: center; margin: 0; }
+.big-btn.an-strike { min-height: 42vh; background: #8b8f99; box-shadow: inset 0 4px 0 #b4b8c2, inset 0 -6px 0 #5c606a, 0 3px 0 var(--outline); -webkit-touch-callout: none; }
+.big-btn.an-strike.nibble { transform: translateY(2px); filter: brightness(1.1); }
+.big-btn.an-strike.bite { background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); font-size: 30px; animation: an-pulse 0.25s infinite alternate; }
+@keyframes an-pulse { to { transform: scale(1.03); filter: brightness(1.2); } }
+.an-tension { position: relative; height: 34px; border: 3px solid var(--outline); background: linear-gradient(90deg, #bfd8ea 0 22%, #e8b84a 22% 78%, #e0503f 78%); }
+.an-zone { position: absolute; top: 0; bottom: 0; background: #46b04a; box-shadow: inset 0 3px 0 #7fd47f; }
+.an-needle { position: absolute; top: -8px; bottom: -8px; width: 6px; margin-left: -3px; background: var(--paper-light); border: 2px solid var(--outline); transition: left 60ms linear; }
+.an-tension.high .an-needle { background: #e0503f; animation: an-pulse 0.12s infinite alternate; }
+.an-tension.low .an-needle { background: #93d3f3; }
+.an-lbl { position: absolute; bottom: -18px; font-size: 7px; color: var(--ink-soft); }
+.an-lbl.l { left: 0; }
+.an-lbl.r { right: 0; color: var(--red); }
+.an-pull { margin-top: 10px; min-height: 2.6em; text-align: center; font-size: 10px; }
+.an-arrow.on { color: var(--red); animation: an-pulse 0.2s infinite alternate; display: inline-block; }
+.an-dist { height: 10px; border: 2px solid var(--outline); background: #3f95d0; }
+.an-dist > div { height: 100%; width: 0; background: var(--gold); transition: width 120ms linear; }
+.big-btn.an-reel { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 36vh; background: #2fb5a5; box-shadow: inset 0 4px 0 #6fdccd, inset 0 -6px 0 #1f7f73, 0 3px 0 var(--outline); border: 3px solid var(--outline); color: var(--ink); -webkit-touch-callout: none; }
+.big-btn.an-reel small { font-size: 10px; }
+.big-btn.an-reel.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+.an-catch { align-items: center; text-align: center; }
+.an-catch .an-fish canvas { image-rendering: pixelated; }
+.an-fishname { font-size: 16px; margin: 0; }
+.an-catch.rare h2, .an-catch.rare .an-fishname { color: #c98a10; }
