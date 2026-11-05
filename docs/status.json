@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 18:35",
+  "updated": "2026-11-05 18:50",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -40,6 +40,41 @@
       "type": "Neues Spiel",
       "branch": "spiel/wackel-pruegelei",
       "detail": "à la Gang Beasts: labbrige Ragdolls, Greifen und vom Steg ins Meer werfen"
+    },
+    {
+      "title": "Review Phase 0: Netz + Reconnect",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/netz-reconnect",
+      "detail": "changed() sofort senden, meta-Event, private nur bei Änderung, 3 s Gnadenfrist statt sofort raus, Stick-Timeout, WebSocket"
+    },
+    {
+      "title": "Review Phase 0: Fairness + Parcours-Bug",
+      "kind": "parcours",
+      "type": "Review-Umsetzung",
+      "branch": "review/fairness",
+      "detail": "Alle 12 laufen im Parcours, Punkte nach Spielerzahl, Startspieler rotiert, Koop-Münzen Flieger/Grill, Sprint serverseitig"
+    },
+    {
+      "title": "Review Phase 1: Ton + Juice am TV",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/sound-juice",
+      "detail": "sfx.ts über den fxBus, juice.ts (Shake, Hit-Stop, Partikel, Banner), Sprecher, Ergebnis-Reveal"
+    },
+    {
+      "title": "Review Phase 1: Handy-Ausrichtung (Marlons Feedback)",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/ausrichtung",
+      "detail": "orientation pro Spiel, Ansage + Overlay, ein schwebender Stick, Querlayout, Haptik-Ersatz fürs iPhone, erste 8 Spiele quer"
+    },
+    {
+      "title": "Review Phase 0/4: Pacing + Igel Stufe S",
+      "kind": "igel",
+      "type": "Review-Umsetzung",
+      "branch": "review/pacing-igel",
+      "detail": "Brett-Listen, Spieldauer-Klassen, TTT/Golf/Sprüche kürzer, Igel: Wind driftet, Zugzeit, Flut pro Runde, Kamera, HP-Countdown"
     }
   ],
   "queue": [],
