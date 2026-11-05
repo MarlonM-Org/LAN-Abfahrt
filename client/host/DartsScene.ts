@@ -6,6 +6,8 @@ import { DART_COLORS, DART_TV, dartPix, dartboardPix, paintDartsBar } from '../a
 import { crown } from '../art/objects';
 import { bus, getState, playerById } from './store';
 import { Countdown, GOLD, LIGHT, RED_INK, background, ensureTex, ink, panel, txt } from './ui';
+import { sfx } from './sfx';
+import { say } from './speech';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const { CX, CY, S } = DART_TV;
@@ -149,6 +151,7 @@ export class DartsScene extends Phaser.Scene {
     const tx = wx(d.x);
     const ty = wy(d.y);
     img.setPosition(tx + 40 + (d.n - 1) * 20, WORLD.H + 20).setScale(3).setAlpha(0.9);
+    sfx('throw', { x: tx, pitch: 1.3, vol: 0.6 });
     this.tweens.add({
       targets: img,
       x: tx,
@@ -170,6 +173,10 @@ export class DartsScene extends Phaser.Scene {
     const text = d.ring === 'miss' ? 'DANEBEN' : st.mult > 1 && d.points > 0 ? `${d.short} x2` : d.short;
     const t = txt(this, x + 6, y - 16, text, { color: col }).setDepth(1900);
     this.tweens.add({ targets: t, y: y - 30, alpha: 0, delay: 500, duration: 700, onComplete: () => t.destroy() });
+    // Einschlag + Callout
+    sfx(d.ring === 'miss' ? 'bonk' : 'hit', { x, pitch: d.ring === 'miss' ? 0.7 : 1.3, vol: 0.7 });
+    if (d.ring === 'bull') (sfx('goal'), say('Bullseye!'));
+    else if (d.ring === 'triple' && d.seg >= 17) (sfx('coin'), say(`Triple ${d.seg}!`));
     if (d.ring === 'bull' || (d.ring === 'triple' && d.seg >= 17)) {
       this.queueSpecial({ text: d.ring === 'bull' ? 'BULLSEYE!' : `TRIPLE ${d.seg}!`, sub: shortName(d.owner, 12), color: col });
     }
@@ -177,6 +184,8 @@ export class DartsScene extends Phaser.Scene {
     const mine = st.darts.filter((x) => x.owner === d.owner);
     if (mine.length === DARTS.DARTS_PER_ROUND && mine.every((x) => x.ring === 'triple' && x.seg === 20)) {
       this.queueSpecial({ text: 'ONE HUNDRED AND EIGHTY!', sub: shortName(d.owner, 12), color: GOLD });
+      sfx('cheer');
+      say('One hundred and eighty!', { interrupt: true, rate: 0.9 });
     }
   }
 

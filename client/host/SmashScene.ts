@@ -6,6 +6,9 @@ import * as A from '../art/smash';
 import { bus, getState, playerById } from './store';
 import { ensureAvatar, ensurePortrait } from './textures';
 import { ensureTex, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { say, spokenName } from './speech';
 
 type C = Phaser.GameObjects.Container;
 
@@ -66,6 +69,7 @@ export class SmashScene extends Phaser.Scene {
   private fxSeen = -1;
   private lastSub = '';
   private cam = { x: 240, y: 135, z: 1 };
+  private juice!: Juice;
 
   constructor() {
     super('smash');
@@ -90,6 +94,7 @@ export class SmashScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0).setDepth(100);
     this.beamG = this.add.graphics();
     this.fxL.add(this.beamG);
+    this.juice = new Juice(this, { layer: this.fxL, hud: this.hud, manualZoom: true });
 
     const main = this.cameras.main;
     main.setBounds(0, 0, WORLD.W, WORLD.H).setZoom(1).centerOn(240, 135);
@@ -253,6 +258,8 @@ export class SmashScene extends Phaser.Scene {
       if (st.sub === 'fight' && prev === 'countdown') this.pop('LOS!', '', 800);
       if (st.sub === 'over') {
         this.pop('SPIEL!', '', 1300);
+        sfx('win');
+        this.juice.flash(0xffffff, 250);
         const w = st.winner;
         this.time.delayedCall(1300, () => this.banner.setText(w ? `${playerById(w)?.name ?? '?'}\ngewinnt!` : 'Zeit um!').setAlpha(1).setScale(1));
       }
@@ -316,24 +323,36 @@ export class SmashScene extends Phaser.Scene {
     switch (fx.type) {
       case 'hit': {
         this.star(fx.x, fx.y, 0.5 + fx.p * 1.2, fx.p > 0.5 ? 0xffd25e : 0xffffff);
+        this.juice.burst(fx.x, fx.y, 'spark', 4 + Math.round(fx.p * 10));
+        sfx(fx.p > 0.55 ? 'hitHard' : 'hit', { x: fx.x, pitch: 1.15 - fx.p * 0.3 });
         if (fx.p > 0.45) this.cameras.main.shake(90 + fx.p * 120, 0.004 + fx.p * 0.008);
+        // Starker Rückstoß: Darstellung kurz anhalten + Zoom-Stoß
+        if (fx.p > 0.6) {
+          this.juice.hitStop(40 + fx.p * 60);
+          this.juice.zoomPunch(0.02 + fx.p * 0.04, 200);
+        }
         break;
       }
       case 'shield': {
         const r = this.add.circle(fx.x, fx.y, 14, 0x7fd4ff, 0).setStrokeStyle(2, 0x7fd4ff, 1);
         this.fxL.add(r);
         this.tweens.add({ targets: r, scale: 1.6, alpha: 0, duration: 220, onComplete: () => r.destroy() });
+        sfx('pop', { x: fx.x, pitch: 1.4, vol: 0.7 });
         break;
       }
       case 'break':
+        sfx('crack', { x: fx.x });
+        this.juice.burst(fx.x, fx.y, 'spark', 10);
         this.floatText(fx.x, fx.y - 26, 'Schild kaputt!', '#7fd4ff');
         this.star(fx.x, fx.y, 1.3, 0x7fd4ff);
         break;
       case 'stun':
         this.floatText(fx.x, fx.y - 16, '!?', '#ffd25e');
+        sfx('bonk', { x: fx.x });
         break;
       case 'heal':
         this.floatText(fx.x, fx.y - 6, `-${SMASH.ANANAS_HEAL}%`, '#9ad65a');
+        sfx('powerup', { x: fx.x, vol: 0.7 });
         break;
       case 'wave':
         for (const dir of [-1, 1]) {
@@ -342,6 +361,8 @@ export class SmashScene extends Phaser.Scene {
           this.tweens.add({ targets: e, x: fx.x + dir * 40, scaleX: 2.2, alpha: 0, duration: 320, onComplete: () => e.destroy() });
         }
         this.cameras.main.shake(140, 0.008);
+        this.juice.burst(fx.x, fx.y - 2, 'splash', 12);
+        sfx('splash', { x: fx.x });
         break;
       case 'boom': {
         const c = this.add.circle(fx.x, fx.y, 8, 0x7fd4ff, 0.8);
@@ -354,18 +375,25 @@ export class SmashScene extends Phaser.Scene {
           this.tweens.add({ targets: d, x: fx.x + Math.cos(a) * 30, y: fx.y + Math.sin(a) * 24 + 8, alpha: 0, duration: 420, onComplete: () => d.destroy() });
         }
         this.cameras.main.shake(160, 0.008);
+        this.juice.burst(fx.x, fx.y, 'splash', 18);
+        sfx('boom', { x: fx.x, vol: 0.8 });
+        sfx('splash', { x: fx.x, delay: 0.05 });
         break;
       }
       case 'spawn': {
         const ring = this.add.image(fx.x, fx.y + 4, ensureTex(this, 'sm_ring', A.ringPix));
         this.actL.add(ring);
         this.tweens.add({ targets: ring, y: ring.y + 30, alpha: 0, delay: 900, duration: 600, onComplete: () => ring.destroy() });
+        sfx('jump', { x: fx.x, pitch: 0.8, vol: 0.7 });
         break;
       }
       case 'ko': {
         const fig = fx.id ? this.figs.get(fx.id) : undefined;
         if (fig) fig.root.setVisible(false);
         this.cameras.main.shake(320, 0.016);
+        sfx('ko', { x: fx.x });
+        this.juice.slowMo(0.4, 600);
+        this.juice.zoomPunch(0.08, 400);
         this.flash.setFillStyle(0xffffff, 0.55);
         this.tweens.add({ targets: this.flash, fillAlpha: 0, duration: 300 });
         // Lichtstrahl am Bildschirmrand, wo die Figur rausgeflogen ist
@@ -380,6 +408,7 @@ export class SmashScene extends Phaser.Scene {
         const name = fx.id ? (playerById(fx.id)?.name ?? '') : '';
         const f = fx.id ? st.fighters[fx.id] : undefined;
         this.pop('K.O.!', f && f.state === 'out' ? `${name} ist raus!` : name, 900);
+        if (f && f.state === 'out') say(`${spokenName(name)} ist raus!`);
         break;
       }
     }
@@ -411,6 +440,8 @@ export class SmashScene extends Phaser.Scene {
   update(time: number, delta: number) {
     const st = this.latest;
     if (!st) return;
+    // Hit-Stop: Figuren, Plattformen und Kamera kurz stehen lassen (nur Darstellung)
+    if (this.juice.frozen) return;
     const age = Math.min(0.08, (performance.now() - this.recvAt) / 1000);
     const t = st.sub === 'fight' ? st.t + age * 1000 : st.t;
     for (const pl of this.plats) {
@@ -633,7 +664,7 @@ export class SmashScene extends Phaser.Scene {
     this.cam.z += (z - this.cam.z) * 0.04;
     this.cam.x += (cx - this.cam.x) * 0.06;
     this.cam.y += (cy - this.cam.y) * 0.06;
-    this.cameras.main.setZoom(this.cam.z).centerOn(this.cam.x, this.cam.y);
+    this.cameras.main.setZoom(this.cam.z * this.juice.zoom).centerOn(this.cam.x, this.cam.y);
   }
 
   private updateMarkers(st: SmashState) {
