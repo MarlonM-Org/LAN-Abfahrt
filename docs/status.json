@@ -1,11 +1,18 @@
 {
-  "updated": "2026-11-05 23:45",
+  "updated": "2026-11-05 23:50",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
+    {
+      "title": "Online spielen über Cloudflare-Tunnel",
+      "kind": "",
+      "type": "Feature",
+      "branch": "feature/online-tunnel",
+      "detail": "npm run online startet Server + Tunnel und zeigt den Link; über den Tunnel keine Laptop-Rechte und Musik nur lesen; TV-Ansicht bei Freunden zeigt den Online-QR-Code"
+    },
     {
       "title": "Review Nacharbeit: Handy-Farben, TV-Banner, Doku-Dubletten",
       "kind": "",
@@ -357,6 +364,10 @@
     },
     {
       "title": "Spiel-Review Phase 0+1 (Fairness, Netz, Pacing, Ton/Juice, Ausrichtung, Igel S) umgesetzt – offen: Regelkarte, Zuschauer-Rollen, Look, Spielbrett 2.0, Igel M, neue Spiele",
+      "status": "in Arbeit"
+    },
+    {
+      "title": "Online mit Freunden spielen (Cloudflare-Tunnel statt Port öffnen)",
       "status": "in Arbeit"
     }
   ]
