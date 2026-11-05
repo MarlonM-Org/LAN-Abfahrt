@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import QRCode from 'qrcode';
-import type { GameState } from '../../shared/types';
+import type { GameState, MiniKind } from '../../shared/types';
+import { MINI_INFO } from '../../shared/games';
 import { WORLD } from '../../shared/flunky';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
@@ -79,7 +80,7 @@ export class LobbyScene extends Phaser.Scene {
     this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
     const offMin = (p: GameState['players'][number]) => Math.floor((p.offlineMs ?? 0) / 60_000);
-    this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : 'Der VIP wählt am Handy ein Spiel!');
+    this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : s.mode === 'arcade' && s.arcadeVote ? this.voteHint(s) : 'Der VIP wählt am Handy ein Spiel!');
 
     const key = s.mode + s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') + (s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
     if (key === this.renderedPlayers) return;
@@ -132,6 +133,17 @@ export class LobbyScene extends Phaser.Scene {
       this.playerLayer.add(ink(this, x + w - 70, ry, String(e.points)));
       this.playerLayer.add(ink(this, x + w - 30, ry, String(e.wins)));
     });
+  }
+
+  /** Arcade-Abstimmung: meistgewünschtes Spiel in der Fußzeile */
+  private voteHint(s: GameState) {
+    const counts = new Map<MiniKind, number>();
+    for (const k of Object.values(s.arcadeVote?.votes ?? {})) counts.set(k, (counts.get(k) ?? 0) + 1);
+    const top = [...counts].sort((a, b) => b[1] - a[1])[0];
+    if (!top) return 'Alle wählen am Handy – tippt euer Wunschspiel!';
+    const title = MINI_INFO[top[0]].title;
+    // Fußzeile fasst ~38 Zeichen
+    return `Wunsch: ${MINI_INFO[top[0]].icon} ${title.length > 21 ? `${title.slice(0, 20)}…` : title} (${top[1]})`;
   }
 
   private crown(x: number, y: number) {
