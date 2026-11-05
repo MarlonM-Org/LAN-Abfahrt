@@ -1,9 +1,9 @@
 import Matter from 'matter-js';
 import type { MiniSnapshot, TurmActive, TurmLane } from '../shared/types';
-import { TURM, TURM_SHAPES, turmCellOffsets } from '../shared/games';
+import { TURM, TURM_SHAPES, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore } from './minigame';
 
-const { Bodies, Body, Composite, Engine, Query } = Matter;
+const { Bodies, Body, Composite, Engine } = Matter;
 
 const TICK_MS = 50;
 const STEP_MS = 1000 / 60;
@@ -13,8 +13,28 @@ const PLATFORM_HALF = (TURM.PLATFORM_W / 2) * B;
 const LOST_Y = (TURM.VIEW_BOTTOM + 2) * B;
 const LOST_X = (TURM.LANE_HALF + 4) * B;
 const PROF = !!process.env.TURM_PROF;
+/** Seitliches Raster (Physik-Einheiten) */
+const STEP = TURM.STEP * B;
+/**
+ * Erlaubte Überlappung des gesteuerten Teils mit liegenden Teilen (Physik-Einheiten, ≈ 0,2 px am TV).
+ * Liegende Teile sinken minimal ein oder sind um Bruchteile eines Grads verdreht – ohne diese Toleranz
+ * klemmt das Teil, obwohl optisch nichts im Weg ist.
+ */
+const SKIN = 0.35;
 
-/** Das gesteuerte Teil – noch kein Physik-Körper, nur eine Probe für Kollisionstests. */
+type Offs = { x: number; y: number }[];
+/** Seitliches Ausweichen beim Fallen (Physik-Einheiten), kleinste zuerst */
+const NUDGES = Array.from({ length: 16 }, (_, i) => (i + 1) * 0.25).flatMap((n) => [n, -n]);
+
+/** Zellmitten relativ zum Schwerpunkt bei rot × 90° (gerundet: keine Fließkomma-Reste von cos/sin) */
+function cellsOf(shape: number, rot: number): Offs {
+  return turmCellOffsets(shape, (rot * Math.PI) / 2).map((o) => ({ x: Math.round(o.x * 1000) / 1000, y: Math.round(o.y * 1000) / 1000 }));
+}
+
+/**
+ * Das gesteuerte Teil – noch kein Physik-Körper. Es bewegt sich kinematisch (fallen, schieben, drehen)
+ * und prüft dabei seine Zellen (Quadrate in exakt der gezeichneten Größe) gegen liegende Teile.
+ */
 interface Active {
   id: number;
   shape: number;
@@ -23,12 +43,54 @@ interface Active {
   /** Physik-y (nach unten) */
   y: number;
   rot: number;
-  probe: Matter.Body;
+  offs: Offs;
+  /** Liegt gerade auf (Lock-Delay läuft) */
+  grounded: boolean;
+  /** Erstes Aufsetzen überhaupt (0 = noch nie) – begrenzt das Lock-Delay insgesamt */
+  contactAt: number;
+  /** Letztes Aufsetzen */
+  groundedAt: number;
+  lockAt: number;
+  /** Landehöhe (Physik-y) für die Fall-Vorschau am TV; null = fällt ins Meer */
+  ghost: number | null;
+}
+
+/** Überlappungstiefe (SAT) eines achsparallelen Quadrats (Mitte cx/cy, halbe Kante h) mit einem konvexen Teil */
+function overlapDepth(cx: number, cy: number, h: number, part: Matter.Body): number {
+  // Achsen des Quadrats: x und y (die Bounds von Matter sind um die Geschwindigkeit erweitert → selbst projizieren)
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const v of part.vertices) {
+    if (v.x < minX) minX = v.x;
+    if (v.x > maxX) maxX = v.x;
+    if (v.y < minY) minY = v.y;
+    if (v.y > maxY) maxY = v.y;
+  }
+  let depth = Math.min(cx + h - minX, maxX - (cx - h), cy + h - minY, maxY - (cy - h));
+  if (depth <= 0) return 0;
+  for (const ax of part.axes) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const v of part.vertices) {
+      const d = v.x * ax.x + v.y * ax.y;
+      if (d < lo) lo = d;
+      if (d > hi) hi = d;
+    }
+    const c = cx * ax.x + cy * ax.y;
+    const r = h * (Math.abs(ax.x) + Math.abs(ax.y));
+    const o = Math.min(c + r - lo, hi - (c - r));
+    if (o <= 0) return 0;
+    if (o < depth) depth = o;
+  }
+  return depth;
 }
 
 interface Lane {
   id: string;
   engine: Matter.Engine;
+  platform: Matter.Body;
   bodies: Matter.Body[];
   /** Physik-Körper → [Teil-ID, Form, Variante] */
   meta: Map<number, [number, number, number]>;
@@ -85,6 +147,8 @@ export class TurmGame implements MiniGame {
   private finishedCount = 0;
   private timers = new Timers();
   private prof = { n: 0, sum: 0, max: 0, since: Date.now() };
+  /** Uhr für Eingaben/Lock-Delay (in Tests ersetzbar) */
+  private clock = () => Date.now();
 
   constructor(
     private ids: string[],
@@ -99,6 +163,7 @@ export class TurmGame implements MiniGame {
       const lane: Lane = {
         id,
         engine,
+        platform,
         bodies: [],
         meta: new Map(),
         active: null,
@@ -181,6 +246,7 @@ export class TurmGame implements MiniGame {
       }
       this.cleanup(lane);
       this.measure(lane, now);
+      if (lane.active) lane.active.ghost = this.ghost(lane, lane.active);
       // Während der Turm über dem Ziel gehalten wird, kommt kein neues Teil
       if (!lane.active && !lane.frozen && !lane.place && !lane.holdSince && now >= lane.spawnAt) this.spawn(lane);
     }
@@ -200,33 +266,128 @@ export class TurmGame implements MiniGame {
     // Nicht immer exakt mittig – sonst wächst ein Turm ganz ohne Zutun gerade nach oben
     const steps = Math.round(TURM.SPAWN_JITTER * 2);
     const x = ((Math.floor(Math.random() * (2 * steps + 1)) - steps) * B) / 2;
-    const probe = makeBody(shape, x, y, 0, B - 1.2, false);
-    lane.active = { id: ++this.seq, shape, v, x, y, rot: 0, probe };
+    lane.active = this.makeActive(++this.seq, shape, v, x, y, 0);
+    lane.active.ghost = this.ghost(lane, lane.active);
   }
 
-  /** Kollidiert die Probe an (x, y, rot) mit Plattform oder liegenden Teilen? */
-  private blocked(lane: Lane, a: Active, x: number, y: number, rot: number) {
-    Body.setAngle(a.probe, (rot * Math.PI) / 2);
-    Body.setPosition(a.probe, { x, y });
-    const others = Composite.allBodies(lane.engine.world);
-    const hit = a.probe.parts.slice(1).some((part) => Query.collides(part, others).length > 0);
-    Body.setAngle(a.probe, (a.rot * Math.PI) / 2);
-    Body.setPosition(a.probe, { x: a.x, y: a.y });
-    return hit;
+  private makeActive(id: number, shape: number, v: number, x: number, y: number, rot: number): Active {
+    return { id, shape, v, x: turmSnapX(shape, rot, x), y, rot, offs: cellsOf(shape, rot), grounded: false, contactAt: 0, groundedAt: 0, lockAt: 0, ghost: null };
+  }
+
+  /** Überlappung der Zellen an (x, y) mit einem Körper */
+  private bodyDepth(body: Matter.Body, offs: Offs, x: number, y: number): number {
+    const h = B / 2;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const o of offs) {
+      minX = Math.min(minX, x + o.x - h);
+      maxX = Math.max(maxX, x + o.x + h);
+      minY = Math.min(minY, y + o.y - h);
+      maxY = Math.max(maxY, y + o.y + h);
+    }
+    const bb = body.bounds;
+    if (bb.max.x <= minX || bb.min.x >= maxX || bb.max.y <= minY || bb.min.y >= maxY) return 0;
+    let worst = 0;
+    const parts = body.parts.length === 1 ? body.parts : body.parts.slice(1);
+    for (const part of parts) {
+      const pb = part.bounds;
+      if (pb.max.x <= minX || pb.min.x >= maxX || pb.max.y <= minY || pb.min.y >= maxY) continue;
+      for (const o of offs) {
+        const d = overlapDepth(x + o.x, y + o.y, h, part);
+        if (d > worst) worst = d;
+      }
+    }
+    return worst;
+  }
+
+  /** Passt das Teil an (x, y)? Kleine Überlappungen bis SKIN sind erlaubt. */
+  private fits(lane: Lane, offs: Offs, x: number, y: number) {
+    if (this.bodyDepth(lane.platform, offs, x, y) > SKIN) return false;
+    for (const b of lane.bodies) if (this.bodyDepth(b, offs, x, y) > SKIN) return false;
+    return true;
+  }
+
+  /**
+   * Strengere Probe für „bis zum Kontakt“ (Aufsetzen, Heranschieben): an (x0, y0) → (x, y) darf das Teil
+   * in keinen Körper tiefer als 0,05 eindringen, außer es streift ihn schon (schräger Nachbar) – dann
+   * höchstens so tief wie vorher. Ergebnis: bündig anliegend statt um SKIN eingesunken.
+   */
+  private fitsFlush(lane: Lane, offs: Offs, x0: number, y0: number, x: number, y: number) {
+    for (const b of [lane.platform, ...lane.bodies]) {
+      const d = this.bodyDepth(b, offs, x, y);
+      if (d <= 0.05) continue;
+      if (d > SKIN || d > this.bodyDepth(b, offs, x0, y0) + 0.01) return false;
+    }
+    return true;
+  }
+
+  private inLane(x: number) {
+    return Math.abs(x) <= TURM.LANE_HALF * B + 0.01;
+  }
+
+  /** Größter Weg d ∈ [0, max], für den `test(d)` noch gilt (Bisektion, auf ~1/30 Einheit genau) */
+  private sweep(test: (d: number) => boolean, max: number): number {
+    if (test(max)) return max;
+    let lo = 0;
+    let hi = max;
+    for (let i = 0; i < 8; i++) {
+      const mid = (lo + hi) / 2;
+      if (test(mid)) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** Nach einer erfolgreichen Bewegung im Liegen: Lock-Delay verlängern (aber nie über LOCK_MAX_MS hinaus) */
+  private touched(a: Active, now: number) {
+    if (a.grounded) a.lockAt = Math.min(a.contactAt + TURM.LOCK_MAX_MS, now + TURM.LOCK_MS);
   }
 
   private moveActive(lane: Lane, now: number) {
     const a = lane.active;
     if (!a) return;
+    // Der wackelnde Turm hat sich ins Teil geschoben → nach oben ausweichen und sofort ablegen
+    if (!this.fits(lane, a.offs, a.x, a.y)) {
+      for (let k = 1; k <= B; k++) {
+        if (this.fits(lane, a.offs, a.x, a.y - k)) {
+          a.y -= k;
+          break;
+        }
+      }
+      return this.land(lane, 0);
+    }
     // Windböe schiebt seitlich
     if (lane.gustDir && now < lane.gustUntil) {
       const nx = a.x + (lane.gustDir * 1.3 * B) / 60;
-      if (Math.abs(nx) <= TURM.LANE_HALF * B && !this.blocked(lane, a, nx, a.y, a.rot)) a.x = nx;
+      if (this.inLane(nx) && this.fits(lane, a.offs, nx, a.y)) a.x = nx;
     } else lane.gustDir = 0;
     const dy = ((lane.fast ? TURM.FAST : TURM.FALL) * B) / 60;
-    if (this.blocked(lane, a, a.x, a.y + dy, a.rot)) return this.land(lane, dy);
-    a.y += dy;
-    Body.setPosition(a.probe, { x: a.x, y: a.y });
+    if (this.fits(lane, a.offs, a.x, a.y + dy)) {
+      a.y += dy;
+      a.grounded = false;
+    } else {
+      // Seitliches Entlangstreifen ist kein Aufsetzen: minimal zur Seite ausweichen und weiterfallen.
+      // Bis zu einem Viertelblock – so rutscht ein Teil auch in einen genau 1 Block breiten Schacht,
+      // dessen Wände nicht exakt im Raster stehen (wer nur mit einer Ecke aufkommt, kippt eh herunter).
+      const nudge = a.grounded ? undefined : NUDGES.find((n) => this.fits(lane, a.offs, a.x + n, a.y + dy));
+      if (nudge !== undefined) {
+        a.x += nudge;
+        a.y += dy;
+      } else {
+        // Aufsetzen: bündig bis zum Kontakt absenken, dann läuft das Lock-Delay
+        a.y += this.sweep((d) => this.fitsFlush(lane, a.offs, a.x, a.y, a.x, a.y + d), dy);
+        if (!a.grounded) {
+          a.grounded = true;
+          a.groundedAt = now;
+          if (!a.contactAt) a.contactAt = now;
+          a.lockAt = Math.min(a.contactAt + TURM.LOCK_MAX_MS, now + TURM.LOCK_MS);
+        }
+        const lockAt = lane.fast ? Math.min(a.lockAt, a.groundedAt + TURM.LOCK_FAST_MS) : a.lockAt;
+        if (now >= lockAt) return this.land(lane, 0);
+      }
+    }
     // Neben der Plattform ins Meer gefallen
     if (a.y > LOST_Y) {
       lane.active = null;
@@ -234,23 +395,99 @@ export class TurmGame implements MiniGame {
     }
   }
 
-  /** Teil berührt etwas → wird zum echten Physik-Körper */
-  private land(lane: Lane, dy: number) {
+  /** Landehöhe für die Fall-Vorschau: in Halbblock-Schritten nach unten tasten, dann genau */
+  private ghost(lane: Lane, a: Active): number | null {
+    if (a.grounded) return a.y;
+    let y = a.y;
+    const step = B / 2;
+    while (this.fits(lane, a.offs, a.x, y + step)) {
+      y += step;
+      if (y > LOST_Y) return null;
+    }
+    return y + this.sweep((d) => this.fitsFlush(lane, a.offs, a.x, y, a.x, y + d), step);
+  }
+
+  /** Lock: Teil wird zum echten Physik-Körper */
+  private land(lane: Lane, vy: number) {
     const a = lane.active!;
     const body = makeBody(a.shape, a.x, a.y, (a.rot * Math.PI) / 2, B, true);
-    // Geschwindigkeit in Einheiten pro 16,7-ms-Schritt: halbe Fallgeschwindigkeit mitnehmen
-    Body.setVelocity(body, { x: 0, y: dy * 0.5 });
+    Body.setVelocity(body, { x: 0, y: vy });
     Composite.add(lane.engine.world, body);
     lane.bodies.push(body);
     lane.meta.set(body.id, [a.id, a.shape, a.v]);
     lane.active = null;
-    lane.spawnAt = Date.now() + 350;
+    lane.spawnAt = this.clock() + 350;
+  }
+
+  /**
+   * Seitlich schieben im Halbblock-Raster (Zellkanten auf dem Raster). Klemmt es knapp, wird erst ein
+   * kleines Stück nach oben/unten ausgewichen (zum Hineinschieben in Lücken), sonst bis zum Kontakt
+   * geschoben – so liegt das Teil immer bündig am Nachbarn, auch wenn der nicht genau im Raster liegt.
+   */
+  private shift(lane: Lane, a: Active, dir: number, now: number) {
+    const left = a.x + Math.min(...a.offs.map((o) => o.x)) - B / 2;
+    const target = dir > 0 ? (Math.floor((left + 0.5) / STEP) + 1) * STEP : (Math.ceil((left - 0.5) / STEP) - 1) * STEP;
+    const nx = Math.round((a.x + target - left) * 1000) / 1000;
+    if (!this.inLane(nx)) return false;
+    const dist = Math.abs(nx - a.x);
+    // Feine Schritte: eine Lücke von genau einem Block lässt kaum Spiel (siehe SKIN)
+    const kicks = [0];
+    for (let k = 0.25; k <= TURM.KICK * B; k += 0.25) kicks.push(k, -k);
+    // 1. voller Schritt, notfalls mit kleinem Ausweichen nach unten/oben
+    for (const ky of kicks) {
+      if (this.fits(lane, a.offs, nx, a.y + ky) && (ky === 0 || this.fits(lane, a.offs, a.x, a.y + ky))) {
+        a.x = nx;
+        a.y += ky;
+        this.touched(a, now);
+        return true;
+      }
+    }
+    // 2. bis zum Kontakt schieben (bündig an den Nachbarn)
+    let best = { d: 0, ky: 0 };
+    for (const ky of kicks) {
+      if (!this.fits(lane, a.offs, a.x, a.y + ky)) continue;
+      const d = this.sweep((t) => this.fitsFlush(lane, a.offs, a.x, a.y + ky, a.x + dir * t, a.y + ky), dist);
+      if (d > best.d + 0.25) best = { d, ky };
+      if (ky === 0 && d >= 1) break;
+    }
+    if (best.d < 0.05) return false;
+    a.x += dir * best.d;
+    a.y += best.ky;
+    this.touched(a, now);
+    return true;
+  }
+
+  /** Drehen um den Schwerpunkt, Kanten wieder ins Raster; klemmt es, kleine Ausweich-Versuche („Kicks“) */
+  private rotate(lane: Lane, a: Active, now: number) {
+    const rot = (a.rot + 1) % 4;
+    const offs = cellsOf(a.shape, rot);
+    const bx = turmSnapX(a.shape, rot, a.x);
+    const cands: [number, number][] = [];
+    for (const kx of [0, -STEP, STEP, -2 * STEP, 2 * STEP]) {
+      for (let ky = 0; ky <= TURM.KICK * B; ky += 1) {
+        cands.push([kx, -ky]);
+        if (ky) cands.push([kx, ky]);
+      }
+    }
+    // Kleine Ausweichbewegungen zuerst; bei Gleichstand lieber nach oben als zur Seite
+    cands.sort((p, q) => Math.abs(p[0]) + Math.abs(p[1]) * 0.9 - (Math.abs(q[0]) + Math.abs(q[1]) * 0.9));
+    for (const [kx, ky] of cands) {
+      const nx = bx + kx;
+      if (!this.inLane(nx) || !this.fits(lane, offs, nx, a.y + ky)) continue;
+      a.x = nx;
+      a.y += ky;
+      a.rot = rot;
+      a.offs = offs;
+      this.touched(a, now);
+      return true;
+    }
+    return false;
   }
 
   private lose(lane: Lane) {
     lane.lostSeq += 1;
     // Stürzt der halbe Turm ein, kostet das nicht sofort alle Leben: kurze Schonfrist
-    const now = Date.now();
+    const now = this.clock();
     lane.spawnAt = Math.max(lane.spawnAt, now + 600);
     if (now - lane.lastLoss < TURM.LOSS_GRACE_MS) return;
     lane.lastLoss = now;
@@ -341,28 +578,10 @@ export class TurmGame implements MiniGame {
       return;
     }
     if (!a) return;
-    if (action === 'shift') {
-      const dir = Number(asRecord(payload).dir) < 0 ? -1 : 1;
-      const nx = a.x + (dir * B) / 2;
-      if (Math.abs(nx) <= TURM.LANE_HALF * B && !this.blocked(lane, a, nx, a.y, a.rot)) {
-        a.x = nx;
-        Body.setPosition(a.probe, { x: a.x, y: a.y });
-      }
-    } else if (action === 'rotate') {
-      const rot = (a.rot + 1) % 4;
-      // Wenn es klemmt: ein Stück zur Seite oder nach oben ausweichen
-      for (const [kx, ky] of [[0, 0], [B / 2, 0], [-B / 2, 0], [B, 0], [-B, 0], [0, -B / 2]]) {
-        const nx = a.x + kx;
-        if (Math.abs(nx) > TURM.LANE_HALF * B) continue;
-        if (this.blocked(lane, a, nx, a.y + ky, rot)) continue;
-        a.x = nx;
-        a.y += ky;
-        a.rot = rot;
-        Body.setAngle(a.probe, (rot * Math.PI) / 2);
-        Body.setPosition(a.probe, { x: a.x, y: a.y });
-        break;
-      }
-    }
+    const now = this.clock();
+    const moved = action === 'shift' ? this.shift(lane, a, Number(asRecord(payload).dir) < 0 ? -1 : 1, now) : action === 'rotate' ? this.rotate(lane, a, now) : false;
+    if (!moved) return;
+    a.ghost = this.ghost(lane, a);
     this.ctx.onChange();
   }
 
@@ -410,7 +629,8 @@ export class TurmGame implements MiniGame {
 
   private activeSnap(a: Active | null): TurmActive | null {
     if (!a) return null;
-    return { id: a.id, shape: a.shape, v: a.v, x: Math.round(a.x), y: Math.round(-a.y), rot: a.rot };
+    const r1 = (n: number) => Math.round(n * 10) / 10;
+    return { id: a.id, shape: a.shape, v: a.v, x: r1(a.x), y: r1(-a.y), rot: a.rot, gy: a.ghost === null ? null : r1(-a.ghost), rest: a.grounded };
   }
 
   snapshot(): MiniSnapshot {
@@ -452,6 +672,49 @@ export class TurmGame implements MiniGame {
   playerDisconnected(id: string) {
     const lane = this.lanes.find((l) => l.id === id);
     if (lane) lane.fast = false;
+  }
+
+  /** Nur für `scripts/test-turm.ts`: Spiel ohne Timer steuern (Uhr und Physik-Schritte von außen) */
+  testApi() {
+    const g = this;
+    let t = Date.now();
+    g.clock = () => t;
+    return {
+      begin() {
+        g.timers.clear();
+        g.sub = 'play';
+        g.startedAt = t;
+        g.deadline = Infinity;
+        g.nextGust = Infinity;
+        for (const l of g.lanes) l.spawnAt = Infinity;
+      },
+      lane: (i: number) => g.lanes[i],
+      /** Liegendes Teil (Physik-y nach unten, x/y = Schwerpunkt) */
+      place(i: number, shape: number, x: number, y: number, rot: number, isStatic: boolean) {
+        const lane = g.lanes[i];
+        const body = makeBody(shape, x, y, (rot * Math.PI) / 2, B, !isStatic);
+        Composite.add(lane.engine.world, body);
+        lane.bodies.push(body);
+        lane.meta.set(body.id, [++g.seq, shape, 0]);
+        return body;
+      },
+      activate(i: number, shape: number, x: number, y: number, rot: number) {
+        const lane = g.lanes[i];
+        lane.active = g.makeActive(++g.seq, shape, 0, x, y, rot);
+        lane.active.ghost = g.ghost(lane, lane.active);
+        return lane.active;
+      },
+      /** Ein Physik-Schritt (1/60 s) */
+      step(n = 1) {
+        for (let k = 0; k < n; k++) {
+          t += STEP_MS;
+          g.tick(t, 1);
+        }
+      },
+      input: (id: string, action: string, payload?: unknown) => g.input(id, action, payload),
+      cells: (shape: number, rot: number) => cellsOf(shape, rot),
+      SKIN,
+    };
   }
 
   dispose() {

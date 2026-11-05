@@ -1326,6 +1326,35 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .intro-icon { font-size: 40px; line-height: 1.2; text-align: center; }
 .center p.insp, p.insp { font-size: 8px; color: var(--ink-soft); opacity: 0.85; }
 
+/* ---------------------------------------------------------------- Wasserpistolen-Duell */
+.wp-call { min-height: 2.4em; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; color: var(--ink); }
+.wp-call.go { color: #c0392b; font-size: 22px; animation: wp-pop 0.25s ease-out; }
+.wp-call.ok { color: var(--green); }
+.wp-call.bad { color: #2d64a8; }
+@keyframes wp-pop { from { transform: scale(1.8); } to { transform: scale(1); } }
+.wp-box { width: 100%; image-rendering: pixelated; border: 4px solid var(--wood-dark); box-shadow: 0 0 0 2px var(--outline), 0 3px 0 var(--outline); touch-action: none; background: #2d6a28; }
+.wp-info { display: flex; align-items: center; gap: 10px; min-height: 26px; }
+.wp-tank { display: flex; gap: 5px; }
+.wp-tank i { width: 14px; height: 18px; border: 2px solid var(--outline); border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%; background: var(--paper-dark); opacity: 0.5; }
+.wp-tank i.full { background: radial-gradient(circle at 35% 35%, #eaf8ff 0 2px, #4aa2dc 3px); opacity: 1; }
+.wp-msg { flex: 1; text-align: right; color: var(--ink-soft); font-size: 9px; }
+.wp-pad {
+  flex: 1; min-height: 28vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 8px;
+  touch-action: none; -webkit-touch-callout: none; color: #fff4d6; text-shadow: 2px 2px 0 var(--wood-darker); text-align: center;
+  background: #b8783f; border: 3px solid var(--outline);
+  box-shadow: inset 0 5px 0 #d39a5c, inset 0 -7px 0 #5e3518, 0 3px 0 var(--outline);
+}
+.wp-pad b { font-size: 24px; font-weight: normal; }
+.wp-pad small { font-size: 8px; opacity: 0.9; line-height: 1.8; }
+.wp-pad.held { transform: translateY(3px); background: #8d5629; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+.wp-pad.wp-fire { background: #3f8fe0; box-shadow: inset 0 5px 0 #7fbcf0, inset 0 -7px 0 #2d64a8, 0 3px 0 var(--outline); }
+.wp-pad.wp-fire.held { background: #2d64a8; }
+.wp-pad.go { animation: wp-glow 0.6s infinite alternate; }
+@keyframes wp-glow { from { filter: brightness(1); } to { filter: brightness(1.25); } }
+.wp-tools { display: flex; gap: 8px; }
+.wp-tools button { flex: 1; }
+.wp-ask-motion { background: var(--sea); min-height: 30vh; font-size: 16px; }
+
 /* ------------------------------------------------------------------ Angeln */
 .an-steps { margin: 0; padding-left: 28px; display: flex; flex-direction: column; gap: 12px; font-size: 10px; }
 .an-green { color: var(--green); }
