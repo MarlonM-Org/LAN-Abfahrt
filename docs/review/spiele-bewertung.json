@@ -1,0 +1,781 @@
+[
+ {
+  "kind": "flunky",
+  "title": "Flunkyball",
+  "icon": "🍺",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Trinkritual der Gruppe mit Teams und Wind.",
+  "weakness": "„Trinken“ und „Laufen“ sind Tipp-Spam (`RUN_TAPS 24`), immer wirft nur einer.",
+  "fix": "Laufen als Rhythmus-Tippen (Takt halten statt hämmern) und optional Echt-trinken-Modus, bei dem das gegnerische Team „ausgetrunken“ bestätigt.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`.swipe-pad` bis knapp über den unteren Rand ziehen, Teambadge und Wind in eine Kopfzeile, TRINKEN/LAUFEN in die untere Daumenzone."
+ },
+ {
+  "kind": "sprint",
+  "title": "Liegestuhl-Sprint",
+  "icon": "🏖️",
+  "category": "Action",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 2,
+   "opus": 2
+  },
+  "funAvg": 2.3,
+  "strength": "30-Sekunden-Lückenfüller mit Fehlstart-Regel, sofort verständlich.",
+  "weakness": "Nur 3 Runden Reaktionstest, und die Zeit misst das Handy selbst (`p.ms` aus dem Payload, trivial fälschbar).",
+  "fix": "Fake-Signale (Möwe, Wolke) als Fehlstart-Fallen einbauen und die Zeit serverseitig aus `goSeq`-Sendezeit minus RTT messen.",
+  "orientation": "egal",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`min-height: 68vh` bei `.big-btn.sun` durch `flex: 1` ersetzen, damit der Knopf jede Lage füllt; kein Hinweis-Overlay."
+ },
+ {
+  "kind": "descent",
+  "title": "Der Abstieg",
+  "icon": "⛰️",
+  "category": "Action",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 2,
+   "opus": 2
+  },
+  "funAvg": 2.3,
+  "strength": "Hübsches Date-Kapitel mit nur einem Sprungknopf.",
+  "weakness": "Steht in `BOARD_KINDS`, ist aber für 2 gebaut; mit 12 auf dem Brett ein Sprung-Wettrennen ohne Reiz.",
+  "fix": "Aus `BOARD_KINDS` und `ARCADE_RANDOM` nehmen und nur im Date-Modus belassen.",
+  "orientation": "egal",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`.big-btn.jump` per `flex: 1` statt 52vh."
+ },
+ {
+  "kind": "wrap",
+  "title": "Wraps mit Sriracha-Mayo",
+  "icon": "🌯",
+  "category": "Action",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 2,
+   "opus": 2
+  },
+  "funAvg": 2.3,
+  "strength": "Liebevoll persönliches Merkspiel mit klarer Reihenfolge-Logik.",
+  "weakness": "Auf dem Brett mit 12 Spielern beliebig, wenig Interaktion und kein Zeitdruck.",
+  "fix": "Aus `BOARD_KINDS` nehmen (oder zwei Spieler gleichzeitig gegeneinander statt solo).",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "GREIFEN in die Daumenzone unten, Rezeptleiste oben."
+ },
+ {
+  "kind": "sup",
+  "title": "SUP-Rennen",
+  "icon": "🏄",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Lustige Abhängigkeit zu zweit („einer links, einer rechts“) mit Teamchaos, `TIME_MS 80 s`.",
+  "weakness": "Zufällige Paare, bei ungerader Zahl unrund; 1700 px Länge plus Wobble kann frustrieren.",
+  "fix": "Paare in der Lobby wählbar machen (oder Wobble anfangs halbieren) und Rempeln zwischen Boards zulassen.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Balance-Leiste und Fortschritt oben, Paddel-Knopf bis zum unteren Rand."
+ },
+ {
+  "kind": "tidy",
+  "title": "Aufräumen!",
+  "icon": "🧺",
+  "category": "Action",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 3,
+   "opus": 2
+  },
+  "funAvg": 2.7,
+  "strength": "Einfache Joystick-Steuerung, 60 s, klares Ziel.",
+  "weakness": "Kaum Tiefe, Schieben mit 26 Items ist beliebig und es fehlt Teamgefühl.",
+  "fix": "Ausmustern oder als „Umzugschaos“-Prototyp mit farbigen Körben und Klau-Mechanik ausbauen.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`.lx`-Grundlayout: Kopfzeile 28 px (Team, Zeit, Punkte), links schwebender Stick, SPRINT rechts unten mit ca. 40 % Höhe."
+ },
+ {
+  "kind": "kurve",
+  "title": "Kurven-Duell",
+  "icon": "🌀",
+  "category": "Action",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4.3,
+  "strength": "Perfekt für 12: nur LINKS/RECHTS, kurze Runden (`ROUND_MAX_MS 55 s`, Sturm ab 25 s), „Du bist Rot“ farbig auf dem Handy.",
+  "weakness": "Wer raus ist, wartet bis zu 55 s, und es gibt nur 3 recht brave Power-ups.",
+  "fix": "Power-ups „Spiegel“ (Steuerung der anderen 3 s vertauscht) und „Radiergummi“ ergänzen, dazu Zeitlupe des letzten Crashs.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Beide Knöpfe als volle Bildhälften (`height: 100%`), Farbe, Runde und Status als schmale Leiste oben in der Mitte."
+ },
+ {
+  "kind": "arena",
+  "title": "Bomben-Arena",
+  "icon": "💣",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Klassiker mit sauberem Raster (`TILE 18`, 25 × 13), Flut nach 60 s erzwingt das Ende, Spawn-Clearing auch für 12.",
+  "weakness": "Wer nass ist, liest nur „PLATSCH! Zuschauen …“ und wartet bis zu 60 s; zudem `playerDisconnected` → `kill()` (Handy sperrt = tot).",
+  "fix": "Rache-Möwen: Ausgeschiedene fliegen am Rand entlang und werfen alle 4 s eine Kokosnuss ins Feld, wer trifft, ist wieder drin.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Kopf (Avatar, Runde, Stats) als Zeile, links schwebender Stick, BOMBE rechts unten ca. 120 × 100 px."
+ },
+ {
+  "kind": "kart",
+  "title": "Kart-Rennen",
+  "icon": "🏎️",
+  "category": "Action",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4.3,
+  "strength": "Mode-7 mit Vorhersage am Handy (`world.predict`), Drift mit Mini-Turbo, Items nach Platzierung, „So fährst du“-Overlay.",
+  "weakness": "Komplex für Neue (TV/Handy-Pille, Drift über GAS), kein Rubber-Banding, `COUNTDOWN_MS 8000`, und wer mit Handy-Ansicht fährt, schaut nicht mehr auf den TV.",
+  "fix": "Fertige Fahrer werden Tribünen-Zuschauer und dürfen 2 Bananen auf die Strecke werfen; „Nochmal als Grand Prix“ fertigstellen.",
+  "orientation": "quer",
+  "orientationToday": "quer",
+  "orientationEffort": "S",
+  "orientationChange": "`.k3-portrait` durch das zentrale Overlay ersetzen, TV-Split-Hochkant als Override `any` behalten und bei Rennende kein `leaveFullscreen()` mehr."
+ },
+ {
+  "kind": "smash",
+  "title": "Smash-Arena",
+  "icon": "🥊",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 3
+  },
+  "funAvg": 3.7,
+  "strength": "Technisch ambitioniertestes Spiel: Prozente, Schild, Specials, dynamische Kamera, Flash beim KO.",
+  "weakness": "Touch-Prügeln mit 4 Knöpfen plus Stick ist für Gelegenheitsspieler zäh, kein Hitstop, ca. 100–150 ms gefühlte Latenz bei Tick 50 ms, und für 12 freigegeben (kein `maxPlayers`).",
+  "fix": "`maxPlayers: 8`, ab 7 Spielern 2-gegen-2-Teams und 60–120 ms Hitstop bei hohem Rückstoß.",
+  "orientation": "quer",
+  "orientationToday": "egal (Quer-CSS ohne Hinweis)",
+  "orientationEffort": "S",
+  "orientationChange": "Das vorhandene Querlayout (`@media (orientation: landscape) and (max-height:520px)`) zum Standard machen, hochkant nur als Notbehelf."
+ },
+ {
+  "kind": "parcours",
+  "title": "Fallen-Parcours",
+  "icon": "🏁",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Starkes Konzept mit Selbstregulierung („zu leicht“ und „zu schwer“ bringen keine Punkte), Coyote-Time und Sprungpuffer vorhanden.",
+  "weakness": "`RUN_MS 25 s` laut Feedback zu kurz, Bauphase nur hochkant und Platzieren per Joystick fummelig.",
+  "fix": "Platzieren direkt auf einer Mini-Karte am Handy antippen und ziehen, statt den Cursor mit dem Joystick zu schieben.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Karten als 3 Spalten, Bau: Stick links und DREHEN/PLATZIEREN rechts, Lauf: Stick (nur x) links und SPRINGEN rechts unten groß."
+ },
+ {
+  "kind": "wasser",
+  "title": "Wasserbomben-Schlacht",
+  "icon": "💦",
+  "category": "Action",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 4,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Teams, Nachladen am Eimer und Schlauch, Wasserpistole als Event.",
+  "weakness": "Zwei-Stick-Steuerung ist die schwierigste Eingabe im Portfolio und auf 360 px kaputt (2 × 158 + 8 = 324 > 308 px).",
+  "fix": "Zielen automatisieren: Wurf geht auf den nächsten Gegner in Blickrichtung, am Handy bleibt Laufen und Werfen.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Linke und rechte Hälfte je eine schwebende Stick-Zone, Nässe-Meter und Munition in die Kopfzeile."
+ },
+ {
+  "kind": "sumo",
+  "title": "Sumo-Steg",
+  "icon": "🤼",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Sofort verständlich, `ROUND_MS 45 s`, schrumpfender Steg (`SHRINK_MS 24 s`), Frontal-Rempler-Bonus und viel Juice.",
+  "weakness": "Nach dem Platsch nur Zuschauen, und ab 8 Spielern ist die Mitte ein Gewusel.",
+  "fix": "Wer im Wasser ist, steuert eine Welle (Joystick) und darf 1× pro Runde eine Planke anknacksen.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Wie Arena: Stick links, REMPELN rechts unten, Abklingfüllung bleibt."
+ },
+ {
+  "kind": "bogen",
+  "title": "Bogen-Arena",
+  "icon": "🏹",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "TowerFall-Kern gut getroffen: ein Treffer, Pfeile aufsammeln, Wrap-around, Dash fängt Pfeile; `maxPlayers: 8` ehrlich.",
+  "weakness": "Zielen in 8 Richtungen per Touch-Stick bei 20 Hz Tick (`TICK_MS 50`) und der Höhepunkt des letzten Treffers verpufft.",
+  "fix": "Letzter Pfeil der Runde in Zeitlupe (`this.time.timeScale = 0.3` für 600 ms, Kamera-Zoom auf das Ziel).",
+  "orientation": "quer",
+  "orientationToday": "egal (Quer-CSS ohne Hinweis)",
+  "orientationEffort": "S",
+  "orientationChange": "Die vorhandene Landscape-Media-Query zum Standard machen (wie Smash)."
+ },
+ {
+  "kind": "autoball",
+  "title": "Auto-Fußball",
+  "icon": "⚽",
+  "category": "Action",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4.3,
+  "strength": "Konfetti beim Tor, Golden Goal, Tore wachsen mit der Teamgröße, kleineres Team lädt schneller Boost.",
+  "weakness": "Draufsicht mit 12 Mini-Karts auf 480×270 wird Pixelbrei („Wer bin ich?“), 3 min plus 7 s Intro.",
+  "fix": "Eigenen Wagen mit blinkendem Ring in der Handy-Rahmenfarbe markieren und ein Tor-Replay der letzten 3 s in Zeitlupe zeigen.",
+  "orientation": "quer",
+  "orientationToday": "quer",
+  "orientationEffort": "S",
+  "orientationChange": "Wie Kart: zentrales Overlay statt `.afb .k3-portrait`, Vollbild bei Abpfiff nicht verlassen."
+ },
+ {
+  "kind": "volley",
+  "title": "Strand-Volleyball",
+  "icon": "🏐",
+  "category": "Action",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Bank-Rotation (max. 3 pro Seite) ist eine kluge Lösung für 12 und ungleiche Teams.",
+  "weakness": "Slime-Physik bei 20 Hz plus WLAN fühlt sich schwammig an, und bis 7 mit 2 Vorsprung oder `MATCH_MS` ist lang.",
+  "fix": "`TARGET 5`, `MATCH_MS 150 s`, dazu Ball-Schatten und Aufprall-Marker auf dem Sand.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`.vb-left/.vb-right` auf `height: 100%`, Kopf (Team/Punkte) als Zeile; fast nur CSS."
+ },
+ {
+  "kind": "bowling",
+  "title": "Strand-Bowling",
+  "icon": "🎳",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Schwung per Sensor mit Wisch-Fallback, verkürzte Frames je nach Spielerzahl.",
+  "weakness": "Reihum: bei 12 Spielern ca. 6 min Wartezeit, Sensor-Erkennung ohne Feedback, und `BowlingScene` hat nur 2 Tweens (Strike wirkt zu wenig).",
+  "fix": "2–4 Bahnen nebeneinander, alle werfen gleichzeitig (wie Darts); Strike mit Kegel-Partikeln, Shake und Jubel-Sound.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Startleiste oben, Schwungknopf (46vh) in die Daumenzone unten, Rangliste im Zuschau-Screen darf scrollen."
+ },
+ {
+  "kind": "boule",
+  "title": "Boule am Strand",
+  "icon": "🥥",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Gute Regelumsetzung (Schweinchen-Logik, Legen oder Schießen), Team-Modus ab 5.",
+  "weakness": "Gleiches Warteproblem wie Bowling, langsam (`AIM_MS 25 s`), Sensor-Feedback fehlt.",
+  "fix": "Bei Teams wirft das Team gleichzeitig, alle Kugeln einer Seite fliegen nacheinander in einer Animation.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Legen/Schießen oben neben der Karte (wie heute), Wurffläche unten; keine weiteren Änderungen."
+ },
+ {
+  "kind": "darts",
+  "title": "Darts an der Strandbar",
+  "icon": "🎯",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 4
+  },
+  "funAvg": 3.7,
+  "strength": "Alle werfen gleichzeitig, „Höchste Punktzahl“ statt 301, letzte Runde zählt doppelt, Wackel-Fadenkreuz.",
+  "weakness": "`INTRO_MS 8 s` ist lang, und die Board-Größe wird einmalig aus `innerHeight*0.36` (`darts.ts:108`) berechnet.",
+  "fix": "Treffer-Callouts mit Stimme („TRIPLE ZWANZIG!“, Web Speech API).",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Board oben, Schnell-Ziele (T20/BULL/T19) direkt darunter, Wurffläche unten in der Daumenzone."
+ },
+ {
+  "kind": "golf",
+  "title": "Urlaubs-Minigolf",
+  "icon": "⛳",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 4
+  },
+  "funAvg": 3.7,
+  "strength": "Alle putten gleichzeitig, intuitive Schleuder-Steuerung, ehrliche Länge.",
+  "weakness": "Bälle stoßen bewusst nicht zusammen (kostet Schadenfreude), pro Loch bis 60 s (`HOLE_S`), 7 Bahnen ≈ 8–10 min.",
+  "fix": "Chaos-Loch als 7. Bahn: Bälle kollidieren, jeder darf 1× „Windstoß“ auf einen anderen Ball; im Party-Modus 5 Bahnen.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Karte bis `calc(100svh - Kopf - Knopf)` (statt einmaligem `fit()` aus `innerHeight*0.42`, `golf.ts:266`), Modus-Umschalter oben."
+ },
+ {
+  "kind": "enten",
+  "title": "Ententeich",
+  "icon": "🦆",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 4,
+   "opus": 5
+  },
+  "funAvg": 4.7,
+  "strength": "Bestes Handy-Gefühl im Portfolio („sehr cool“), alle gleichzeitig, Combo-Bonus, Lag-Ausgleich `LAG_MS 220`.",
+  "weakness": "Mit 3 Wellen in ca. 80 s fast zu kurz, und Neigen driftet ohne Kalibrierung.",
+  "fix": "Vierte Welle als Boss: Riesen-Möwe mit Lebensbalken, alle müssen gemeinsam treffen.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "SCHUSS-Fläche ganz unten (Daumen), „Zentrieren/Touchpad“ klein oben; im Touchpad-Modus Screen-Override `any`."
+ },
+ {
+  "kind": "igel",
+  "title": "Igel-Krieg",
+  "icon": "🦔",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Zerstörbares Terrain, effizient übertragen (Seed plus Kraterliste), Wind, Rückzug, Fallschaden, Minikarte für Zuschauer.",
+  "weakness": "Bei 12 Spielern ca. 20 s pro Zug (ca. 4 min Warten), nur 4 Waffen, Bazooka max. 45 von 100 HP, fast jede große Runde endet am Zeitlimit.",
+  "fix": "Team-Modus ab 5 Spielern und Simultan-Zielen (siehe Abschnitt 4a).",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Links Waffen 2×3 und ◀ SPRUNG ▶, rechts das Ziel-Pad (ca. 60 % Breite, volle Höhe), „Fertig“ oben rechts, Minikarte (`aspect-ratio 480/270`) groß im Zuschau-Screen."
+ },
+ {
+  "kind": "turm",
+  "title": "Wackelturm",
+  "icon": "🗼",
+  "category": "Zielen & Werfen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 3
+  },
+  "funAvg": 3.3,
+  "strength": "Echte matter-js-Physik auf dem Server, Windböe gegen den Führenden.",
+  "weakness": "Mit 12 Spielern ist ein Block auf dem TV nur ca. 4 px groß, und Heranschieben klappt nicht (Feedback, Fix läuft).",
+  "fix": "Die eigene Bahn groß am Handy zeigen (privater Bildschirm), der TV ist dann nur die Übersicht.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Links ◀ ▶ nebeneinander unten, rechts DREHEN über FALLEN, in der Mitte Leben, „Nächstes“ und Meldung."
+ },
+ {
+  "kind": "rhythm",
+  "title": "Das erste Gespräch",
+  "icon": "💬",
+  "category": "Gemeinsam",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 2,
+   "opus": 3
+  },
+  "funAvg": 2.7,
+  "strength": "Synchronisation über Server-Uhr, Ton am Handy, ruhiges Co-op.",
+  "weakness": "Nur für 2 Spieler (Date-Nische) und Bluetooth-Versatz.",
+  "fix": "Kalibrierungs-Tap einbauen und weitere Songs aus der Werkstatt einbinden.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`.lane` 16vh → 22vh ganz unten, Canvas mit `max-height: calc(100svh - …)`."
+ },
+ {
+  "kind": "stars",
+  "title": "Tanz unter den Sternen",
+  "icon": "✨",
+  "category": "Gemeinsam",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 2,
+   "opus": 3
+  },
+  "funAvg": 2.7,
+  "strength": "Ruhig und romantisch, Sternbilder verbinden.",
+  "weakness": "Nischig, nur Date, wenig Wiederspielwert.",
+  "fix": "Zufällige Sternbild-Aufgaben ergänzen.",
+  "orientation": "egal",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "`@media (orientation: landscape)`: Infos in schmale linke Spalte, Canvas `height: calc(100svh - 24px)` (ca. +85 % Fläche)."
+ },
+ {
+  "kind": "flieger",
+  "title": "Urlaubsflieger",
+  "icon": "✈️",
+  "category": "Gemeinsam",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 5,
+   "opus": 5
+  },
+  "funAvg": 5,
+  "strength": "Spaceteam-Prinzip ist der stärkste Handy-Mechanismus: privater Bildschirm, Rufen, Chaos; 76 alberne Namen, Schwierigkeit skaliert (`fliegerTarget`).",
+  "weakness": "Absturz oder Landung in Bali ist für die Belohnung egal: `end()` ruft in beiden Fällen `groupByScore` ohne `coins`-Override auf.",
+  "fix": "`coins` nach Ziel vergeben (Bali 8 für alle, je Etappe weniger, Absturz 1, +2 für den MVP).",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Anweisung bleibt oben, Status (Etappe/Sprit) in die Kopfzeile, Panel bekommt die ganze Resthöhe."
+ },
+ {
+  "kind": "grill",
+  "title": "Grill-Chaos",
+  "icon": "🔥",
+  "category": "Gemeinsam",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Overcooked passt zu Stick plus 2 Knöpfen, Sterne-Ziel, ab 7 Spielern Team-Duell in gespiegelten Küchen.",
+  "weakness": "Regeln nur in 4 s Countdown (`COUNTDOWN_MS 4000`), Wertung nach individuellem Beitrag (`groupByScore(... contrib)`) lädt zum Klauen ein, `ACT_LATCH_MS 900` klebt bei Lag.",
+  "fix": "Erste Bestellung als geführtes Tutorial mit Pfeilen; Koop-Münzen nach Sternen für alle gleich, Beitrag nur als Anzeige.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Kopfzeile Zeit · Punkte · Bestellungen, links Stick-Zone, Mitte „Du trägst“, rechts NEHMEN über AKTION."
+ },
+ {
+  "kind": "murder",
+  "title": "Mord im Ferienhaus",
+  "icon": "🔪",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 3
+  },
+  "funAvg": 3.7,
+  "strength": "Geheime Rollen auf dem Handy, Tote machen als Geist weiter Aufgaben.",
+  "weakness": "Aufgaben sind 15× Tippen (`TASK_TAPS 15`), reines Hämmern; der TV zeigt nur Raum-Zähler (Menü-Spiel).",
+  "fix": "Je Raum eine echte Mini-Aufgabe (Abwasch = Wischen, Betten = Ecken antippen) und am TV ein Grundriss mit Tür-Geräuschen.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "TIPPEN (22vh) ganz nach unten; AUSSCHALTEN/LEICHE MELDEN mit ≥ 24 px Abstand über den Räumen oder 300 ms halten."
+ },
+ {
+  "kind": "ttt",
+  "title": "Verräter im Ferienhaus",
+  "icon": "🏊",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 2
+  },
+  "funAvg": 3.3,
+  "strength": "Viel Systemtiefe: Shop, Detektiv mit Spurensuche, Fake-Funkspruch.",
+  "weakness": "Der gemeinsame TV zeigt alles (`TttScene.attackFx` enttarnt Angreifer), 3 Runden × `ROUND_MS 180 s` und Ausgeknockte warten bis zu 3 min.",
+  "fix": "Stromausfall-Modus (Licht aus `GeistScene` wiederverwenden), Angriffe im Dunkeln nur als „BONK!“, `ROUND_MS` 100 s, 2 Runden.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Stick links, ANGRIFF groß rechts unten, BENUTZEN schräg darüber, Rolle und Fach als kleine Tabs oben rechts, Shop als Sheet."
+ },
+ {
+  "kind": "verstecken",
+  "title": "Versteckspiel mit Möbeln",
+  "icon": "🪴",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Prop-Hunt-Idee passt hervorragend (Pfeifen für Punkte gegen Risiko), Gefundene werden Zuschauer.",
+  "weakness": "`HIDE_MS 25 s` plus lange Suche, Gefundene haben nichts zu tun.",
+  "fix": "Gefundene werden „Möbelrücker“ und verschieben einmal pro 20 s ein echtes Möbel.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Stick links, rechts Daumenbogen: EINRASTEN groß, VERWANDELN oben, PFEIFEN innen; Möbelvorschau in der Kopfzeile."
+ },
+ {
+  "kind": "fangen",
+  "title": "Urlaubs-Fangen",
+  "icon": "🕵️",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 3
+  },
+  "funAvg": 3.7,
+  "strength": "Asymmetrie mit privater Karte und Warm/Kalt-Ring.",
+  "weakness": "`rounds = min(n, MAX_ROUNDS 4)`: bei 12 Spielern ist nur ein Drittel je Animateur, die Wertung (`WIN_BONUS 20`) vergleicht aber alle.",
+  "fix": "Bei mehr als 4 Spielern 2 Animateure gleichzeitig, Punkte nur innerhalb der Rolle vergleichen.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Animateur: Stick links, Karte mittig (`height: 100%`), ABLENKUNG rechts; Fänger: Hitze mittig, Stick links, SPRINT rechts."
+ },
+ {
+  "kind": "geist",
+  "title": "Geisterjagd",
+  "icon": "👻",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Luigi’s-Mansion-Kern gut übertragen: Licht, Blitz, Erschreckte retten.",
+  "weakness": "Wie Fangen `rounds = min(n, 3)`, und Vibration ist am iPhone nicht verfügbar.",
+  "fix": "Ab 7 Spielern 2 Geister und als iOS-Ersatz ein Herzschlag-Ton am Handy bei Nähe.",
+  "orientation": "quer",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "M",
+  "orientationChange": "Geist: Karte mittig groß, Stick links, Status als rechte Spalte; Jäger: Stick links, LICHT rechts, Gänsehaut-Meter in der Kopfzeile."
+ },
+ {
+  "kind": "tourist",
+  "title": "Wer ist der Tourist?",
+  "icon": "🧳",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "34 Orte, Ankläger-Bonus, ab 9 Spielern 2 Touristen, Handy sagt „Lena fragt Ben“.",
+  "weakness": "6–8 min pro Runde, bis 4 Runden; für stille Gruppen tot.",
+  "fix": "`MAX_ROUNDS 2` als Standard und bei Stille nach 20 s eine Frage-Idee am TV vorschlagen.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "ANKLAGEN nicht direkt unter der Liste, erst nach 500 ms Halten auslösen."
+ },
+ {
+  "kind": "werwolf",
+  "title": "Werwölfe im Ferienhaus",
+  "icon": "🐺",
+  "category": "Geheime Rollen",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4.3,
+  "strength": "Nachts tippen alle (Verdacht, Schäfchen zählen), so verrät niemand seine Rolle; Tote sehen alle Rollen.",
+  "weakness": "Lang: ca. 12–18 min pro Spiel, und der TV zeigt Text-Panels ohne Erzähler.",
+  "fix": "Sprecher per `speechSynthesis` (deutsche Stimme): „Das Dorf schläft ein …“.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "„Jetzt abstimmen“ (VIP) nicht in die Daumenzone der Liste legen."
+ },
+ {
+  "kind": "wwe",
+  "title": "Wer würde eher ...?",
+  "icon": "🗳️",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Kostet nichts, funktioniert in jeder Gruppe, eigene Fragen möglich.",
+  "weakness": "Nur 5 Fragen, danach vorbei, kein Moment für Rechtfertigung.",
+  "fix": "Nach der Auflösung 10 s „Verteidigungsrede“: TV zeigt den Gewählten groß mit Countdown.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Frage als Kopf fixieren (`position: sticky`), nur das Grid scrollt (ab 9 Spielern 3 Spalten)."
+ },
+ {
+  "kind": "nhie",
+  "title": "Ich hab noch nie ...",
+  "icon": "🙊",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 4
+  },
+  "funAvg": 4,
+  "strength": "Trink-Klassiker, der immer funktioniert.",
+  "weakness": "Keine Pacing-Hilfe, Fragenqualität und endlicher Pool, Trinkzwang.",
+  "fix": "Kategorien („harmlos“, „schlimm“) einführen.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Keine Änderung nötig, Knöpfe sitzen schon unten."
+ },
+ {
+  "kind": "hilo",
+  "title": "Höher oder Tiefer",
+  "icon": "🃏",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 3,
+   "sonnet": 2,
+   "opus": 2
+  },
+  "funAvg": 2.3,
+  "strength": "Einfach und schnell.",
+  "weakness": "Reiner Zufall, glückslastig.",
+  "fix": "Einsatz setzen (1–3 Schlücke) bzw. Streak „Doppelt oder nichts“, damit es zur Mutprobe wird.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Keine Änderung nötig."
+ },
+ {
+  "kind": "bomb",
+  "title": "Tick-Tack-Bumm",
+  "icon": "⏰",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 3,
+   "opus": 4
+  },
+  "funAvg": 3.7,
+  "strength": "Laut, chaotisch, analog, Spannung durch Zünder (15–38 s).",
+  "weakness": "Hängt an der Gruppe, Tick-Geräusch am TV fehlt komplett.",
+  "fix": "Tick-Geräusch am TV, das schneller wird.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Knopf WEITERGEBEN unten auf `flex: 1`."
+ },
+ {
+  "kind": "stillepost",
+  "title": "Stille Post mit Bildern",
+  "icon": "🖍️",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 5,
+   "opus": 5
+  },
+  "funAvg": 5,
+  "strength": "Garantierte Lacher, eigene Startsätze, Likes.",
+  "weakness": "Bei 12 Spielern 45 + 6 × 70 + 5 × 45 s, also ca. 11,5 min malen und schreiben, danach 12 Ketten vorführen.",
+  "fix": "Kettenlänge auf max. 6 Schritte begrenzen und nur die 6 lustigsten Ketten (per Like gewählt) vorführen.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Palette und Werkzeuge unter dem Canvas in der Daumenzone, „Fertig!“ mit Abstand unter den Werkzeugen und farbig abgesetzt."
+ },
+ {
+  "kind": "sprueche",
+  "title": "Sprüche-Duell",
+  "icon": "🗯️",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 5,
+   "sonnet": 5,
+   "opus": 5
+  },
+  "funAvg": 5,
+  "strength": "Quiplash 1:1 inklusive ABRÄUMER und Sicherheits-Spruch.",
+  "weakness": "Bei 12 Spielern 12 Duelle pro Runde × (20 s Abstimmen + 8 s Auflösung), insgesamt ca. 15 min.",
+  "fix": "Ab 9 Spielern nur Runde 1 und Finale oder 2 Duelle gleichzeitig abstimmen lassen.",
+  "orientation": "hochkant (gesperrt)",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Prompt oben fixieren, damit die Tastatur ihn nicht wegschiebt."
+ },
+ {
+  "kind": "pixel",
+  "title": "Pixel-Galerie",
+  "icon": "🖼️",
+  "category": "Partyklassiker",
+  "fun": {
+   "haiku": 4,
+   "sonnet": 4,
+   "opus": 3
+  },
+  "funAvg": 3.7,
+  "strength": "Vernissage-Inszenierung mit Goldrahmen, verdeckte Abstimmung.",
+  "weakness": "16 × 16 Pixel sind für viele Themen zu grob, 75 s Malzeit ohne Interaktion.",
+  "fix": "Fälscher-Variante: Einer bekommt ein anderes Thema und muss es so malen, dass es passt.",
+  "orientation": "hochkant",
+  "orientationToday": "hochkant implizit",
+  "orientationEffort": "S",
+  "orientationChange": "Werkzeuge (`.px-tools` 36 px hoch) auf 44 px vergrößern."
+ }
+]

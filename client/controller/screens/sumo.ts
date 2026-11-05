@@ -2,9 +2,10 @@ import type { SumoState } from '../../../shared/types';
 import { SUMO } from '../../../shared/sumo';
 import { SHIRTS } from '../../../shared/avatar';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 
-/** Sumo-Steg: Joystick links, REMPELN rechts */
+/** Sumo-Steg (quer): schwebender Stick links, REMPELN rechts */
 export function pickSumo(s: SumoState): Screen {
   const id = store.playerId!;
   const mine = s.players[id];
@@ -15,24 +16,21 @@ export function pickSumo(s: SumoState): Screen {
     const look = me()?.look;
     const color = look ? SHIRTS[look.shirt] : '#f2c33a';
     const root = el(`
-      <div class="arena-head" style="border-color:${color}">
-        <span class="arena-av"></span>
-        <div><div class="arena-round su-round"></div><div class="arena-stats su-stats"></div></div>
-      </div>
-      <p class="hint arena-hint su-hint"></p>
-      <div class="arena-controls">
-        <div class="stick-area"></div>
-        <button class="big-btn su-dash">REMPELN<span class="su-cd"></span></button>
+      <div class="lx ar-lx su-lx" style="--ar-color:${color}">
+        <div class="lx-head"><span class="arena-av"></span><span class="arena-round su-round"></span><span class="arena-stats su-stats grow"></span></div>
+        <div class="lx-left ar-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+        <div class="lx-mid"><p class="hint arena-hint su-hint"></p></div>
+        <div class="lx-right"><button class="big-btn su-dash">REMPELN<span class="su-cd"></span></button></div>
       </div>
     `);
-    if (look) q(root, '.arena-av').append(avatarCanvas(3, look));
-    joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+    if (look) q(root, '.arena-av').append(avatarCanvas(1, look));
+    stickZone(q(root, '.ar-stick'), (x, y) => send('stick', { x, y }));
     const dash = q<HTMLButtonElement>(root, '.su-dash');
     const cd = q(root, '.su-cd');
     tapButton(dash, () => {
       if (dash.disabled) return;
       send('dash');
-      navigator.vibrate?.(30);
+      haptic(30);
     });
     let hits = mine.hits;
     app.append(root);
@@ -51,7 +49,7 @@ export function pickSumo(s: SumoState): Screen {
       q(root, '.su-hint').textContent = hint;
       if (p.hits > hits) {
         hits = p.hits;
-        navigator.vibrate?.([40, 30, 60]);
+        haptic([40, 30, 60]);
       }
       const ready = st.sub === 'play' && p.alive && p.cd <= 0;
       dash.disabled = !ready;

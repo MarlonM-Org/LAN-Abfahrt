@@ -9,10 +9,19 @@ import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
 import { GREEN_INK, PLACE_COLORS, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 import { drawSessionBoard, seriesTitle } from './sessionBoard';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { say, spokenName } from './speech';
 
 /** Einzelspiel-Ergebnis: erst dieses Spiel, dann das Leaderboard des Abends – im Wechsel */
 const STAGE_GAME_MS = 7000;
 const STAGE_BOARD_MS = 11000;
+/** Ergebnis-Aufbau: Plätze von hinten nach vorn im Abstand von 200 ms, Sieger nach dem Trommelwirbel */
+const REVEAL_START = 300;
+const REVEAL_STEP = 200;
+const DRUMROLL_S = 1.5;
+
+type C = Phaser.GameObjects.Container;
 
 export class ResultsScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container;
@@ -21,6 +30,11 @@ export class ResultsScene extends Phaser.Scene {
   private stage: 'game' | 'board' = 'game';
   private stageTimer: Phaser.Time.TimerEvent | null = null;
   private stageFor: unknown = null;
+  private juice!: Juice;
+  /** Welches Ergebnis schon aufgebaut wurde (nur ein neues Ergebnis wird animiert und vertont) */
+  private revealKey = '';
+  private anim = false;
+  private revealTimers: Phaser.Time.TimerEvent[] = [];
 
   constructor() {
     super('results');
@@ -31,6 +45,9 @@ export class ResultsScene extends Phaser.Scene {
     this.stage = 'game';
     this.stageTimer = null;
     this.stageFor = null;
+    this.revealKey = '';
+    this.anim = false;
+    this.revealTimers = [];
     background(this, 'results', WORLD.W, WORLD.H, (p) => {
       paintGrass(p, 0, 0, WORLD.W, WORLD.H, 61);
       paintPath(p, [{ x: 0, y: 250 }, { x: 480, y: 246 }], 18, 62);
@@ -40,6 +57,7 @@ export class ResultsScene extends Phaser.Scene {
     prop(this, 'fruitTree', () => O.fruitTree(3), 34, 236);
     prop(this, 'bush4', () => O.bush(4, true), 446, 236);
     this.layer = this.add.container(0, 0).setDepth(500);
+    this.juice = new Juice(this, { depth: 600 });
 
     const onState = (s: GameState) => this.render(s);
     bus.on('state', onState);
@@ -80,6 +98,11 @@ export class ResultsScene extends Phaser.Scene {
     if (key === this.stateKey) return;
     this.stateKey = key;
     this.layer.removeAll(true);
+    for (const t of this.revealTimers) t.remove();
+    this.revealTimers = [];
+    const rk = r ? JSON.stringify([r.title, r.subtitle, r.rows, r.final]) : '';
+    this.anim = !!r && rk !== this.revealKey && this.stage === 'game';
+    if (r) this.revealKey = rk;
     if (!r) return;
     if (single) return this.renderSingle(s);
 
@@ -164,20 +187,92 @@ export class ResultsScene extends Phaser.Scene {
     const x = 60, y = top, w = 360;
     const rowH = Math.min(22, Math.floor((236 - top) / Math.max(1, r.rows.length)));
     this.layer.add(panel(this, x, y, w, rowH * r.rows.length + 16));
+    const plan = this.anim ? this.revealPlan(r.rows.map((row) => row.place)) : null;
     r.rows.forEach((row, i) => {
+      const rc = this.add.container(0, 0);
+      this.layer.add(rc);
       const p = playerById(row.playerId);
       const ry = y + 8 + i * rowH;
       const color = r.hearts !== undefined ? '#3d2414' : PLACE_COLORS[Math.min(row.place - 1, PLACE_COLORS.length - 1)];
-      if (r.hearts === undefined) this.layer.add(ink(this, x + 14, ry + 6, `${row.place}.`, { origin: [0, 0], color }));
-      if (p) this.layer.add(this.add.image(x + 44, ry + rowH - 3, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
-      this.layer.add(ink(this, x + 58, ry + 6, p?.name ?? '?', { origin: [0, 0], color }));
-      this.layer.add(ink(this, x + 156, ry + 6, row.detail.slice(0, r.hearts !== undefined ? 24 : 16), { origin: [0, 0], color: '#7a5a3a' }));
+      if (r.hearts === undefined) rc.add(ink(this, x + 14, ry + 6, `${row.place}.`, { origin: [0, 0], color }));
+      if (p) rc.add(this.add.image(x + 44, ry + rowH - 3, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
+      rc.add(ink(this, x + 58, ry + 6, p?.name ?? '?', { origin: [0, 0], color }));
+      rc.add(ink(this, x + 156, ry + 6, row.detail.slice(0, r.hearts !== undefined ? 24 : 16), { origin: [0, 0], color: '#7a5a3a' }));
+      let gain: { t: Phaser.GameObjects.Text; n: number; fmt: (v: number) => string } | null = null;
       if (s.partyActive) {
-        this.layer.add(this.add.image(x + w - 46, ry + 9, ensureTex(this, 'coin', O.coinIcon)));
-        this.layer.add(ink(this, x + w - 14, ry + 6, `+${row.coins}`, { origin: [1, 0] }));
+        rc.add(this.add.image(x + w - 46, ry + 9, ensureTex(this, 'coin', O.coinIcon)));
+        const fmt = (v: number) => `+${v}`;
+        gain = { t: ink(this, x + w - 14, ry + 6, fmt(row.coins), { origin: [1, 0] }), n: row.coins, fmt };
       } else if (r.points) {
-        this.layer.add(ink(this, x + w - 14, ry + 6, `+${r.points[row.playerId] ?? 0} Pkt`, { origin: [1, 0], color: GREEN_INK }));
+        const fmt = (v: number) => `+${v} Pkt`;
+        const n = r.points[row.playerId] ?? 0;
+        gain = { t: ink(this, x + w - 14, ry + 6, fmt(n), { origin: [1, 0], color: GREEN_INK }), n, fmt };
       }
+      if (gain) rc.add(gain.t);
+      if (!plan) return;
+      rc.setAlpha(0).setX(-14);
+      if (gain) gain.t.setText(gain.fmt(0));
+      this.at(plan.delays[i], () => {
+        this.tweens.add({ targets: rc, alpha: 1, x: 0, duration: 220, ease: 'Back.Out' });
+        if (row.place !== 1) sfx('pop', { x: x + 58, pitch: 0.8 + 0.4 / Math.max(1, row.place - 1), vol: 0.7 });
+        if (gain && gain.n > 0) this.countUp(gain.t, gain.n, gain.fmt, row.place === 1);
+        if (row.place === 1) {
+          this.juice.burst(x + 58, ry + 6, 'confetti', 30);
+          this.juice.burst(x + w - 30, ry + 6, 'confetti', 20);
+        }
+      });
+    });
+    if (plan) this.revealSound(plan, r.rows.filter((row) => row.place === 1).map((row) => row.playerId), r.hearts === undefined);
+  }
+
+  /** Verzögerung (ms) je Eintrag: höchste Plätze zuerst im 200-ms-Takt, Platz 1 nach dem Trommelwirbel */
+  private revealPlan(places: number[]) {
+    const order = places.map((pl, i) => ({ pl, i })).filter((e) => e.pl !== 1).sort((a, b) => b.pl - a.pl || b.i - a.i);
+    const delays: number[] = places.map(() => 0);
+    order.forEach((e, k) => (delays[e.i] = REVEAL_START + k * REVEAL_STEP));
+    const winnerAt = Math.max(DRUMROLL_S * 1000 + 100, REVEAL_START + order.length * REVEAL_STEP + 400);
+    places.forEach((pl, i) => {
+      if (pl === 1) delays[i] = winnerAt;
+    });
+    return { delays, winnerAt, hasWinner: places.includes(1) };
+  }
+
+  /** Trommelwirbel bis zum Sieger, dann Fanfare + Ansage */
+  private revealSound(plan: { winnerAt: number; hasWinner: boolean }, winners: string[], announce: boolean) {
+    if (!plan.hasWinner) return;
+    sfx('drumroll', { delay: Math.max(0, plan.winnerAt / 1000 - DRUMROLL_S) });
+    this.at(plan.winnerAt, () => {
+      sfx('fanfare');
+      sfx('cheer', { vol: 0.8, delay: 0.3 });
+      this.juice.flash(0xfff4d6, 220);
+      const names = winners.map((id) => spokenName(playerById(id)?.name));
+      if (!announce || !names.length) return;
+      if (names.length === 1) say(`${names[0]} gewinnt!`);
+      else if (names.length <= 3) say(`${names.slice(0, -1).join(', ')} und ${names.at(-1)} gewinnen!`);
+      else say(`${names.length} Sieger!`);
+    });
+  }
+
+  private at(ms: number, fn: () => void) {
+    this.revealTimers.push(this.time.delayedCall(ms, fn));
+  }
+
+  /** Münzen/Punkte hochzählen */
+  private countUp(t: Phaser.GameObjects.Text, n: number, fmt: (v: number) => string, big: boolean) {
+    this.tweens.addCounter({
+      from: 0, to: n, duration: Math.min(900, 250 + n * 40), ease: 'Quad.Out',
+      onUpdate: (tw) => {
+        const v = Math.round(tw.getValue() ?? n);
+        if (t.active && t.text !== fmt(v)) {
+          t.setText(fmt(v));
+          sfx('tick', { pitch: 1.4, vol: 0.4 });
+        }
+      },
+      onComplete: () => {
+        if (!t.active) return;
+        t.setText(fmt(n));
+        sfx('coin', { pitch: big ? 1.2 : 1, vol: big ? 0.9 : 0.5 });
+      },
     });
   }
 
@@ -190,6 +285,7 @@ export class ResultsScene extends Phaser.Scene {
     ];
     const baseY = 214;
     const crate = ensureTex(this, 'crate', O.crate);
+    const units: { place: number; c: C }[] = [];
     for (const slot of podium) {
       for (let k = 0; k < slot.h; k++) {
         for (const dx of [-16, 0, 16]) this.layer.add(this.add.image(slot.x + dx, baseY - k * 16, crate).setOrigin(0.5, 1));
@@ -197,25 +293,31 @@ export class ResultsScene extends Phaser.Scene {
       const top = baseY - slot.h * 16;
       this.layer.add(ink(this, slot.x, baseY - 12, String(slot.place), { size: 8, color: C.white }).setShadow(1, 1, '#2d1b12', 0, false, true));
       const row = r.rows.filter((rw) => rw.place === slot.place);
+      const sc = this.add.container(0, 0);
+      this.layer.add(sc);
+      if (row.length) units.push({ place: slot.place, c: sc });
       row.slice(0, 3).forEach((rw, i) => {
         const p = playerById(rw.playerId);
         if (!p) return;
         const ox = (i - (Math.min(3, row.length) - 1) / 2) * 24;
         const f = figure(this, p.look, slot.x + ox, top, 2);
-        this.layer.add(f);
+        sc.add(f);
         if (slot.place === 1) {
           this.tweens.add({ targets: f.getData('img'), y: -6, duration: 300, yoyo: true, repeat: -1 });
-          this.layer.add(this.add.image(slot.x + ox, top - 62, ensureTex(this, 'crown', O.crown)).setScale(2));
+          sc.add(this.add.image(slot.x + ox, top - 62, ensureTex(this, 'crown', O.crown)).setScale(2));
         }
       });
       const names = row.map((rw) => playerById(rw.playerId)?.name ?? '?').join(', ');
       const detail = row[0]?.detail.replace(' Cocktails · ', ' Cockt.\n').replace(' Münzen', ' $') ?? '';
       if (row.length) {
-        this.layer.add(nameTag(this, slot.x, baseY + 2, names.slice(0, 10)));
-        this.layer.add(ink(this, slot.x, baseY + 16, detail, { color: '#7a5a3a' }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
+        sc.add(nameTag(this, slot.x, baseY + 2, names.slice(0, 10)));
+        sc.add(ink(this, slot.x, baseY + 16, detail, { color: '#7a5a3a' }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
       }
     }
     const rest = r.rows.filter((rw) => rw.place > 3);
+    const restC = this.add.container(0, 0);
+    this.layer.add(restC);
+    if (rest.length) units.push({ place: 99, c: restC });
     if (rest.length > 5) {
       // Viele Spieler (bis 12): Plätze ab 4 als zwei Listen links und rechts neben dem Podest
       const half = Math.ceil(rest.length / 2);
@@ -223,11 +325,29 @@ export class ResultsScene extends Phaser.Scene {
         const left = i < half;
         const line = `${rw.place}. ${(playerById(rw.playerId)?.name ?? '?').slice(0, 9)}`;
         const t = ink(this, left ? 6 : WORLD.W - 6, 72 + (left ? i : i - half) * 13, line, { origin: [left ? 0 : 1, 0] });
-        this.layer.add(t.setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
+        restC.add(t.setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
       });
     } else if (rest.length) {
       const line = rest.map((rw) => `${rw.place}. ${playerById(rw.playerId)?.name ?? '?'}`).join('  ');
-      this.layer.add(ink(this, WORLD.W / 2, 72, line).setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
+      restC.add(ink(this, WORLD.W / 2, 72, line).setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
     }
+
+    // Aufbau: erst die Plätze ab 4, dann 3, 2 – und nach dem Trommelwirbel der Sieger mit Konfetti
+    if (!this.anim) return;
+    const plan = this.revealPlan(units.map((u) => u.place));
+    units.forEach((u, i) => {
+      u.c.setAlpha(0).setY(u.place === 99 ? 0 : -40);
+      this.at(plan.delays[i], () => {
+        this.tweens.add({ targets: u.c, alpha: 1, y: 0, duration: u.place === 99 ? 250 : 420, ease: u.place === 99 ? 'Quad.Out' : 'Bounce.Out' });
+        if (u.place !== 1) sfx(u.place === 99 ? 'pop' : 'select', { pitch: u.place === 2 ? 1.2 : 1 });
+        else {
+          this.juice.burst(240, 120, 'confetti', 60);
+          this.juice.burst(136, 150, 'confetti', 25);
+          this.juice.burst(344, 160, 'confetti', 25);
+          this.juice.shake(1);
+        }
+      });
+    });
+    this.revealSound(plan, r.rows.filter((rw) => rw.place === 1).map((rw) => rw.playerId), true);
   }
 }

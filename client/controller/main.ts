@@ -29,6 +29,7 @@ import { pickSmash } from './screens/smash';
 import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
+import { pickSpion } from './screens/spion';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
@@ -39,6 +40,7 @@ import { pickPixel } from './screens/pixel';
 import { pickWpistole } from './screens/wpistole';
 import { pickAngeln } from './screens/angeln';
 import { pickKoffer } from './screens/koffer';
+import { pickSuess } from './screens/suess';
 import { pickUmzug } from './screens/umzug';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
@@ -47,6 +49,8 @@ import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
+import { initVipMenu } from './vipMenu';
+import { onRotate, syncOrientation } from './orientation';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -151,7 +155,11 @@ socket.on('state', (s: GameState) => {
   const prevKey = timerKey(store.state);
   store.state = s;
   const key = timerKey(s);
-  if (key !== prevKey && s.mini && 'endsIn' in s.mini.state) store.endsAt = performance.now() + s.mini.state.endsIn;
+  if (key !== prevKey && s.mini && 'endsIn' in s.mini.state) {
+    store.endsAt = performance.now() + s.mini.state.endsIn;
+    // endsIn 0 zu Beginn einer Phase = kein Zeitlimit
+    store.noTimer = s.mini.state.endsIn <= 0;
+  }
   // Server neu gestartet oder aus der Lobby geflogen → neu beitreten
   if (store.joined && !s.players.some((p) => p.id === store.playerId)) {
     store.joined = false;
@@ -198,6 +206,7 @@ function render() {
     }
   }
   syncVipAbort();
+  syncOrientation(screen);
   try {
     updater?.();
   } catch (e) {
@@ -328,6 +337,10 @@ function pickScreen(): Screen {
           return pickAngeln(m.state);
         case 'koffer':
           return pickKoffer(m.state);
+        case 'suess':
+          return pickSuess(m.state);
+        case 'spion':
+          return pickSpion(m.state);
         case 'umzug':
           return pickUmzug(m.state);
       }
@@ -374,7 +387,14 @@ async function requestWakeLock() {
 }
 
 onKartRerender(() => render());
+// Handy gedreht: Werte nachziehen; Darts/Golf berechnen ihre Größe einmalig → neu bauen (beim Drehen tippt niemand)
+onRotate(() => {
+  const k = store.state?.mini?.kind;
+  if (store.state?.phase === 'mini' && (k === 'darts' || k === 'golf')) screenKey = '';
+  render();
+});
 initVipPlayersButton();
+initVipMenu();
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

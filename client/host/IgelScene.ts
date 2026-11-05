@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { GameState, IgelFx, IgelState, Look } from '../../shared/types';
-import { IGEL, IGEL_COLORS, WEAPONS, type Mask, carve, genTerrain, seeded, surfaceY, windArrows } from '../../shared/igel';
+import { IGEL, IGEL_COLORS, WEAPONS, type Mask, carve, genTerrain, seeded, surfaceY } from '../../shared/igel';
 import { C } from '../art/palette';
+import { cloud } from '../art/flieger';
 import * as O from '../art/objects';
 import { coconut, hedgehog, paintCrater, paintIslandSky, paintTerrain, sandcastle, swimRing, waterBomb } from '../art/igel';
 import { bus, getState, playerById } from './store';
@@ -11,6 +12,15 @@ const TERRAIN_KEY = 'igel_terrain';
 const lookKey = (l: Look) => `${l.hair}_${l.hairStyle}_${l.shirt}`;
 const colorOf = (st: IgelState, id: string) => IGEL_COLORS[Math.max(0, st.teams.indexOf(id)) % IGEL_COLORS.length];
 const colorNum = (s: string) => parseInt(s.slice(1), 16);
+/** Kamera: Zoom auf den aktiven Igel / das Geschoss, Überblick in der Settle-Phase */
+const ZOOM_NEAR = 1.5;
+const CAM_PAN_MS = 600;
+/** So lange bleibt die Kamera nach dem Einschlag auf dem Krater stehen */
+const CAM_HOLD_MS = 300;
+/** Wolken ziehen mit wind × 40 px/s */
+const CLOUD_SPEED = 40;
+
+type CamMode = 'overview' | 'hog' | 'proj' | 'hold';
 
 interface HogView {
   c: Phaser.GameObjects.Container;
@@ -45,6 +55,17 @@ export class IgelScene extends Phaser.Scene {
   private lastFx = -1;
   private waterY: number = IGEL.WATER_Y;
   private latest: GameState | null = null;
+  /** Eigene HUD-Kamera: HUD und Banner bleiben fix, während die Hauptkamera zoomt und schwenkt */
+  private hudCam!: Phaser.Cameras.Scene2D.Camera;
+  private hudBuilding = false;
+  private camMode: CamMode = 'overview';
+  private camTurn = -1;
+  private camHoldUntil = 0;
+  private followProj = -1;
+  private clouds!: Phaser.GameObjects.TileSprite;
+  private specks: { r: Phaser.GameObjects.Rectangle; x: number; y: number; ph: number }[] = [];
+  private bubbles: { t: Phaser.GameObjects.Text; hog: number; until: number }[] = [];
+  private windG!: Phaser.GameObjects.Graphics;
 
   constructor() {
     super('igel');
@@ -63,16 +84,49 @@ export class IgelScene extends Phaser.Scene {
     this.lastFx = -1;
     this.waterY = IGEL.WATER_Y;
     this.latest = null;
+    this.camMode = 'overview';
+    this.camTurn = -1;
+    this.camHoldUntil = 0;
+    this.followProj = -1;
+    this.specks = [];
+    this.bubbles = [];
+    this.hudBuilding = false;
+
+    // Kameras: Hauptkamera für die Welt (Zoom/Schwenk), HUD-Kamera fix darüber.
+    // Alles, was neu in die Szene kommt, sieht die HUD-Kamera nicht – außer beim HUD-Aufbau.
+    const main = this.cameras.main;
+    main.setBounds(0, 0, IGEL.W, IGEL.H).setZoom(1).centerOn(IGEL.W / 2, IGEL.H / 2);
+    this.hudCam = this.cameras.add(0, 0, IGEL.W, IGEL.H);
+    const onAdded = (go: Phaser.GameObjects.GameObject) => {
+      if (!this.hudBuilding) this.hudCam.ignore(go);
+    };
+    this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
+
     background(this, 'igelsky', IGEL.W, IGEL.H, (p) => paintIslandSky(p, 9));
+    this.clouds = this.add.tileSprite(0, 6, IGEL.W, 96, ensureTex(this, 'igel_clouds', () => this.cloudStrip())).setOrigin(0, 0).setDepth(-900).setAlpha(0.85);
+    for (let i = 0; i < 18; i++) {
+      const x = Math.random() * IGEL.W;
+      const y = 30 + Math.random() * 170;
+      const r = this.add.rectangle(x, y, i % 3 ? 2 : 3, 1, i % 3 ? 0xf3e2b0 : 0x7cc46a).setDepth(5).setAlpha(0);
+      this.specks.push({ r, x, y, ph: Math.random() * Math.PI * 2 });
+    }
     this.aimG = this.add.graphics().setDepth(25);
     this.waterG = this.add.graphics().setDepth(30);
-    this.hud = this.add.container(0, 0).setDepth(1000);
     this.activeName = txt(this, 0, 0, '', {}).setDepth(26);
+    this.hudBuilding = true;
+    this.hud = this.add.container(0, 0).setDepth(1000);
     this.banner = txt(this, IGEL.W / 2, 92, '', { size: 24, color: GOLD }).setDepth(1001);
     this.bannerSub = txt(this, IGEL.W / 2, 124, '', { size: 8 }).setDepth(1001);
+    this.windG = this.add.graphics().setDepth(1002);
+    this.hudBuilding = false;
+    main.ignore([this.hud, this.banner, this.bannerSub, this.windG]);
+
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      bus.off('state', fn);
+      this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
+    });
     const s = getState();
     if (s) this.onState(s);
   }
@@ -169,13 +223,21 @@ export class IgelScene extends Phaser.Scene {
         }
         v.state = h.state;
       }
-      v.label.setText(String(Math.max(0, h.hp)));
+      // Schaden zählt erst am Zugende herunter (Server liefert `shown`)
+      v.label.setText(String(Math.max(0, h.shown ?? h.hp)));
     }
 
     // Geschosse
     const alive = new Set(st.projs.map((p) => p.id));
     for (const [id, p] of this.projs) {
       if (!alive.has(id)) {
+        if (this.followProj === id) {
+          // Kurz auf dem Krater stehen bleiben
+          this.cameras.main.stopFollow();
+          this.followProj = -1;
+          this.camMode = 'hold';
+          this.camHoldUntil = this.time.now + CAM_HOLD_MS;
+        }
         p.img.destroy();
         this.projs.delete(id);
       }
@@ -183,7 +245,17 @@ export class IgelScene extends Phaser.Scene {
     for (const p of st.projs) {
       if (this.projs.has(p.id)) continue;
       const key = p.type === 'bazooka' ? ensureTex(this, 'igel_coco', coconut) : ensureTex(this, 'igel_bomb', waterBomb);
-      this.projs.set(p.id, { img: this.add.image(p.x, p.y, key).setDepth(20), x: p.x, y: p.y });
+      const img = this.add.image(p.x, p.y, key).setDepth(20);
+      this.projs.set(p.id, { img, x: p.x, y: p.y });
+      if (this.followProj === -1) {
+        // Kamera folgt dem Geschoss
+        const cam = this.cameras.main;
+        cam.panEffect.reset();
+        cam.zoomTo(ZOOM_NEAR, 250, 'Sine.easeOut', true);
+        cam.startFollow(img, true, 0.25, 0.25);
+        this.followProj = p.id;
+        this.camMode = 'proj';
+      }
     }
 
     // Effekte
@@ -209,6 +281,34 @@ export class IgelScene extends Phaser.Scene {
     this.renderHud(st);
   }
 
+  /** Wolkenband (nahtlos kachelbar) für die Windebene */
+  private cloudStrip(): HTMLCanvasElement {
+    const c = document.createElement('canvas');
+    c.width = IGEL.W;
+    c.height = 96;
+    const ctx = c.getContext('2d')!;
+    const spots = [
+      [20, 8, 1],
+      [130, 40, 4],
+      [235, 14, 2],
+      [330, 52, 5],
+      [410, 22, 3],
+    ];
+    for (const [x, y, seed] of spots) ctx.drawImage(cloud(seed).canvas, x, y);
+    return c;
+  }
+
+  private showBanner(text: string, sub: string, ms: number) {
+    this.banner.setText(text).setData('fx', true);
+    this.bannerSub.setText(sub);
+    this.time.delayedCall(ms, () => {
+      if (this.banner.text !== text) return;
+      this.banner.setData('fx', false);
+      this.banner.setText('');
+      this.bannerSub.setText('');
+    });
+  }
+
   private hogTex(look: Look, frame: number) {
     return ensureTex(this, `igel_hog_${lookKey(look)}_${frame}`, () => hedgehog(look, frame));
   }
@@ -216,10 +316,19 @@ export class IgelScene extends Phaser.Scene {
   private renderHud(st: IgelState) {
     const secs = st.sub === 'aim' || st.sub === 'retreat' ? Math.ceil(st.endsIn / 1000) : null;
     const flood = st.suddenDeath ? 'FLUT!' : `Flut ${Math.floor(st.suddenIn / 60000)}:${String(Math.floor(st.suddenIn / 1000) % 60).padStart(2, '0')}`;
-    const hpOf = (id: string) => st.hogs.filter((h) => h.owner === id && h.state === 'ok').reduce((a, h) => a + h.hp, 0);
+    const hpOf = (id: string) => st.hogs.filter((h) => h.owner === id && h.state === 'ok').reduce((a, h) => a + Math.max(0, h.shown ?? h.hp), 0);
     const key = JSON.stringify([st.active, secs, st.sub, st.weapon, st.wind, flood, st.teams.map(hpOf)]);
     if (key === this.hudKey) return;
     this.hudKey = key;
+    this.hudBuilding = true;
+    try {
+      this.buildHud(st, secs, flood, hpOf);
+    } finally {
+      this.hudBuilding = false;
+    }
+  }
+
+  private buildHud(st: IgelState, secs: number | null, flood: string, hpOf: (id: string) => number) {
     this.hud.removeAll(true);
     this.hud.add(panel(this, 2, 2, 476, 20));
     if (st.active) {
@@ -230,8 +339,20 @@ export class IgelScene extends Phaser.Scene {
     } else {
       this.hud.add(ink(this, 10, 8, st.sub === 'countdown' ? 'Igel auf Position ...' : '...', { origin: [0, 0] }));
     }
-    const wind = Math.abs(st.wind) < 0.17 ? 'Wind -' : `Wind ${windArrows(st.wind)}`;
-    this.hud.add(ink(this, 470, 8, `${wind}  ${flood}`, { origin: [1, 0], color: st.suddenDeath ? '#a8342a' : undefined }));
+    // Windbalken: Mitte = windstill, nach links/rechts so weit wie der Wind
+    this.hud.add(ink(this, 318, 8, 'Wind', { origin: [1, 0] }));
+    const bx = 322;
+    const bw = 64;
+    const g = this.windG;
+    g.clear();
+    g.fillStyle(0x2d1b12).fillRect(bx, 8, bw, 8);
+    g.fillStyle(0xfff4d6).fillRect(bx + 1, 9, bw - 2, 6);
+    const half = (bw - 2) / 2;
+    const len = Math.round(Math.abs(st.wind) * half);
+    const col = Math.abs(st.wind) > 0.66 ? 0xe0503f : Math.abs(st.wind) > 0.33 ? 0xf2c33a : 0x46b04a;
+    if (len > 0) g.fillStyle(col).fillRect(st.wind > 0 ? bx + 1 + half : bx + 1 + half - len, 9, len, 6);
+    g.fillStyle(0x2d1b12).fillRect(bx + bw / 2 - 0.5, 7, 1, 10);
+    this.hud.add(ink(this, 470, 8, flood, { origin: [1, 0], color: st.suddenDeath ? '#a8342a' : undefined }));
 
     // Team-Übersicht unten (über dem Wasser)
     const n = st.teams.length;
@@ -310,24 +431,76 @@ export class IgelScene extends Phaser.Scene {
         this.tweens.add({ targets: t, y: t.y - 14, alpha: 0, duration: 1500, onComplete: () => t.destroy() });
         break;
       }
-      case 'water': {
-        this.banner.setText(f.text ?? 'FLUT!').setData('fx', true);
-        this.bannerSub.setText('');
-        this.time.delayedCall(1800, () => {
-          this.banner.setData('fx', false);
-          this.banner.setText('');
-        });
+      case 'water':
+        this.showBanner(f.text ?? 'FLUT!', '', 1800);
+        break;
+      case 'taunt': {
+        if (f.hog === undefined || !f.text) break;
+        // Pro Igel nur eine Blase – ein neuer Spruch ersetzt den alten
+        for (const b of this.bubbles.filter((b) => b.hog === f.hog)) b.t.destroy();
+        this.bubbles = this.bubbles.filter((b) => b.hog !== f.hog);
+        const t = ink(this, f.x, f.y - 30, f.text, { origin: [0.5, 1] }).setBackgroundColor('#fff6dc').setPadding(3, 2, 3, 2).setDepth(45).setScale(0.3);
+        this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.out' });
+        this.bubbles.push({ t, hog: f.hog, until: this.time.now + IGEL.TAUNT_SHOW_MS });
         break;
       }
     }
   }
 
+  // ---------------------------------------------------------------- Kamera
+
+  private updateCamera(st: IgelState) {
+    const cam = this.cameras.main;
+    const ah = st.activeHog !== null ? this.hogs.get(st.activeHog) : undefined;
+    // Zugbeginn: Schwenk + Zoom auf den aktiven Igel, Banner „<Name> ist dran“
+    if (st.sub === 'aim' && st.turn !== this.camTurn && ah) {
+      this.camTurn = st.turn;
+      this.camMode = 'hog';
+      this.followProj = -1;
+      cam.stopFollow();
+      const target = ah;
+      cam.pan(target.x, target.y - 16, CAM_PAN_MS, 'Sine.easeInOut', true, (_c: Phaser.Cameras.Scene2D.Camera, progress: number) => {
+        if (progress === 1 && this.camMode === 'hog') cam.startFollow(target.c, true, 0.1, 0.1, 0, 16);
+      });
+      cam.zoomTo(ZOOM_NEAR, CAM_PAN_MS, 'Sine.easeInOut', true);
+      const name = st.active ? (playerById(st.active)?.name ?? '?') : '?';
+      this.showBanner(`${name} ist dran`, '', 1400);
+      return;
+    }
+    if (this.camMode === 'proj') return;
+    if (this.camMode === 'hold' && this.time.now < this.camHoldUntil) return;
+    const want: CamMode = st.sub === 'aim' || st.sub === 'retreat' || st.sub === 'flight' ? 'hog' : 'overview';
+    if (want === this.camMode) return;
+    this.camMode = want;
+    cam.stopFollow();
+    cam.panEffect.reset();
+    if (want === 'hog' && ah) {
+      // Rückzug (nach Einschlag, Teleport oder Schlag): wieder dem eigenen Igel folgen
+      cam.zoomTo(ZOOM_NEAR, 300, 'Sine.easeOut', true);
+      cam.startFollow(ah.c, true, 0.12, 0.12, 0, 16);
+    } else {
+      // Settle/Ende: Überblick über die ganze Insel
+      cam.pan(IGEL.W / 2, IGEL.H / 2, 500, 'Sine.easeInOut', true);
+      cam.zoomTo(1, 500, 'Sine.easeInOut', true);
+    }
+  }
+
   // ---------------------------------------------------------------- Frame
 
-  update(time: number) {
+  update(time: number, delta: number) {
     const s = this.latest;
     if (s?.mini?.kind !== 'igel') return;
     const st = s.mini.state;
+    const dt = Math.min(0.1, delta / 1000);
+
+    // Wind: Wolkenebene und ein paar Sandkörner/Blätter ziehen mit
+    this.clouds.tilePositionX -= st.wind * CLOUD_SPEED * dt;
+    for (const p of this.specks) {
+      p.x += st.wind * CLOUD_SPEED * 2.2 * dt;
+      if (p.x > IGEL.W + 4) p.x -= IGEL.W + 8;
+      if (p.x < -4) p.x += IGEL.W + 8;
+      p.r.setPosition(Math.round(p.x), Math.round(p.y + Math.sin(time / 300 + p.ph) * 3)).setAlpha(Math.min(0.9, Math.abs(st.wind) * 1.2));
+    }
 
     // Igel
     for (const h of st.hogs) {
@@ -345,6 +518,21 @@ export class IgelScene extends Phaser.Scene {
       }
       v.c.setDepth(h.id === st.activeHog ? 12 : 10);
     }
+
+    this.updateCamera(st);
+
+    // Sprechblasen der Zuschauer folgen ihrem Igel
+    this.bubbles = this.bubbles.filter((b) => {
+      const v = this.hogs.get(b.hog);
+      if (time >= b.until || !v) {
+        this.tweens.add({ targets: b.t, alpha: 0, duration: 250, onComplete: () => b.t.destroy() });
+        return false;
+      }
+      const hs = st.hogs[b.hog];
+      const drowned = hs?.state === 'drowned';
+      b.t.setPosition(Math.round(drowned ? b.t.x : v.x), Math.round(drowned ? this.waterY - 12 : v.y - 30));
+      return true;
+    });
 
     // Aktiver Igel: Pfeil + Name
     this.aimG.clear();

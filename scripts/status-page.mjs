@@ -16,6 +16,7 @@ for (const m of block.matchAll(/^\s+(\w+): \{ title: '([^']+)'(.*)$/gm)) {
     title: m[2],
     icon: /icon: '([^']+)'/.exec(rest)?.[1] ?? '🎮',
     inspired: /inspiredBy: '([^']+)'/.exec(rest)?.[1] ?? '',
+    orient: /orientation: '(\w+)'/.exec(rest)?.[1] ?? '',
   };
 }
 const groups = [];
@@ -39,7 +40,7 @@ const card = (t) => `<div class="card wip-card"><div class="row"><span class="ta
 
 const gameRow = (k) => {
   const g = info[k]; const fb = data.feedback[k];
-  return `<tr><td class="ic">${g.icon}</td><td><b>${esc(g.title)}</b>${g.inspired ? `<div class="sub">à la ${esc(g.inspired)}</div>` : ''}</td>
+  return `<tr><td class="ic">${g.icon}</td><td><b>${esc(g.title)}</b>${g.orient === 'landscape' ? ' <span title="Handy quer">↔</span>' : g.orient === 'portrait' ? ' <span title="Handy hochkant">↕</span>' : ''}${g.inspired ? `<div class="sub">à la ${esc(g.inspired)}</div>` : ''}</td>
 <td><span class="pill ${fb ? fbClass[fb.status] ?? 'open' : 'none'}">${fb ? esc(fb.status) : 'noch kein Feedback'}</span></td><td class="notes">${fb ? esc(fb.notes) : ''}</td></tr>`;
 };
 
@@ -80,7 +81,7 @@ ul.done a{color:#b9a8ff;text-decoration:none;font-size:13px}.d{color:var(--mut);
 @media (max-width:640px){body{padding:14px}.notes{display:none}}
 </style></head><body><div class="wrap">
 <h1>LAN-ABFAHRT · STATUS</h1>
-<div class="meta">Stand: ${esc(data.updated)} · <a href="${REPO}" style="color:#b9a8ff">Repo</a></div>
+<div class="meta">Stand: ${esc(data.updated)} · <a href="${REPO}" style="color:#b9a8ff">Repo</a>${data.analysis ? ` · <a href="${esc(data.analysis.url)}" style="color:#b9a8ff">${esc(data.analysis.title)}</a>` : ''}</div>
 <div class="stats">
 <div class="stat"><b>${total}</b><span>Spiele in main</span></div>
 <div class="stat"><b>${data.inProgress.length}</b><span>gerade in Arbeit</span></div>

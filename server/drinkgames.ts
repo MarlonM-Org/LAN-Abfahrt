@@ -1,6 +1,6 @@
-import type { BombState, HiloState, MiniSnapshot, NhieState } from '../shared/types';
+import type { BombState, HiloState, MiniSnapshot, NhieState, SkipInfo } from '../shared/types';
 import { BOMB, BOMB_CATEGORIES, HILO, NHIE } from '../shared/games';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle, waitLabel } from './minigame';
 
 const zeroSips = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, 0]));
 
@@ -48,8 +48,7 @@ export class NhieGame implements MiniGame {
     s.answered = [];
     s.have = null;
     this.answers.clear();
-    this.deadline = Date.now() + NHIE.QUESTION_MS;
-    this.timers.later(NHIE.QUESTION_MS, () => this.reveal());
+    this.deadline = phaseTimer(this.timers, NHIE.QUESTION_MS, () => this.reveal());
     this.ctx.onChange();
   }
 
@@ -60,9 +59,27 @@ export class NhieGame implements MiniGame {
     // Wer es als Einziger getan hat, trinkt doppelt – und muss erzählen!
     for (const id of s.have) s.sips[id] += s.have.length === 1 ? 2 : 1;
     s.sub = 'reveal';
-    this.deadline = Date.now() + NHIE.REVEAL_MS;
-    this.timers.later(NHIE.REVEAL_MS, () => this.next());
+    this.deadline = phaseTimer(this.timers, NHIE.REVEAL_MS, () => this.next());
     this.ctx.onChange();
+  }
+
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub === 'question') {
+      const missing = this.ids.filter((p) => this.ctx.isConnected(p) && !this.answers.has(p));
+      return { label: waitLabel(this.ctx, missing, 'Antwort', 'Jetzt auflösen') };
+    }
+    if (s.sub === 'reveal') return { label: 'Nächste Aussage', info: true };
+    return null;
+  }
+
+  /** Fehlende Antworten zählen als „hab ich noch nie“ */
+  skip() {
+    if (this.state.sub === 'question') this.reveal();
+    else if (this.state.sub === 'reveal') {
+      this.timers.clear();
+      this.next();
+    }
   }
 
   input(id: string, action: string, payload: unknown) {
@@ -75,7 +92,7 @@ export class NhieGame implements MiniGame {
   }
 
   snapshot(): MiniSnapshot {
-    return { kind: 'nhie', state: { ...this.state, endsIn: Math.max(0, this.deadline - Date.now()) } };
+    return { kind: 'nhie', state: { ...this.state, endsIn: endsIn(this.deadline) } };
   }
 
   playerDisconnected() {
@@ -122,8 +139,7 @@ export class HiloGame implements MiniGame {
     s.guesses = null;
     s.roundSips = null;
     this.guesses.clear();
-    this.deadline = Date.now() + HILO.GUESS_MS;
-    this.timers.later(HILO.GUESS_MS, () => this.reveal());
+    this.deadline = phaseTimer(this.timers, HILO.GUESS_MS, () => this.reveal());
     this.ctx.onChange();
   }
 
@@ -142,9 +158,27 @@ export class HiloGame implements MiniGame {
     }
     for (const [id, n] of Object.entries(s.roundSips)) s.sips[id] += n;
     s.sub = 'reveal';
-    this.deadline = Date.now() + HILO.REVEAL_MS;
-    this.timers.later(HILO.REVEAL_MS, () => this.next());
+    this.deadline = phaseTimer(this.timers, HILO.REVEAL_MS, () => this.next());
     this.ctx.onChange();
+  }
+
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub === 'guess') {
+      const missing = this.ids.filter((p) => this.ctx.isConnected(p) && !this.guesses.has(p));
+      return { label: waitLabel(this.ctx, missing, 'Tipp', 'Karte jetzt aufdecken') };
+    }
+    if (s.sub === 'reveal') return { label: 'Nächste Karte', info: true };
+    return null;
+  }
+
+  /** Wer nicht getippt hat, liegt daneben (wie bisher beim Ablauf der Zeit) */
+  skip() {
+    if (this.state.sub === 'guess') this.reveal();
+    else if (this.state.sub === 'reveal') {
+      this.timers.clear();
+      this.next();
+    }
   }
 
   input(id: string, action: string, payload: unknown) {
@@ -158,7 +192,7 @@ export class HiloGame implements MiniGame {
   }
 
   snapshot(): MiniSnapshot {
-    return { kind: 'hilo', state: { ...this.state, endsIn: Math.max(0, this.deadline - Date.now()) } };
+    return { kind: 'hilo', state: { ...this.state, endsIn: endsIn(this.deadline) } };
   }
 
   playerDisconnected() {
@@ -210,6 +244,17 @@ export class BombGame implements MiniGame {
     s.sips[s.holder] += BOMB.SIPS;
     this.ctx.onChange();
     this.timers.later(BOMB.BOOM_MS, () => this.next());
+  }
+
+  /** Die Lunte ist Spielzeit – überspringen lässt sich nur die Pause nach dem Knall */
+  skippable(): SkipInfo | null {
+    return this.state.sub === 'boom' ? { label: 'Nächste Runde', info: true } : null;
+  }
+
+  skip() {
+    if (this.state.sub !== 'boom') return;
+    this.timers.clear();
+    this.next();
   }
 
   input(id: string, action: string) {

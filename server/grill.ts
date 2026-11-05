@@ -548,13 +548,15 @@ export class GrillGame implements MiniGame {
     if (!this.teams) {
       const k = this.kitchens[0];
       this.stars = this.goals.filter((g) => k.score >= g).length;
-      const groups = groupByScore(this.ids, (id) => this.contrib(this.players.get(id)!));
       const starTxt = this.stars === 0 ? 'Leider kein Stern' : this.stars === 1 ? '1 Stern' : `${this.stars} Sterne`;
+      // Koop: alle stehen gemeinsam auf Platz 1 und bekommen dieselben Münzen nach Sternen; der Beitrag steht nur im Text
+      const STAR_COINS = [1, 3, 6, 10];
+      const coopDetails = Object.fromEntries(ps.map((p) => [p.id, `${details[p.id]} · Beitrag ${this.contrib(p)}`]));
       result = {
-        groups,
-        details,
+        groups: [this.ids],
+        details: coopDetails,
         subtitle: `${k.score} Punkte, ${k.served} Gerichte – ${starTxt}!`,
-        coins: groups.map((_, i) => Math.max(1, 3 + this.stars * 2 - i * 2)),
+        coins: [STAR_COINS[Math.min(this.stars, STAR_COINS.length - 1)]],
       };
     } else {
       const [A, B] = this.kitchens;

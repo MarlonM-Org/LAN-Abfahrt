@@ -1,86 +1,16 @@
 import type { SmashState } from '../../../shared/types';
 import { SPECIALS, pctColor } from '../../../shared/smash';
 import { type Screen, app, avatarCanvas, el, escapeHtml, me, message, q, send, store } from '../core';
+import { onInputReset, stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 /**
- * Schwebender Joystick: Wo der Daumen aufsetzt, ist die Mitte.
- * Schickt die Richtung gedrosselt (~20 Hz) und bei jeder deutlichen Änderung.
+ * Schwebender Joystick für Smash/Bogen/Zauber – jetzt der gemeinsame aus stick.ts
+ * (Deadzone, mitziehender Ring, input-reset). Der alte Ring im Markup wird ersetzt.
  */
 export function floatingStick(zone: HTMLElement, onMove: (x: number, y: number) => void) {
-  const ring = q(zone, '.sm-ring');
-  const knob = q(zone, '.sm-knob');
-  const R = 46;
-  let active: number | null = null;
-  let cx = 0;
-  let cy = 0;
-  let cur = { x: 0, y: 0 };
-  let sent = { x: 0, y: 0, t: 0 };
-  const emit = (force = false) => {
-    const now = performance.now();
-    const changed = Math.hypot(cur.x - sent.x, cur.y - sent.y);
-    // große Richtungswechsel sofort, kleine höchstens alle 50 ms
-    if (!force && changed < 0.08) return;
-    if (!force && changed < 0.45 && now - sent.t < 50) return;
-    sent = { ...cur, t: now };
-    onMove(cur.x, cur.y);
-  };
-  const place = (x: number, y: number) => {
-    const r = zone.getBoundingClientRect();
-    ring.style.left = `${x - r.left}px`;
-    ring.style.top = `${y - r.top}px`;
-  };
-  const reset = () => {
-    ring.style.left = '';
-    ring.style.top = '';
-    knob.style.transform = '';
-    ring.classList.remove('on');
-  };
-  const move = (e: PointerEvent) => {
-    let dx = e.clientX - cx;
-    let dy = e.clientY - cy;
-    const d = Math.hypot(dx, dy);
-    if (d > R) {
-      // Daumen zieht den Ring mit – so muss man nie "zurückgreifen"
-      const over = d - R;
-      cx += (dx / d) * over;
-      cy += (dy / d) * over;
-      place(cx, cy);
-      dx = (dx / d) * R;
-      dy = (dy / d) * R;
-    }
-    knob.style.transform = `translate(${dx}px, ${dy}px)`;
-    const m = Math.hypot(dx, dy) / R;
-    const k = m < 0.18 ? 0 : 1;
-    cur = { x: Math.round((dx / R) * k * 100) / 100, y: Math.round((dy / R) * k * 100) / 100 };
-    emit();
-  };
-  zone.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    if (active !== null) return;
-    zone.setPointerCapture(e.pointerId);
-    active = e.pointerId;
-    cx = e.clientX;
-    cy = e.clientY;
-    place(cx, cy);
-    ring.classList.add('on');
-    move(e);
-  });
-  zone.addEventListener('pointermove', (e) => e.pointerId === active && move(e));
-  const up = (e: PointerEvent) => {
-    if (e.pointerId !== active) return;
-    active = null;
-    cur = { x: 0, y: 0 };
-    reset();
-    emit(true);
-  };
-  zone.addEventListener('pointerup', up);
-  zone.addEventListener('pointercancel', up);
-  zone.addEventListener('lostpointercapture', up);
-  const keepAlive = setInterval(() => {
-    if (!zone.isConnected) return clearInterval(keepAlive);
-    if (active !== null) emit(true);
-  }, 250);
-  return () => cur;
+  zone.querySelector('.sm-ring')?.remove();
+  return stickZone(zone, onMove);
 }
 
 /** Knopf mit Drücken/Loslassen (für SCHILD halten) – reagiert sofort beim Berühren */
@@ -92,7 +22,7 @@ export function holdButton(btn: HTMLElement, onDown: () => void, onUp?: () => vo
     pid = e.pointerId;
     btn.setPointerCapture(e.pointerId);
     btn.classList.add('pressed');
-    navigator.vibrate?.(8);
+    haptic(8);
     onDown();
   });
   const up = (e: PointerEvent) => {
@@ -105,6 +35,13 @@ export function holdButton(btn: HTMLElement, onDown: () => void, onUp?: () => vo
   btn.addEventListener('pointercancel', up);
   btn.addEventListener('lostpointercapture', up);
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Handy gedreht / Ausrichtungs-Overlay: losgelassen
+  onInputReset(btn, () => {
+    if (pid === null) return;
+    pid = null;
+    btn.classList.remove('pressed');
+    onUp?.();
+  });
 }
 
 export function pickSmash(s: SmashState): Screen {
@@ -178,8 +115,8 @@ export function pickSmash(s: SmashState): Screen {
       else if (me2.hold) hint = `${me2.hold === 'kokos' ? 'Kokosnuss' : 'Wasserbombe'} in der Hand – SCHLAG zum Werfen!`;
       else if (me2.anim === 'dizzy') hint = 'Schild kaputt – du bist benommen!';
       q(root, '.sm-hint').textContent = hint;
-      if (me2.pct > lastPct) navigator.vibrate?.(Math.min(60, 15 + (me2.pct - lastPct) * 3));
-      if (me2.stocks < lastStocks) navigator.vibrate?.([120, 60, 120]);
+      if (me2.pct > lastPct) haptic(Math.min(60, 15 + (me2.pct - lastPct) * 3));
+      if (me2.stocks < lastStocks) haptic([120, 60, 120]);
       lastPct = me2.pct;
       lastStocks = me2.stocks;
     };

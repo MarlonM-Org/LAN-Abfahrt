@@ -222,12 +222,6 @@ export function umzugShards(k: number): Pix {
   return p;
 }
 
-export function umzugGlassBit(): Pix {
-  const p = new Pix(2, 2);
-  p.rect(0, 0, 2, 2, GLASS).px(0, 0, C.white);
-  return p;
-}
-
 /** Der Vermieter: Anzug, Hut, Aktentasche */
 export function umzugLandlord(): Pix {
   const p = new Pix(14, 22);

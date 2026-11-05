@@ -1,7 +1,7 @@
-import type { MiniSnapshot } from '../shared/types';
+import type { MiniSnapshot, SkipInfo } from '../shared/types';
 import { DARTS, type DartsDart, type DartsPlayer, type DartsState, dartsLanding, dartsNoise, dartsPhase, dartsPowerHint, dartsScore, dartsWobble } from '../shared/darts';
 import { SHIRTS } from '../shared/avatar';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, waitLabel } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
@@ -90,15 +90,39 @@ export class DartsGame implements MiniGame {
       p.thrown = 0;
     }
     this.sub = 'throw';
-    this.deadline = Date.now() + DARTS.ROUND_MS;
     const r = this.round;
-    // Zeit um → wer noch Darts hat, wirft sie automatisch (eher ungenau)
-    this.timers.later(DARTS.ROUND_MS, () => {
-      if (this.sub !== 'throw' || this.round !== r) return;
-      for (const p of this.players) while (p.thrown < DARTS.DARTS_PER_ROUND) this.throwDart(p.id, this.autoThrow(p), true);
+    // Zeit um (falls gesetzt) → wer noch Darts hat, wirft sie automatisch (eher ungenau)
+    this.deadline = phaseTimer(this.timers, DARTS.ROUND_MS, () => {
+      if (this.sub === 'throw' && this.round === r) this.throwRest();
     });
     for (const p of this.players) if (!this.ctx.isConnected(p.id)) this.autoLater(p.id);
     this.ctx.onChange();
+  }
+
+  private throwRest() {
+    for (const p of this.players) while (p.thrown < DARTS.DARTS_PER_ROUND) this.throwDart(p.id, this.autoThrow(p), true);
+  }
+
+  /** VIP/Laptop: Erklärung/Zwischenstand überspringen bzw. Runde beenden (fehlende Darts fliegen automatisch) */
+  skippable(): SkipInfo | null {
+    if (this.sub === 'intro') return { label: 'Los geht’s', info: true };
+    if (this.sub === 'tally') return { label: this.round >= DARTS.ROUNDS ? 'Zum Ergebnis' : 'Nächste Runde', info: true };
+    if (this.sub === 'throw' && !this.closing) {
+      const missing = this.players.filter((p) => p.thrown < DARTS.DARTS_PER_ROUND && this.ctx.isConnected(p.id)).map((p) => p.id);
+      return { label: waitLabel(this.ctx, missing, 'Darts', 'Runde beenden') };
+    }
+    return null;
+  }
+
+  skip() {
+    if (this.sub === 'intro') {
+      this.timers.clear();
+      this.startRound();
+    } else if (this.sub === 'tally') {
+      this.timers.clear();
+      if (this.round >= DARTS.ROUNDS) this.over();
+      else this.startRound();
+    } else if (this.sub === 'throw' && !this.closing) this.throwRest();
   }
 
   /** Abwesende werfen nach und nach automatisch */
@@ -177,9 +201,8 @@ export class DartsGame implements MiniGame {
     const best = Math.max(...this.players.map((p) => p.round));
     this.tally = { best: this.players.filter((p) => p.round === best).map((p) => p.id), points: best };
     this.sub = 'tally';
-    this.deadline = Date.now() + DARTS.TALLY_MS;
     this.ctx.onChange();
-    this.timers.later(DARTS.TALLY_MS, () => (this.round >= DARTS.ROUNDS ? this.over() : this.startRound()));
+    this.deadline = phaseTimer(this.timers, DARTS.TALLY_MS, () => (this.round >= DARTS.ROUNDS ? this.over() : this.startRound()));
   }
 
   private over() {
@@ -204,7 +227,7 @@ export class DartsGame implements MiniGame {
   snapshot(): MiniSnapshot {
     const state: DartsState = {
       sub: this.sub,
-      endsIn: Math.max(0, this.deadline - Date.now()),
+      endsIn: endsIn(this.deadline),
       round: this.round,
       rounds: DARTS.ROUNDS,
       mult: this.mult,

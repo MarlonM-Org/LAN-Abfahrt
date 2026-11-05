@@ -7,6 +7,8 @@ import { paintSumoSea, sumoBoat, sumoBuoy, sumoPlank, sumoPost, sumoRing } from 
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
 import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const T = SUMO.TILE;
 const hexNum = (h: string) => parseInt(h.slice(1), 16);
@@ -39,6 +41,8 @@ export class SumoScene extends Phaser.Scene {
   private round = 0;
   private suddenShown = false;
   private clock = new Countdown();
+  private juice!: Juice;
+  private cheerRound = 0;
 
   constructor() {
     super('sumo');
@@ -52,6 +56,8 @@ export class SumoScene extends Phaser.Scene {
     this.phaseKey = '';
     this.round = 0;
     this.suddenShown = false;
+    this.cheerRound = 0;
+    this.juice = new Juice(this, { depth: 1650 });
 
     background(this, 'sumo', WORLD.W, WORLD.H, (p) => paintSumoSea(p, WORLD.W, WORLD.H));
     // Wellen, die sanft glitzern
@@ -190,6 +196,7 @@ export class SumoScene extends Phaser.Scene {
       if (t === '!' && !img.getData('cracked')) {
         img.setData('cracked', true);
         img.setTexture(ensureTex(this, `sumo_plank${v}c`, () => sumoPlank(v, true)));
+        sfx('crack', { x: img.x + T / 2, vol: 0.6 });
         const x0 = img.x;
         this.tweens.add({ targets: img, x: x0 + 1, duration: 60, yoyo: true, repeat: -1 });
       } else if (t === '.') {
@@ -205,6 +212,11 @@ export class SumoScene extends Phaser.Scene {
           onComplete: () => img.destroy(),
         });
         this.ripple(img.x + T / 2, img.y + T / 2 + 4, 0.6);
+        // Planke bricht: Holzsplitter + kleiner Platscher
+        this.juice.burst(img.x + T / 2, img.y + T / 2, 'wood', 7);
+        this.juice.burst(img.x + T / 2, img.y + T / 2 + 4, 'splash', 4);
+        sfx('crack', { x: img.x + T / 2, pitch: 0.7 });
+        sfx('splash', { x: img.x + T / 2, vol: 0.35, pitch: 1.3, delay: 0.12 });
       }
     }
 
@@ -212,11 +224,17 @@ export class SumoScene extends Phaser.Scene {
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
-      if (p.dash && !a.dash) this.whoosh(a.x, a.y, p.f);
+      if (p.dash && !a.dash) {
+        this.whoosh(a.x, a.y, p.f);
+        sfx('whoosh', { x: a.x, vol: 0.7, pitch: 1.3 });
+        this.juice.burst(a.x - p.f * 5, a.y + 2, 'sand', 5);
+      }
       a.dash = p.dash;
       if (p.hits > a.hits) {
         a.hits = p.hits;
         this.bonk(a.x, a.y - 12);
+        sfx('bonk', { x: a.x });
+        this.juice.burst(a.x, a.y - 12, 'spark', 6);
       }
       if (a.alive && !p.alive) {
         a.alive = false;
@@ -229,6 +247,8 @@ export class SumoScene extends Phaser.Scene {
     if (st.sudden && !this.suddenShown) {
       this.suddenShown = true;
       this.flash('DER STEG BRICHT!', 'Jetzt zählt jede Planke …');
+      sfx('crack', { vol: 1.2, pitch: 0.6 });
+      sfx('strike', { vol: 0.6, pitch: 0.6, delay: 0.1 });
       this.cameras.main.shake(300, 0.004);
     }
     this.drawHud(st);
@@ -246,6 +266,12 @@ export class SumoScene extends Phaser.Scene {
     } else if (st.sub === 'roundOver' || st.sub === 'over') {
       const w = st.roundWinner ? playerById(st.roundWinner)?.name ?? '?' : null;
       this.banner.setText(w ? `${w} gewinnt!` : 'Alle im Wasser!');
+      if (this.cheerRound !== st.round) {
+        this.cheerRound = st.round;
+        sfx(w ? 'win' : 'lose');
+        const wf = st.roundWinner ? this.figs.get(st.roundWinner) : undefined;
+        if (wf) this.juice.burst(wf.x, wf.y - 14, 'confetti', 30);
+      }
       this.sub.setText(st.sub === 'over' ? 'Sumo-Steg vorbei!' : w ? 'Rundensieg – als Letzte(r) auf dem Steg!' : 'Unentschieden – diese Runde zählt nicht.');
     }
   }
@@ -325,7 +351,9 @@ export class SumoScene extends Phaser.Scene {
     }
     this.ripple(x, y + 2, 1.3);
     this.time.delayedCall(180, () => this.ripple(x, y + 2, 1));
-    this.cameras.main.shake(120, 0.005);
+    this.juice.burst(x, y, 'splash', 16);
+    sfx('splash', { x });
+    this.juice.shake(2);
     const name = playerById(id)?.name ?? '';
     const ty = Math.max(48, y - 34);
     const t = txt(this, x, ty, 'PLATSCH!', { color: '#93d3f3' }).setDepth(1700);

@@ -3,8 +3,11 @@ import type { GameState } from '../../shared/types';
 import { TEAM_INFO, WORLD } from '../../shared/flunky';
 import { UMZUG as U, UMZUG_KINDS, type UmzugGeo, type UmzugState, grabPoints, umzugGoals, umzugGrid, umzugTruckZone } from '../../shared/umzug';
 import { C } from '../art/palette';
-import { paintUmzugLot, umzugBrokenWindow, umzugGlassBit, umzugHandMark, umzugItemKey, umzugItemPix, umzugLandlord, umzugShards, umzugStar } from '../art/umzug';
+import { paintUmzugLot, umzugBrokenWindow, umzugHandMark, umzugItemKey, umzugItemPix, umzugLandlord, umzugShards, umzugStar } from '../art/umzug';
 import { bus, getState, playerById } from './store';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { say } from './speech';
 import { figure } from './textures';
 import { BLUE_INK, INK, background, ensureTex, ink, panel, txt } from './ui';
 
@@ -42,7 +45,6 @@ export class UmzugScene extends Phaser.Scene {
   private truckLoads: Phaser.GameObjects.Container[] = [];
   private loadKeys: string[] = [];
   private seenEvents = new Set<number>();
-  private floats: number[] = [];
   private marks!: Phaser.GameObjects.Graphics;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
@@ -51,6 +53,7 @@ export class UmzugScene extends Phaser.Scene {
   private overLayer!: Phaser.GameObjects.Container;
   private geos: UmzugGeo[] = [];
   private latest: UmzugState | null = null;
+  private juice!: Juice;
   private hudKey = '';
   private built = false;
   private overShown = false;
@@ -66,7 +69,6 @@ export class UmzugScene extends Phaser.Scene {
     this.truckLoads = [];
     this.loadKeys = [];
     this.seenEvents.clear();
-    this.floats = [];
     this.geos = [];
     this.latest = null;
     this.hudKey = '';
@@ -74,6 +76,7 @@ export class UmzugScene extends Phaser.Scene {
     this.overShown = false;
 
     this.marks = this.add.graphics().setDepth(950);
+    this.juice = new Juice(this, { depth: 1050 });
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.banner = txt(this, WORLD.W / 2, 104, '', { size: 24, color: C.gold }).setDepth(1101);
     this.helpBg = panel(this, 50, 92, 380, 132, 'dark').setDepth(1100).setVisible(false);
@@ -227,43 +230,47 @@ export class UmzugScene extends Phaser.Scene {
     });
   }
 
-  private float(x: number, y: number, text: string, color: string, life = 1300) {
-    const now = this.time.now;
-    this.floats = this.floats.filter((t) => now - t < 1200);
-    const lift = (this.floats.length % 3) * 12;
-    this.floats.push(now);
-    const t = txt(this, x, y - lift, text, { color }).setDepth(1050);
-    this.tweens.add({ targets: t, y: y - lift - 18, alpha: 0, delay: life * 0.4, duration: life * 0.6, onComplete: () => t.destroy() });
-  }
-
   private showEvent(e: UmzugState['events'][number]) {
+    const J = this.juice;
     if (e.kind === 'deliver') {
-      this.float(e.x, e.y - 20, `+${e.pts}`, C.gold);
-      if (e.k !== undefined && UMZUG_KINDS[e.k].heavy) this.cameras.main.shake(120, 0.003);
+      J.float(e.x, e.y - 20, `+${e.pts}`, 'gold');
+      sfx('coin', { x: e.x, pitch: 1 + Math.min(0.5, (e.pts ?? 1) * 0.1) });
+      if (e.k !== undefined && UMZUG_KINDS[e.k].heavy) {
+        J.shake(1);
+        sfx('bonk', { x: e.x, pitch: 0.7, delay: 0.05 });
+      }
     } else if (e.kind === 'break') {
-      this.float(e.x, e.y - 16, 'KLIRR! -1', '#ff8a7a', 1600);
+      J.float(e.x, e.y - 16, 'KLIRR! -1', 'dmg');
       this.add.image(e.x, e.y, ensureTex(this, `um_shards_${e.k ?? 0}`, () => umzugShards(e.k ?? 0))).setDepth(1).setAlpha(0.9);
-      for (let i = 0; i < 8; i++) this.bit(e.x, e.y, e.k === 4 ? 0x5aa9e6 : 0xd9b98a);
-      this.cameras.main.shake(150, 0.004);
+      J.burst(e.x, e.y, 'spark', 10);
+      J.burst(e.x, e.y, e.k === 4 ? 'splash' : 'wood', 6);
+      J.shake(2);
+      sfx('crack', { x: e.x, pitch: 1.3 });
+      sfx('lose', { x: e.x, vol: 0.4, delay: 0.15 });
     } else if (e.kind === 'glass') {
-      this.float(e.x, e.y - 14, 'KLIRR!', '#9fd8f5', 1200);
-      for (let i = 0; i < 12; i++) this.bit(e.x, e.y, 0x9fd8f5);
-      this.cameras.main.shake(100, 0.003);
+      J.float(e.x, e.y - 14, 'KLIRR!', 'water');
+      J.burst(e.x, e.y, 'splash', 14);
+      J.burst(e.x, e.y, 'spark', 6);
+      J.shake(1);
+      sfx('crack', { x: e.x, pitch: 1.6 });
+    } else if (e.kind === 'throw') {
+      sfx('whoosh', { x: e.x, vol: 0.6 });
     } else if (e.kind === 'bonus') {
-      this.float(e.x, e.y - 10, `Alles draußen! +${e.pts} Zeitbonus`, C.gold, 2400);
+      J.float(e.x, e.y - 10, `Alles draußen! +${e.pts} Zeitbonus`, 'gold');
+      J.burst(e.x, e.y, 'confetti', 30);
+      sfx('fanfare', { x: e.x });
     }
-  }
-
-  private bit(x: number, y: number, tint: number) {
-    const b = this.add.image(x, y, ensureTex(this, 'um_glassbit', umzugGlassBit)).setDepth(990).setTint(tint);
-    const a = Math.random() * Math.PI * 2;
-    const d = 6 + Math.random() * 14;
-    this.tweens.add({ targets: b, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d - 6, alpha: 0, duration: 500 + Math.random() * 300, ease: 'Quad.easeOut', onComplete: () => b.destroy() });
   }
 
   private showOver(st: UmzugState) {
     this.overShown = true;
     const L = this.overLayer;
+    sfx('whistle', { vol: 0.8 });
+    say('Der Vermieter ist da!', { interrupt: true });
+    if (!st.teams) {
+      sfx(st.stars >= 2 ? 'win' : st.stars === 1 ? 'cheer' : 'lose', { delay: 0.5 });
+      if (st.stars === 3) this.juice.burst(WORLD.W / 2, 120, 'confetti', 50);
+    } else sfx(st.winner ? 'win' : 'cheer', { delay: 0.5 });
     L.add(panel(this, 100, 88, 280, 100));
     L.add(ink(this, WORLD.W / 2, 98, 'Der Vermieter ist da!'));
     if (!st.teams) {
@@ -272,7 +279,7 @@ export class UmzugScene extends Phaser.Scene {
         const on = i < st.stars;
         const img = this.add.image(WORLD.W / 2 - 34 + i * 34, 134, ensureTex(this, `um_star_${on}`, () => umzugStar(on))).setScale(0);
         L.add(img);
-        this.tweens.add({ targets: img, scale: 2, delay: 300 + i * 450, duration: 300, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: img, scale: 2, delay: 300 + i * 450, duration: 300, ease: 'Back.easeOut', onStart: () => on && sfx('powerup', { pitch: 1 + i * 0.2 }) });
       }
       const total = h.delivered.length + h.left + h.broken;
       L.add(ink(this, WORLD.W / 2, 160, `${h.delivered.length} von ${total} Sachen im Laster${h.broken ? ` · ${h.broken} kaputt` : ''}`, { color: '#7a5a3a' }));
@@ -355,7 +362,8 @@ export class UmzugScene extends Phaser.Scene {
       }
       if (p.no !== a.no) {
         a.no = p.no;
-        this.float(a.x, a.y - 44, '?', '#ff6b5e', 500);
+        this.juice.float(a.x, a.y - 44, '?', 'dmg');
+        sfx('error', { x: a.x, vol: 0.4 });
       }
       // Sprint-Staub
       if (p.d && Math.random() < 0.5) {

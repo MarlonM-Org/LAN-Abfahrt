@@ -1,6 +1,8 @@
 import type { TurmState } from '../../../shared/types';
 import { TURM, TURM_SHAPES } from '../../../shared/games';
 import { turmPiece } from '../../art/turm';
+import { haptic } from '../haptic';
+import { onInputReset } from '../stick';
 import { type Screen, app, el, message, q, send, store } from '../core';
 
 const meters = (h: number) => `${(h / TURM.BLOCK).toFixed(1).replace('.', ',')} m`;
@@ -30,6 +32,7 @@ function repeatButton(btn: HTMLElement, fire: () => void) {
   });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(ev, stop);
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  onInputReset(btn, stop);
 }
 
 /** Nächstes Teil als Pixel-Art auf ein Canvas malen */
@@ -50,32 +53,37 @@ export function pickTurm(s: TurmState): Screen {
   if (me.frozen) return ['turm-frozen', message('Keine Leben mehr!', `Dein Turm ist eingefroren bei ${meters(me.height)}.`)];
 
   return ['turm-play', () => {
+    // Quer wie ein Tetris-Gamepad: links ◀ ▶ schieben, rechts DREHEN über FALLEN, Mitte Leben/Nächstes/Meldung
     const root = el(`
-      <div class="top-row"><span class="timer"></span><span class="hgt"></span></div>
-      <div class="turm-info">
-        <div class="turm-lives"></div>
-        <div class="turm-next"><small>Nächstes:</small><canvas width="48" height="36"></canvas><small class="next-name"></small></div>
-      </div>
-      <p class="turm-msg"></p>
-      <div class="turm-pad">
-        <button class="big-btn turm-btn shift" data-dir="-1">${ICON.left}</button>
-        <button class="big-btn turm-btn rot">${ICON.rot}</button>
-        <button class="big-btn turm-btn shift" data-dir="1">${ICON.right}</button>
-        <button class="big-btn turm-btn drop">${ICON.drop}<span>FALLEN</span></button>
+      <div class="lx turm-lx">
+        <div class="lx-head"><span class="timer"></span><span class="hgt grow"></span></div>
+        <div class="lx-left turm-move">
+          <button class="big-btn turm-btn shift" data-dir="-1">${ICON.left}</button>
+          <button class="big-btn turm-btn shift" data-dir="1">${ICON.right}</button>
+        </div>
+        <div class="lx-mid turm-info">
+          <div class="turm-lives"></div>
+          <div class="turm-next"><small>Nächstes:</small><canvas width="48" height="36"></canvas><small class="next-name"></small></div>
+          <p class="turm-msg"></p>
+        </div>
+        <div class="lx-right turm-act">
+          <button class="big-btn turm-btn rot">${ICON.rot}<span>DREHEN</span></button>
+          <button class="big-btn turm-btn drop">${ICON.drop}<span>FALLEN</span></button>
+        </div>
       </div>
     `);
     for (const b of root.querySelectorAll<HTMLButtonElement>('.shift')) {
       const dir = Number(b.dataset.dir);
       repeatButton(b, () => {
         send('shift', { dir });
-        navigator.vibrate?.(5);
+        haptic(5);
       });
     }
     const rot = q<HTMLButtonElement>(root, '.rot');
     rot.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       send('rotate');
-      navigator.vibrate?.(8);
+      haptic(8);
     });
     rot.addEventListener('contextmenu', (e) => e.preventDefault());
     const drop = q<HTMLButtonElement>(root, '.drop');
@@ -93,6 +101,11 @@ export function pickTurm(s: TurmState): Screen {
       });
     }
     drop.addEventListener('contextmenu', (e) => e.preventDefault());
+    onInputReset(drop, () => {
+      if (!drop.classList.contains('held')) return;
+      drop.classList.remove('held');
+      send('drop', { on: false });
+    });
     app.append(root);
 
     const canvas = q<HTMLCanvasElement>(root, 'canvas');
@@ -120,7 +133,7 @@ export function pickTurm(s: TurmState): Screen {
       if (lane.lostSeq !== lostSeq) {
         lostSeq = lane.lostSeq;
         lostAt = performance.now();
-        navigator.vibrate?.([60, 40, 60]);
+        haptic([60, 40, 60]);
       }
       const msg = q(root, '.turm-msg');
       const text =

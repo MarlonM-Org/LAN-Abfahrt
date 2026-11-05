@@ -59,6 +59,8 @@ export function unlockMusic() {
 export const audioReady = () => !!synth && synth.ctx.state === 'running';
 export const audioCtx = () => synth?.ctx ?? null;
 export const audioOut = () => synth?.master ?? null;
+/** Effekt-Bus (Regler „Effekte“) – Soundeffekte in `sfx.ts` hängen hier dran */
+export const audioFx = () => synth?.fxBus ?? null;
 
 // ------------------------------------------------------------------ Lautstärke
 

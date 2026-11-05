@@ -1,6 +1,7 @@
-import type { MiniSnapshot, PrivateState } from '../shared/types';
+import type { MiniSnapshot, PrivateState, SkipInfo } from '../shared/types';
+import { possessive } from '../shared/players';
 import { WOLF, WOLF_ROLES, type WolfCause, type WolfPrivate, type WolfRole, type WolfState, isWolfTeam, wolfCount, wolfDayMs } from '../shared/werwolf';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle, waitLabel } from './minigame';
 
 /**
  * Werwölfe im Ferienhaus – Werwolf ohne Spielleiter.
@@ -51,7 +52,7 @@ export class WerwolfGame implements MiniGame {
       day: 0,
       endsIn: 0,
       phaseNo: 0,
-      dayMs: wolfDayMs(n),
+      dayMs: WOLF.DAY_MS === null ? 0 : wolfDayMs(n),
       alive: Object.fromEntries(ids.map((id) => [id, true])),
       revealed: {},
       roleCounts,
@@ -81,7 +82,7 @@ export class WerwolfGame implements MiniGame {
       s.nightTotal = active.length;
       s.nightDone = active.filter((id) => this.nightPicks.has(id)).length;
     }
-    return { kind: 'werwolf', state: { ...s, endsIn: Math.max(0, this.deadline - Date.now()) } };
+    return { kind: 'werwolf', state: { ...s, endsIn: endsIn(this.deadline) } };
   }
 
   privateFor(id: string): PrivateState {
@@ -202,15 +203,56 @@ export class WerwolfGame implements MiniGame {
   }
 
   /** Neue Phase: alte Timer weg, Deadline setzen, Ablauf-Timer starten */
-  private enter(sub: WolfState['sub'], ms: number, then: () => void) {
+  private enter(sub: WolfState['sub'], ms: number | null, then: () => void) {
     this.timers.clear();
     const s = this.state;
     s.sub = sub;
     s.phaseNo += 1;
     this.phaseStart = Date.now();
-    this.deadline = Date.now() + ms;
-    this.timers.later(ms, then);
+    this.then = then;
+    this.deadline = phaseTimer(this.timers, ms, then);
     this.ctx.onChange();
+  }
+
+  /** Wie es nach der aktuellen Phase weitergeht (für Ablauf-Timer und VIP-Überspringen) */
+  private then: (() => void) | null = null;
+
+  /** VIP/Laptop: jede Phase abkürzen – fehlende Wahl zählt als „keine“, die Nacht wird mit dem Stand aufgelöst */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    switch (s.sub) {
+      case 'roles':
+        return { label: 'Los geht’s', info: true };
+      case 'night': {
+        const missing = this.voters().filter((id) => !this.nightPicks.has(id));
+        return { label: waitLabel(this.ctx, missing, 'Wahl', 'Nacht beenden') };
+      }
+      case 'witch':
+        return { label: 'Nacht beenden' };
+      case 'dawn':
+      case 'verdict':
+        return { label: 'Weiter', info: true };
+      case 'day':
+        return { label: 'Diskussion beenden', info: true };
+      case 'vote': {
+        const missing = this.voters().filter((id) => !this.votes.has(id));
+        return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+      }
+      case 'hunter':
+        return !s.shotDone && s.hunter ? { label: `${possessive(this.ctx.nameOf(s.hunter))} Schuss überspringen` } : null;
+    }
+    return null;
+  }
+
+  skip() {
+    const s = this.state;
+    if (s.sub === 'night') return this.endNightStage();
+    if (s.sub === 'witch') return this.resolveNight();
+    if (s.sub === 'hunter') return this.hunterShot(null);
+    if (s.sub === 'over') return;
+    const then = this.then;
+    this.timers.clear();
+    then?.();
   }
 
   // ---------------------------------------------------------------- Nacht
@@ -327,7 +369,7 @@ export class WerwolfGame implements MiniGame {
   // ---------------------------------------------------------------- Tag
 
   private startDay() {
-    this.enter('day', this.state.dayMs, () => this.startVote());
+    this.enter('day', WOLF.DAY_MS === null ? null : this.state.dayMs, () => this.startVote());
   }
 
   private startVote() {

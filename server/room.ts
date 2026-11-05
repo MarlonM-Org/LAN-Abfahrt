@@ -15,7 +15,7 @@ import type {
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
-import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
+import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, placeCoins } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
 import { Bot } from './botclient';
@@ -33,7 +33,7 @@ import { IgelGame } from './igel';
 import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { SessionBoard } from './session';
-import { ARCADE_POINTS, ARCADE_RANDOM, fitsPlayers, seriesLabel } from '../shared/games';
+import { ARCADE_COOP_POINTS, ARCADE_RANDOM, arcadePoints, fitsPlayers, seriesLabel } from '../shared/games';
 import { KART_TRACKS } from '../shared/kart';
 import { WasserGame } from './wasser';
 import { GrillGame } from './grill';
@@ -61,6 +61,7 @@ import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
+import { SpionGame } from './spion';
 import { StillepostGame } from './stillepost';
 import { isLoopback } from './net';
 import { TouristGame } from './tourist';
@@ -70,6 +71,7 @@ import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
 import { KofferGame } from './koffer';
+import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
@@ -85,8 +87,10 @@ const VIP_GRACE_MS = Number(process.env.VIP_GRACE_MS ?? 60_000);
 const AUTO_RESULTS_MS = Number(process.env.AUTO_CONTINUE_MS ?? 12_000);
 const AUTO_STORY_MS = 10_000;
 const AUTO_MINI_MS = 5_000;
+/** Nur Bots da und ein Spiel wartet auf eine Eingabe, die nie kommt (z. B. Werwölfe uneinig) → so lange warten, dann überspringen */
+const AUTO_SKIP_MS = 60_000;
 
-export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board';
+export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board' | 'skip';
 
 interface Player extends PlayerPublic {
   socketId: string | null;
@@ -143,6 +147,9 @@ export class Room {
   /** Worauf gerade gewartet wird (Ergebnis, Story-Karte, …) und seit wann – für das Auto-Weiter */
   private gateKey: unknown = null;
   private gateSince = 0;
+  /** Dasselbe für überspringbare Schritte (Zug, Phase, Info-Screen), wenn kein Mensch überspringen kann */
+  private skipKey = '';
+  private skipSince = 0;
 
   constructor(
     private io: Server,
@@ -244,7 +251,7 @@ export class Room {
       } else if (req.mode === 'party') {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
-        this.startParty(ids, rounds);
+        this.startParty(ids, rounds, req.longGames === true);
       } else if (req.mode === 'top' || req.mode === 'favorites') {
         const kind = this.votedKind(req.mode);
         if (!kind) return socket.emit('toast', 'Noch keine (passenden) Stimmen.');
@@ -346,6 +353,13 @@ export class Room {
       if (isVip() && this.phase === 'mini') this.mini?.vipAction?.(String(action));
     });
 
+    // VIP-Menü am Handy: Zug/Phase überspringen (gleiche Logik wie Taste S am Laptop)
+    socket.on('vip:skip', (ack?: (r: { ok: boolean; msg?: string }) => void) => {
+      const reply = (r: { ok: boolean; msg?: string }) => typeof ack === 'function' && ack(r);
+      if (!isVip()) return reply({ ok: false, msg: 'Nur der VIP darf überspringen.' });
+      reply(this.skipCurrent());
+    });
+
     // Kart-Rennen: jeder Spieler wählt selbst, ob seine Verfolger-Ansicht auf dem TV oder dem Handy läuft (gilt auch für spätere Rennen)
     socket.on('kart:view', (view: string) => {
       const p = playerId ? this.players.get(playerId) : undefined;
@@ -408,7 +422,7 @@ export class Room {
 
   // ---------------------------------------------------------------- Ablauf
 
-  private startParty(ids: string[], rounds: number) {
+  private startParty(ids: string[], rounds: number, longGames = false) {
     this.session.endSeries();
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
@@ -418,7 +432,7 @@ export class Room {
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
       isGone: (id) => !!this.players.get(id)?.removed,
-    });
+    }, longGames);
     this.results = null;
     this.phase = 'board';
     this.changed();
@@ -635,6 +649,9 @@ export class Room {
       case 'fangen':
         this.mini = new FangenGame(ids, ctx);
         break;
+      case 'spion':
+        this.mini = new SpionGame(ids, ctx);
+        break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);
         break;
@@ -686,6 +703,9 @@ export class Room {
       case 'koffer':
         this.mini = new KofferGame(ids, ctx);
         break;
+      case 'suess':
+        this.mini = new SuessGame(ids, ctx);
+        break;
       case 'umzug':
         this.mini = new UmzugGame(ids, ctx);
         break;
@@ -701,13 +721,15 @@ export class Room {
     this.mini?.dispose();
     this.mini = null;
     this.miniIds = null;
-    const coinsPerGroup = r.coins ?? PLACE_COINS;
+    // Münzen: eigene Staffel des Spiels (pro Gruppe) oder Standard-Staffel nach Rang und Spielerzahl
+    const ranks = groupPlaces(r.groups);
+    const ranked = r.groups.reduce((sum, g) => sum + g.length, 0);
     const rows = r.groups.flatMap((group, gi) =>
       group.map((id) => ({
         playerId: id,
         place: gi + 1,
         detail: r.details[id] ?? '',
-        coins: coinsPerGroup[Math.min(gi, coinsPerGroup.length - 1)],
+        coins: r.coins ? r.coins[Math.min(gi, r.coins.length - 1)] : placeCoins(ranks[gi], ranked),
       })),
     );
     const hearts = r.hearts !== undefined ? { hearts: r.hearts, maxHearts: HEARTS_PER_CHAPTER } : {};
@@ -732,9 +754,12 @@ export class Room {
     // Gemeinsame Spiele (nur eine Gruppe): Herzen bzw. feste Punkte für alle
     const coop = groups.length === 1;
     const points: Record<string, number> = {};
+    // Punkte nach Rang und Spielerzahl (1. 10 … Letzter 1)
+    const ranks = groupPlaces(groups);
+    const ranked = groups.reduce((sum, g) => sum + g.length, 0);
     groups.forEach((g, gi) => {
       // Entfernte Spieler bekommen für dieses Spiel nichts mehr (ihre bisherigen Punkte bleiben)
-      for (const id of g) if (this.players.has(id) && !this.players.get(id)!.removed) points[id] = coop ? (r.hearts ?? ARCADE_POINTS[1]) : ARCADE_POINTS[Math.min(gi, ARCADE_POINTS.length - 1)];
+      for (const id of g) if (this.players.has(id) && !this.players.get(id)!.removed) points[id] = coop ? (r.hearts ?? ARCADE_COOP_POINTS) : arcadePoints(ranks[gi], ranked);
     });
     const winners = new Set(coop ? [] : (groups[0] ?? []));
     for (const [id, pts] of Object.entries(points)) this.leaderboard.add(this.nameOf(id), kind, pts, winners.has(id));
@@ -861,6 +886,7 @@ export class Room {
       this.advance();
       return { ok: true, msg: 'Weiter!' };
     }
+    if (cmd === 'skip') return this.skipCurrent();
     if (cmd === 'again') {
       if (!this.singleResults()) return { ok: false, msg: 'Nochmal geht nur im Ergebnis eines Einzelspiels.' };
       const err = this.nochmal();
@@ -891,6 +917,23 @@ export class Room {
       return { ok: true, msg: 'Bots entfernt.' };
     }
     return { ok: false, msg: 'Unbekannter Befehl.' };
+  }
+
+  /** Was gerade übersprungen werden kann (Minispiel-Zug/-Phase oder Würfeln auf dem Brett) */
+  private skippable() {
+    if (this.phase === 'mini') return this.mini?.skippable?.() ?? null;
+    if (this.phase === 'board') return this.board?.skippable() ?? null;
+    return null;
+  }
+
+  /** VIP-Menü bzw. Taste S am Laptop: aktuellen Zug/Phase überspringen */
+  private skipCurrent(): { ok: boolean; msg?: string } {
+    const info = this.skippable();
+    if (!info) return { ok: false, msg: 'Gerade gibt es nichts zum Überspringen.' };
+    if (this.phase === 'mini') this.mini?.skip?.();
+    else if (this.phase === 'board') this.board?.skip();
+    this.changed();
+    return { ok: true, msg: `${info.label} ✓` };
   }
 
   /** Laptop-Arcade-Auswahl: Spiel, 'random' (Zufall) oder 'top' (meiste Stimmen) starten */
@@ -972,7 +1015,32 @@ export class Room {
     } else {
       this.gateKey = null;
     }
+
+    // Kein Mensch kann überspringen (nur Bots) → Info-Screens nach AUTO_MINI_MS, alles andere nach AUTO_SKIP_MS.
+    // Ohne Zeitlimits würde ein Bot-Spiel sonst hängen, wenn ein Bot eine Phase nicht kennt.
+    const skip = this.skippable();
+    if (skip && !this.humanCanAct(now)) {
+      const key = `${this.phase}|${this.mini?.kind ?? ''}|${skip.label}|${this.stepTag()}`;
+      if (key !== this.skipKey) {
+        this.skipKey = key;
+        this.skipSince = now;
+      } else if (now - this.skipSince >= (skip.info ? AUTO_MINI_MS : AUTO_SKIP_MS)) {
+        this.skipKey = '';
+        this.skipCurrent();
+        return;
+      }
+    } else {
+      this.skipKey = '';
+    }
     if (dirty) this.changed();
+  }
+
+  /** Grobe Kennung des aktuellen Schritts (Runde, Phase, Zug …) – damit gleich beschriftete Schritte nicht zusammenfallen */
+  private stepTag(): string {
+    if (this.phase === 'board' && this.board) return `${this.board.state.round}-${this.board.state.turnIdx}-${this.board.state.sub}`;
+    const st = this.mini?.snapshot().state as unknown as Record<string, unknown> | undefined;
+    if (!st) return '';
+    return ['sub', 'round', 'phaseNo', 'shown', 'chain', 'match', 'hole', 'turn', 'aimSeq'].map((k) => String(st[k] ?? '')).join('-');
   }
 
   private connectedHumans() {
@@ -1185,6 +1253,7 @@ export class Room {
       inGame: this.phase === 'mini' ? this.miniIds : null,
       customQuipCount: this.quips.all.length,
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
+      skippable: this.skippable(),
       session: this.session.state(this.present()),
       nochmal: this.nochmalState(),
       showBoard: this.phase === 'lobby' && this.showBoard,

@@ -23,6 +23,7 @@ import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } f
 import { grillBot } from './grillbot';
 import { umzugBot } from './umzugbot';
 import { golfBot } from './golfbot';
+import { spionBot } from './spionbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -48,6 +49,7 @@ import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
 import type { AngelnState } from '../shared/angeln';
 import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
+import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt, isWalk as suessWalk, stepAlong as suessStep, suessBfs, tileCenter as suessCenter, tileOf as suessTile } from '../shared/suess';
 
 export interface BotOptions {
   url: string;
@@ -445,6 +447,14 @@ export class Bot {
   }
 
   /** Führt eine Aktion pro Schlüssel nur einmal gleichzeitig aus */
+  /** Grobe Kennung des aktuellen Schritts (wie Room.stepTag) – für das VIP-Weiterschalten */
+  private stepTag(s: GameState): string {
+    if (s.phase === 'board' && s.board) return `b-${s.board.round}-${s.board.turnIdx}-${s.board.sub}`;
+    const st = s.mini?.state as unknown as Record<string, unknown> | undefined;
+    if (!st) return s.phase;
+    return [s.mini!.kind, ...['sub', 'round', 'phaseNo', 'shown', 'chain', 'match', 'hole', 'turn', 'aimSeq'].map((k) => String(st[k] ?? ''))].join('-');
+  }
+
   once(key: string, fn: () => Promise<void> | void) {
     if (this.busy.has(key)) return;
     this.busy.add(key);
@@ -710,6 +720,18 @@ export class Bot {
         this.socket.emit('board:roll');
       });
     }
+    // Bot als VIP (nur, wenn kein Mensch da ist): Info-Screens (Auflösung, Intro, Zwischenstand) nach ~2 s weiterschalten –
+    // so wie ein Mensch „Weiter“ im VIP-Menü drücken würde. Züge/Abstimmungen überspringt er nicht (die Bots spielen sie).
+    if (me?.isVip && s.skippable?.info && (s.phase === 'mini' || s.phase === 'board')) {
+      const label = s.skippable.label;
+      const tag = this.stepTag(s);
+      this.once(`vip-skip-${tag}-${label}`, async () => {
+        await sleep(2000);
+        const now = this.state;
+        if (now?.skippable?.label === label && this.stepTag(now) === tag) this.socket.emit('vip:skip');
+      });
+    }
+
     if (s.phase !== 'mini' || !s.mini) return;
 
     const m = s.mini;
@@ -1154,6 +1176,10 @@ export class Bot {
     if (m.kind === 'bogen') bogenBot(this, m.state);
 
     if (m.kind === 'angeln') angelBot(this, m.state);
+
+    if (m.kind === 'suess') suessBot(this, m.state);
+
+    if (m.kind === 'spion') spionBot(this, m.state);
 
     if (m.kind === 'autoball') afbBot(this, m.state);
 
@@ -1640,6 +1666,13 @@ function shuffleArr<T>(arr: T[]): T[] {
 
 /** Igel-Krieg: kurz laufen, dann per Simulation zielen und schießen */
 function igelBot(bot: Bot, st: IgelState) {
+  // Zuschauer-Sprüche ab und zu (Server: Abklingzeit 8 s)
+  if (st.active !== bot.id && st.sub !== 'over' && st.sub !== 'countdown') {
+    bot.once('igel-taunt', async () => {
+      await sleep(rand(4000, 14000));
+      if (Math.random() < 0.5) bot.send('taunt', { i: Math.floor(Math.random() * 4) });
+    });
+  }
   if (st.active !== bot.id || st.activeHog === null) return;
   const cur = () => (bot.state?.mini?.kind === 'igel' ? bot.state.mini.state : null);
   if (st.sub === 'aim') {
@@ -3299,4 +3332,152 @@ function zaubBot(bot: Bot, st: ZauberState) {
   if (w.l < 0.05) stick(0, 0);
   else stick(w.x, w.y);
   if (aheadBad && !me.stun && me.cdB <= 0 && far > 50 && Math.random() < 0.3) bot.send('sprint', { x: home.x, y: home.y });
+}
+
+// ---------------------------------------------------------------- Süßigkeiten-Klau
+
+interface SuessBotMem {
+  nextAt: number;
+  /** Ab so viel Beute geht der Bot heim */
+  greed: number;
+  stick: string;
+  stickAt: number;
+  round: number;
+  /** Ziel-Süßigkeit (Bot bleibt dabei, solange es sie gibt) */
+  goal: number | null;
+}
+const suessBotMem = new WeakMap<Bot, SuessBotMem>();
+const SUESS_STASH_DIST = suessBfs(STASH_TILES);
+
+function suessStick(bot: Bot, mem: SuessBotMem, me: { x: number; y: number }, to: { x: number; y: number } | null) {
+  let x = 0;
+  let y = 0;
+  if (to) {
+    const dx = to.x - me.x;
+    const dy = to.y - me.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1.5) {
+      x = Math.round((dx / d) * 100) / 100;
+      y = Math.round((dy / d) * 100) / 100;
+    }
+  }
+  const key = `${x},${y}`;
+  const now = Date.now();
+  if (key === mem.stick && now - mem.stickAt < 500) return;
+  mem.stick = key;
+  mem.stickAt = now;
+  bot.send('stick', { x, y });
+}
+
+/** Weg zu einem Punkt: in derselben/nächsten Kachel direkt hin, sonst Kachel für Kachel (Breitensuche vom Ziel) */
+function suessRoute(me: { x: number; y: number }, to: { x: number; y: number }, guard: boolean) {
+  const a = suessTile(me.x, me.y);
+  const b = suessTile(to.x, to.y);
+  if (Math.abs(a.col - b.col) + Math.abs(a.row - b.row) <= 1) return to;
+  return suessStep(me, suessBfs([b], guard), guard);
+}
+
+/**
+ * Bots: Naschkatzen sammeln gierig die nächste lohnende Süßigkeit (weg von Wächtern) und gehen heim,
+ * wenn die Taschen voll genug sind oder ein Wächter naht; Wächter jagen die dickste erreichbare Beute.
+ */
+function suessBot(bot: Bot, st: SuessState) {
+  let mem = suessBotMem.get(bot);
+  if (!mem) {
+    mem = { nextAt: 0, greed: Math.round(rand(4, 8)), stick: '', stickAt: 0, round: 0, goal: null };
+    suessBotMem.set(bot, mem);
+  }
+  if (mem.round !== st.round) {
+    mem.round = st.round;
+    mem.goal = null;
+    mem.greed = Math.round(rand(4, 8));
+  }
+  if (st.sub !== 'play') return;
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(120, 200);
+
+  const thief = st.thieves[bot.id];
+  const guard = st.guards[bot.id];
+  if (thief) {
+    if (thief.state !== 'run') return;
+    const guardTiles = Object.values(st.guards).map((g) => suessTile(g.x, g.y));
+    const dG = suessBfs(guardTiles, false);
+    const me = suessTile(thief.x, thief.y);
+    const danger = suessDistAt(dG, me.col, me.row);
+    const home = suessDistAt(SUESS_STASH_DIST, me.col, me.row);
+    // Notbremse: Wächter direkt dran, viel Beute, weit weg vom Versteck → ablegen und flitzen
+    if (danger <= 1 && thief.carry >= 6 && home > 4 && Math.random() < 0.35) {
+      bot.send('drop');
+      mem.goal = null;
+      return;
+    }
+    const goHome = thief.carry >= mem.greed || (thief.carry >= 2 && danger <= 4 && home <= danger + 3) || thief.carry >= SUESS.CARRY_MAX - 1;
+    if (goHome) {
+      mem.goal = null;
+      return suessStick(bot, mem, thief, suessStep(thief, SUESS_STASH_DIST));
+    }
+    // Wächter ganz nah und kein Versteck in Reichweite → weg von ihm
+    if (danger <= 2 && !thief.safe) {
+      let best: { x: number; y: number } | null = null;
+      let bestD = danger;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!suessWalk(me.col + dc, me.row + dr)) continue;
+        const d = suessDistAt(dG, me.col + dc, me.row + dr) - suessDistAt(SUESS_STASH_DIST, me.col + dc, me.row + dr) * 0.01;
+        if (d > bestD) {
+          bestD = d;
+          best = suessCenter(me.col + dc, me.row + dr);
+        }
+      }
+      if (best) return suessStick(bot, mem, thief, best);
+    }
+    const dMe = suessBfs([me]);
+    let target = st.candy.find((c) => c.id === mem!.goal) ?? null;
+    if (!target || Math.random() < 0.05) {
+      let bestScore = Infinity;
+      target = null;
+      for (const c of st.candy) {
+        const t = suessTile(c.x, c.y);
+        const v = CANDY_KINDS[c.t].v;
+        if (thief.carry + v > SUESS.CARRY_MAX) continue;
+        const dg = suessDistAt(dG, t.col, t.row);
+        const score = suessDistAt(dMe, t.col, t.row) - v * 2.2 + (dg < 3 ? 14 : dg < 6 ? 5 : 0) + Math.random() * 2;
+        if (score < bestScore) {
+          bestScore = score;
+          target = c;
+        }
+      }
+      mem.goal = target?.id ?? null;
+    }
+    if (!target) return suessStick(bot, mem, thief, thief.carry > 0 ? suessStep(thief, SUESS_STASH_DIST) : null);
+    return suessStick(bot, mem, thief, suessRoute(thief, target, false));
+  }
+
+  if (guard) {
+    const me = suessTile(guard.x, guard.y);
+    const dMe = suessBfs([me], true);
+    // Bei zwei Wächtern: der zweite bevorzugt eine andere Beute
+    const others = Object.entries(st.guards).filter(([id]) => id !== bot.id);
+    let best: { x: number; y: number } | null = null;
+    let bestScore = -Infinity;
+    for (const t of Object.values(st.thieves)) {
+      if (t.state !== 'run' || t.safe) continue;
+      const tt = suessTile(t.x, t.y);
+      const d = suessDistAt(dMe, tt.col, tt.row);
+      if (d === Infinity) continue;
+      const crowd = others.some(([, g]) => Math.hypot(g.x - t.x, g.y - t.y) < Math.hypot(guard.x - t.x, guard.y - t.y)) ? 0.5 : 1;
+      const score = ((t.carry + 1.5) / (d + 3)) * crowd * (t.shield ? 0.3 : 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = t;
+      }
+    }
+    if (!best) {
+      // niemand draußen: an der Minibar lauern
+      return suessStick(bot, mem, guard, suessRoute(guard, suessCenter(16, 11), true));
+    }
+    const px = Math.hypot(best.x - guard.x, best.y - guard.y);
+    if (px < 50 && guard.sprintLeft <= 0 && Math.random() < 0.5) bot.send('sprint');
+    return suessStick(bot, mem, guard, suessRoute(guard, best, true));
+  }
 }

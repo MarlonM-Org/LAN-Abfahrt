@@ -61,6 +61,8 @@ export const DESCENT_OBSTACLES: { s: number; type: 'bottle' | 'pigeon' | 'puddle
 // ------------------------------------------------------------------ Gespräch (Rhythmus)
 
 export const RHYTHM = {
+  /** Warten auf „Bereit“: `null` = kein Limit (vorher 25 s) – der VIP kann im Menü starten */
+  READY_MS: null as number | null,
   BPM: 96,
   LEAD_IN: 3000,
   BEATS: 48,

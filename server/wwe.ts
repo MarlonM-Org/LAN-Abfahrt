@@ -1,6 +1,6 @@
-import type { MiniSnapshot, WweState } from '../shared/types';
+import type { MiniSnapshot, SkipInfo, WweState } from '../shared/types';
 import { WWE } from '../shared/games';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle, waitLabel } from './minigame';
 
 /**
  * Wer würde eher …? – alle stimmen geheim ab, wer gemeint ist.
@@ -45,7 +45,7 @@ export class WweGame implements MiniGame {
   }
 
   snapshot(): MiniSnapshot {
-    return { kind: 'wwe', state: { ...this.state, endsIn: Math.max(0, this.deadline - Date.now()) } };
+    return { kind: 'wwe', state: { ...this.state, endsIn: endsIn(this.deadline) } };
   }
 
   input(playerId: string, action: string, payload: unknown) {
@@ -86,13 +86,30 @@ export class WweGame implements MiniGame {
     s.tally = null;
     s.sips = null;
     this.votes.clear();
-    this.deadline = Date.now() + WWE.QUESTION_MS;
-    this.timers.later(WWE.QUESTION_MS, () => this.reveal());
+    this.deadline = phaseTimer(this.timers, WWE.QUESTION_MS, () => this.reveal());
     this.ctx.onChange();
+  }
+
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub === 'question') {
+      const missing = this.ids.filter((id) => this.ctx.isConnected(id) && !this.votes.has(id));
+      return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+    }
+    if (s.sub === 'reveal') return { label: 'Nächste Frage', info: true };
+    return null;
+  }
+
+  /** Fehlende Stimmen verfallen */
+  skip() {
+    this.timers.clear();
+    if (this.state.sub === 'question') this.reveal();
+    else if (this.state.sub === 'reveal') this.nextRound();
   }
 
   private reveal() {
     const s = this.state;
+    this.timers.clear();
     const tally: Record<string, number> = {};
     for (const t of this.votes.values()) tally[t] = (tally[t] ?? 0) + 1;
     const max = Math.max(0, ...Object.values(tally));
@@ -108,8 +125,7 @@ export class WweGame implements MiniGame {
     s.sub = 'reveal';
     s.votes = Object.fromEntries(this.votes);
     s.tally = tally;
-    this.deadline = Date.now() + WWE.REVEAL_MS;
-    this.timers.later(WWE.REVEAL_MS, () => this.nextRound());
+    this.deadline = phaseTimer(this.timers, WWE.REVEAL_MS, () => this.nextRound());
     this.ctx.onChange();
   }
 

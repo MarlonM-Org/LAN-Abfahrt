@@ -2,7 +2,8 @@ import type { VerstPrivate, VerstState } from '../../../shared/types';
 import { PROPS, ZONES } from '../../../shared/verstecken';
 import { hideProp } from '../../art/hideprops';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton, toast } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 const vs = () => (store.state?.mini?.kind === 'verstecken' ? store.state.mini.state : null);
 const priv = (): VerstPrivate | null => (store.priv?.kind === 'verstecken' ? store.priv.state : null);
@@ -60,7 +61,7 @@ function buildBlind() {
     const m = vs();
     if (!m) return;
     q(root, '.vs-count').textContent = String(Math.ceil(m.endsIn / 1000));
-    if (m.endsIn < 400) navigator.vibrate?.(200);
+    if (m.endsIn < 400) haptic(200);
   };
 }
 
@@ -89,31 +90,31 @@ function drawProp(c: HTMLCanvasElement, d: VerstPrivate['disguise']) {
 }
 
 function buildHider() {
+  // Quer: Stick links, rechts ein Daumenbogen – EINRASTEN groß (Hauptaktion), VERWANDELN oben, PFEIFEN innen
   const root = el(`
-    <div class="vs-top"><span class="vs-role hider">VERSTECKER</span><span class="vs-timer"></span></div>
-    <div class="vs-status">
-      <div class="vs-propbox"></div>
-      <div class="vs-info"><div class="vs-name"></div><div class="vs-hint"></div></div>
-    </div>
-    <div class="vs-controls">
-      <div class="stick-area"></div>
-      <div class="vs-btns">
+    <div class="lx vs-lx vs-hide">
+      <div class="lx-head"><span class="lx-tag vs-role hider">VERSTECKER</span><span class="vs-timer"></span><span class="vs-foot grow"></span></div>
+      <div class="lx-left vs-stick"><span class="st-label">LAUFEN</span></div>
+      <div class="lx-mid vs-status">
+        <div class="vs-propbox"></div>
+        <div class="vs-name"></div><div class="vs-hint"></div>
+      </div>
+      <div class="lx-right vs-btns">
         <button class="big-btn vs-morph">VERWANDELN</button>
-        <button class="big-btn vs-lock">EINRASTEN</button>
         <button class="big-btn vs-whistle">PFEIFEN</button>
+        <button class="big-btn vs-lock">EINRASTEN</button>
       </div>
     </div>
-    <p class="vs-foot"></p>
   `);
   const canvas = propCanvas();
   q(root, '.vs-propbox').append(canvas);
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.vs-stick'), (x, y) => send('stick', { x, y }));
   const morph = q<HTMLButtonElement>(root, '.vs-morph');
   const lock = q<HTMLButtonElement>(root, '.vs-lock');
   const whistle = q<HTMLButtonElement>(root, '.vs-whistle');
-  tapButton(morph, () => (send('morph'), navigator.vibrate?.(15)));
-  tapButton(lock, () => (send('lock'), navigator.vibrate?.(25)));
-  tapButton(whistle, () => (send('whistle'), navigator.vibrate?.([30, 40, 30])));
+  tapButton(morph, () => (send('morph'), haptic(15)));
+  tapButton(lock, () => (send('lock'), haptic(25)));
+  tapButton(whistle, () => (send('whistle'), haptic([30, 40, 30])));
   app.append(root);
   let drawn = '';
   return () => {
@@ -145,21 +146,19 @@ function buildHider() {
 
 function buildSeeker() {
   const root = el(`
-    <div class="vs-top"><span class="vs-role seeker">SUCHER</span><span class="vs-timer"></span></div>
-    <div class="vs-status seeker">
-      <div class="vs-info"><div class="vs-name"></div><div class="vs-hint"></div></div>
-    </div>
-    <div class="vs-controls">
-      <div class="stick-area"></div>
-      <div class="vs-btns">
-        <button class="big-btn vs-check">PRÜFEN</button>
+    <div class="lx vs-lx vs-seek">
+      <div class="lx-head"><span class="lx-tag vs-role seeker">SUCHER</span><span class="vs-timer"></span><span class="vs-name grow"></span></div>
+      <div class="lx-left vs-stick"><span class="st-label">LAUFEN</span></div>
+      <div class="lx-mid vs-status seeker">
+        <div class="vs-hint"></div>
+        <p class="vs-foot">Falsch geprüft = kurz schwindelig. Achte auf Pfiffe und wackelnde Möbel!</p>
       </div>
+      <div class="lx-right vs-btns"><button class="big-btn vs-check">PRÜFEN</button></div>
     </div>
-    <p class="vs-foot">Falsch geprüft = kurz schwindelig. Achte auf Pfiffe und wackelnde Möbel!</p>
   `);
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.vs-stick'), (x, y) => send('stick', { x, y }));
   const check = q<HTMLButtonElement>(root, '.vs-check');
-  tapButton(check, () => (send('check'), navigator.vibrate?.(20)));
+  tapButton(check, () => (send('check'), haptic(20)));
   app.append(root);
   let lastFinds = priv()?.finds ?? 0;
   return () => {
@@ -178,7 +177,7 @@ function buildSeeker() {
     check.textContent = stunned ? 'SCHWINDELIG' : 'PRÜFEN';
     if (p.finds > lastFinds) {
       lastFinds = p.finds;
-      navigator.vibrate?.([60, 40, 120]);
+      haptic([60, 40, 120]);
     }
   };
 }

@@ -3,9 +3,11 @@ import { KART, KART_TRACKS, type KartInput, wrapAngle } from '../../../shared/ka
 import { itemIcon } from '../../art/kartsprites';
 import { Mode7Renderer } from '../../kart3d/render';
 import { KartWorld } from '../../kart3d/world';
+import { onInputReset } from '../stick';
 import { type Screen, LS, app, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
 import { steerFromRoll, tiltLabel, tiltRoll } from '../tilt';
+import { haptic } from '../haptic';
 
 /**
  * Kart-Rennen am Handy (quer halten):
@@ -31,13 +33,8 @@ let introFor = 0;
 // iOS: Pinch-Zoom-Gesten im Spiel unterbinden
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
-export const vibrate = (pattern: number | number[]) => {
-  try {
-    if ('vibrate' in navigator) navigator.vibrate(pattern);
-  } catch {
-    /* egal */
-  }
-};
+/** Rückmeldung (Android: Vibration, iPhone: Klick + Rand-Blitz) – auch von Auto-Fußball genutzt */
+export const vibrate = (pattern: number | number[]) => haptic(pattern);
 
 function screenAngle(): number {
   const a = screen.orientation?.angle ?? (window as unknown as { orientation?: number }).orientation ?? 0;
@@ -82,47 +79,15 @@ export function stopTilt() {
 export function pickKart(s: KartState): Screen {
   const car = s.karts[store.playerId!];
   if (!car) return ['spectate', message('Du schaust zu')];
-  if (s.sub === 'over') {
-    leaveFullscreen();
-    return ['kart-over', message('Rennen vorbei!', 'Schau auf den Fernseher!')];
-  }
+  // Vollbild/Quer-Sperre bleibt nach dem Rennen bestehen (orientation.ts) – kein Verlassen mehr pro Rennen
+  if (s.sub === 'over') return ['kart-over', message('Rennen vorbei!', 'Schau auf den Fernseher!')];
   if (car.finished) {
-    leaveFullscreen();
     return [`kart-fin-${car.place}`, message(`Im Ziel – Platz ${car.place}!`, 'Ehrenrunde fährt von allein. Schau auf den Fernseher!')];
   }
   const mode = tilt.on ? 'tilt' : 'touch';
-  // Die Ansicht (TV/Handy) gehört absichtlich nicht in den Key – sie wird im laufenden Screen umgeschaltet
-  return [`kart3-${mode}`, () => buildDrive(mode, () => window.dispatchEvent(new Event('kart-rerender')))];
-}
-
-// ------------------------------------------------------------------ Vollbild / Querformat
-
-let fullscreenTried = false;
-export async function tryFullscreen() {
-  if (fullscreenTried) return;
-  fullscreenTried = true;
-  try {
-    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
-    if (!document.fullscreenElement) await (root.requestFullscreen?.({ navigationUI: 'hide' }) ?? root.webkitRequestFullscreen?.());
-  } catch {
-    /* iPhone kann kein Vollbild – egal */
-  }
-  try {
-    const o = screen.orientation as ScreenOrientation & { lock?: (t: string) => Promise<void> };
-    await o.lock?.('landscape');
-  } catch {
-    /* nur in Vollbild auf Android – sonst Hinweis „quer halten“ */
-  }
-}
-
-export function leaveFullscreen() {
-  fullscreenTried = false;
-  try {
-    if (document.fullscreenElement) void document.exitFullscreen?.();
-    (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
-  } catch {
-    /* egal */
-  }
+  // Die Ansicht (TV/Handy) gehört absichtlich nicht in den Key – sie wird im laufenden Screen umgeschaltet.
+  // Im TV-Splitscreen ist hochkant erlaubt (Handy zeigt nur Platz/Knöpfe), mit eigener Ansicht muss es quer sein.
+  return [`kart3-${mode}`, () => buildDrive(mode, () => window.dispatchEvent(new Event('kart-rerender'))), car.phoneView ? undefined : 'any'];
 }
 
 // ------------------------------------------------------------------ Fahr-Screen
@@ -161,7 +126,6 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
         <div class="k3-btn k3-brake" data-b="brake">BREMSE<small>im Stand: zurück</small></div>
         <div class="k3-btn k3-gas" data-b="gas">GAS</div>
       </div>
-      <div class="k3-portrait">Dreh dein Handy quer!</div>
       <div class="k3-intro hidden">
         <h2>So fährst du</h2>
         <div class="k3-intro-grid">
@@ -212,7 +176,6 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       stick.style.top = `${e.clientY - r.top}px`;
       stick.classList.add('on');
       knob.style.transform = '';
-      void tryFullscreen();
     });
     left.addEventListener('pointermove', (e) => {
       if (e.pointerId !== active) return;
@@ -238,7 +201,6 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       e.preventDefault();
       tilt.center = tilt.roll;
       toast('Mitte gesetzt');
-      void tryFullscreen();
     });
   }
   // `.k3` unterdrückt touchstart → Handys feuern kein `click`. `touchend` zählt auf iOS sicher
@@ -310,7 +272,6 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     right.setPointerCapture(e.pointerId);
     fingers.set(e.pointerId, hit(e.clientX, e.clientY));
     applyButtons();
-    void tryFullscreen();
   });
   right.addEventListener('pointermove', (e) => {
     if (!fingers.has(e.pointerId)) return;
@@ -326,6 +287,15 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   };
   right.addEventListener('pointerup', release);
   right.addEventListener('pointercancel', release);
+  // Handy gedreht / Ausrichtungs-Overlay eingeblendet: gehaltene Knöpfe und Lenkung loslassen
+  onInputReset(right, () => {
+    fingers.clear();
+    applyButtons();
+    if (inp.steer) {
+      inp.steer = 0;
+      push(true);
+    }
+  });
   window.addEventListener('resize', measure);
   /** Aufräumen, wenn der Screen ersetzt wurde (Fensterlistener) */
   const cleanup: (() => void)[] = [() => window.removeEventListener('resize', measure)];

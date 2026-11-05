@@ -1,6 +1,7 @@
-import type { MiniSnapshot, PrivateState, TourOutcome, TourState } from '../shared/types';
+import type { MiniSnapshot, PrivateState, SkipInfo, TourOutcome, TourState } from '../shared/types';
+import { possessive } from '../shared/players';
 import { TOUR, TOUR_LOCATIONS, tourRoundMs } from '../shared/tourist';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle, waitLabel } from './minigame';
 
 /**
  * Wer ist der Tourist? – Spyfall im Urlaub.
@@ -52,7 +53,7 @@ export class TouristGame implements MiniGame {
 
   snapshot(): MiniSnapshot {
     const s = this.state;
-    const left = Math.max(0, this.deadline - Date.now());
+    const left = endsIn(this.deadline);
     return { kind: 'tourist', state: { ...s, endsIn: left, roundLeft: s.sub === 'play' ? left : s.roundLeft } };
   }
 
@@ -168,6 +169,7 @@ export class TouristGame implements MiniGame {
     this.votes.clear();
     this.setDeadline(TOUR.INTRO_MS);
     this.timers.later(TOUR.INTRO_MS, () => this.resumePlay());
+    this.after = () => this.resumePlay();
     this.ctx.onChange();
   }
 
@@ -192,8 +194,7 @@ export class TouristGame implements MiniGame {
     s.sub = 'vote';
     s.phaseNo += 1;
     this.votes.clear();
-    this.setDeadline(TOUR.VOTE_MS);
-    this.timers.later(TOUR.VOTE_MS, () => this.resolveVote());
+    this.deadline = phaseTimer(this.timers, TOUR.VOTE_MS, () => this.resolveVote());
     if (this.voters().length === 0) return this.resolveVote();
     this.ctx.onChange();
   }
@@ -212,13 +213,15 @@ export class TouristGame implements MiniGame {
     v.passed = needed.every((id) => this.votes.get(id) === true);
     this.setDeadline(TOUR.VOTE_RESULT_MS);
     this.ctx.onChange();
-    this.timers.later(TOUR.VOTE_RESULT_MS, () => {
+    this.after = () => {
       if (v.passed) {
         this.endRound(this.touristen.includes(v.accused) ? 'caught' : 'wrong-accuse', { accuser: v.accuser, accused: v.accused });
       } else {
         this.resumePlay();
       }
-    });
+    };
+    const after = this.after;
+    this.timers.later(TOUR.VOTE_RESULT_MS, after);
   }
 
   private endRound(outcome: TourOutcome, extra: { guesser?: string; guess?: string; accuser?: string; accused?: string } = {}) {
@@ -253,6 +256,7 @@ export class TouristGame implements MiniGame {
     };
     this.setDeadline(TOUR.REVEAL_MS);
     this.timers.later(TOUR.REVEAL_MS, () => this.nextRound());
+    this.after = () => this.nextRound();
     this.ctx.onChange();
   }
 
@@ -276,6 +280,42 @@ export class TouristGame implements MiniGame {
         subtitle: 'Punkte fürs Entlarven, Erraten und Durchmogeln.',
       }),
     );
+  }
+
+  /** Nächster Schritt nach einem Info-Screen (Intro, Abstimmungsergebnis, Auflösung) */
+  private after: (() => void) | null = null;
+
+  /**
+   * VIP/Laptop: Info-Screens überspringen, Abstimmung beenden (fehlende Stimmen = nein) oder
+   * die Frage weitergeben, wenn der Gefragte nicht reagiert. Die Rundenuhr selbst bleibt Spielzeit.
+   */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub === 'intro' || s.sub === 'reveal') return { label: 'Weiter', info: true };
+    if (s.sub === 'vote' && s.vote) {
+      if (s.vote.passed !== null) return { label: 'Weiter', info: true };
+      const missing = this.voters().filter((id) => !this.votes.has(id));
+      return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+    }
+    if (s.sub === 'play' && s.asker) return { label: `${possessive(this.ctx.nameOf(s.asker))} Frage überspringen` };
+    return null;
+  }
+
+  skip() {
+    const s = this.state;
+    if (s.sub === 'play') {
+      const others = this.ids.filter((o) => o !== s.asker && this.ctx.isConnected(o));
+      const pool = others.length ? others : this.ids.filter((o) => o !== s.asker);
+      if (pool.length) s.asker = pool[Math.floor(Math.random() * pool.length)];
+      s.lastAsk = null;
+      return this.ctx.onChange();
+    }
+    if (s.sub === 'vote' && s.vote?.passed === null) return this.resolveVote();
+    const after = this.after;
+    if (!after) return;
+    this.after = null;
+    this.timers.clear();
+    after();
   }
 
   private setDeadline(ms: number) {

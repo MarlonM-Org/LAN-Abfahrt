@@ -9,6 +9,9 @@ import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { say, spokenName } from './speech';
 
 const STEP_MS = 280;
 const GEM: Record<string, [string, 'q' | 's' | undefined]> = {
@@ -30,6 +33,11 @@ export class BoardScene extends Phaser.Scene {
   private introLayer!: Phaser.GameObjects.Container;
   private introShown = false;
   private scoreKey = '';
+  private juice!: Juice;
+  /** Für Münzen-/Cocktail-Effekte: letzter bekannter Stand (null = noch nicht gesehen) */
+  private prevCoins: Record<string, number> | null = null;
+  private prevCocktails: Record<string, number> | null = null;
+  private msgSeq = -1;
 
   constructor() {
     super('board');
@@ -40,6 +48,10 @@ export class BoardScene extends Phaser.Scene {
     this.animating.clear();
     this.introShown = false;
     this.scoreKey = '';
+    this.prevCoins = null;
+    this.prevCocktails = null;
+    this.msgSeq = -1;
+    this.juice = new Juice(this, { depth: 2500 });
     const st = getState();
     this.lastRollSeq = st?.board?.lastRoll?.seq ?? 0;
 
@@ -141,6 +153,42 @@ export class BoardScene extends Phaser.Scene {
 
     this.renderScores(b);
     this.renderIntro(b);
+    this.changeFx(b);
+  }
+
+  /** Münzen +/−, Cocktails und Ereignistexte: Ton + schwebende Zahl über der Figur */
+  private changeFx(b: BoardState) {
+    if (this.msgSeq >= 0 && b.messageSeq !== this.msgSeq && b.sub !== 'intro') sfx('pop', { vol: 0.6 });
+    this.msgSeq = b.messageSeq;
+    const coins = this.prevCoins;
+    const cocktails = this.prevCocktails;
+    this.prevCoins = { ...b.coins };
+    this.prevCocktails = { ...b.cocktails };
+    if (!coins || !cocktails) return;
+    for (const id of b.order) {
+      const tok = this.tokens.get(id);
+      const x = tok?.x ?? 240;
+      const y = (tok?.y ?? 140) - 34;
+      const dc = (b.coins[id] ?? 0) - (coins[id] ?? 0);
+      const dk = (b.cocktails[id] ?? 0) - (cocktails[id] ?? 0);
+      if (dk > 0) {
+        sfx('fanfare');
+        this.juice.burst(x, y + 10, 'confetti', 40);
+        this.juice.float(x, y - 10, `+${dk} COCKTAIL`, '#f07aa8');
+        say(`${spokenName(playerById(id)?.name)} holt einen Cocktail!`);
+      } else if (dk < 0) {
+        sfx('lose', { vol: 0.8 });
+        this.juice.float(x, y - 10, `${dk} COCKTAIL`, 'dmg');
+      }
+      if (dc > 0) {
+        for (let i = 0; i < Math.min(5, dc); i++) sfx('coin', { x, pitch: 1 + i * 0.04, delay: i * 0.08, vol: 0.8 });
+        this.juice.float(x, y, `+${dc}`, 'gold');
+        this.juice.burst(x, y + 14, 'spark', 6);
+      } else if (dc < 0) {
+        sfx('error', { x });
+        this.juice.float(x, y, `${dc}`, 'dmg');
+      }
+    }
   }
 
   private renderScores(b: BoardState) {
@@ -222,6 +270,11 @@ export class BoardScene extends Phaser.Scene {
       callback: () => {
         ticks++;
         num.setText(ticks > 10 ? String(roll.value) : String(1 + Math.floor(Math.random() * 6)));
+        sfx(ticks > 10 ? 'select' : 'tick', { x: dice.x, pitch: ticks > 10 ? 1 : 0.9 + ticks * 0.03 });
+        if (ticks > 10) {
+          dice.setScale(1.4);
+          this.tweens.add({ targets: dice, scale: 1, duration: 200, ease: 'Back.Out' });
+        }
         dice.setAngle(ticks > 10 ? 0 : Phaser.Math.Between(-12, 12));
       },
     });
@@ -239,6 +292,7 @@ export class BoardScene extends Phaser.Scene {
           ease: 'Quad.out',
           onComplete: () => this.tweens.add({ targets: tok, y: p.y, duration: STEP_MS / 2 - 10 }),
         });
+        sfx('jump', { x: p.x, pitch: 0.9 + (i % 2) * 0.1, vol: 0.6 });
         if (i === steps.length - 1) this.time.delayedCall(STEP_MS, () => this.animating.delete(roll.playerId));
       });
     });

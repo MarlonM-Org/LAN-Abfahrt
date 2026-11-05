@@ -2,16 +2,22 @@
 export const SPRUECHE = {
   /** Normale Runden + Finale */
   ROUNDS: 3,
-  INTRO_MS: 4500,
-  /** Zwei Fragen pro Spieler */
-  ANSWER_MS: 75000,
-  /** Finale: eine Frage für alle */
-  FINAL_ANSWER_MS: 50000,
-  VOTE_MS: 20000,
-  FINAL_VOTE_MS: 40000,
-  REVEAL_MS: 8000,
-  FINAL_REVEAL_MS: 14000,
-  SCORES_MS: 8000,
+  /**
+   * Zeiten: `null` = kein Zeitlimit (Schreiben/Abstimmen endet, wenn alle fertig sind oder der VIP überspringt).
+   * Info-Screens schalten großzügig von selbst weiter; der VIP kann jederzeit „Weiter“ drücken.
+   */
+  INTRO_MS: 8000,
+  /** Zwei Fragen pro Spieler (vorher 75 s) */
+  ANSWER_MS: null as number | null,
+  /** Finale: eine Frage für alle (vorher 50 s) */
+  FINAL_ANSWER_MS: null as number | null,
+  /** vorher 20 s / 40 s */
+  VOTE_MS: null as number | null,
+  FINAL_VOTE_MS: null as number | null,
+  /** vorher 8 s / 14 s / 8 s */
+  REVEAL_MS: 15000,
+  FINAL_REVEAL_MS: 20000,
+  SCORES_MS: 15000,
   MAX_TEXT: 60,
   /** Punkte pro Stimme (× Runden-Multiplikator) */
   POINTS: 100,

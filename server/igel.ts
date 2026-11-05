@@ -1,14 +1,19 @@
-import type { IgelFx, IgelHog, IgelState, IgelWeapon, MiniSnapshot } from '../shared/types';
+import type { IgelFx, IgelHog, IgelState, IgelWeapon, MiniSnapshot, SkipInfo } from '../shared/types';
+import { possessive } from '../shared/players';
 import {
   BAZOOKA,
   GRENADE,
   IGEL,
+  IGEL_TAUNTS,
   PUNCH,
   WEAPONS,
   type Mask,
   bodyHits,
   carve,
   genTerrain,
+  igelMaxHp,
+  igelSuddenMs,
+  igelTurnMs,
   isSolid,
   launch,
   stepBallistic,
@@ -26,6 +31,8 @@ interface Hog extends IgelHog {
   vx: number;
   vy: number;
   walkAcc: number;
+  /** Rest für das Herunterzählen der HP-Anzeige */
+  shownAcc: number;
 }
 
 interface Proj {
@@ -43,6 +50,8 @@ interface Proj {
 /**
  * Igel-Krieg – rundenbasiert wie Worms auf einer zerstörbaren Urlaubsinsel.
  * Jeder Spieler ist ein Team (bis 4 Spieler: 2 Igel pro Team, sonst 1).
+ * Zugzeit, HP und Sudden Death skalieren mit der Spielerzahl (`igelTurnMs` usw.), der Wind driftet,
+ * die Flut steigt pro voller Runde, Schaden zählt am Zugende herunter.
  * Das Terrain liegt hier als Bitmaske; übertragen werden nur Seed + Kraterliste.
  */
 export class IgelGame implements MiniGame {
@@ -79,6 +88,12 @@ export class IgelGame implements MiniGame {
   private outTurn: Record<string, number> = {};
   private tickNo = 0;
   private dirty = true;
+  /** Nach Spielerzahl: Zugzeit, Start-HP, Sudden-Death-Beginn */
+  private turnMs: number;
+  private maxHp: number;
+  private suddenMs: number;
+  /** Zuschauer-Sprüche: wann darf der Spieler wieder? */
+  private tauntReady: Record<string, number> = {};
 
   constructor(
     private ids: string[],
@@ -86,6 +101,12 @@ export class IgelGame implements MiniGame {
   ) {
     this.mask = genTerrain(this.seed);
     this.teams = shuffle(ids);
+    this.turnMs = igelTurnMs(ids.length);
+    this.maxHp = igelMaxHp(ids.length);
+    // Zum Testen kürzer: IGEL_SUDDEN_MS=20000 npm run dev
+    this.suddenMs = Number(process.env.IGEL_SUDDEN_MS) || igelSuddenMs(ids.length);
+    // Startwind leicht, danach driftet er pro Zug
+    this.wind = Math.round((Math.random() - 0.5) * 0.8 * 100) / 100;
     const perTeam = ids.length <= 4 ? 2 : 1;
     for (const id of ids) {
       this.damage[id] = 0;
@@ -99,7 +120,7 @@ export class IgelGame implements MiniGame {
     for (let n = 0; n < perTeam; n++) {
       for (const owner of this.teams) {
         const s = spots[k++];
-        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: IGEL.HP, dir: s.x < IGEL.W / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0 });
+        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < IGEL.W / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, shownAcc: 0 });
       }
     }
     this.timers.every(TICK_MS, () => this.tick());
@@ -157,13 +178,15 @@ export class IgelGame implements MiniGame {
     this.turn += 1;
     this.active = owner;
     this.activeHog = hog.id;
-    const w = Math.random() * 2 - 1;
-    this.wind = Math.round(Math.sign(w) * Math.abs(w) ** 1.3 * 100) / 100;
+    // Wind driftet nur leicht weiter – so lernt man aus dem Schuss des Vorgängers
+    if (this.turn > 1) this.wind = Math.round(clamp(this.wind + (Math.random() - 0.5) * IGEL.WIND_DRIFT, -1, 1) * 100) / 100;
+    for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0);
     if (this.ammo[owner][this.weaponOf[owner]] === 0) this.weaponOf[owner] = 'bazooka';
     this.aim = null;
     this.walkDir = 0;
     this.sub = 'aim';
-    this.deadline = Date.now() + (this.ctx.isConnected(owner) ? IGEL.TURN_MS : 1500);
+    // Kurz offline (App gewechselt)? 5 s Gnadenfrist statt sofort weiter
+    this.deadline = Date.now() + (this.ctx.isConnected(owner) ? this.turnMs : IGEL.OFFLINE_TURN_MS);
     this.dirty = true;
   }
 
@@ -183,11 +206,18 @@ export class IgelGame implements MiniGame {
         this.addFx({ type: 'ko', x: h.x, y: h.y - 10, text: 'K.O.' });
       }
     }
-    if (!this.suddenDeath && now - this.startedAt >= IGEL.SUDDEN_MS) {
+    for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0);
+    // Volle Runde vorbei? (Der nächste Zug springt in der Reihenfolge wieder nach vorn.)
+    const nextIdx = this.nextTeamFrom(this.teamPtr);
+    const roundDone = nextIdx >= 0 && nextIdx <= this.teamPtr;
+    if (!this.suddenDeath && now - this.startedAt >= this.suddenMs) {
       this.suddenDeath = true;
       this.addFx({ type: 'water', x: IGEL.W / 2, y: 90, text: 'SUDDEN DEATH – Flut!' });
-    } else if (this.suddenDeath) {
-      this.water = Math.max(60, this.water - IGEL.WATER_RISE);
+    } else if (this.suddenDeath && roundDone) {
+      // Flut steigt pro voller Runde (fair: jeder war seitdem einmal dran) – bei vielen Teams etwas mehr
+      const alive = this.teams.filter((id) => this.teamAlive(id)).length;
+      const rise = Math.round(IGEL.WATER_RISE * clamp(alive / 4, 1, 2));
+      this.water = Math.max(60, this.water - rise);
       this.addFx({ type: 'water', x: IGEL.W / 2, y: 90, text: 'Die Flut steigt!' });
       for (const h of this.hogs) if (h.state !== 'drowned' && h.y - 3 > this.water) this.drown(h);
     }
@@ -269,8 +299,11 @@ export class IgelGame implements MiniGame {
         break;
       case 'settle': {
         const busy = this.projs.length > 0 || this.hogs.some((h) => h.state !== 'drowned' && h.flying);
+        // Erst wenn alles liegt: HP-Anzeige Punkt für Punkt herunterzählen
+        const counting = !busy && this.countDownHp(dt);
+        if (counting) moving = true;
         // Notbremse nach 8 s: falls ein Igel ewig zappelt, trotzdem weiter
-        if ((!busy && now >= this.settleAt) || now - this.settleAt > 8000) {
+        if ((!busy && !counting && now >= this.settleAt) || now - this.settleAt > 8000) {
           this.projs = [];
           this.finishTurn();
         }
@@ -282,6 +315,23 @@ export class IgelGame implements MiniGame {
       this.dirty = false;
       this.ctx.onChange();
     }
+  }
+
+  /** Zählt die angezeigten HP Richtung echter HP herunter; true, solange noch etwas läuft */
+  private countDownHp(dt: number): boolean {
+    const behind = this.hogs.filter((h) => h.state !== 'drowned' && h.shown > Math.max(0, h.hp));
+    if (!behind.length) return false;
+    const maxGap = Math.max(...behind.map((h) => h.shown - Math.max(0, h.hp)));
+    const rate = Math.max(IGEL.HP_TICK_PER_S, maxGap / (IGEL.HP_TICK_MAX_MS / 1000));
+    for (const h of behind) {
+      h.shownAcc += rate * dt;
+      const step = Math.floor(h.shownAcc);
+      if (step < 1) continue;
+      h.shownAcc -= step;
+      h.shown = Math.max(Math.max(0, h.hp), h.shown - step);
+    }
+    this.dirty = true;
+    return true;
   }
 
   private walkStep(h: Hog, dir: -1 | 1): boolean {
@@ -357,6 +407,7 @@ export class IgelGame implements MiniGame {
     const wasAlive = h.state === 'ok';
     h.state = 'drowned';
     h.hp = 0;
+    h.shown = 0;
     h.flying = false;
     h.y = this.water;
     h.x = clamp(h.x, 4, IGEL.W - 4);
@@ -448,6 +499,7 @@ export class IgelGame implements MiniGame {
   // ---------------------------------------------------------------- Eingaben
 
   input(id: string, action: string, payload: unknown) {
+    if (action === 'taunt') return this.taunt(id, asRecord(payload));
     if (id !== this.active || this.activeHog === null) return;
     const h = this.hogs[this.activeHog];
     if (h.state !== 'ok') return;
@@ -493,6 +545,21 @@ export class IgelGame implements MiniGame {
         break;
     }
     this.dirty = true;
+  }
+
+  /** Zuschauer-Spruch: Sprechblase über dem eigenen Igel (nicht, wer gerade dran ist) */
+  private taunt(id: string, pl: Record<string, unknown>) {
+    const i = Number(pl.i);
+    if (!Number.isInteger(i) || i < 0 || i >= IGEL_TAUNTS.length) return;
+    if (this.sub === 'over' || id === this.active || !this.teams.includes(id)) return;
+    const now = Date.now();
+    if (now < (this.tauntReady[id] ?? 0)) return;
+    // Lebender Igel bevorzugt, sonst der Grabstein; wer ertrunken ist, ruft vom Schwimmring
+    const mine = this.hogs.filter((h) => h.owner === id);
+    const hog = mine.find((h) => h.state === 'ok') ?? mine.find((h) => h.state === 'dead') ?? mine[0];
+    if (!hog) return;
+    this.tauntReady[id] = now + IGEL.TAUNT_COOLDOWN_MS;
+    this.addFx({ type: 'taunt', x: hog.x, y: hog.state === 'drowned' ? this.water : hog.y, text: IGEL_TAUNTS[i], hog: hog.id });
   }
 
   private fire(h: Hog, angle: number, power: number) {
@@ -602,7 +669,7 @@ export class IgelGame implements MiniGame {
         water: this.water,
         wind: this.wind,
         teams: this.teams,
-        hogs: this.hogs.map((h) => ({ id: h.id, owner: h.owner, x: r1(h.x), y: r1(h.y), hp: h.hp, dir: h.dir, state: h.state, flying: h.flying, walking: h.walking })),
+        hogs: this.hogs.map((h) => ({ id: h.id, owner: h.owner, x: r1(h.x), y: r1(h.y), hp: h.hp, shown: h.shown, dir: h.dir, state: h.state, flying: h.flying, walking: h.walking })),
         turn: this.turn,
         active: this.active,
         activeHog: this.activeHog,
@@ -613,17 +680,30 @@ export class IgelGame implements MiniGame {
         projs: this.projs.map((p) => ({ id: p.id, type: p.type, x: r1(p.x), y: r1(p.y) })),
         fx: this.fx,
         suddenDeath: this.suddenDeath,
-        suddenIn: Math.max(0, this.startedAt + IGEL.SUDDEN_MS - now),
+        suddenIn: Math.max(0, this.startedAt + this.suddenMs - now),
+        maxHp: this.maxHp,
+        turnMs: this.turnMs,
         damage: this.damage,
         out: this.out,
       },
     };
   }
 
+  /** VIP/Laptop: Zug des aktiven Spielers beenden (ohne Schuss) */
+  skippable(): SkipInfo | null {
+    return this.sub === 'aim' && this.active ? { label: `${possessive(this.ctx.nameOf(this.active))} Zug überspringen` } : null;
+  }
+
+  skip() {
+    if (this.sub !== 'aim') return;
+    this.toSettle();
+    this.ctx.onChange();
+  }
+
   playerDisconnected(id: string) {
     if (id === this.active && this.sub === 'aim') {
       this.walkDir = 0;
-      this.deadline = Math.min(this.deadline, Date.now() + 1500);
+      this.deadline = Math.min(this.deadline, Date.now() + IGEL.OFFLINE_TURN_MS);
     }
   }
 

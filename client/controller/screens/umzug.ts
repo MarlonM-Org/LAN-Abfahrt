@@ -2,7 +2,8 @@ import { UMZUG_KINDS, type UmzugState, umzugGoals, umzugName } from '../../../sh
 import { TEAM_INFO } from '../../../shared/flunky';
 import { umzugItemPix } from '../../art/umzug';
 import { type Screen, app, el, message, q, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { onInputReset, stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 /** Möbelstück groß und pixelig auf ein Canvas malen */
 function paintItem(cv: HTMLCanvasElement, k: number | null) {
@@ -16,8 +17,9 @@ function paintItem(cv: HTMLCanvasElement, k: number | null) {
 }
 
 /**
- * Umzugschaos am Handy: Joystick links, rechts GREIFEN (gedrückt halten = tragen bzw. ein Ende
- * eines schweren Teils festhalten, loslassen = absetzen) und WERFEN (ohne Teil in der Hand: SPRINT).
+ * Umzugschaos am Handy (quer wie am Gamepad): links Stick, Mitte „Du trägst“ + Hinweis + Sterne,
+ * rechts GREIFEN (gedrückt halten = tragen bzw. ein Ende eines schweren Teils festhalten, loslassen =
+ * absetzen) über WERFEN (ohne Teil in der Hand: SPRINT).
  */
 export function pickUmzug(s: UmzugState): Screen {
   const id = store.playerId!;
@@ -39,28 +41,27 @@ export function pickUmzug(s: UmzugState): Screen {
     () => {
       const h = s.houses[me.k];
       const badge = h.team
-        ? `<div class="team-badge team-${h.team}">${TEAM_INFO[h.team].name} – Haus ${h.team === 'A' ? 'links' : 'rechts'}</div>`
-        : `<div class="team-badge gr-coop">Gemeinsam ausräumen!</div>`;
+        ? `<span class="lx-tag team-${h.team}">${TEAM_INFO[h.team].name} · Haus ${h.team === 'A' ? 'links' : 'rechts'}</span>`
+        : `<span class="lx-tag gr-coop">Gemeinsam ausräumen!</span>`;
       const root = el(`
-        <div class="gr um">
-          ${badge}
-          <div class="top-row"><span class="timer"></span><span class="score"></span></div>
-          <div class="gr-carry">
-            <canvas class="gr-held" width="88" height="80"></canvas>
-            <div class="gr-carry-txt"><small class="um-carry-l">DU TRÄGST</small><b class="gr-what"></b></div>
-          </div>
-          <p class="gr-hint"></p>
-          <div class="um-stars"></div>
-          <div class="gr-controls">
-            <div class="stick-area"></div>
-            <div class="gr-btns">
-              <button class="big-btn gr-grab um-grab"><span class="gr-grab-l">GREIFEN</span><small class="gr-grab-s">halten = tragen</small></button>
-              <button class="big-btn gr-act um-throw"><span class="um-throw-l">SPRINT</span><small class="um-throw-s">kurzer Spurt</small></button>
+        <div class="lx gr um-lx">
+          <div class="lx-head">${badge}<span class="timer"></span><span class="score grow"></span></div>
+          <div class="lx-left um-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+          <div class="lx-mid">
+            <div class="gr-carry">
+              <canvas class="gr-held" width="88" height="80"></canvas>
+              <div class="gr-carry-txt"><small class="um-carry-l">DU TRÄGST</small><b class="gr-what"></b></div>
             </div>
+            <p class="gr-hint"></p>
+            <div class="um-stars"></div>
+          </div>
+          <div class="lx-right gr-btns">
+            <button class="big-btn gr-grab um-grab"><span class="gr-grab-l">GREIFEN</span><small class="gr-grab-s">halten = tragen</small></button>
+            <button class="big-btn gr-act um-throw"><span class="um-throw-l">SPRINT</span><small class="um-throw-s">kurzer Spurt</small></button>
           </div>
         </div>
       `);
-      joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+      stickZone(q(root, '.um-stick'), (x, y) => send('stick', { x, y }));
       // GREIFEN: gedrückt halten (regelmäßig wiederholen, falls ein Paket verloren geht)
       const grab = q<HTMLButtonElement>(root, '.um-grab');
       let grabPointer: number | null = null;
@@ -80,7 +81,7 @@ export function pickUmzug(s: UmzugState): Screen {
         grabPointer = e.pointerId;
         grab.classList.add('held');
         send('grab', { down: true });
-        navigator.vibrate?.(10);
+        haptic(10);
         clearInterval(grabTimer);
         grabTimer = window.setInterval(() => {
           if (!grab.isConnected) return clearInterval(grabTimer);
@@ -90,11 +91,12 @@ export function pickUmzug(s: UmzugState): Screen {
       grab.addEventListener('pointerup', release);
       grab.addEventListener('pointercancel', release);
       grab.addEventListener('lostpointercapture', release);
+      onInputReset(grab, () => grabPointer !== null && release());
       grab.addEventListener('contextmenu', (e) => e.preventDefault());
       const thr = q<HTMLButtonElement>(root, '.um-throw');
       tapButton(thr, () => {
         send('throw');
-        navigator.vibrate?.(14);
+        haptic(14);
       });
       app.append(root);
 
@@ -128,7 +130,7 @@ export function pickUmzug(s: UmzugState): Screen {
         }
         thr.disabled = (!!item && !!UMZUG_KINDS[item.k].heavy) || (!item && p.cd > 0);
         let hint: string;
-        if (st.sub === 'countdown') hint = 'Gleich geht’s los! Alles muss in den Laster – rechts am Haus.';
+        if (st.sub === 'countdown') hint = 'Gleich geht’s los! Alles muss in den Laster rechts am Haus.';
         else if (item && UMZUG_KINDS[item.k].heavy) {
           const partner = item.by.some((b) => b && b !== id);
           hint = partner ? 'Zieht beide in dieselbe Richtung – längs durch die Tür!' : 'Jemand muss das andere Ende anpacken!';
@@ -144,9 +146,9 @@ export function pickUmzug(s: UmzugState): Screen {
             stars.innerHTML = goals.map((g) => `<span class="${hs.score >= g ? 'on' : ''}">★<small>${g}</small></span>`).join('');
           }
         }
-        if (p.no > prevNo) navigator.vibrate?.([30, 40, 30]);
-        if (p.pts > prevPts) navigator.vibrate?.(60);
-        if (p.st[3] > prevBroke) navigator.vibrate?.([80, 40, 80, 40, 80]);
+        if (p.no > prevNo) haptic([30, 40, 30]);
+        if (p.pts > prevPts) haptic(60);
+        if (p.st[3] > prevBroke) haptic([80, 40, 80, 40, 80]);
         prevNo = p.no;
         prevPts = p.pts;
         prevBroke = p.st[3];
@@ -154,4 +156,3 @@ export function pickUmzug(s: UmzugState): Screen {
     },
   ];
 }
-
