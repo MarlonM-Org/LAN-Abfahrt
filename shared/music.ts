@@ -166,7 +166,7 @@ export function defaultSongForScene(scene: string): string {
       return 'spooky';
     case 'stillepost': case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'tourist': case 'sprueche':
       return 'bar';
-    case 'pixel':
+    case 'pixel': case 'angeln':
       return 'strandpromenade';
     default:
       return 'action';
