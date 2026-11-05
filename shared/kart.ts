@@ -321,9 +321,10 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 /**
  * Ein Physik-Schritt für ein Kart – identisch auf dem Server und (als Vorhersage) auf dem Handy.
  * Kollisionen mit anderen Karts, Items und Rundenzählung macht nur der Server.
+ * Ohne Strecke (`T = null`, z. B. Auto-Fußball) gibt es kein Gelände und keine Bande – Wände macht dann das Spiel selbst.
  * Liefert true, wenn gerade ein Mini-Turbo gezündet wurde.
  */
-export function stepKart(c: KartPhys, inp: KartInput, dt: number, T: Track, o: StepOpts = {}): boolean {
+export function stepKart(c: KartPhys, inp: KartInput, dt: number, T: Track | null, o: StepOpts = {}): boolean {
   let fired = false;
   const steer = clamp(inp.steer, -1, 1);
   const spinning = c.spinMs > 0;
@@ -331,7 +332,7 @@ export function stepKart(c: KartPhys, inp: KartInput, dt: number, T: Track, o: S
   const fy = Math.sin(c.angle);
   let vf = c.vx * fx + c.vy * fy;
   let vl = -c.vx * fy + c.vy * fx;
-  c.offroad = project(T, c.x, c.y).dist > T.half + 1;
+  c.offroad = T ? project(T, c.x, c.y).dist > T.half + 1 : false;
   const boosting = c.boostMs > 0;
 
   if (spinning) {
@@ -397,7 +398,7 @@ export function stepKart(c: KartPhys, inp: KartInput, dt: number, T: Track, o: S
   c.y += c.vy * dt;
   c.spinMs = Math.max(0, c.spinMs - dt * 1000);
   c.boostMs = Math.max(0, c.boostMs - dt * 1000);
-  keepInside(c, T);
+  if (T) keepInside(c, T);
   return fired;
 }
 

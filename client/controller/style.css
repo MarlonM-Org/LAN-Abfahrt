@@ -605,6 +605,36 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .k3-portrait { top: 60%; }
 }
 
+/* ---------------------------------------------------------------- Auto-Fußball (gleiches Querformat wie das Kart-Rennen) */
+.afb { background: linear-gradient(180deg, var(--paper) 0%, #f1d49a 100%); }
+.afb-A { box-shadow: inset 0 6px 0 #f4c542; }
+.afb-B { box-shadow: inset 0 6px 0 #3fa7e0; }
+.afb .k3-hud { top: calc(30px + var(--st)); }
+.afb-score { font-size: 34px; line-height: 1; color: var(--ink); }
+.afb-score .sa { color: #c8961c; }
+.afb-score .sb { color: #2a86c0; }
+.afb-score i { font-style: normal; margin: 0 8px; color: var(--ink-soft); }
+.afb-clock { margin-top: 8px; font-size: 11px; color: var(--ink); }
+.afb-team { margin-top: 8px; font-size: 7px; color: var(--ink-soft); }
+.afb-A .afb-team b { color: #c8961c; }
+.afb-B .afb-team b { color: #2a86c0; }
+.afb .k3-center { top: auto; bottom: calc(30% + var(--sb)); }
+.afb .k3-center.count { color: #c8961c; }
+.afb .k3-center.go { color: var(--green-ink, #2f7d32); }
+.afb .k3-center.hit { color: var(--red); }
+.afb .k3-btn small { text-align: center; line-height: 1.5; }
+.afb-boost { background: #f0973a; box-shadow: inset 0 4px 0 #f7bd7a, inset 0 -6px 0 #b8661c, 0 3px 0 var(--outline); }
+.afb-boost.empty { filter: grayscale(0.8) brightness(0.9); }
+.afb-bar { width: 76%; height: 9px; border: 2px solid var(--outline); background: rgba(0,0,0,0.35); box-sizing: border-box; }
+.afb-bar i { display: block; height: 100%; width: 0; background: #ffd25e; transition: width 120ms linear; }
+.afb-hop { right: calc(12px + var(--sr) + var(--bw) + var(--gap)); bottom: calc(12px + var(--sb) + var(--bh) + var(--gap)); width: calc(var(--bw) * 0.72); height: calc(var(--bh) * 0.78);
+  background: #9b5fc0; box-shadow: inset 0 4px 0 #c08fe0, inset 0 -6px 0 #6e3f8f, 0 3px 0 var(--outline); font-size: 9px; }
+.afb-hop.cool { filter: grayscale(0.7) brightness(0.85); }
+.afb .k3-brake.afb-charged { box-shadow: inset 0 2px 0 rgba(0,0,0,0.25), 0 0 0 4px #ffd25e; }
+@media (orientation: portrait) {
+  .afb .k3-portrait { display: block; }
+}
+
 /* ---------------------------------------------------------------- Wackelturm */
 .turm-info { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .turm-lives { font-size: 22px; letter-spacing: 4px; font-family: system-ui, sans-serif; }

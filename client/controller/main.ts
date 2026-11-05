@@ -33,6 +33,7 @@ import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
+import { pickAutoball } from './screens/autoball';
 import { buildKicked, initVipPlayersButton } from './players';
 
 let screenKey = '';
@@ -291,6 +292,8 @@ function pickScreen(): Screen {
           return pickTourist(m.state);
         case 'sprueche':
           return pickSprueche(m.state, vip);
+        case 'autoball':
+          return pickAutoball(m.state);
       }
       return outdatedScreen();
     }

@@ -2,6 +2,7 @@ import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
+import type { AfbState } from './autoball';
 
 export interface Look {
   skin: number;
@@ -56,7 +57,8 @@ export type MiniKind =
   | 'boule'
   | 'sumo'
   | 'tourist'
-  | 'sprueche';
+  | 'sprueche'
+  | 'autoball';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1534,7 +1536,8 @@ export type MiniSnapshot =
   | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
   | { kind: 'tourist'; state: TourState }
-  | { kind: 'sprueche'; state: SpruecheState };
+  | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'autoball'; state: AfbState };
 
 export interface GameState {
   phase: Phase;

@@ -31,6 +31,7 @@ import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
+import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 
 export interface BotOptions {
   url: string;
@@ -1048,6 +1049,8 @@ export class Bot {
     }
 
     if (m.kind === 'sumo') sumoBot(this, m.state);
+
+    if (m.kind === 'autoball') afbBot(this, m.state);
 
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
@@ -2174,4 +2177,159 @@ function shuffleQuip<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// ------------------------------------------------------------------ Auto-Fußball
+
+interface AfbBotMemory {
+  nextAt: number;
+  /** Für die Geschwindigkeit (der Snapshot hat keine) */
+  px: number;
+  py: number;
+  pt: number;
+  speed: number;
+  stuckSince: number;
+  reverseUntil: number;
+  /** Eigene Ungenauigkeit beim Lenken */
+  slop: number;
+  idle: boolean;
+}
+
+const afbBotMem = new WeakMap<Bot, AfbBotMemory>();
+const afbClamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const afbWrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Auto-Fußball-Bot: fährt zu einem Punkt hinter dem Ball (auf der Linie Ball → gegnerisches Tor)
+ * und schiebt dann durch. Steht er vor dem Ball, fährt er außen herum. Pro Team verteidigt ein Bot
+ * (der dem eigenen Tor am nächsten ist), sobald der Ball in der eigenen Hälfte ist; weitere Bots
+ * halten Abstand und warten auf Abpraller.
+ */
+function afbBot(bot: Bot, st: AfbState) {
+  let mem = afbBotMem.get(bot);
+  if (!mem) afbBotMem.set(bot, (mem = { nextAt: 0, px: 0, py: 0, pt: 0, speed: 0, stuckSince: 0, reverseUntil: 0, slop: rand(-0.12, 0.12), idle: true }));
+  const me = st.cars[bot.id];
+  if (!me) return;
+  if (st.sub === 'over') {
+    if (!mem.idle) {
+      mem.idle = true;
+      bot.send('steer', { x: 0, gas: false, brake: false, boost: false });
+    }
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 130);
+  if (mem.pt) mem.speed = (Math.hypot(me.x - mem.px, me.y - mem.py) / Math.max(1, now - mem.pt)) * 1000;
+  mem.px = me.x;
+  mem.py = me.y;
+  mem.pt = now;
+  if (st.sub === 'countdown') {
+    mem.idle = false;
+    mem.stuckSince = 0;
+    bot.send('steer', { x: 0, gas: true, brake: false, boost: false });
+    return;
+  }
+
+  const dir = me.t === 'A' ? 1 : -1;
+  const ownX = me.t === 'A' ? AFB.X0 : AFB.X1;
+  const goalX = me.t === 'A' ? AFB.X1 + 12 : AFB.X0 - 12;
+  // Ball etwas vorausberechnen
+  const bx = st.ball.x + st.ball.vx * 0.2;
+  const by = st.ball.y + st.ball.vy * 0.2;
+  const isBot = (id: string) => !!bot.state?.players.find((p) => p.id === id)?.bot;
+  const team = Object.entries(st.cars).filter(([, c]) => c.t === me.t);
+  const teamBots = team.filter(([id]) => isBot(id));
+
+  // Rolle: Verteidiger (Ball in der eigenen Hälfte, ab 2 Autos im Team), Stürmer (am nächsten am Ball) oder Unterstützer
+  const ballOwnHalf = (bx - AFB_CX) * dir < 0;
+  const defender = team.length >= 2 && ballOwnHalf ? teamBots.sort((a, b) => Math.abs(a[1].x - ownX) - Math.abs(b[1].x - ownX))[0]?.[0] : undefined;
+  const others = team.filter(([id]) => id !== defender);
+  const striker = others.sort((a, b) => Math.hypot(a[1].x - bx, a[1].y - by) - Math.hypot(b[1].x - bx, b[1].y - by))[0]?.[0];
+
+  let ux = goalX - bx;
+  let uy = AFB_CY - by;
+  const ul = Math.hypot(ux, uy) || 1;
+  ux /= ul;
+  uy /= ul;
+  const rx = me.x - bx;
+  const ry = me.y - by;
+  const along = rx * ux + ry * uy;
+  const side = -rx * uy + ry * ux;
+  const reach = AFB.BALL_R + AFB.CAR_R;
+
+  let tx: number;
+  let ty: number;
+  let pushing = false;
+  let park = false;
+  const goalSide = (me.x - bx) * dir < 0;
+  const ballNearOwnGoal = Math.abs(bx - ownX) < 80;
+  if (bot.id === defender && !(ballNearOwnGoal && goalSide)) {
+    // Vor dem eigenen Tor zwischen Ball und Tor stehen
+    tx = ownX + dir * 26;
+    ty = afbClamp(AFB_CY + (by - AFB_CY) * 0.5, AFB_CY - st.goalHalf, AFB_CY + st.goalHalf);
+    park = true;
+  } else if (bot.id !== defender && bot.id !== striker && others.length > 1) {
+    // Unterstützer: mit Abstand hinter dem Ball, seitlich versetzt
+    const idx = others.findIndex(([id]) => id === bot.id);
+    const off = (idx % 2 ? 1 : -1) * (36 + 10 * Math.floor(idx / 2));
+    tx = bx - ux * 64 - uy * off;
+    ty = by - uy * 64 + ux * off;
+    park = true;
+  } else if (along < -4 && Math.abs(side) < 8 + Math.abs(along) * 0.3) {
+    // Hinter dem Ball auf Linie → durchschieben
+    tx = bx + ux * 30;
+    ty = by + uy * 30;
+    pushing = true;
+  } else if (along < 0) {
+    tx = bx - ux * (reach + 12);
+    ty = by - uy * (reach + 12);
+  } else {
+    // Vor dem Ball → außen herum, nicht ins eigene Tor schieben
+    const sgn = Math.sign(side) || 1;
+    tx = bx - ux * (reach + 18) - uy * sgn * 28;
+    ty = by - uy * (reach + 18) + ux * sgn * 28;
+  }
+  tx = afbClamp(tx, AFB.X0 - (pushing ? 20 : -10), AFB.X1 + (pushing ? 20 : -10));
+  ty = afbClamp(ty, AFB.Y0 + 10, AFB.Y1 - 10);
+
+  const dx = tx - me.x;
+  const dy = ty - me.y;
+  const dist = Math.hypot(dx, dy);
+  const diff = afbWrap(Math.atan2(dy, dx) - me.a);
+  let steer = afbClamp(diff * 2.2 + mem.slop, -1, 1);
+  let gas = true;
+  let brake = false;
+  let boost = false;
+  if (now < mem.reverseUntil) {
+    gas = false;
+    brake = true;
+    steer = -Math.sign(diff) || 1;
+  } else if (park && dist < 12) {
+    gas = false;
+    steer = 0;
+  } else if (Math.abs(diff) > 2.1 && dist < 60) {
+    // Ziel liegt hinter uns und nah: rückwärts drehen
+    gas = false;
+    brake = true;
+    steer = -Math.sign(diff);
+  } else if (Math.abs(diff) > 1.3 && mem.speed > 55) {
+    // scharfe Kurve: Bremse in voller Fahrt = Drift
+    gas = false;
+    brake = true;
+  } else {
+    const ballDist = Math.hypot(bx - me.x, by - me.y);
+    boost = me.b > 8 && Math.abs(diff) < 0.3 && ((pushing && ballDist < 70) || (dist > 150 && me.b > 45));
+    if (pushing && ballDist < reach + 10 && Math.abs(diff) < 0.35 && me.hc === 0 && Math.random() < 0.3) bot.send('hop');
+  }
+  // Festgefahren? Kurz zurücksetzen
+  if (gas && mem.speed < 6) {
+    if (!mem.stuckSince) mem.stuckSince = now;
+    else if (now - mem.stuckSince > 1100) {
+      mem.reverseUntil = now + rand(450, 750);
+      mem.stuckSince = 0;
+    }
+  } else mem.stuckSince = 0;
+  mem.idle = false;
+  bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
 }
