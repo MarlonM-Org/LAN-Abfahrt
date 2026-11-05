@@ -245,7 +245,7 @@ export class Room {
       } else if (req.mode === 'party') {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
-        this.startParty(ids, rounds);
+        this.startParty(ids, rounds, req.longGames === true);
       } else if (req.mode === 'top' || req.mode === 'favorites') {
         const kind = this.votedKind(req.mode);
         if (!kind) return socket.emit('toast', 'Noch keine (passenden) Stimmen.');
@@ -409,7 +409,7 @@ export class Room {
 
   // ---------------------------------------------------------------- Ablauf
 
-  private startParty(ids: string[], rounds: number) {
+  private startParty(ids: string[], rounds: number, longGames = false) {
     this.session.endSeries();
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
@@ -419,7 +419,7 @@ export class Room {
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
       isGone: (id) => !!this.players.get(id)?.removed,
-    });
+    }, longGames);
     this.results = null;
     this.phase = 'board';
     this.changed();

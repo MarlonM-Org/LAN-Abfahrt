@@ -1637,6 +1637,13 @@ function shuffleArr<T>(arr: T[]): T[] {
 
 /** Igel-Krieg: kurz laufen, dann per Simulation zielen und schießen */
 function igelBot(bot: Bot, st: IgelState) {
+  // Zuschauer-Sprüche ab und zu (Server: Abklingzeit 8 s)
+  if (st.active !== bot.id && st.sub !== 'over' && st.sub !== 'countdown') {
+    bot.once('igel-taunt', async () => {
+      await sleep(rand(4000, 14000));
+      if (Math.random() < 0.5) bot.send('taunt', { i: Math.floor(Math.random() * 4) });
+    });
+  }
   if (st.active !== bot.id || st.activeHog === null) return;
   const cur = () => (bot.state?.mini?.kind === 'igel' ? bot.state.mini.state : null);
   if (st.sub === 'aim') {

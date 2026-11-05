@@ -6,6 +6,9 @@ import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, t
 import { lobbyPlayerList } from '../players';
 import { sessionPanel } from './leaderboard';
 
+/** VIP-Schalter im Party-Modus: auch lange Minispiele (> 4 min) aufs Brett – bleibt bis zum Neuladen */
+let partyLongGames = false;
+
 /** Avatar-Editor. `onDone` tritt dem Spiel bei bzw. aktualisiert den Charakter. */
 export function buildEdit(onDone: () => void) {
   const preview = avatarCanvas(8);
@@ -166,11 +169,20 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     const roundRow = el(`<div class="btn-row"></div>`);
     for (const r of PARTY_ROUND_OPTIONS) {
       const b = el(`<button>${r} Runden</button>`).firstElementChild as HTMLButtonElement;
-      b.addEventListener('click', () => socket.emit('vip:start', { mode: 'party', rounds: r }));
+      b.addEventListener('click', () => socket.emit('vip:start', { mode: 'party', rounds: r, longGames: partyLongGames }));
       q(roundRow, '.btn-row').append(b);
       gated.push({ btn: b, min: 2 });
     }
     menu.append(roundRow);
+    const longLabel = () => `Lange Spiele (Golf, Bowling …): ${partyLongGames ? 'AN' : 'AUS'}`;
+    const longTog = el(`<button class="small ${partyLongGames ? '' : 'secondary'}"></button>`).firstElementChild as HTMLButtonElement;
+    longTog.textContent = longLabel();
+    longTog.addEventListener('click', () => {
+      partyLongGames = !partyLongGames;
+      longTog.textContent = longLabel();
+      longTog.classList.toggle('secondary', !partyLongGames);
+    });
+    menu.append(longTog);
     singles(PARTY_KINDS);
   } else {
     const label = mode === 'date' ? 'Date Night ♥' : mode === 'drink' ? 'Trinkspiel' : 'Party-Abfahrt';

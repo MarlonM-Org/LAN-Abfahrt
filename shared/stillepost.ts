@@ -6,8 +6,8 @@ export const POST = {
   DRAW_MS: 70000,
   DESCRIBE_MS: 45000,
   VOTE_MS: 25000,
-  /** Mehr Schritte pro Kette werden zu lang (≈ 6–8 Minuten Spielzeit) */
-  MAX_STEPS: 8,
+  /** Mehr Schritte pro Kette werden zu lang (6 Schritte ≈ 5 Minuten Spielzeit) */
+  MAX_STEPS: 6,
   MAX_TEXT: 90,
   /** Zeichenfläche: Koordinaten 0 … GRID (ganzzahlig, 1 Byte) */
   GRID: 255,

@@ -1,3 +1,4 @@
+import { fairRoleScores } from './rolefair';
 import type { FangenHunter, FangenOutcome, FangenPrint, FangenState, MiniSnapshot, PrivateState } from '../shared/types';
 import {
   FANGEN,
@@ -51,6 +52,9 @@ export class FangenGame implements MiniGame {
   private decoyReady = 0;
   private decoy: { col: number; row: number; left: number } | null = null;
   private points: Record<string, number>;
+  /** Anteil der Punkte aus der Animateur-Rolle (für die faire Wertung) */
+  private runnerPts: Record<string, number>;
+  private huntedRounds: Record<string, number>;
   private outcome: FangenOutcome | null = null;
   private history: FangenOutcome[] = [];
   private deadline = 0;
@@ -65,6 +69,8 @@ export class FangenGame implements MiniGame {
     this.rounds = Math.min(ids.length, FANGEN.MAX_ROUNDS);
     this.order = shuffle(ids).slice(0, this.rounds);
     this.points = Object.fromEntries(ids.map((id) => [id, 0]));
+    this.runnerPts = Object.fromEntries(ids.map((id) => [id, 0]));
+    this.huntedRounds = Object.fromEntries(ids.map((id) => [id, 0]));
     this.timers.every(TICK_MS, () => this.tick());
     this.startRound();
   }
@@ -85,6 +91,7 @@ export class FangenGame implements MiniGame {
     const fromSpawn = bfsFrom([spawn]);
     const near = [...WALK_TILES].sort((a, b) => distAt(fromSpawn, a.col, a.row) - distAt(fromSpawn, b.col, b.row));
     const hunterIds = this.ids.filter((id) => id !== this.runnerId);
+    for (const id of hunterIds) this.huntedRounds[id] += 1;
     hunterIds.forEach((id, i) => {
       const t = near[i % near.length];
       const c = tileCenter(t.col, t.row);
@@ -119,7 +126,9 @@ export class FangenGame implements MiniGame {
     this.outcome = { runner: this.runnerId, caught, by, survivedMs, x: Math.round(this.runner.x), y: Math.round(this.runner.y) };
     this.history.push(this.outcome);
     // Punkte: Flüchtling nach Überlebenszeit + Bonus fürs Entkommen; Fänger: Team-Punkte + Fang-Bonus
-    this.points[this.runnerId] += Math.floor(survivedMs / FANGEN.SURVIVE_MS_PER_POINT) + (caught ? 0 : FANGEN.WIN_BONUS);
+    const runPts = Math.floor(survivedMs / FANGEN.SURVIVE_MS_PER_POINT) + (caught ? 0 : FANGEN.WIN_BONUS);
+    this.points[this.runnerId] += runPts;
+    this.runnerPts[this.runnerId] += runPts;
     if (by) {
       for (const id of this.hunters.keys()) this.points[id] += FANGEN.TEAM_POINTS;
       this.points[by] += FANGEN.CATCH_BONUS;
@@ -141,14 +150,16 @@ export class FangenGame implements MiniGame {
       if (h.by) catches.set(h.by, (catches.get(h.by) ?? 0) + 1);
     }
     const caughtCount = this.history.filter((h) => h.caught).length;
+    // Mehr Spieler als Runden: Animateur-Punkte nur unter Animateuren vergleichen (sonst entscheidet das Los)
+    const fair = fairRoleScores(this.ids, this.rounds, this.points, this.runnerPts, this.huntedRounds, this.history.map((h) => h.runner));
     this.timers.later(2500, () =>
       this.ctx.finish({
-        groups: groupByScore(this.ids, (id) => this.points[id]),
+        groups: groupByScore(this.ids, (id) => fair[id]),
         details: Object.fromEntries(
           this.ids.map((id) => {
             // max. 16 Zeichen (Ergebnis-Tafel)
             const extra = escaped.get(id) ? ' Flucht' : catches.get(id) ? ` ${catches.get(id)}× Fang` : '';
-            return [id, `${this.points[id]} Pkt${extra}`];
+            return [id, `${Math.round(fair[id])} Pkt${extra}`];
           }),
         ),
         subtitle:
