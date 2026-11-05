@@ -86,9 +86,6 @@ export const WASSER_PISTOL_SPOTS: Point[] = [
   { x: 330, y: 160 },
 ];
 
-/** Farben für Jeder-gegen-jeden (bei 3 Spielern) */
-export const WASSER_FFA_COLORS = [0xe0503f, 0x46b04a, 0x9b5fc0];
-
 /** Alle Hindernisse für die Bewegung */
 export const WASSER_BLOCKERS: WasserRect[] = [...WASSER_COVER, WASSER_POOL, WASSER_HOSE_REEL];
 

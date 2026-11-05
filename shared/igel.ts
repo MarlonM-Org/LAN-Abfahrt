@@ -130,12 +130,6 @@ export const squadOf = (st: { squads: IgelSquad[] | null }, id: string) => (st.s
 /** Gehören zwei Spieler zur selben Seite (gleiches Team oder dieselbe Person)? */
 export const sameSide = (st: { squads: IgelSquad[] | null }, a: string, b: string) => a === b || (squadOf(st, a) >= 0 && squadOf(st, a) === squadOf(st, b));
 
-/** Teamfarben für bis zu 12 Teams (gut unterscheidbar) */
-export const IGEL_COLORS = [
-  '#e0503f', '#3f8fe0', '#46b04a', '#f2c33a', '#9b5fc0', '#f0973a',
-  '#2fb5a5', '#f07aa8', '#8a5a2b', '#5a6ad6', '#b6d33a', '#fdf7ea',
-];
-
 // ------------------------------------------------------------------ Terrain
 
 export type Mask = Uint8Array;

@@ -481,7 +481,7 @@ export interface KurveHead {
   /** aktuelle Geschwindigkeit (px/s) – zum Glätten auf dem TV */
   v: number;
   alive: boolean;
-  /** Index in KURVE.COLORS */
+  /** Spurfarbe: Index in `PLAYER_COLORS` (= Spielerfarbe des Abends, `shared/players.ts`) */
   color: number;
   score: number;
   /** Gerade in einer Lücke (Kopf zieht keine Spur) */

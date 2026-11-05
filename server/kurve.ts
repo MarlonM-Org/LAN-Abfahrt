@@ -1,5 +1,6 @@
 import type { KurveHead, KurvePower, KurveState, MiniSnapshot } from '../shared/types';
 import { KURVE } from '../shared/games';
+import { PLAYER_COLORS } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
 import { BetBook } from './spectator';
 
@@ -69,14 +70,14 @@ export class KurveGame implements MiniGame {
   constructor(
     private ids: string[],
     private ctx: MiniCtx,
-    /** T-Shirt-Farbe pro Spieler (Index in SHIRTS) – wird, wenn frei, zur Spurfarbe */
+    /** Spielerfarbe des Abends pro Spieler (Index in `PLAYER_COLORS`) – wird, wenn frei, zur Spurfarbe */
     shirts: (number | undefined)[] = [],
   ) {
     this.rounds = KURVE.roundsFor(ids.length);
     const taken = new Set<number>();
     const colors = ids.map((_, i) => {
       const want = shirts[i];
-      if (want !== undefined && want < KURVE.COLORS.length && !taken.has(want)) {
+      if (want !== undefined && want < PLAYER_COLORS.length && !taken.has(want)) {
         taken.add(want);
         return want;
       }
@@ -85,8 +86,8 @@ export class KurveGame implements MiniGame {
     ids.forEach((id, i) => {
       let c = colors[i];
       if (c < 0) {
-        c = KURVE.COLORS.findIndex((_, k) => !taken.has(k));
-        if (c < 0) c = i % KURVE.COLORS.length;
+        c = PLAYER_COLORS.findIndex((_, k) => !taken.has(k));
+        if (c < 0) c = i % PLAYER_COLORS.length;
         taken.add(c);
       }
       this.racers.set(id, {

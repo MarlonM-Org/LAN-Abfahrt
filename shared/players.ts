@@ -20,8 +20,7 @@ export function possessive(name: string): string {
  * (`PlayerPublic.color` = Index) und behält sie, solange der Spieler im Raum ist. Alle Spiele
  * nutzen sie für Ring, Namensschild, Spur, Fadenkreuz, Ball und HUD-Rahmen – das Shirt bleibt frei wählbar.
  * Auf Abstand geprüft (CIEDE2000 ≥ 21 zwischen allen Paaren): kein Blau/Hellblau, kein Gelb/Limette,
- * Orange bewusst kräftig, Gelb zitronig. Reihenfolge = Vergabe-Reihenfolge, die ersten sechs sind die klarsten;
- * Index 0–7, 9 und 11 entsprechen den alten Kurven-Farben (`KURVE.COLORS`), damit Handy und TV dort übereinstimmen.
+ * Orange bewusst kräftig, Gelb zitronig. Reihenfolge = Vergabe-Reihenfolge, die ersten sechs sind die klarsten.
  */
 export const PLAYER_COLORS: readonly { readonly hex: string; readonly name: string }[] = [
   { hex: '#e8323a', name: 'Rot' },

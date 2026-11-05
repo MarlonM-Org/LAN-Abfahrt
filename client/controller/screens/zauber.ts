@@ -1,8 +1,7 @@
 import type { ZauberState } from '../../../shared/types';
 import { ZAUBER } from '../../../shared/zauber';
-import { SHIRTS } from '../../../shared/avatar';
 import { haptic } from '../haptic';
-import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store } from '../core';
+import { type Screen, app, avatarCanvas, el, me, message, myColor, nameOf, q, secondsLeft, send, store } from '../core';
 import { floatingStick, holdButton } from './smash';
 
 /**
@@ -31,7 +30,7 @@ export function pickZauber(s: ZauberState): Screen {
 
   return ['zb-play', () => {
     const look = me()?.look;
-    const color = look ? SHIRTS[look.shirt] : '#9b5fc0';
+    const color = myColor()?.hex ?? '#9b5fc0';
     const root = el(`
       <div class="smash zauber" style="--zb-color:${color}">
         <div class="sm-top zb-top">
