@@ -1,10 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BoardAsk, BoardAward, BoardPrivate, BoardState, BoardStats, DuelPick, ItemKind, MiniKind, PartyResumeInfo, SkipInfo } from '../shared/types';
+import type { BoardAsk, BoardAward, BoardPrivate, BoardState, BoardStats, DuelPick, ItemKind, MiniKind, MiniTeams, PartyResumeInfo, SkipInfo } from '../shared/types';
 import {
-  BAR_FIELDS, BOARD_FIELDS, BOARD_KINDS, BOARD_TIMING, DOUBLE_ROUNDS, DUEL_PENALTY, DUEL_POT, FIELD_COINS, FINALE_COCKTAILS, FINALE_KINDS,
-  ITEM_INFO, ITEM_KINDS, ITEM_MIN_PRICE, KLAU_COINS, LONG_WAY_FIELDS, MINI_INFO, MINI_LENGTH, cocktailPrice, fitsPlayers, miniLabel,
+  BAR_FIELDS, BOARD_FIELDS, BOARD_KINDS, BOARD_TEAM_CHANCE, BOARD_TIMING, DOUBLE_ROUNDS, DUEL_PENALTY, DUEL_POT, FIELD_COINS, FINALE_COCKTAILS, FINALE_KINDS,
+  FIELD_TYPES, ITEM_INFO, ITEM_KINDS, ITEM_MIN_PRICE, KLAU_COINS, LONG_WAY_FIELDS, MINI_INFO, MINI_LENGTH, TEAM_KINDS, UNEVEN_TEAM_KINDS, cocktailPrice, fitsPlayers, miniLabel, teamLabel,
 } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
@@ -15,7 +15,8 @@ const {
 
 export interface BoardCtx {
   onChange(): void;
-  startMini(kind: MiniKind): void;
+  /** `teams`: Team-Minispiel nach Feldfarbe (2 gegen 2, 1 gegen 3), sonst Jeder gegen jeden */
+  startMini(kind: MiniKind, teams?: MiniTeams | null): void;
   isConnected(id: string): boolean;
   nameOf(id: string): string;
   connectedCount(): number;
@@ -351,7 +352,7 @@ export class Board {
     if (s.sub === 'moving' && s.duel?.sub === 'choose') return this.revealDuel();
     if (s.sub === 'intro' && s.nextMini) {
       this.timers.clear();
-      this.ctx.startMini(s.nextMini);
+      this.ctx.startMini(s.nextMini, s.teams);
     }
   }
 
@@ -442,6 +443,7 @@ export class Board {
     s.sub = 'roll';
     s.rolls = {};
     s.turnIdx = 0;
+    s.teams = null;
     s.double = s.maxRounds >= 3 && s.round > s.maxRounds - DOUBLE_ROUNDS;
     s.timeOfDay = this.dayTime();
     if (s.double) this.say(`${s.message} ${s.round === s.maxRounds ? 'Letzte Runde' : 'Endspurt'}: Blaue und rote Felder zählen doppelt!`);
@@ -827,16 +829,50 @@ export class Board {
     const pool: MiniKind[] = fitting.filter((k) => k !== this.lastMini);
     if (!pool.length) pool.push(...(fitting.length ? fitting : BOARD_KINDS));
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+    // Team-Minispiel nach Feldfarbe (Rot gegen Blau): nur Spiele, die zu den Teamgrößen passen und gerade dran sein dürfen
+    let teams = isFinale || Math.random() >= BOARD_TEAM_CHANCE ? null : this.teamsByField();
+    const teamPool = teams ? (teams.A.length === teams.B.length ? TEAM_KINDS : UNEVEN_TEAM_KINDS).filter((k) => pool.includes(k)) : [];
+    if (!teamPool.length) teams = null;
     // Fallback, falls zu wenige übrig sind (z. B. nach Entfernen von Spielern)
-    const kind: MiniKind = (isFinale ? pick(finales) : pick(pool)) ?? 'sprint';
+    const kind: MiniKind = (isFinale ? pick(finales) : teams ? pick(teamPool) : pick(pool)) ?? 'sprint';
     this.lastMini = kind;
     this.finaleNow = isFinale;
     s.sub = 'intro';
     s.nextMini = kind;
+    s.teams = teams;
     if (isFinale) s.timeOfDay = 1;
-    this.say(isFinale ? `FINALE: ${miniLabel(kind)}! Die Sieger bekommen ${FINALE_COCKTAILS} Cocktails.` : `Minispiel: ${miniLabel(kind)}!`);
+    this.say(
+      isFinale
+        ? `FINALE: ${miniLabel(kind)}! Die Sieger bekommen ${FINALE_COCKTAILS} Cocktails.`
+        : teams
+          ? `${teams.label} nach Feldfarbe – Rot (Team Sonne) gegen Blau (Team Meer): ${miniLabel(kind)}!`
+          : `Minispiel: ${miniLabel(kind)}!`,
+    );
     this.ctx.onChange();
-    this.timers.later(INTRO_MS, () => this.ctx.startMini(kind));
+    this.timers.later(INTRO_MS, () => this.ctx.startMini(kind, teams));
+  }
+
+  /**
+   * Teams nach Feldfarbe (Mario-Party-Prinzip): Rot = Team Sonne (A), Blau/Start = Team Meer (B), auf einem neutralen (Ereignis, Laden, Duell)
+   * Ereignisfeld kommt man in die kleinere Seite (bei Gleichstand per Los). Null, wenn weniger als 4 Spieler
+   * auf dem Brett stehen oder eine Seite leer bliebe – dann wie bisher Jeder gegen jeden.
+   */
+  teamsByField(): MiniTeams | null {
+    const s = this.state;
+    const ids = this.active;
+    if (ids.length < 4) return null;
+    const A: string[] = [];
+    const B: string[] = [];
+    const undecided: string[] = [];
+    for (const id of ids) {
+      const t = FIELD_TYPES[s.pos[id]];
+      if (t === 'red') A.push(id);
+      else if (t === 'event' || t === 'shop' || t === 'duel') undecided.push(id); // neutrale Felder: kleinere Seite
+      else B.push(id);
+    }
+    for (const id of shuffle(undecided)) (A.length < B.length || (A.length === B.length && Math.random() < 0.5) ? A : B).push(id);
+    if (!A.length || !B.length) return null;
+    return { A, B, label: teamLabel(A.length, B.length) };
   }
 
   // ---------------------------------------------------------------- Bonus-Cocktails am Ende

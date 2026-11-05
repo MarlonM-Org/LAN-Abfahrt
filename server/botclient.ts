@@ -715,6 +715,10 @@ export class Bot {
         this.resultCount++;
         const drink = this.opts.game === 'drink';
         const cur = this.state ?? s;
+        if (cur.board && cur.results && !cur.results.final) {
+          const rows = cur.results.rows.map((r) => `${r.place}. ${cur.players.find((p) => p.id === r.playerId)?.name ?? r.playerId} +${r.coins}`).join(' | ');
+          this.opts.log?.(`Ergebnis ${cur.results.title}: ${cur.results.subtitle} – ${rows}`);
+        }
         if (cur.session?.games && cur.results?.points) {
           const table = cur.session.rows.map((r) => `${r.rank}. ${r.name} ${r.points}${r.last !== null ? ` (+${r.last})` : ''}`).join(' | ');
           const ser = cur.session.series;
@@ -838,7 +842,10 @@ export class Bot {
     if (s.phase === 'intro' && s.intro && !s.intro.ready.includes(this.id)) {
       const it = s.intro;
       this.once(`intro-${it.kind}-${it.endsAt}`, async () => {
-        if (this.leader) this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (kurz, 5 s)' : ' (15 s)'}`);
+        if (this.leader) {
+          const teams = it.teams ? ` · ${it.teams.label} (Sonne ${it.teams.A.length} / Meer ${it.teams.B.length})` : '';
+          this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (kurz, 5 s)' : ' (15 s)'}${teams}`);
+        }
         await sleep(rand(150, 500));
         this.socket.emit('intro:ready');
       });

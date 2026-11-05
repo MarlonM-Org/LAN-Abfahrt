@@ -1,4 +1,4 @@
-import type { MiniKind, MiniSnapshot, PrivateState, SkipInfo } from '../shared/types';
+import type { MiniKind, MiniSnapshot, MiniTeams, PrivateState, SkipInfo, Team } from '../shared/types';
 import { possessive } from '../shared/players';
 
 export interface MiniResult {
@@ -32,6 +32,8 @@ export interface MiniCtx {
   /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) */
   colorOf?(id: string): number | undefined;
   mode: import('../shared/types').GameMode;
+  /** Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) – Team-Spiele übernehmen sie über `splitTeams()` */
+  teams?: MiniTeams | null;
   /**
    * Markantes Ereignis fürs Protokoll des Abends („Titel des Abends“, server/fx.ts): `p` = Spieler,
    * `n` = Menge (Standard 1), `o` = zweiter Beteiligter. Typen siehe `FxEvent` in shared/types.ts.
@@ -115,6 +117,21 @@ export function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/**
+ * Teams eines Team-Spiels: die vorgegebenen (`ctx.teams`, nur Spieler aus `ids`; wer darin fehlt, kommt ins kleinere
+ * Team), sonst zufällig abwechselnd aufgeteilt. Wäre eine vorgegebene Seite leer, wird ebenfalls zufällig geteilt.
+ */
+export function splitTeams(ids: string[], teams?: MiniTeams | null): Record<Team, string[]> {
+  if (teams) {
+    const A = ids.filter((id) => teams.A.includes(id));
+    const B = ids.filter((id) => teams.B.includes(id));
+    for (const id of ids) if (!A.includes(id) && !B.includes(id)) (A.length <= B.length ? A : B).push(id);
+    if (A.length && B.length) return { A, B };
+  }
+  const order = shuffle(ids);
+  return { A: order.filter((_, i) => i % 2 === 0), B: order.filter((_, i) => i % 2 === 1) };
 }
 
 /** Gruppiert Spieler nach Punkten (absteigend) → Platzierungsgruppen. */

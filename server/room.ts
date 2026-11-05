@@ -9,6 +9,7 @@ import type {
   JoinResponse,
   KickResponse,
   MiniKind,
+  MiniTeams,
   Phase,
   PlayerPublic,
   NochmalState,
@@ -143,6 +144,9 @@ interface Player extends PlayerPublic {
   kartView?: 'phone' | 'tv';
 }
 
+/** Start-Optionen eines Minispiels: Kart-Strecke („Nochmal“ fährt die nächste), feste Teams vom Spielbrett */
+type MiniOpts = { track?: number; teams?: MiniTeams | null };
+
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
 export class Room {
   private players = new Map<string, Player>();
@@ -188,6 +192,8 @@ export class Room {
   private lastKind: MiniKind | null = null;
   /** Wer im laufenden Minispiel mitspielt */
   private miniIds: string[] | null = null;
+  /** Vorgegebene Teams des laufenden Minispiels (Spielbrett: nach Feldfarbe), sonst null */
+  private miniTeams: MiniTeams | null = null;
   /** Gekickte Spieler-IDs (Handy mit alter ID bekommt „Du wurdest entfernt“) */
   private kicks = new KickList();
   /** Zuschauer-Emotes (😂 😱 👏 🍅) – für alle Spiele, unabhängig vom Minispiel */
@@ -542,7 +548,7 @@ export class Room {
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
       onChange: () => this.changed(),
-      startMini: (kind) => this.startMini(kind),
+      startMini: (kind, teams) => this.startMini(kind, teams ? { teams } : undefined),
       isConnected: (id) => this.inPlay(id),
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
@@ -669,7 +675,7 @@ export class Room {
   // ---------------------------------------------------------------- Regelkarte (Phase `intro`)
 
   /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, Ende (Server-Zeit) */
-  private intro: { kind: MiniKind; opts?: { track?: number }; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
+  private intro: { kind: MiniKind; opts?: MiniOpts; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
   /** Spiele, die heute (seit Serverstart) schon liefen → Regelkarte nur kurz */
   private introSeen = new Set<MiniKind>();
   private static readonly INTRO_MS = 15_000;
@@ -679,7 +685,7 @@ export class Room {
    * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, Übungsfeld, „Bereit!“). Ohne Karte:
    * Date-Night-Kapitel, Trinkspiele und „Nochmal“ desselben Spiels.
    */
-  private startMini(kind: MiniKind, opts?: { track?: number }) {
+  private startMini(kind: MiniKind, opts?: MiniOpts) {
     const again = this.singleResults() && this.lastKind === kind;
     this.endIntro();
     if (this.dateRun || this.drinkRun || again) {
@@ -736,12 +742,13 @@ export class Room {
   private introState() {
     const it = this.intro;
     if (this.phase !== 'intro' || !it) return null;
-    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short };
+    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short, teams: it.opts?.teams ?? null };
   }
 
-  private launchMini(kind: MiniKind, opts?: { track?: number }) {
+  private launchMini(kind: MiniKind, opts?: MiniOpts) {
     this.mini?.dispose();
     this.showBoard = false;
+    this.miniTeams = opts?.teams ?? null;
     // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
     this.arcadeVotes?.clear();
     this.lastKind = kind;
@@ -760,6 +767,7 @@ export class Room {
       lookOf: (id) => this.players.get(id)?.look,
       colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
+      teams: this.miniTeams,
       log: (type, data) => this.fx.push(type, data, kind),
     };
     switch (kind) {
@@ -948,6 +956,13 @@ export class Room {
         coins: r.coins ? r.coins[Math.min(gi, r.coins.length - 1)] : placeCoins(ranks[gi], ranked),
       })),
     );
+    // Team-Spiel vom Brett mit ungleichen Teams (1 gegen 3): gewinnt das kleinere Team, bekommt es doppelte Münzen
+    const teams = this.miniTeams;
+    this.miniTeams = null;
+    if (teams && this.board && teams.A.length !== teams.B.length && r.groups.length > 1) {
+      const small = teams.A.length < teams.B.length ? teams.A : teams.B;
+      if (r.groups[0].every((id) => small.includes(id))) for (const row of rows) if (row.place === 1) row.coins *= 2;
+    }
     // Party-Finale (Mord/Verräter): Sieger bekommen zusätzlich Cocktails – das Brett bucht sie in afterMini
     const finaleCocktails = this.board?.finaleCocktails(kind) ?? 0;
     if (finaleCocktails) for (const row of rows) if (row.place === 1) row.detail = [row.detail, `+${finaleCocktails} Cocktails`].filter(Boolean).join(' · ');

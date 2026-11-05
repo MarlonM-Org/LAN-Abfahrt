@@ -2075,6 +2075,8 @@ export interface BoardState {
   message: string;
   messageSeq: number;
   nextMini: MiniKind | null;
+  /** Ansage: das nächste Minispiel läuft in Teams nach Feldfarbe (sonst Jeder gegen jeden) */
+  teams?: MiniTeams | null;
 }
 
 // ------------------------------------------------------------------ Ergebnisse
@@ -2115,6 +2117,8 @@ export interface IntroState {
   endsAt: number;
   /** Spiel lief heute schon: nur 5 s, ohne Bereit-Pflicht */
   short: boolean;
+  /** Team-Minispiel vom Spielbrett (2 gegen 2, 1 gegen 3) */
+  teams?: MiniTeams | null;
 }
 
 export type MiniSnapshot =
@@ -2625,6 +2629,21 @@ export interface WerwarsPrivate {
   /** Raten: Das ist meine eigene Antwort (dann ist der eigene Tipp nur Schein) */
   mine: boolean;
   myGuess: string | null;
+}
+
+// ------------------------------------------------------------------ Team-Minispiele vom Spielbrett
+
+/**
+ * Vorgegebene Teams für ein Minispiel („2 gegen 2“, „1 gegen 3“). Das Spielbrett leitet sie aus der Feldfarbe ab
+ * (`Board.teamsByField()`): Rot = Team Sonne (A), Blau/Start = Team Meer (B), Ereignisfeld = kleinere Seite.
+ * Bei ungleichen Teams startet das kleinere mit Vorsprung (`teamHandicap()` in `shared/games.ts`) und bekommt
+ * bei Sieg doppelte Münzen.
+ */
+export interface MiniTeams {
+  A: string[];
+  B: string[];
+  /** Anzeige, kleineres Team zuerst: „2 gegen 2“, „1 gegen 3“ */
+  label: string;
 }
 
 // ------------------------------------------------------------------ Abend-Statistik („Titel des Abends“) & Turnier

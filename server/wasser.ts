@@ -1,5 +1,6 @@
 import type { MiniSnapshot, Point, Team } from '../shared/types';
 import { TEAM_INFO } from '../shared/flunky';
+import { teamHandicap } from '../shared/games';
 import {
   WASSER as W,
   WASSER_BASE,
@@ -16,7 +17,7 @@ import {
   segHitsRect,
 } from '../shared/wasser';
 import { playerColor } from '../shared/players';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, splitTeams } from './minigame';
 
 const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -87,14 +88,19 @@ export class WasserGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    this.ffa = ids.length === 3;
-    const order = shuffle(ids);
+    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) oder zufällig geteilt; bei 3 Spielern Jeder gegen jeden
+    this.ffa = ids.length === 3 && !ctx.teams;
+    const split = splitTeams(ids, ctx.teams);
+    const order = [...split.A, ...split.B];
+    const teamOf = new Map<string, Team>([...split.A.map((id) => [id, 'A'] as const), ...split.B.map((id) => [id, 'B'] as const)]);
+    // Handicap bei ungleichen Brett-Teams: das kleinere startet mit Vorsprung
+    if (ctx.teams && !this.ffa) this.score = teamHandicap(split.A.length, split.B.length);
     const perTeam: Record<Team, number> = { A: 0, B: 0 };
     order.forEach((id, i) => {
-      const team: Team = i % 2 === 0 ? 'A' : 'B';
+      const team: Team = teamOf.get(id) ?? 'A';
       const k = perTeam[team]++;
       const base = WASSER_BASE[team];
-      const rows = Math.ceil(order.length / 2);
+      const rows = Math.max(split.A.length, split.B.length);
       const y = W.AREA.y + 60 + ((k + 0.5) * (W.AREA.h - 90)) / rows;
       this.players.set(id, {
         id,

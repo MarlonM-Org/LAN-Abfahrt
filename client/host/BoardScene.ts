@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import type { BoardAward, BoardDuel, BoardState, GameState, Point } from '../../shared/types';
-import { BOARD_SIZE, BOARD_TIMING, FIELD_POS, FIELD_TYPES, FINALE_COCKTAILS, FINALE_KINDS, FORK_FIELD, ITEM_INFO, MERGE_FIELD, MINI_INFO, SHORTCUT_FIELDS, miniInspired } from '../../shared/games';
-import { WORLD } from '../../shared/flunky';
+import type { BoardAward, BoardDuel, BoardState, GameState, MiniKind, MiniTeams, Point, Team } from '../../shared/types';
+import { BOARD_SIZE, BOARD_TIMING, FIELD_POS, FIELD_TYPES, FINALE_COCKTAILS, FINALE_KINDS, FORK_FIELD, ITEM_INFO, MERGE_FIELD, MINI_INFO, SHORTCUT_FIELDS, miniInspired, teamHandicapText } from '../../shared/games';
+import { TEAM_INFO, WORLD } from '../../shared/flunky';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintGrass, paintPath, paintWater } from '../art/ground';
@@ -642,23 +642,57 @@ export class BoardScene extends Phaser.Scene {
     }
     if (this.introShown) return;
     this.introShown = true;
-    const info = MINI_INFO[b.nextMini];
-    const isFinale = b.round === b.maxRounds && FINALE_KINDS.includes(b.nextMini);
+    const kind = b.nextMini;
+    const teams = b.teams ?? null;
+    if (!teams) return this.introCard(kind, b, null);
+    // Team-Spiel nach Feldfarbe: erst zeigen, wer auf Rot und wer auf Blau steht – dann die Karte
+    this.teamsFx(teams);
+    this.time.delayedCall(1700, () => {
+      const now = getState()?.board;
+      if (this.introShown && now?.sub === 'intro' && now.nextMini === kind) this.introCard(kind, now, teams);
+    });
+  }
+
+  /** Rot gegen Blau: Banner, Blitz, farbige Ringe unter den Figuren und ihr Team über dem Kopf */
+  private teamsFx(teams: MiniTeams) {
+    this.juice.flash(0xfff4d6, 220);
+    sfx('drumroll', { vol: 0.7 });
+    this.juice.banner(`${teams.label.toUpperCase()}!`, 'Rot gegen Blau – wo ihr steht, entscheidet', 1600);
+    say(`${teams.label}! Rot gegen Blau.`);
+    for (const t of ['A', 'B'] as Team[]) {
+      for (const id of teams[t]) {
+        const tok = this.tokens.get(id);
+        if (!tok) continue;
+        const ring = this.add.graphics().setDepth(tok.y - 1);
+        ring.lineStyle(2, TEAM_INFO[t].colorNum, 1).strokeEllipse(tok.x, tok.y + 3, 24, 12);
+        ring.fillStyle(TEAM_INFO[t].colorNum, 0.25).fillEllipse(tok.x, tok.y + 3, 24, 12);
+        this.introLayer.add(ring);
+        this.tweens.add({ targets: ring, alpha: 0.35, duration: 420, yoyo: true, repeat: 3 });
+        this.juice.float(tok.x, tok.y - 44, t === 'A' ? 'SONNE' : 'MEER', TEAM_INFO[t].color);
+      }
+    }
+  }
+
+  private introCard(kind: MiniKind, b: BoardState, teams: MiniTeams | null) {
+    const info = MINI_INFO[kind];
+    const isFinale = b.round === b.maxRounds && FINALE_KINDS.includes(kind);
     const bg = this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x1a1008, 0.6).setOrigin(0);
     const card = this.add.container(WORLD.W / 2, WORLD.H / 2);
     card.add(panel(this, -170, -70, 340, 140));
-    card.add(ink(this, 0, -54, isFinale ? `~ FINALE · Sieger +${FINALE_COCKTAILS} Cocktails ~` : '~ Minispiel ~', { color: RED_INK }));
+    const head = isFinale ? `~ FINALE · Sieger +${FINALE_COCKTAILS} Cocktails ~` : teams ? `~ Minispiel · ${teams.label.toUpperCase()} ~` : '~ Minispiel ~';
+    card.add(ink(this, 0, -54, head, { color: RED_INK }));
     const title = ink(this, 0, -36, `${info.icon} ${info.title}`, { size: 16, wrap: 310 });
     card.add(title);
     // Lange Titel brechen um → „à la …“ und Tagline darunter anordnen
     let y = title.y + title.height + 3;
-    const insp = miniInspired(b.nextMini);
+    const insp = miniInspired(kind);
     if (insp) {
       card.add(ink(this, 0, y, insp, { color: '#7a5a3a' }));
       y += 13;
     }
     card.add(ink(this, 0, Math.max(y + 4, 10), info.tagline, { wrap: 290 }));
-    card.add(ink(this, 0, 46, 'Schaut auf eure Handys!', { color: '#7a5a3a' }));
+    const hc = teams ? teamHandicapText(teams, kind) : '';
+    card.add(ink(this, 0, 46, hc ? `Handicap: ${hc}` : 'Schaut auf eure Handys!', { color: '#7a5a3a' }));
     this.introLayer.add([bg, card]);
     card.setScale(0.2);
     this.tweens.add({ targets: card, scale: 1, duration: 450, ease: 'Back.out' });
