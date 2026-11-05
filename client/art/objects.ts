@@ -316,7 +316,7 @@ export function crate(): Pix {
 // ------------------------------------------------------------------ Spielbrett
 
 /** Trittstein mit farbigem Edelstein in der Mitte */
-export function fieldStone(gem: string, symbol?: 'q' | 's'): Pix {
+export function fieldStone(gem: string, symbol?: 'q' | 's' | 'd' | 'b'): Pix {
   const p = new Pix(18, 15);
   p.ellipse(9, 8, 8, 6, C.stone);
   p.overlayOn(() => {
@@ -328,6 +328,10 @@ export function fieldStone(gem: string, symbol?: 'q' | 's'): Pix {
   p.px(7, 5, C.white).px(8, 5, shade(gem, 1.5));
   if (symbol === 'q') p.map(8, 4, ['##.', '..#', '.#.', '...', '.#.'], { '#': C.ink });
   if (symbol === 's') p.map(8, 4, ['###', '#..', '###', '..#', '###'], { '#': C.white });
+  // Duell: gekreuzte Wasserpistolen
+  if (symbol === 'd') p.map(7, 4, ['#...#', '.#.#.', '..#..', '.#.#.', '#...#'], { '#': C.white });
+  // Laden: Einkaufstasche
+  if (symbol === 'b') p.map(7, 3, ['.#.#.', '#####', '#...#', '#...#', '#####'], { '#': C.ink });
   p.outline(C.outline);
   return p;
 }

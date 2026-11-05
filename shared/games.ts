@@ -1,4 +1,4 @@
-import type { FieldType, KurvePower, MiniKind, Point, TttItemKind, TttRole, TttShopItem } from './types';
+import type { FieldType, ItemKind, KurvePower, MiniKind, Point, TttItemKind, TttRole, TttShopItem } from './types';
 
 export interface MiniInfo {
   title: string;
@@ -267,6 +267,7 @@ export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
 // ------------------------------------------------------------------ Spielbrett
 
+/** Felder auf dem Rundweg (0–23); dazu kommt die Abkürzung (24–27) – siehe `BOARD_FIELDS` */
 export const BOARD_SIZE = 24;
 
 /**
@@ -278,6 +279,8 @@ export const BOARD_TIMING = {
   STEP_MS: 160,
   /** Würfel über der Figur, bevor sie losläuft */
   MOVE_LEAD_MS: 150,
+  /** Taxi zur Bar: ein großer Hüpfer */
+  TAXI_MS: 700,
   /** Pause nach einem Zug (vorher 1800) – nach Ereignis oder Cocktail etwas länger zum Lesen */
   PAUSE_MS: 700,
   EVENT_PAUSE_MS: 1100,
@@ -285,19 +288,62 @@ export const BOARD_TIMING = {
   INTRO_MS: 6000,
   /** Würfelfenster: so lange dürfen alle gleichzeitig würfeln */
   ROLL_WINDOW_MS: 10000,
+  /** Entscheidungen am Handy: Bar („Cocktail kaufen?“), Laden, Abzweigung – danach entscheidet der Server */
+  ASK_BAR_MS: 8000,
+  ASK_SHOP_MS: 8000,
+  ASK_FORK_MS: 6000,
+  /** Duell „Teilen oder Klauen“: geheime Wahl, dann deckt der TV die Karten nacheinander auf */
+  DUEL_CHOOSE_MS: 10000,
+  DUEL_FLIP_MS: 1100,
+  DUEL_REVEAL_MS: 3600,
+  DUEL_DONE_MS: 2600,
   /** Bonus-Cocktails am Ende: Trommelwirbel, dann Auflösung pro Karte */
   BONUS_DRUM_MS: 1600,
   BONUS_SHOW_MS: 3600,
 };
-export const COCKTAIL_PRICE = 10;
+/** Cocktail-Preisstaffel pro Spieler: der erste kostet 10, der zweite 15, ab dem dritten 20 */
+export const COCKTAIL_PRICES = [10, 15, 20];
+/** Preis des nächsten Cocktails für jemanden, der schon `bought` gekauft hat */
+export const cocktailPrice = (bought: number) => COCKTAIL_PRICES[Math.min(Math.max(0, bought), COCKTAIL_PRICES.length - 1)];
+/** Grundpreis (für Texte) */
+export const COCKTAIL_PRICE = COCKTAIL_PRICES[0];
+/** Duell „Teilen oder Klauen“: Pott (aus der Bank), Strafe wenn beide klauen */
+export const DUEL_POT = 10;
+export const DUEL_PENALTY = 3;
+/** Cocktail-Klau ohne Cocktails im Umlauf: Trostpreis aus der Bank */
+export const KLAU_COINS = 10;
 /** Finale (Mord/Verräter) im Party-Modus: Sieger bekommen so viele Cocktails (zusätzlich zu den Münzen) */
 export const FINALE_COCKTAILS = 2;
 /** In den letzten Runden zählen blaue/rote Felder doppelt („Endspurt“) */
 export const DOUBLE_ROUNDS = 2;
 export const PARTY_ROUND_OPTIONS = [3, 5, 8];
 
-/** Feldpositionen: Rundweg am Rand der 480 × 270-Welt */
-export const FIELD_POS: Point[] = (() => {
+/** Items aus dem Laden (höchstens eins im Inventar) */
+export const ITEM_KINDS: ItemKind[] = ['dice2', 'klau', 'taxi', 'schild'];
+export const ITEM_INFO: Record<ItemKind, { icon: string; title: string; desc: string; price: number; /** Vor dem Würfeln einsetzen (sonst passiv) */ active: boolean }> = {
+  dice2: { icon: '🎲', title: 'Doppelwürfel', desc: 'Nächster Wurf mit zwei Würfeln', price: 5, active: true },
+  klau: { icon: '🦜', title: 'Cocktail-Klau', desc: `Klaut dem Führenden einen Cocktail (hat niemand einen: +${KLAU_COINS} Münzen)`, price: 12, active: true },
+  taxi: { icon: '🚕', title: 'Taxi zur Bar', desc: 'Fährt dich statt zu würfeln direkt zur Bar', price: 8, active: true },
+  schild: { icon: '🧴', title: 'Sonnencreme-Schild', desc: 'Neutralisiert das nächste rote Feld oder Pech-Ereignis', price: 4, active: false },
+};
+export const ITEM_MIN_PRICE = Math.min(...ITEM_KINDS.map((k) => ITEM_INFO[k].price));
+
+/**
+ * Das Brett: Rundweg am Rand der 480 × 270-Welt (0–23, Start oben links, im Uhrzeigersinn) und eine Abkürzung
+ * durch den Garten (24–27): An der Gabelung (Feld 12, unten rechts) führt der lange Weg über die untere Reihe
+ * (Bar, Ereignis, zwei rote Felder, Duell), die Abkürzung spart drei Felder, hat aber auch ein rotes Feld und keine Bar.
+ * `next` = mögliche nächste Felder; an der Gabelung [langer Weg, Abkürzung].
+ */
+export interface BoardField {
+  x: number;
+  y: number;
+  type: FieldType;
+  next: number[];
+}
+export const FORK_FIELD = 12;
+/** Wo die Abkürzung wieder auf den Rundweg trifft */
+export const MERGE_FIELD = 20;
+export const BOARD_FIELDS: BoardField[] = (() => {
   const pts: Point[] = [];
   const left = 36, right = 444, top = 80, bottom = 252;
   const stepX = (right - left) / 8;
@@ -306,15 +352,27 @@ export const FIELD_POS: Point[] = (() => {
   for (let i = 1; i <= 3; i++) pts.push({ x: right, y: top + i * stepY });
   for (let i = 0; i <= 8; i++) pts.push({ x: right - i * stepX, y: bottom });
   for (let i = 1; i <= 3; i++) pts.push({ x: left, y: bottom - i * stepY });
-  return pts;
+  // Abkürzung durch den Garten
+  pts.push({ x: 392, y: 222 }, { x: 300, y: 220 }, { x: 208, y: 220 }, { x: 116, y: 222 });
+  const types: Record<number, FieldType> = { 0: 'start', 2: 'shop', 3: 'event', 4: 'red', 6: 'duel', 9: 'event', 11: 'duel', 14: 'red', 15: 'event', 17: 'duel', 19: 'red', 21: 'event', 25: 'red' };
+  return pts.map((p, i) => {
+    let next: number[];
+    if (i === FORK_FIELD) next = [i + 1, BOARD_SIZE];
+    else if (i < BOARD_SIZE) next = [(i + 1) % BOARD_SIZE];
+    else if (i === pts.length - 1) next = [MERGE_FIELD];
+    else next = [i + 1];
+    return { x: p.x, y: p.y, type: types[i] ?? 'blue', next };
+  });
 })();
-
-export const FIELD_TYPES: FieldType[] = Array.from({ length: BOARD_SIZE }, (_, i) => {
-  if (i === 0) return 'start';
-  if (i % 6 === 3) return 'event';
-  if (i % 5 === 4) return 'red';
-  return 'blue';
-});
+/** Feldpositionen (für den TV) */
+export const FIELD_POS: Point[] = BOARD_FIELDS.map((f) => ({ x: f.x, y: f.y }));
+export const FIELD_TYPES: FieldType[] = BOARD_FIELDS.map((f) => f.type);
+/** Die Felder der Abkürzung (ohne Gabelung und Einmündung) */
+export const SHORTCUT_FIELDS = BOARD_FIELDS.map((_, i) => i).filter((i) => i >= BOARD_SIZE);
+/** Die Felder des langen Wegs zwischen Gabelung und Einmündung */
+export const LONG_WAY_FIELDS = BOARD_FIELDS.map((_, i) => i).filter((i) => i > FORK_FIELD && i < MERGE_FIELD);
+/** Wo die Bar stehen darf: blaue Felder des Rundwegs (nie auf der Abkürzung) */
+export const BAR_FIELDS = BOARD_FIELDS.map((f, i) => (f.type === 'blue' && i < BOARD_SIZE ? i : -1)).filter((i) => i >= 0);
 
 export const FIELD_COINS = { blue: 3, red: -3 };
 
