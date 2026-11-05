@@ -54,6 +54,7 @@ import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../share
 import type { AngelnState } from '../shared/angeln';
 import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
 import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt, isWalk as suessWalk, stepAlong as suessStep, suessBfs, tileCenter as suessCenter, tileOf as suessTile } from '../shared/suess';
+import { funkBot } from './funkbot';
 import { schaetzBot } from './schaetzbot';
 
 export interface BotOptions {
@@ -1252,6 +1253,7 @@ export class Bot {
 
     if (m.kind === 'zauber') zaubBot(this, m.state);
 
+    if (m.kind === 'funk') funkBot(this, m.state);
     if (m.kind === 'schaetz') schaetzBot(this, m.state);
     if (m.kind === 'maexchen') maexBot(this, m.state, () => (this.state?.mini?.kind === 'maexchen' ? this.state.mini.state : null));
     if (m.kind === 'werwars') werwarsBot(this, m.state, !!me?.isVip);

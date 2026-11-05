@@ -84,6 +84,7 @@ export type MiniKind =
   | 'suess'
   | 'umzug'
   | 'wackel'
+  | 'funk'
   | 'schaetz'
   | 'maexchen'
   | 'werwars';
@@ -2110,6 +2111,7 @@ export type MiniSnapshot =
   | { kind: 'spion'; state: SpionState }
   | { kind: 'umzug'; state: UmzugState }
   | { kind: 'wackel'; state: WackelState }
+  | { kind: 'funk'; state: FunkState }
   | { kind: 'schaetz'; state: SchaetzState }
   | { kind: 'maexchen'; state: MaexState }
   | { kind: 'werwars'; state: WerwarsState };
@@ -2273,6 +2275,7 @@ export type PrivateState =
   | { kind: 'werwolf'; state: WolfPrivate }
   | { kind: 'pixel'; state: PixelPrivate }
   | { kind: 'spion'; state: SpionPrivate }
+  | { kind: 'funk'; state: FunkPrivate }
   | { kind: 'schaetz'; state: SchaetzPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
@@ -2318,6 +2321,67 @@ export interface StartRequest {
   /** Party-Modus: gespeicherten Brettstand (data/party.json) fortsetzen */
   resume?: boolean;
   version?: string;
+}
+
+// ------------------------------------------------------------------ Funkfrequenz
+
+/** intro (Rundenbanner) → clue (Funker überlegt) → tune (Team dreht) → bet (Gegner wetten) → reveal → … → over */
+export type FunkSub = 'intro' | 'clue' | 'tune' | 'bet' | 'reveal' | 'over';
+
+export type FunkSide = 'left' | 'right';
+
+export interface FunkReveal {
+  /** Das geheime Ziel (0–100) – erst in der Auflösung öffentlich */
+  target: number;
+  dial: number;
+  /** Punkte fürs funkende Team (0/2/3/4) */
+  points: number;
+  /** Mehrheitswette des Gegnerteams (null = Gleichstand/keine Stimmen) */
+  bet: FunkSide | null;
+  betRight: boolean | null;
+  gains: Record<Team, number>;
+}
+
+/** Öffentlicher Zustand – das Ziel steht erst in `reveal` */
+export interface FunkState {
+  sub: FunkSub;
+  round: number;
+  rounds: number;
+  endsIn: number;
+  /** Zählt jede Phase hoch (Screen-Keys) */
+  phaseNo: number;
+  teams: Record<Team, string[]>;
+  score: Record<Team, number>;
+  /** Team, das gerade funkt */
+  active: Team;
+  funker: string;
+  /** Bestätigt den Tipp (aus dem funkenden Team, nicht der Funker) */
+  captain: string | null;
+  /** Pole [links, rechts] */
+  pair: [string, string];
+  /** Optional getippter Hinweis des Funkers */
+  clue: string | null;
+  /** Zeiger = Mittelwert der Regler (0–100) */
+  dial: number;
+  /** Regler der Team-Mitglieder, die schon gedreht haben */
+  dials: Record<string, number>;
+  /** Tipp steht */
+  locked: boolean;
+  /** Wetten des Gegnerteams */
+  bets: Record<string, FunkSide>;
+  reveal: FunkReveal | null;
+  winScore: number;
+  /** Wie oft jemand schon Funker war */
+  funkCount: Record<string, number>;
+}
+
+export interface FunkPrivate {
+  round: number;
+  role: 'funker' | 'team' | 'gegner';
+  /** Nur für den Funker */
+  target: number | null;
+  /** Nur für Testspieler im funkenden Team: „gehörter“ Hinweis (das Ziel; der Bot streut selbst) */
+  botHint?: number;
 }
 
 // ------------------------------------------------------------------ Schätzkönig (à la Wits & Wagers)

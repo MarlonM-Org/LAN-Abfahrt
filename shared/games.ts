@@ -75,6 +75,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   suess: { title: 'Süßigkeiten-Klau', icon: '🍬', inspiredBy: 'Animal Crossing: Sweet Day', tagline: 'Plündert die Minibar – aber je voller die Taschen, desto langsamer!', minPlayers: 3 , orientation: 'landscape' },
   umzug: { title: 'Umzugschaos', icon: '📦', inspiredBy: 'Moving Out', tagline: 'Sofa, Kühlschrank, Gartenzwerg – alles in den Laster, bevor der Vermieter klingelt!', minPlayers: 2, orientation: 'landscape' },
   werwolf: { title: 'Werwölfe im Ferienhaus', icon: '🐺', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6 , orientation: 'portrait' },
+  funk: { title: 'Funkfrequenz', icon: '📻', inspiredBy: 'Wavelength', tagline: 'Ein Hinweis, zwei Pole – trefft ihr die geheime Frequenz?', minPlayers: 4, orientation: 'portrait' },
   schaetz: { title: 'Schätzkönig', icon: '🧮', inspiredBy: 'Wits & Wagers', tagline: 'Keine Ahnung? Egal – schätzen, dann auf die beste Zahl wetten!', minPlayers: 3, orientation: 'portrait' },
   maexchen: { title: 'Mäxchen am Pool', icon: '🎲', inspiredBy: 'Mäxchen', tagline: 'Würfeln, ansagen, bluffen – glaubst du das oder deckst du auf?', minPlayers: 2, orientation: 'portrait' },
   werwars: { title: 'Wer war’s?', icon: '🕵️‍♀️', inspiredBy: "Who's Who", tagline: 'Peinliche Geständnisse, anonym auf dem TV – wer hat das geschrieben?', minPlayers: 3, orientation: 'portrait' },
@@ -153,6 +154,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   suess: { goal: 'Plündert die Minibar und bringt die Beute ins Versteck – der Wächter jagt euch!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🍬', text: 'ABLEGEN / SPRINT: Beute, Tempo' }, { icon: '🐢', text: 'Volle Taschen = langsam' }] },
   umzug: { goal: 'Alles muss in den Laster, bevor der Vermieter klingelt!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '📦', text: 'GREIFEN: halten = tragen' }, { icon: '💨', text: 'SPRINT: ohne Teil (sonst werfen)' }] },
   werwolf: { goal: 'Dorf gegen Werwölfe: Findet die Wölfe, bevor sie euch fressen.', controls: [{ icon: '🃏', text: 'Rolle geheim (verdeckte Karte)' }, { icon: '🌙', text: 'Nachts: alle tippen jemanden an' }, { icon: '🗳️', text: 'Tags: diskutieren, abstimmen' }] },
+  funk: { goal: 'Nur der Funker kennt das Ziel und gibt laut einen Hinweis – sein Team trifft die Frequenz!', controls: [{ icon: '📻', text: 'Schieber: Frequenz einstellen' }, { icon: '🃏', text: 'Funker: Ziel geheim (halten)' }, { icon: '↔️', text: 'Gegner: links/rechts wetten' }] },
   schaetz: { goal: 'Schätzt die Zahl – dann setzt Chips auf die Karte, die am nächsten dran ist, ohne drüber.', controls: [{ icon: '🔢', text: 'Zahl am Handy eintippen' }, { icon: '🪙', text: '2 Chips setzen (außen = ×3/×4)' }, { icon: '👑', text: 'Beste Karte: Autor +3' }] },
   maexchen: { goal: 'Würfelt geheim, sagt einen höheren Wert an – ehrlich oder geblufft. Wer erwischt wird, verliert!', controls: [{ icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
   werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }, { icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
@@ -178,7 +180,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'funk'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
@@ -248,6 +250,8 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   // bis 5 Runden à 15–60 s (Flut beendet jede Runde)
   wackel: 'mittel',
   werwolf: 'lang',
+  // 6–8 Runden à ca. 40–90 s, endet früher bei 10 Punkten
+  funk: 'mittel',
   // Brett: 1 Frage ≈ 90 s (Arcade: 4 Fragen ≈ 4–5 min)
   schaetz: 'kurz',
   // reihum, 3 Leben bzw. 6 Runden um den Tisch (Trinkspiel: 2) – 6 Spieler ≈ 4 min, 12 Spieler deutlich länger
@@ -768,7 +772,7 @@ const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'R
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele und ohne Date-Night-Kapitel) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'funk'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
@@ -776,5 +780,5 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
-  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'funk'] },
 ];

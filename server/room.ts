@@ -77,6 +77,7 @@ import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
+import { FunkGame } from './funk';
 import { SchaetzGame } from './schaetz';
 import { MaexGame } from './maexchen';
 import { WerwarsGame } from './werwars';
@@ -878,6 +879,9 @@ export class Room {
         break;
       case 'umzug':
         this.mini = new UmzugGame(ids, ctx);
+        break;
+      case 'funk':
+        this.mini = new FunkGame(ids, ctx);
         break;
       case 'schaetz':
         this.mini = new SchaetzGame(ids, ctx);
