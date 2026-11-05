@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import type { GameState, Team } from '../../shared/types';
 import { WORLD, TEAM_INFO } from '../../shared/flunky';
 import { AFB, AFB_CY, type AfbState } from '../../shared/autoball';
-import { wrapAngle } from '../../shared/kart';
 import { ballShine, beachBall, paintAutoballPitch } from '../art/autoball';
 import { kartSprite } from '../art/kartsprites';
 import { bus, getState, playerById } from './store';
