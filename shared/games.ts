@@ -152,6 +152,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   suess: { goal: 'Plündert die Minibar und bringt die Beute ins Versteck – der Wächter jagt euch!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🍬', text: 'ABLEGEN / SPRINT: Beute, Tempo' }, { icon: '🐢', text: 'Volle Taschen = langsam' }] },
   umzug: { goal: 'Alles muss in den Laster, bevor der Vermieter klingelt!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '📦', text: 'GREIFEN: halten = tragen' }, { icon: '💨', text: 'SPRINT: ohne Teil (sonst werfen)' }] },
   werwolf: { goal: 'Dorf gegen Werwölfe: Findet die Wölfe, bevor sie euch fressen.', controls: [{ icon: '🃏', text: 'Rolle geheim (verdeckte Karte)' }, { icon: '🌙', text: 'Nachts: alle tippen jemanden an' }, { icon: '🗳️', text: 'Tags: diskutieren, abstimmen' }] },
+  maexchen: { goal: 'Würfelt geheim, sagt einen höheren Wert an – ehrlich oder geblufft. Wer erwischt wird, verliert!', controls: [{ icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
   werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }, { icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
 };
 

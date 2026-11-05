@@ -84,7 +84,7 @@ export type MiniKind =
   | 'suess'
   | 'umzug'
   | 'wackel'
-  | 'maexchen';
+  | 'maexchen'
   | 'werwars';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
