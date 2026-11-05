@@ -1,6 +1,10 @@
 {
   "updated": "2026-11-05 18:35",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
+  "analysis": {
+    "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
+    "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
+  },
   "inProgress": [
     {
       "title": "Zug überspringen + mehr Ruhe",
@@ -245,6 +249,14 @@
     {
       "title": "Sensor-Rückmeldung für Bewegungsspiele",
       "status": "umgesetzt"
+    },
+    {
+      "title": "Handy-Ausrichtung pro Spiel (hochkant/quer) festlegen, immer anzeigen, Layout dafür optimieren",
+      "status": "offen"
+    },
+    {
+      "title": "Spiel-Review: Soundeffekte, Juice, Pacing ab 8 Spielern, Zuschauer-Rollen, Spielbrett 2.0, Igel→Worms (Umsetzungs-Briefing im Review)",
+      "status": "offen"
     }
   ]
 }
