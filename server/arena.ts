@@ -489,6 +489,7 @@ export class ArenaGame implements MiniGame {
       kind: 'arena',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: Math.max(0, this.deadline - now),
         round: this.round,
         winRounds: ARENA.WIN_ROUNDS,

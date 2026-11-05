@@ -3,6 +3,7 @@ import { isMusicMenuOpen } from './musicMenu';
 import type { GameState } from '../../shared/types';
 import { bus, getState } from './store';
 import { installArcadePicker } from './arcadePicker';
+import { hdFactor, setHdFactor } from './hd';
 
 /**
  * Steuerung direkt am Laptop (Maus + Tastatur), falls kein Handy-VIP mehr da ist.
@@ -14,6 +15,7 @@ import { installArcadePicker } from './arcadePicker';
  *   A               Arcade-Auswahl: beliebiges Spiel per Maus/Tastatur starten (im Ergebnis: anderes Spiel)
  *   L               Lobby: Leaderboard des Abends groß ein-/ausblenden
  *   S               Zug/Phase überspringen (wie das VIP-Menü am Handy) – nur in Zug-/Warte-Phasen
+ *   Auflösung ×1/×2  Render-Auflösung der TV-Seite (hd.ts) – lädt die Seite neu
  */
 const HIDE_MS = 3500;
 const ARM_MS = 3000;
@@ -59,6 +61,7 @@ export function installHostControls(socket: Socket) {
       <button data-cmd="menu" tabindex="-1" hidden>Anderes Spiel (A)</button>
       <button data-cmd="board" tabindex="-1">Leaderboard (L)</button>
       <button data-cmd="resetSession" tabindex="-1">Leaderboard zurücksetzen</button>
+      <button data-local="hd" tabindex="-1" title="Render-Auflösung: ×2 = 960 × 540 (glattere Bewegung, Welt bleibt 480 × 270) – lädt die TV-Seite neu">Auflösung ×${hdFactor()}</button>
     </div>
     <div class="hc-keys">Esc 2× = abbrechen · Enter = weiter / nochmal · S = überspringen · A = Spiel wählen · L = Leaderboard</div>
     <div class="hc-msg"></div>
@@ -160,6 +163,8 @@ export function installHostControls(socket: Socket) {
   btn('menu').addEventListener('click', () => picker.toggle(true));
   btn('board').addEventListener('click', () => send('board'));
   btn('resetSession').addEventListener('click', resetSession);
+  // Render-Auflösung umschalten (lädt die Seite neu; ein laufendes Spiel läuft am Server weiter)
+  root.querySelector<HTMLButtonElement>('button[data-local="hd"]')!.addEventListener('click', () => setHdFactor(hdFactor() === 2 ? 1 : 2));
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;

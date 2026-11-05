@@ -9,6 +9,7 @@ import { avatarSprite, ensurePortrait, playAvatar } from './textures';
 import { pcol } from './playerColor';
 import { Countdown, ensureTex, txt } from './ui';
 import { Juice } from './juice';
+import { SnapBuffer, lerp } from './interp';
 import { sfx } from './sfx';
 
 type C = Phaser.GameObjects.Container;
@@ -39,7 +40,8 @@ interface Fig {
  */
 export class BogenScene extends Phaser.Scene {
   private latest: BogenState | null = null;
-  private recvAt = 0;
+  /** Wiedergabe-Uhr (60 ms hinter dem Server): Figuren und Pfeile laufen interpoliert, Zeitlupe beim letzten Treffer */
+  private buf = new SnapBuffer<BogenState>();
   private stageShown = -1;
   private bg!: Phaser.GameObjects.Image;
   private bgL!: C;
@@ -80,13 +82,14 @@ export class BogenScene extends Phaser.Scene {
     this.hudKey = '';
     this.shotSeen.clear();
     this.cheerRound = 0;
+    this.buf = new SnapBuffer();
 
     this.bgL = this.add.container(0, 0).setDepth(0);
     this.itemL = this.add.container(0, 0).setDepth(5);
     this.actL = this.add.container(0, 0).setDepth(10);
     this.fxL = this.add.container(0, 0).setDepth(20);
     this.hud = this.add.container(0, 0).setDepth(100);
-    this.juice = new Juice(this, { layer: this.fxL, hud: this.hud });
+    this.juice = new Juice(this, { layer: this.fxL, hud: this.hud, clock: this.buf });
     this.bg = this.add.image(0, 0, '__WHITE').setOrigin(0, 0);
     this.bgL.add(this.bg);
 
@@ -122,7 +125,7 @@ export class BogenScene extends Phaser.Scene {
     if (s.mini?.kind !== 'bogen') return;
     const st = s.mini.state;
     this.latest = st;
-    this.recvAt = performance.now();
+    this.buf.push(st.t, st);
     if (st.stage !== this.stageShown) {
       this.stageShown = st.stage;
       this.bg.setTexture(ensureTex(this, `bogen_bg_${st.stage}`, () => bogenBackdrop(st.stage)));
@@ -163,22 +166,27 @@ export class BogenScene extends Phaser.Scene {
       }
     }
 
-    // Effekte
+    // Effekte – erst, wenn die Wiedergabe-Uhr den Stand erreicht (dann stehen die Figuren am Treffpunkt)
     const maxSeq = st.fx.reduce((m, f) => Math.max(m, f.seq), 0);
     if (this.fxSeen < 0) this.fxSeen = maxSeq;
-    let hitNow = false;
-    for (const fx of st.fx) {
-      if (fx.seq <= this.fxSeen) continue;
-      this.playFx(fx);
-      if (fx.type === 'hit' || fx.type === 'stomp' || fx.type === 'boom') hitNow = true;
-    }
+    const fresh = st.fx.filter((fx) => fx.seq > this.fxSeen);
     this.fxSeen = Math.max(this.fxSeen, maxSeq);
-    // Letzter Treffer der Runde: Zeitlupe
-    const all = Object.values(st.players);
-    if (hitNow && st.sub !== 'countdown' && all.length > 1 && all.filter((p) => p.alive).length <= 1) {
-      this.juice.slowMo(0.35, 900);
-      this.juice.flash(0xffffff, 160);
-      sfx('ko', { pitch: 0.8 });
+    if (fresh.length) {
+      const all = Object.values(st.players);
+      const lastHit = st.sub !== 'countdown' && all.length > 1 && all.filter((p) => p.alive).length <= 1;
+      this.buf.after(st.t, () => {
+        let hitNow = false;
+        for (const fx of fresh) {
+          this.playFx(fx);
+          if (fx.type === 'hit' || fx.type === 'stomp' || fx.type === 'boom') hitNow = true;
+        }
+        // Letzter Treffer der Runde: Zeitlupe
+        if (hitNow && lastHit) {
+          this.juice.slowMo(0.35, 900);
+          this.juice.flash(0xffffff, 160);
+          sfx('ko', { pitch: 0.8 });
+        }
+      });
     }
 
     // Schüsse
@@ -260,20 +268,25 @@ export class BogenScene extends Phaser.Scene {
 
   update(time: number) {
     const st = this.latest;
-    if (!st) return;
-    const age = st.sub === 'play' ? Math.min(0.06, (performance.now() - this.recvAt) / 1000) : 0;
-    for (const [id, p] of Object.entries(st.players)) this.updateFig(id, p, age, time);
-    for (const a of st.arrows) {
-      const img = this.arrowImgs.get(a.id);
+    const s = this.buf.sample();
+    if (!st || !s) return;
+    const { a, b, f } = s;
+    for (const [id, p] of Object.entries(b.players)) this.updateFig(id, p, a.players[id] ?? p, f, time);
+    for (const ar of b.arrows) {
+      const img = this.arrowImgs.get(ar.id);
       if (!img) continue;
-      if (a.s === 0) {
-        img.setPosition(bogenWrapX(a.x + a.vx * age), AY + bogenWrapY(a.y + a.vy * age)).setRotation(Math.atan2(a.vy, a.vx));
-      } else if (a.s === 2 && (a.vx || a.vy)) {
-        img.setPosition(a.x + a.vx * age, AY + a.y + a.vy * age).setAngle(img.angle + 14);
+      const aa = a.arrows.find((q) => q.id === ar.id) ?? ar;
+      if (ar.s === 0) {
+        // fliegt (mit Wrap an den Rändern)
+        const x = bogenWrapX(aa.x + bogenDx(aa.x, ar.x) * f);
+        const y = bogenWrapY(aa.y + bogenDy(aa.y, ar.y) * f);
+        img.setPosition(x, AY + y).setRotation(Math.atan2(ar.vy, ar.vx));
+      } else if (ar.s === 2 && (ar.vx || ar.vy)) {
+        img.setPosition(lerp(aa.x, ar.x, f), AY + lerp(aa.y, ar.y, f)).setAngle(img.angle + 14 * this.buf.rate);
       } else {
-        img.setPosition(a.x, AY + a.y).setAngle(a.a);
+        img.setPosition(ar.x, AY + ar.y).setAngle(ar.a);
         // liegende Pfeile: Spitze leicht über dem Boden
-        if (a.s === 2) img.setPosition(a.x + (a.a === 180 ? -7 : 7), AY + a.y);
+        if (ar.s === 2) img.setPosition(ar.x + (ar.a === 180 ? -7 : 7), AY + ar.y);
       }
     }
     if (this.chestImg) this.chestImg.setY(AY + (st.chest?.y ?? 0) + Math.round(Math.sin(time / 260)) * 1);
@@ -282,21 +295,20 @@ export class BogenScene extends Phaser.Scene {
     this.timer.setText(st.sub === 'play' && secs <= 10 ? String(secs) : '');
   }
 
-  private updateFig(id: string, p: BogenPlayer, age: number, time: number) {
+  private updateFig(id: string, p: BogenPlayer, pa: BogenPlayer, f: number, time: number) {
     const g = this.figs.get(id);
     if (!g || !p.alive) return;
-    const tx = bogenWrapX(p.x + p.vx * age);
-    const ty = bogenWrapY(p.y + (p.ground ? 0 : p.vy * age));
-    const dx = bogenDx(g.x, tx);
-    const dy = bogenDy(g.y, ty);
+    // Zwischen den zwei Ständen auf dem kurzen Weg (Wrap an den Rändern); Respawn = Sprung
+    const dx = bogenDx(pa.x, p.x);
+    const dy = bogenDy(pa.y, p.y);
     if (Math.hypot(dx, dy) > 40) {
-      g.x = tx;
-      g.y = ty;
+      g.x = p.x;
+      g.y = p.y;
     } else {
-      g.x = bogenWrapX(g.x + dx * 0.55);
-      g.y = bogenWrapY(g.y + dy * 0.55);
+      g.x = bogenWrapX(pa.x + dx * f);
+      g.y = bogenWrapY(pa.y + dy * f);
     }
-    g.root.setPosition(Math.round(g.x), Math.round(AY + g.y));
+    g.root.setPosition(g.x, AY + g.y);
 
     const img = g.img;
     img.setFlipX(p.f < 0).setAngle(0).setScale(1).setY(0).setX(0);

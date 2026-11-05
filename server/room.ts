@@ -104,8 +104,8 @@ const AUTO_MINI_MS = 5_000;
 const DISCONNECT_GRACE_MS = 3_000;
 /** Gehaltene Eingaben (Stick & Co.) schickt das Handy alle 250–500 ms neu – bleiben sie so lange aus, gilt „losgelassen“ */
 const HOLD_TIMEOUT_MS = 700;
-/** Höchstens alle 40 ms ein Zustand (≈ 25/s) – sofort, wenn der letzte länger her ist */
-const FLUSH_MS = 40;
+/** Mindestabstand zwischen zwei Sendungen – unter dem 33-ms-Takt der 30-Hz-Spiele, damit kein Stand verloren geht */
+const FLUSH_MS = 30;
 
 /**
  * Gehaltene Eingaben, die ohne Nachschub auf „neutral“ fallen (z. B. Handy gesperrt, während der Daumen
@@ -1708,7 +1708,7 @@ export class Room {
     };
   }
 
-  /** Bündelt Zustandsänderungen: sofort senden, aber höchstens alle 40 ms (bei 20-Hz-Spielen also ohne Wartezeit). */
+  /** Bündelt Zustandsänderungen: sofort senden, aber höchstens alle 30 ms (bei 20-/30-Hz-Spielen also ohne Wartezeit). */
   private changed() {
     if (this.flushTimer) return;
     const wait = Math.max(0, FLUSH_MS - (Date.now() - this.lastFlush));

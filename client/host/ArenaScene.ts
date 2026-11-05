@@ -11,6 +11,7 @@ import { type Figure, ensurePortrait, figure } from './textures';
 import { pcol } from './playerColor';
 import { Countdown, background, ensureTex, ink, panel, prop, txt } from './ui';
 import { Juice } from './juice';
+import { SnapBuffer, lerpJump } from './interp';
 import { sfx } from './sfx';
 
 const T = ARENA.TILE;
@@ -37,6 +38,8 @@ export class ArenaScene extends Phaser.Scene {
   private banner!: Phaser.GameObjects.Text;
   private sub!: Phaser.GameObjects.Text;
   private latest: ArenaState | null = null;
+  /** Wiedergabe-Uhr (60 ms hinter dem Server), Figuren laufen dazwischen interpoliert */
+  private buf = new SnapBuffer<ArenaState>();
   private hudKey = '';
   private phaseKey = '';
   private round = 0;
@@ -62,7 +65,8 @@ export class ArenaScene extends Phaser.Scene {
     this.round = 0;
     this.floodShown = false;
     this.cheerRound = 0;
-    this.juice = new Juice(this, { depth: 1650 });
+    this.buf = new SnapBuffer();
+    this.juice = new Juice(this, { depth: 1650, clock: this.buf });
 
     const aw = ARENA.COLS * T;
     const ah = ARENA.ROWS * T;
@@ -110,13 +114,15 @@ export class ArenaScene extends Phaser.Scene {
 
   update() {
     const st = this.latest;
-    if (!st) return;
+    const s = this.buf.sample();
+    if (!st || !s) return;
     const now = this.time.now;
-    for (const [id, p] of Object.entries(st.players)) {
+    for (const [id, p] of Object.entries(s.b.players)) {
       const a = this.figs.get(id);
       if (!a || !a.alive) continue;
-      a.x += (p.x - a.x) * 0.45;
-      a.y += (p.y - a.y) * 0.45;
+      const pa = s.a.players[id] ?? p;
+      a.x = lerpJump(pa.x, p.x, s.f, 3);
+      a.y = lerpJump(pa.y, p.y, s.f, 3);
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       if (p.dir === 'l' || p.dir === 'r') img.setFlipX(p.dir === 'l');
       a.f.play(p.moving ? 'walk' : 'idle');
@@ -167,6 +173,7 @@ export class ArenaScene extends Phaser.Scene {
     if (s.mini?.kind !== 'arena') return;
     const st = s.mini.state;
     this.latest = st;
+    this.buf.push(st.t, st);
     if (st.round !== this.round) {
       this.round = st.round;
       this.resetRound(st);

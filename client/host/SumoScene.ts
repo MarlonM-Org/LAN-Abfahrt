@@ -8,6 +8,7 @@ import { pcol } from './playerColor';
 import { ensurePortrait, figure, type Figure } from './textures';
 import { Countdown, backPlate, background, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
+import { SnapBuffer, lerpJump } from './interp';
 import { sfx } from './sfx';
 
 const T = SUMO.TILE;
@@ -36,6 +37,8 @@ export class SumoScene extends Phaser.Scene {
   private banner!: Phaser.GameObjects.Text;
   private sub!: Phaser.GameObjects.Text;
   private latest: SumoState | null = null;
+  /** Wiedergabe-Uhr (60 ms hinter dem Server), Figuren laufen dazwischen interpoliert */
+  private buf = new SnapBuffer<SumoState>();
   private hudKey = '';
   private phaseKey = '';
   private round = 0;
@@ -57,7 +60,8 @@ export class SumoScene extends Phaser.Scene {
     this.round = 0;
     this.suddenShown = false;
     this.cheerRound = 0;
-    this.juice = new Juice(this, { depth: 1650 });
+    this.buf = new SnapBuffer();
+    this.juice = new Juice(this, { depth: 1650, clock: this.buf });
 
     background(this, 'sumo', WORLD.W, WORLD.H, (p) => paintSumoSea(p, WORLD.W, WORLD.H));
     // Wellen, die sanft glitzern
@@ -99,9 +103,10 @@ export class SumoScene extends Phaser.Scene {
 
   update() {
     const st = this.latest;
-    if (!st) return;
+    const s = this.buf.sample();
+    if (!st || !s) return;
     const now = this.time.now;
-    for (const [id, p] of Object.entries(st.players)) {
+    for (const [id, p] of Object.entries(s.b.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
       if (!a.alive) {
@@ -111,8 +116,9 @@ export class SumoScene extends Phaser.Scene {
       }
       const ox = a.x;
       const oy = a.y;
-      a.x += (p.x - a.x) * 0.5;
-      a.y += (p.y - a.y) * 0.5;
+      const pa = s.a.players[id] ?? p;
+      a.x = lerpJump(pa.x, p.x, s.f, 40);
+      a.y = lerpJump(pa.y, p.y, s.f, 40);
       const moving = Math.hypot(a.x - ox, a.y - oy) > 0.15;
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setFlipX(p.f < 0);
@@ -183,6 +189,7 @@ export class SumoScene extends Phaser.Scene {
     if (s.mini?.kind !== 'sumo') return;
     const st = s.mini.state;
     this.latest = st;
+    this.buf.push(st.t, st);
     if (st.round !== this.round) {
       this.round = st.round;
       this.resetRound(st);
