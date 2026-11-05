@@ -8,6 +8,7 @@ import type { WolfPrivate, WolfState } from './werwolf';
 import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
+import type { KofferState } from './koffer';
 
 export interface Look {
   skin: number;
@@ -72,7 +73,8 @@ export type MiniKind =
   | 'pixel'
   | 'wpistole'
   | 'zauber'
-  | 'angeln';
+  | 'angeln'
+  | 'koffer';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1859,7 +1861,8 @@ export type MiniSnapshot =
   | { kind: 'pixel'; state: PixelState }
   | { kind: 'wpistole'; state: WpistoleState }
   | { kind: 'zauber'; state: ZauberState }
-  | { kind: 'angeln'; state: AngelnState };
+  | { kind: 'angeln'; state: AngelnState }
+  | { kind: 'koffer'; state: KofferState };
 
 export interface GameState {
   phase: Phase;

@@ -69,6 +69,7 @@ import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
+import { KofferGame } from './koffer';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
 const MAX_PLAYERS = 12;
@@ -692,6 +693,9 @@ export class Room {
         break;
       case 'angeln':
         this.mini = new AngelnGame(ids, ctx);
+        break;
+      case 'koffer':
+        this.mini = new KofferGame(ids, ctx);
         break;
     }
     this.results = null;
