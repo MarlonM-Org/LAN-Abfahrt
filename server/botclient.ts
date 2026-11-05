@@ -41,6 +41,7 @@ import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
+import { WP, type WpistoleState, wpTargetAt } from '../shared/wpistole';
 import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
 import type { AngelnState } from '../shared/angeln';
@@ -1111,6 +1112,8 @@ export class Bot {
     if (m.kind === 'werwolf') wolfBot(this, m.state);
 
     if (m.kind === 'pixel') pixBot(this, m.state);
+
+    if (m.kind === 'wpistole') wpistBot(this, m.state);
 
     if (m.kind === 'zauber') zaubBot(this, m.state);
 
@@ -2922,6 +2925,85 @@ function afbBot(bot: Bot, st: AfbState) {
   } else mem.stuckSince = 0;
   mem.idle = false;
   bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
+}
+
+// ------------------------------------------------------------------ Wasserpistolen-Duell
+
+interface WpistMem {
+  rk: string;
+  armed: boolean;
+  seen: number;
+  fakeSeen: number;
+  /** Diese Runde zu nervös → Frühstart */
+  jumpy: boolean;
+  jumped: boolean;
+}
+const wpistMem = new WeakMap<Bot, WpistMem>();
+
+/** Wasserpistolen-Duell: Holster, auf „ZIEHT!“ warten (manchmal Frühstart), nach 250–700 ms treffen */
+function wpistBot(bot: Bot, st: WpistoleState) {
+  const d = st.duels.find((x) => x.a.id === bot.id || x.b.id === bot.id);
+  if (!d) return;
+  const me = d.a.id === bot.id ? d.a : d.b;
+  const other = me === d.a ? d.b : d.a;
+  const rk = `${st.final}-${st.round}`;
+  let mem = wpistMem.get(bot);
+  if (!mem || mem.rk !== rk) {
+    mem = { rk, armed: false, seen: mem?.seen ?? 0, fakeSeen: mem?.fakeSeen ?? 0, jumpy: Math.random() < 0.05, jumped: false };
+    wpistMem.set(bot, mem);
+  }
+  const m = mem;
+  const cur = () => (bot.state?.mini?.kind === 'wpistole' ? bot.state.mini.state : null);
+  const stillWait = () => cur()?.sub === 'wait' && `${cur()!.final}-${cur()!.round}` === rk;
+
+  if ((st.sub === 'arm' || st.sub === 'wait') && !m.armed) {
+    m.armed = true;
+    bot.once(`wpist-arm-${rk}`, async () => {
+      await sleep(rand(150, 900));
+      bot.send('arm', { on: true });
+    });
+  }
+  // Auf einen falschen Ruf reinfallen
+  if (st.sub === 'wait' && st.call && !st.callReal && st.callSeq !== m.fakeSeen) {
+    m.fakeSeen = st.callSeq;
+    if (Math.random() < 0.12) {
+      bot.once(`wpist-fake-${st.callSeq}`, async () => {
+        await sleep(rand(250, 450));
+        if (stillWait()) bot.send('draw', { seq: m.seen, t: 0 });
+      });
+    }
+  }
+  // Einfach zu nervös
+  if (st.sub === 'wait' && m.jumpy && !m.jumped) {
+    m.jumped = true;
+    bot.once(`wpist-jump-${rk}`, async () => {
+      await sleep(rand(300, 1400));
+      if (stillWait()) bot.send('draw', { seq: m.seen, t: 0 });
+    });
+  }
+  if (st.sub === 'draw' && st.drawSeq !== m.seen) {
+    const seq = st.drawSeq;
+    m.seen = seq;
+    const t0 = Date.now();
+    bot.send('ack', { seq });
+    const path = other.path;
+    bot.once(`wpist-duel-${seq}`, async () => {
+      const react = rand(250, 700);
+      await sleep(react * 0.5);
+      bot.send('draw', { seq, t: Date.now() - t0 });
+      for (let k = 0; k < WP.SHOTS; k++) {
+        await sleep(k === 0 ? react * 0.5 : rand(280, 520));
+        const c = cur();
+        const dd = c?.duels.find((x) => x.a.id === bot.id || x.b.id === bot.id);
+        if (!c || c.sub !== 'draw' || c.drawSeq !== seq || !dd || dd.done) return;
+        const t = Date.now() - t0;
+        const p = wpTargetAt(path, t);
+        const miss = Math.random() < 0.22;
+        const dx = miss ? rand(10, 16) * (Math.random() < 0.5 ? -1 : 1) : rand(-3, 3);
+        bot.send('shoot', { seq, t, x: p.x + dx, y: p.y + rand(-2, 2), m: 'touch' });
+      }
+    });
+  }
 }
 
 // ------------------------------------------------------------------ Zauber-Arena
