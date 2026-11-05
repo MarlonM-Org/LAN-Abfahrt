@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 20:10",
+  "updated": "2026-11-05 21:10",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -12,17 +12,15 @@
       "type": "Neues Spiel",
       "branch": "spiel/umzugschaos",
       "detail": "à la Moving Out: Ferienhaus ausräumen, schwere Möbel zu zweit, Fenster als Abkürzung"
-    },
-    {
-      "title": "Review Phase 0: Netz + Reconnect",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/netz-reconnect",
-      "detail": "changed() sofort senden, meta-Event, private nur bei Änderung, 3 s Gnadenfrist statt sofort raus, Stick-Timeout, WebSocket"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Review: Netz (sofort senden, meta-Event, WebSocket), Reconnect-Gnadenfrist, Stick-Timeout",
+      "pr": 54,
+      "date": "2026-11-05"
+    },
     {
       "title": "Wackel-Prügelei (à la Gang Beasts)",
       "pr": 52,
@@ -282,7 +280,7 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Spiel-Review: Soundeffekte, Juice, Pacing ab 8 Spielern, Zuschauer-Rollen, Spielbrett 2.0, Igel→Worms (Umsetzungs-Briefing im Review)",
+      "title": "Spiel-Review Phase 0+1 (Fairness, Netz, Pacing, Ton/Juice, Ausrichtung, Igel S) umgesetzt – offen: Regelkarte, Zuschauer-Rollen, Look, Spielbrett 2.0, Igel M, neue Spiele",
       "status": "in Arbeit"
     }
   ]
