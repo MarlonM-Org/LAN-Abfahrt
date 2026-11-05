@@ -27,11 +27,14 @@ import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, t
 import type { FangenState } from '../shared/types';
 import type { SumoState } from '../shared/types';
 import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
+import type { VolleyState } from '../shared/types';
+import { VOLLEY, vollPredict, vollSide, vollSpot } from '../shared/volley';
 import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
 import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
+import type { WolfState } from '../shared/werwolf';
 
 export interface BotOptions {
   url: string;
@@ -1052,6 +1055,8 @@ export class Bot {
 
     if (m.kind === 'autoball') afbBot(this, m.state);
 
+    if (m.kind === 'volley') vballBot(this, m.state);
+
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
       const p = this.priv?.kind === 'geist' ? this.priv.state : null;
@@ -1063,6 +1068,8 @@ export class Bot {
     }
 
     if (m.kind === 'tourist') tourBot(this, m.state);
+
+    if (m.kind === 'werwolf') wolfBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -2099,6 +2106,88 @@ function sumoBot(bot: Bot, st: SumoState) {
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
 }
 
+// ------------------------------------------------------------------ Strand-Volleyball
+
+interface VballBotMemory {
+  nextAt: number;
+  dir: number;
+  jumpAt: number;
+  /** Eigene Ungenauigkeit (px), damit nicht alle Bots gleich spielen */
+  slop: number;
+  /** Wie gern der Bot schmettert */
+  spikeChance: number;
+}
+
+const vballMem = new WeakMap<Bot, VballBotMemory>();
+
+/**
+ * Volleyball-Bot: rechnet aus, wo der Ball auf Schlaghöhe herunterkommt, und läuft
+ * knapp dahinter (dann prallt der Ball Richtung Netz ab). Von mehreren im Team geht nur,
+ * wer am nächsten dran ist – die anderen halten ihre Position. Springt, wenn der Ball nah
+ * ist und fällt, und schmettert manchmal, wenn er in der Luft nah am Netz ist.
+ */
+function vballBot(bot: Bot, st: VolleyState) {
+  let mem = vballMem.get(bot);
+  if (!mem) vballMem.set(bot, (mem = { nextAt: 0, dir: 0, jumpAt: 0, slop: rand(-4, 4), spikeChance: rand(0.2, 0.55) }));
+  const me = st.players[bot.id];
+  const setDir = (d: number) => {
+    if (d === mem!.dir) return;
+    mem!.dir = d;
+    bot.send('move', { dir: d });
+  };
+  if (!me || !me.court || (st.sub !== 'serve' && st.sub !== 'rally')) {
+    setDir(0);
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(50, 90);
+
+  const V = VOLLEY;
+  const d = me.team === 'A' ? 1 : -1;
+  const [lo, hi] = vollSide(me.team);
+  const ownSide = (x: number) => d * (V.NET_X - x) > 0;
+  const b = st.ball;
+  const mates = Object.entries(st.players)
+    .filter(([, p]) => p.team === me.team && p.court)
+    .sort((a, c) => (a[0] < c[0] ? -1 : 1));
+  const home = vollSpot(me.team, Math.max(0, mates.findIndex(([id]) => id === bot.id)));
+
+  let target = home;
+  const hitY = V.GROUND - V.P_BODY - V.P_R - V.BALL_R + 4;
+  const pred = st.sub === 'serve' ? { x: b.x, t: 1 } : vollPredict(b, hitY);
+  if (pred && ownSide(pred.x)) {
+    const closest = mates.reduce((best, cur) => (Math.abs(cur[1].x - pred.x) < Math.abs(best[1].x - pred.x) ? cur : best), mates[0]);
+    if (!closest || closest[0] === bot.id) {
+      // Etwas hinter den Ball (vom Netz aus gesehen), damit er nach vorn abprallt
+      target = pred.x - d * (6 + mem.slop);
+    }
+  } else if (!ownSide(b.x)) {
+    // Ball drüben: auf die Grundposition, leicht zur Mitte der eigenen Hälfte
+    target = home + d * 10;
+  }
+  target = Math.max(lo, Math.min(hi, target));
+  const dx = target - me.x;
+  setDir(Math.abs(dx) < 3 ? 0 : dx > 0 ? 1 : -1);
+
+  // Springen: Ball nah über einem und fällt (oder steigt nur noch langsam).
+  // Nah am Netz springt der Bot früher ab, um von oben zu schmettern.
+  const bx = Math.abs(b.x - me.x);
+  const above = me.y - b.y;
+  const falling = b.vy > -60 || st.sub === 'serve';
+  const nearNet = Math.abs(b.x - V.NET_X) < 80 && ownSide(b.x) && me.cd <= 0;
+  const [jLo, jHi] = nearNet && mem.spikeChance > 0.3 ? [50, 100] : [26, 78];
+  if (!me.air && bx < 22 && above > jLo && above < jHi && falling && now - mem.jumpAt > 350 && Math.random() < 0.85) {
+    mem.jumpAt = now;
+    bot.send('jump');
+  }
+  // Schmettern: in der Luft, Ball in Reichweite, oberhalb der Netzkante und nicht zu weit vom Netz
+  const reach = Math.hypot(b.x - me.x, b.y - (me.y - V.P_BODY));
+  if (me.air && me.cd <= 0 && reach < 36 && b.y < V.NET_TOP - 4 && Math.abs(b.x - V.NET_X) < 90 && ownSide(b.x) && Math.random() < mem.spikeChance + 0.2) {
+    bot.send('spike');
+  }
+}
+
 // ------------------------------------------------------------------ Wer ist der Tourist?
 
 /** Pro Bot und Runde: wann der Bot-Tourist rät bzw. der Bot jemanden anklagt */
@@ -2148,6 +2237,86 @@ function tourBot(bot: Bot, st: TourState) {
       if (cur()?.phaseNo === st.phaseNo) bot.send('vote', { yes: Math.random() < 0.6 });
     });
   }
+}
+
+// ------------------------------------------------------------------ Werwölfe im Ferienhaus
+
+/**
+ * Bots können nicht diskutieren: Wölfe wählen ein zufälliges Nicht-Wolf-Opfer (und schließen sich
+ * gern dem Rudel an), die Seherin schaut in Unbekannte, die Hexe heilt/vergiftet manchmal,
+ * am Tag stimmen alle zufällig ab. Der Leader-Bot (VIP) kürzt die Diskussion ab.
+ */
+function wolfBot(bot: Bot, st: WolfState) {
+  const p = bot.priv?.kind === 'werwolf' ? bot.priv.state : null;
+  if (!p || !(bot.id in st.alive)) return;
+  const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  const cur = () => (bot.state?.mini?.kind === 'werwolf' ? bot.state.mini.state : null);
+  const still = () => cur()?.phaseNo === st.phaseNo;
+  const others = Object.keys(st.alive).filter((id) => st.alive[id] && id !== bot.id);
+
+  if (st.sub === 'day' && bot.leader) {
+    bot.once(`wolf-day-${st.phaseNo}`, async () => {
+      await sleep(4000);
+      if (still()) bot.socket.emit('vip:mini', 'skip');
+    });
+  }
+  // Der Jäger ist schon tot, wenn er schießt
+  if (st.sub === 'hunter' && st.hunter === bot.id && !st.shotDone) {
+    bot.once(`wolf-shoot-${st.phaseNo}`, async () => {
+      await sleep(rand(1500, 4000));
+      const alive = Object.keys(st.alive).filter((id) => st.alive[id] && id !== bot.id);
+      if (still() && alive.length) bot.send('shoot', { target: pickOne(alive) });
+    });
+  }
+  if (!p.alive) return;
+
+  if (st.sub === 'night') {
+    if (p.role === 'wolf') {
+      const prey = others.filter((id) => !p.partners.includes(id));
+      const packPicks = Object.entries(p.pack).filter(([w]) => w !== bot.id).map(([, t]) => t);
+      if (!p.nightPick) {
+        bot.once(`wolf-night-${st.phaseNo}`, async () => {
+          await sleep(rand(1500, 5000));
+          const latest = bot.priv?.kind === 'werwolf' ? bot.priv.state : p;
+          const join = Object.entries(latest.pack).filter(([w]) => w !== bot.id).map(([, t]) => t);
+          if (still() && prey.length) bot.send('night', { target: join.length && Math.random() < 0.8 ? pickOne(join) : pickOne(prey) });
+        });
+      } else if (packPicks.some((t) => t !== p.nightPick)) {
+        // Uneinig → nach kurzem Zögern oft dem Rudel anschließen
+        bot.once(`wolf-agree-${st.phaseNo}`, async () => {
+          await sleep(rand(2000, 4000));
+          if (still() && Math.random() < 0.6) bot.send('night', { target: pickOne(packPicks) });
+        });
+      }
+    } else if (!p.nightPick) {
+      bot.once(`wolf-night-${st.phaseNo}`, async () => {
+        await sleep(rand(1500, 6000));
+        const fresh = p.role === 'seherin' ? others.filter((id) => !p.seen.some((x) => x.id === id)) : others;
+        const pool = fresh.length ? fresh : others;
+        if (still() && pool.length) bot.send('night', { target: pickOne(pool) });
+      });
+    }
+  }
+
+  if (st.sub === 'witch' && p.role === 'hexe' && !p.witchDone) {
+    bot.once(`wolf-witch-${st.phaseNo}`, async () => {
+      await sleep(rand(1500, 4000));
+      if (!still()) return;
+      if (p.victim && p.heal && Math.random() < 0.5) bot.send('heal', { on: true });
+      if (p.poison && others.length && Math.random() < 0.2) bot.send('poison', { target: pickOne(others) });
+      await sleep(300);
+      bot.send('witchDone');
+    });
+  }
+
+  if (st.sub === 'vote' && !p.myVote) {
+    bot.once(`wolf-vote-${st.phaseNo}`, async () => {
+      await sleep(rand(800, 3500));
+      const pool = p.role === 'wolf' ? others.filter((id) => !p.partners.includes(id)) : others;
+      if (still()) bot.send('vote', { target: Math.random() < 0.12 || !pool.length ? 'none' : pickOne(pool) });
+    });
+  }
+
 }
 
 /** Sprüche-Duell: Antworten der Bots (passen zu fast jeder Frage) */
