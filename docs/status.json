@@ -1,11 +1,18 @@
 {
-  "updated": "2026-11-05 21:40",
+  "updated": "2026-11-05 20:25",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
+    {
+      "title": "Feedback-Runde: Steuerung, Bot-Stärke, Handy-Layout, Hängenbleiben",
+      "kind": "",
+      "type": "Feedback-Umsetzung",
+      "branch": "claude/practical-wozniak-2dsd2e",
+      "detail": "Auto-Fußball Richtungs-Stick, Kart-Lenkung weicher, Bots mit menschlicher Reaktionszeit (Leicht/Normal/Profi), Flunkyball mit Sensor, Querlayout fürs iPhone 12 Pro, Abstieg/Paddel-Duell/Parcours/TTT/Sumo ohne Hängenbleiben, erkennbarere Namen"
+    },
     {
       "title": "Review Phase 1: Regelkarte + Übungsfeld + Bereit!",
       "kind": "",
@@ -235,7 +242,7 @@
   "feedback": {
     "kart": {
       "status": "umgesetzt",
-      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert"
+      "notes": "Lenkung zu empfindlich → feinfühlige Kennlinie, begrenzte Lenkgeschwindigkeit, weniger Einschlag bei Vollgas, Kippen erst bei 38° voll (vorher: Handy-Ansicht, Joystick, Drift, KIPPEN aufs iPhone)"
     },
     "enten": {
       "status": "positiv",
@@ -243,7 +250,7 @@
     },
     "parcours": {
       "status": "umgesetzt",
-      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer; ab 9 Spielern laufen jetzt alle 12 (#43)"
+      "notes": "Kein Zeitlimit (AFK nach 60 s), alles quer, 12 Läufer (#43); jetzt: kurzer Tipp springt trotzdem auf die nächste Stufe, „Aufgeben“ beim Laufen und „Aussetzen“ beim Bauen, falls man festsitzt"
     },
     "turm": {
       "status": "umgesetzt",
@@ -263,7 +270,31 @@
     },
     "ttt": {
       "status": "umgesetzt",
-      "notes": "Runden auf 100 s / 2 Runden gekürzt, quer (#45, #46)"
+      "notes": "Runden 100 s / 2 Runden, quer (#45, #46); jetzt: man rutscht in Türen, statt knapp daneben an der Wand hängenzubleiben"
+    },
+    "autoball": {
+      "status": "umgesetzt",
+      "notes": "„Kann nicht steuern“ → Stick zeigt jetzt die Fahrtrichtung auf dem TV (oben = oben), das Auto dreht sich selbst hin und gibt Gas"
+    },
+    "flunky": {
+      "status": "umgesetzt",
+      "notes": "Wurf mit Bewegungssensor (Arm schwingen) oder wie bisher wischen; Trinken/Laufen auch per Schütteln"
+    },
+    "sup": {
+      "status": "umgesetzt",
+      "notes": "Heißt jetzt „Paddel-Duell“; Bojen/Quallen verschwinden beim Rammen, an Steinen dreht man seitlich vorbei"
+    },
+    "descent": {
+      "status": "umgesetzt",
+      "notes": "Hängenbleiben an Hindernissen behoben (nach dem Stolpern klettert man drüber), Sprung wird kurz gepuffert"
+    },
+    "suess": {
+      "status": "umgesetzt",
+      "notes": "Handy-UI war quer zu hoch (Stick/Knopf unter dem Rand) → gemeinsames Querlayout"
+    },
+    "sumo": {
+      "status": "umgesetzt",
+      "notes": "Rempler kurz vor Ende der Betäubung wird gepuffert statt verschluckt"
     }
   },
   "general": [
@@ -322,6 +353,22 @@
     {
       "title": "Spiel-Review Phase 0+1 (Fairness, Netz, Pacing, Ton/Juice, Ausrichtung, Igel S) umgesetzt – offen: Regelkarte, Zuschauer-Rollen, Look, Spielbrett 2.0, Igel M, neue Spiele",
       "status": "in Arbeit"
+    },
+    {
+      "title": "Bots zu gut / finden keine Probleme → Bot-Stärke Leicht/Normal/Profi (VIP-Knopf, --skill); Normal spielt mit menschlicher Reaktionszeit und kleinen Fehlern",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Handy-UI quer teils zu hoch → Maßstab iPhone 12 Pro, iOS-Schriftvergrößerung beim Drehen abgeschaltet, Infospalte schrumpft automatisch; alle Quer-Spiele mit Bots geprüft",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "UX-Durchgang mit „menschlichen“ Bots: Hängenbleiben in Abstieg, Parcours, TTT-Türen, Sumo, Bogen/Smash-Sprung behoben",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Namen erkennbarer: Entenjagd, Wort-Bombe, Cockpit-Chaos, Unsichtbar-Fangen, Paddel-Duell; „à la …“ auch in der Lobby-Liste",
+      "status": "umgesetzt"
     }
   ]
 }

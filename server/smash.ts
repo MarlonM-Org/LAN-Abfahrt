@@ -225,7 +225,10 @@ export class SmashGame implements MiniGame {
       if (b === 'shield') f.shieldHeld = down;
       else if ((b === 'a' || b === 'b' || b === 'jump') && down && this.sub === 'fight') {
         f.buf = f.buf.filter((x) => x.b !== b);
-        f.buf.push({ b, until: Date.now() + 160, x: f.sx, y: f.sy });
+        const now = Date.now();
+        // Sprung während eines längeren Angriffs: bis kurz nach dessen Ende merken (max. 0,5 s), sonst geht er verloren
+        const until = b === 'jump' && now < f.busyUntil ? Math.max(now + 160, Math.min(f.busyUntil, now + 500) + 80) : now + 160;
+        f.buf.push({ b, until, x: f.sx, y: f.sy });
       }
     }
   }

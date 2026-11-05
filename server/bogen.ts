@@ -618,7 +618,8 @@ export class BogenGame implements MiniGame {
       const now = Date.now();
       if (pl.b === 'jump') {
         p.jumpHeld = down;
-        if (down && this.sub === 'play') p.jumpBuf = now + BOGEN.JUMP_BUFFER_MS;
+        // Während eines Dashs gedrückt: Sprung bis kurz nach dem Dash merken (sonst verschluckt)
+        if (down && this.sub === 'play') p.jumpBuf = Math.max(now + BOGEN.JUMP_BUFFER_MS, now < p.dashUntil ? p.dashUntil + 80 : 0);
         // Früh losgelassen → kleiner Hüpfer
         if (!down && p.vy < -120 && now >= p.dashUntil) p.vy *= BOGEN.JUMP_CUT;
       } else if (!down || this.sub !== 'play' || !p.alive) return;

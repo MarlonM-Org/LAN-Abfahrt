@@ -91,6 +91,21 @@ export function walkable(x: number, y: number, r: number): boolean {
   return false;
 }
 
+/**
+ * Ecken-Hilfe für Türen: Läuft man waagerecht (bzw. senkrecht) gegen die Wand, liegt aber knapp neben einer Tür,
+ * wird man zur Türmitte geschoben, statt stehen zu bleiben. Liefert die Verschiebung quer zur Laufrichtung (oder 0).
+ */
+export function doorNudge(x: number, y: number, horizontal: boolean, r: number, step: number): number {
+  for (const d of DOORS) {
+    if (d.vertical !== horizontal) continue;
+    const along = horizontal ? Math.abs(x - d.cx) : Math.abs(y - d.cy);
+    const off = horizontal ? d.cy - y : d.cx - x;
+    const reach = (horizontal ? d.w : d.h) / 2 + r + 4;
+    if (along < reach && Math.abs(off) > 0.01 && Math.abs(off) < HOUSE.DOOR_H / 2 + 6) return Math.max(-step, Math.min(step, off));
+  }
+  return 0;
+}
+
 /** Ist die Sichtlinie zwischen zwei Punkten frei (keine Wand dazwischen)? */
 export function lineFree(x1: number, y1: number, x2: number, y2: number): boolean {
   const len = Math.hypot(x2 - x1, y2 - y1);

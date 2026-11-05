@@ -53,8 +53,9 @@ export const PARCOURS = {
   MAX_FALL: 330,
   WALL_SLIDE: 55,
   WIND_ACC: 1150,
-  COYOTE_MS: 100,
-  BUFFER_MS: 130,
+  /** Großzügig: Wer mit normaler Reaktionszeit kurz nach der Kante drückt, springt noch (Test mit „menschlichen“ Bots) */
+  COYOTE_MS: 150,
+  BUFFER_MS: 180,
   /** Spieler-Hitbox (Ursprung = Füße, Mitte) */
   PW: 8,
   PH: 13,
@@ -85,7 +86,7 @@ export const BASE_SOLIDS: Rect[] = [
   { x: 116, y: 214, w: 40, h: 56 }, // Felsen 1
   { x: 200, y: 198, w: 32, h: 72 }, // Felsen 2
   { x: 290, y: 210, w: 32, h: 60 }, // Felsen 3
-  { x: 380, y: 196, w: 100, h: 74 }, // Steg / Bar
+  { x: 374, y: 196, w: 106, h: 74 }, // Steg / Bar (6 px näher: letzte Lücke mit vollem Sprung nicht mehr auf Kante)
 ];
 
 /** Zielbereich (Flagge an der Cocktailbar) */

@@ -14,6 +14,8 @@ interface P extends SumoPlayer {
   dashUntil: number;
   readyAt: number;
   stunUntil: number;
+  /** Rempler während Betäubung/Abklingzeit gedrückt → wird bis hierhin nachgeholt (Eingabepuffer) */
+  dashQueuedUntil: number;
   lastHitBy: string | null;
   lastHitAt: number;
   diedAt: number;
@@ -56,7 +58,7 @@ export class SumoGame implements MiniGame {
     for (const id of ids) {
       this.players.set(id, {
         x: SUMO_CX, y: SUMO_CY, f: 1, alive: false, dash: false, cd: 0, stun: false, hits: 0, wins: 0, pushes: 0,
-        vx: 0, vy: 0, sx: 0, sy: 0, lx: 1, ly: 0, dashUntil: 0, readyAt: 0, stunUntil: 0,
+        vx: 0, vy: 0, sx: 0, sy: 0, lx: 1, ly: 0, dashUntil: 0, readyAt: 0, stunUntil: 0, dashQueuedUntil: 0,
         lastHitBy: null, lastHitAt: 0, diedAt: 0, survival: 0,
       });
     }
@@ -99,7 +101,7 @@ export class SumoGame implements MiniGame {
         p.f = p.lx < 0 ? -1 : 1;
       }
       p.vx = p.vy = 0;
-      p.dashUntil = p.readyAt = p.stunUntil = 0;
+      p.dashUntil = p.readyAt = p.stunUntil = p.dashQueuedUntil = 0;
       p.dash = p.stun = false;
       p.cd = 0;
       p.lastHitBy = null;
@@ -194,6 +196,10 @@ export class SumoGame implements MiniGame {
 
   private tick(now: number, dt: number) {
     for (const p of this.players.values()) {
+      if (p.dashQueuedUntil && this.sub === 'play' && p.alive && now >= p.stunUntil && now >= p.readyAt) {
+        if (now <= p.dashQueuedUntil) this.dash(p, now);
+        else p.dashQueuedUntil = 0;
+      }
       p.dash = now < p.dashUntil;
       p.stun = now < p.stunUntil;
       p.cd = Math.max(0, p.readyAt - now);
@@ -391,14 +397,25 @@ export class SumoGame implements MiniGame {
       }
     } else if (action === 'dash') {
       const now = Date.now();
-      if (this.sub !== 'play' || !p.alive || now < p.readyAt || now < p.stunUntil) return;
-      p.dashUntil = now + SUMO.DASH_MS;
-      p.readyAt = now + SUMO.DASH_COOLDOWN_MS;
-      p.vx = p.lx * SUMO.DASH_SPEED + p.vx * 0.25;
-      p.vy = p.ly * SUMO.DASH_SPEED + p.vy * 0.25;
-      p.f = p.lx < 0 ? -1 : 1;
-      this.ctx.onChange();
+      if (this.sub !== 'play' || !p.alive) return;
+      if (now < p.readyAt || now < p.stunUntil) {
+        // Kurz vor Ende von Betäubung/Abklingzeit gedrückt: merken statt verschlucken (Rettungs-Rempler am Rand)
+        const ready = Math.max(p.readyAt, p.stunUntil);
+        if (ready - now < 300) p.dashQueuedUntil = ready + 250;
+        return;
+      }
+      this.dash(p, now);
     }
+  }
+
+  private dash(p: P, now: number) {
+    p.dashQueuedUntil = 0;
+    p.dashUntil = now + SUMO.DASH_MS;
+    p.readyAt = now + SUMO.DASH_COOLDOWN_MS;
+    p.vx = p.lx * SUMO.DASH_SPEED + p.vx * 0.25;
+    p.vy = p.ly * SUMO.DASH_SPEED + p.vy * 0.25;
+    p.f = p.lx < 0 ? -1 : 1;
+    this.ctx.onChange();
   }
 
   playerDisconnected(id: string) {

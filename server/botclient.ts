@@ -493,6 +493,11 @@ export class Bot {
     this.human = HUMAN[skill];
   }
 
+  /** Mittlere eigene Reaktionszeit (ms) – Bots planen so weit voraus wie ein Mensch, der die Kante kommen sieht */
+  get reactMs() {
+    return (this.human.lag[0] + this.human.lag[1]) / 2;
+  }
+
   send(action: string, payload?: unknown) {
     const h = this.human;
     if (!h.lag[1]) {
@@ -594,18 +599,24 @@ export class Bot {
     const solids: Rect[] = [...BASE_SOLIDS];
     for (const p of st.parts) if (PART_DEFS[p.type].kind !== 'hazard' && p.type !== 'bomb') solids.push(partRect(p, st.t));
     const hit = (rc: Rect) => solids.some((s) => overlaps(rc, s));
-    const gapAhead = !hit({ x: r.x + 3, y: r.y + 1, w: 6, h: 40 });
+    // Vorausschauen um die eigene Reaktionszeit (wie ein Mensch, der die Lücke kommen sieht)
+    const lead = (PARCOURS.RUN * this.reactMs) / 1000;
+    const gapAhead = !hit({ x: r.x + 3 + lead, y: r.y + 1, w: 6, h: 40 });
     const wallAhead = hit({ x: r.x + 4, y: r.y - PARCOURS.PH + 2, w: 10, h: PARCOURS.PH - 4 });
     const danger =
       st.parts.some((p) => p.type === 'urchin' && overlaps(partRect(p), { x: r.x + 2, y: r.y - 40, w: 26, h: 44 })) ||
       st.nuts.some((n) => Math.abs(n.x - r.x) < 34 && Math.abs(n.y - (r.y - 6)) < 14);
     if ((gapAhead || wallAhead || danger) && Math.random() > this.pc.sloppy) {
+      // Sprungstärke wie ein Mensch nach Augenmaß: breite Lücke = lange drücken, schmale = kurz
+      let land = 0;
+      for (let dx = 12; dx <= 96 && !land; dx += 4) if (hit({ x: r.x + dx, y: r.y - 24, w: 4, h: 60 })) land = dx;
+      const hold = gapAhead && (!land || land > 52) ? rand(400, 520) : rand(200, 320);
       this.pc.jumping = true;
       this.send('jump', { down: true });
       setTimeout(() => {
         this.send('jump', { down: false });
         this.pc.jumping = false;
-      }, rand(200, 340));
+      }, hold);
     }
   }
 

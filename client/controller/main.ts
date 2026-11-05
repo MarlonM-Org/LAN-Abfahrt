@@ -52,6 +52,7 @@ import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
 import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
+import { queueFit } from './fit';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -228,6 +229,7 @@ function renderNow() {
       updater = null;
       message('Hoppla!', 'Anzeigefehler – lade die Seite neu.')();
     }
+    queueFit();
   }
   syncVipAbort();
   syncOrientation(screen);
@@ -236,6 +238,7 @@ function renderNow() {
   } catch (e) {
     console.error(e);
   }
+  queueFit(false);
 }
 
 /** Spiel, das dieser (veraltete) Handy-Code nicht kennt */

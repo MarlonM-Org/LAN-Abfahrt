@@ -12,7 +12,7 @@ import type {
   TttWeapon,
 } from '../shared/types';
 import { ROOMS, SHIRT_NAMES, TTT, TTT_ITEMS, TTT_ROLES, TTT_SHOP } from '../shared/games';
-import { DOORS, lineFree, roomInner, walkable } from '../shared/house';
+import { DOORS, doorNudge, lineFree, roomInner, walkable } from '../shared/house';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 const TICK_MS = 50;
@@ -196,8 +196,19 @@ export class TttGame implements MiniGame {
       const step = TTT.SPEED * dt * Math.min(1, len);
       const nx = p.x + (p.sx / len) * step;
       const ny = p.y + (p.sy / len) * step;
-      if (walkable(nx, p.y, TTT.PLAYER_R)) p.x = nx;
-      if (walkable(p.x, ny, TTT.PLAYER_R)) p.y = ny;
+      const movedX = walkable(nx, p.y, TTT.PLAYER_R);
+      if (movedX) p.x = nx;
+      const movedY = walkable(p.x, ny, TTT.PLAYER_R);
+      if (movedY) p.y = ny;
+      // Knapp neben einer Tür gegen die Wand gelaufen: in die Tür hineinrutschen statt hängenzubleiben
+      if (!movedX && Math.abs(p.sx) > 0.3) {
+        const k = doorNudge(p.x, p.y, true, TTT.PLAYER_R, step);
+        if (k && walkable(p.x, p.y + k, TTT.PLAYER_R)) p.y += k;
+      }
+      if (!movedY && Math.abs(p.sy) > 0.3) {
+        const k = doorNudge(p.x, p.y, false, TTT.PLAYER_R, step);
+        if (k && walkable(p.x + k, p.y, TTT.PLAYER_R)) p.x += k;
+      }
     }
     // Fallen
     this.traps = this.traps.filter((t) => {

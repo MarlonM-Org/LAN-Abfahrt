@@ -140,6 +140,7 @@ function buildPlace(s: ParcoursState, type: PartType) {
       <b>${d.name}</b>
       <small class="pc-status"></small>
       <small class="pcq-hint"></small>
+      <button class="secondary small pc-skip">Passt nirgends? Aussetzen</button>
     </div>
     <div class="pcq-btns">
       <div class="pcq-row">
@@ -161,6 +162,7 @@ function buildPlace(s: ParcoursState, type: PartType) {
     send('place');
     navigator.vibrate?.(25);
   });
+  confirmTap(q(root, '.pc-skip'), 'Wirklich aussetzen? Nochmal tippen', () => send('skip'));
   const status = q(root, '.pc-status');
   const hint = q(root, '.pcq-hint');
   return () => {
@@ -176,13 +178,36 @@ function buildPlace(s: ParcoursState, type: PartType) {
   };
 }
 
+/** Knopf, der erst beim zweiten Tippen (innerhalb von 3 s) auslöst – gegen versehentliches Aufgeben */
+function confirmTap(btn: HTMLButtonElement, ask: string, fn: () => void) {
+  const label = btn.textContent ?? '';
+  let armedUntil = 0;
+  tapButton(btn, () => {
+    const now = performance.now();
+    if (now < armedUntil) {
+      armedUntil = 0;
+      btn.textContent = label;
+      fn();
+      return;
+    }
+    armedUntil = now + 3000;
+    btn.textContent = ask;
+    setTimeout(() => {
+      if (performance.now() >= armedUntil) btn.textContent = label;
+    }, 3100);
+  });
+}
+
 function buildRun(s: ParcoursState) {
   const { root, head } = frame(
     s,
     'run',
     `
     <div class="stick-area"></div>
-    <p class="pcq-hint pc-run-hint"></p>
+    <div class="pc-run-mid">
+      <p class="pcq-hint pc-run-hint"></p>
+      <button class="secondary small pc-giveup">Festgesteckt? Aufgeben</button>
+    </div>
     <button class="big-btn jump pc-jump">SPRINGEN</button>
   `,
   );
@@ -207,9 +232,12 @@ function buildRun(s: ParcoursState) {
   jump.addEventListener('pointercancel', up);
   jump.addEventListener('contextmenu', (e) => e.preventDefault());
   const hint = q(root, '.pc-run-hint');
+  const giveup = q<HTMLButtonElement>(root, '.pc-giveup');
+  confirmTap(giveup, 'Wirklich aufgeben? Nochmal tippen', () => send('giveup'));
   return () => {
     const st = head();
     if (!st) return;
+    giveup.classList.toggle('hidden', st.sub !== 'run' || st.runners[store.playerId!]?.st !== 'run');
     const warn = st.sub === 'run' ? afkText(st.runners[store.playerId!]?.afk ?? 0, 'run') : '';
     hint.textContent = st.sub === 'countdown' ? `Gleich geht’s los! ${secs(st.endsIn)}` : warn || 'Ab zur Cocktailbar! Länger drücken = höher springen';
     hint.classList.toggle('warn', !!warn);

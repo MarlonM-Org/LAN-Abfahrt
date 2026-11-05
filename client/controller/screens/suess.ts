@@ -1,7 +1,7 @@
 import { SUESS, type SuessState, roomNameAt, suessSpeedFactor } from '../../../shared/suess';
 import { candySprite } from '../../art/suess';
 import { type Screen, app, el, message, nameOf, q, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
 
 const cur = () => (store.state?.mini?.kind === 'suess' ? store.state.mini.state : null);
 
@@ -47,23 +47,27 @@ function candyIcon() {
 }
 
 function buildThief() {
+  // Querlayout: Kopf (Rolle · Zeit · Runde) · links Stick · Mitte Beute/Hinweis · rechts ABLEGEN
   const root = el(`
-    <div class="top-row"><span class="su-time"></span><span class="su-round"></span></div>
-    <div class="su-role thief">Du bist NASCHKATZE</div>
-    <div class="su-bar"><i></i><span></span></div>
-    <div class="su-carry">
-      <img class="su-icon" alt="" />
-      <b class="su-count">0</b>
-      <div class="su-carry-txt"><small class="su-load"></small><div class="su-speed"><i></i></div></div>
-    </div>
-    <p class="hint su-hint"></p>
-    <div class="su-controls">
-      <div class="stick-area su-stick"></div>
-      <button class="big-btn su-drop">ABLEGEN<br/><small>alles fallen lassen</small></button>
+    <div class="lx su-lx">
+      <div class="lx-head"><span class="lx-tag su-tag thief">NASCHKATZE</span><span class="timer su-time"></span><span class="su-round grow"></span></div>
+      <div class="lx-left su-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+      <div class="lx-mid">
+        <div class="su-bar"><i></i><span></span></div>
+        <div class="su-carry">
+          <img class="su-icon" alt="" />
+          <b class="su-count">0</b>
+          <div class="su-carry-txt"><small class="su-load"></small><div class="su-speed"><i></i></div></div>
+        </div>
+        <p class="su-hint"></p>
+      </div>
+      <div class="lx-right">
+        <button class="big-btn su-drop">ABLEGEN<small>alles fallen lassen</small></button>
+      </div>
     </div>
   `);
   q<HTMLImageElement>(root, '.su-icon').src = candyIcon();
-  joystick(q(root, '.su-stick'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.su-stick'), (x, y) => send('stick', { x, y }));
   const drop = q<HTMLButtonElement>(root, '.su-drop');
   tapButton(drop, () => {
     if (drop.disabled) return;
@@ -97,7 +101,7 @@ function buildThief() {
     else hint = `Du bist im ${roomNameAt(me.x, me.y)}. Minibar (Wohnzimmer) und Kühlschrank (Küche) haben die dicksten Sachen!`;
     q(root, '.su-hint').textContent = hint;
     q(root, '.su-hint').classList.toggle('su-alarm', danger);
-    root.classList.toggle('su-out', me.state === 'out');
+    q(root, '.su-lx').classList.toggle('su-out', me.state === 'out');
     drop.disabled = s.sub !== 'play' || me.carry <= 0 || me.state !== 'run';
     if (me.state === 'out' && lastState !== 'out') navigator.vibrate?.([80, 40, 80]);
     if (danger && !lastDanger) navigator.vibrate?.(25);
@@ -112,17 +116,20 @@ function buildThief() {
 
 function buildGuard() {
   const root = el(`
-    <div class="top-row"><span class="su-time"></span><span class="su-round"></span></div>
-    <div class="su-role guard">Du bist WÄCHTER</div>
-    <div class="su-bar"><i></i><span></span></div>
-    <div class="su-target"><b></b><small></small></div>
-    <p class="hint su-hint"></p>
-    <div class="su-controls">
-      <div class="stick-area su-stick"></div>
-      <button class="big-btn su-sprint">SPRINT</button>
+    <div class="lx su-lx">
+      <div class="lx-head"><span class="lx-tag su-tag guard">WÄCHTER</span><span class="timer su-time"></span><span class="su-round grow"></span></div>
+      <div class="lx-left su-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+      <div class="lx-mid">
+        <div class="su-bar"><i></i><span></span></div>
+        <div class="su-target"><b></b><small></small></div>
+        <p class="su-hint"></p>
+      </div>
+      <div class="lx-right">
+        <button class="big-btn su-sprint">SPRINT<small>kurzer Spurt</small></button>
+      </div>
     </div>
   `);
-  joystick(q(root, '.su-stick'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.su-stick'), (x, y) => send('stick', { x, y }));
   const sprint = q<HTMLButtonElement>(root, '.su-sprint');
   tapButton(sprint, () => {
     if (sprint.disabled) return;
