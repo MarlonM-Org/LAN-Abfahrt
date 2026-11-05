@@ -6,7 +6,7 @@ import { bananaPeel, coconut, detectiveHat, dizzy, medkit, NOODLE_COLORS, waterP
 import type { Pix } from '../art/pix';
 import { addHouse } from './house';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { BLUE_INK, Countdown, GOLD, GREEN_INK, INK, RED_INK, ensureTex, ink, nameTag, panel, txt } from './ui';
 
 /** Figuren stehen mit den Füßen etwas unter dem Server-Punkt (der ist Körpermitte) */
@@ -91,7 +91,7 @@ export class TttScene extends Phaser.Scene {
       f.x += (p.x - f.x) * 0.35;
       f.y += (p.y - f.y) * 0.35;
       f.img.setFlipX(p.dir < 0);
-      f.img.setY(p.moving ? -Math.abs(Math.sin(this.time.now / 80)) * 2 : 0);
+      playAvatar(f.img, p.stunned ? 'hit' : p.moving ? 'walk' : 'idle');
       f.img.setAngle(p.stunned ? Math.sin(this.time.now / 60) * 12 : 0);
       f.c.setPosition(Math.round(f.x), Math.round(f.y + FOOT)).setDepth(f.y + FOOT);
     }

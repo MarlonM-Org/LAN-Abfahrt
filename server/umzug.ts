@@ -1,7 +1,7 @@
 import Matter from 'matter-js';
 import type { MiniSnapshot, Team } from '../shared/types';
 import { TEAM_INFO } from '../shared/flunky';
-import { SHIRTS } from '../shared/avatar';
+import { playerColor } from '../shared/players';
 import {
   K,
   UMZUG as U,
@@ -49,7 +49,6 @@ const playerCat = (i: number) => 1 << (2 + i);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const hexNum = (s: string) => parseInt(s.slice(1), 16);
 
 interface House extends UmzugGeo {
   team: Team | null;
@@ -166,7 +165,6 @@ export class UmzugGame implements MiniGame {
       }
       const spot = spots[Math.floor((i * 7919) % Math.max(1, spots.length))] ?? { x: house.x0 + 120, y: 150 };
       used.push(spot);
-      const look = ctx.lookOf?.(id);
       const body = Bodies.circle(spot.x, spot.y, R, {
         frictionAir: PLAYER_FA,
         friction: 0,
@@ -192,7 +190,7 @@ export class UmzugGame implements MiniGame {
         dashCd: 0,
         ddx: 0,
         ddy: 1,
-        color: house.team ? TEAM_INFO[house.team].colorNum : hexNum(SHIRTS[look?.shirt ?? i % SHIRTS.length] ?? '#f2c33a'),
+        color: house.team ? TEAM_INFO[house.team].colorNum : playerColor(ctx.colorOf?.(id) ?? i).num,
         no: 0,
         st: [0, 0, 0, 0, 0],
         pts: 0,

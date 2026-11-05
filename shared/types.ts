@@ -26,6 +26,8 @@ export interface PlayerPublic {
   id: string;
   name: string;
   look: Look;
+  /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) – bleibt, solange der Spieler im Raum ist */
+  color: number;
   connected: boolean;
   isVip: boolean;
   /** Offline: seit wie vielen ms (Stand dieses Snapshots) */
@@ -1920,7 +1922,20 @@ export interface ResultsState {
 
 // ------------------------------------------------------------------ Gesamtzustand
 
-export type Phase = 'lobby' | 'board' | 'mini' | 'results' | 'story';
+/** `intro` = Regelkarte vor einem Minispiel (Ziel, Steuerung, Übungsfeld, „Bereit!“) */
+export type Phase = 'lobby' | 'board' | 'intro' | 'mini' | 'results' | 'story';
+
+/** Regelkarte vor dem Minispiel: Start, sobald alle bereit sind – spätestens bei `endsAt` (Server-Zeit, ms) */
+export interface IntroState {
+  kind: MiniKind;
+  /** Wer gleich mitspielt */
+  ids: string[];
+  /** Wer „Bereit!“ gedrückt hat (Bots sofort) */
+  ready: string[];
+  endsAt: number;
+  /** Spiel lief heute schon: nur 5 s, ohne Bereit-Pflicht */
+  short: boolean;
+}
 
 export type MiniSnapshot =
   | { kind: 'flunky'; state: FlunkyState }
@@ -2015,6 +2030,8 @@ export interface GameLive {
   skippable?: SkipInfo | null;
   /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
   nochmal: NochmalState | null;
+  /** Regelkarte (nur in Phase `intro`) */
+  intro?: IntroState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
   showBoard: boolean;
   /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */

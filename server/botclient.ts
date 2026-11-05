@@ -745,6 +745,16 @@ export class Bot {
       });
     }
 
+    // Regelkarte vor dem Spiel: Bots sind sofort bereit
+    if (s.phase === 'intro' && s.intro && !s.intro.ready.includes(this.id)) {
+      const it = s.intro;
+      this.once(`intro-${it.kind}-${it.endsAt}`, async () => {
+        if (this.leader) this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (kurz, 5 s)' : ' (15 s)'}`);
+        await sleep(rand(150, 500));
+        this.socket.emit('intro:ready');
+      });
+    }
+
     if (s.phase !== 'mini' || !s.mini) return;
 
     const m = s.mini;

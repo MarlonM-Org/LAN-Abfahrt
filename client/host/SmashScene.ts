@@ -4,7 +4,8 @@ import { WORLD } from '../../shared/flunky';
 import { SMASH, SMASH_STAGES, type SmashPlatform, pctColor, platformPos } from '../../shared/smash';
 import * as A from '../art/smash';
 import { bus, getState, playerById } from './store';
-import { ensureAvatar, ensurePortrait } from './textures';
+import { avatarSprite, ensurePortrait, playAvatar } from './textures';
+import { pcol } from './playerColor';
 import { ensureTex, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -13,14 +14,13 @@ import { say, spokenName } from './speech';
 type C = Phaser.GameObjects.Container;
 
 /** Spielerfarben (nach Reihenfolge), damit man sich auch bei gleichem Shirt unterscheidet */
-const COLORS = [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8, 0x8d5629, 0x5f6bd6, 0xa8c43a, 0xf4efe2];
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const ATTACK_ANIMS = new Set(['jab', 'side', 'up', 'down', 'nair', 'dair']);
 const HUD_Y = 236;
 
 interface Fig {
   root: C;
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
   shield: Phaser.GameObjects.Arc;
   prop: Phaser.GameObjects.Image;
   held: Phaser.GameObjects.Image;
@@ -163,10 +163,10 @@ export class SmashScene extends Phaser.Scene {
     let f = this.figs.get(id);
     if (f) return f;
     const pl = playerById(id);
-    const color = COLORS[idx % COLORS.length];
+    const color = pcol(id, idx).num;
     const root = this.add.container(0, 0);
     const shield = this.add.circle(0, -SMASH.H / 2, 20, color, 0.35).setStrokeStyle(2, 0xffffff, 0.8).setVisible(false);
-    const img = this.add.image(0, 0, pl ? ensureAvatar(this, pl.look) : '__WHITE').setOrigin(0.5, 1).setScale(SMASH.SCALE);
+    const img = (pl ? avatarSprite(this, pl.look) : this.add.sprite(0, 0, '__WHITE')).setOrigin(0.5, 1).setScale(SMASH.SCALE);
     const prop = this.add.image(0, 0, '__WHITE').setVisible(false);
     const held = this.add.image(0, 0, '__WHITE').setVisible(false);
     const swoosh = this.add.graphics();
@@ -188,7 +188,7 @@ export class SmashScene extends Phaser.Scene {
     const x0 = Math.floor((WORLD.W - n * cw) / 2);
     ids.forEach((id, i) => {
       const pl = playerById(id);
-      const color = COLORS[i % COLORS.length];
+      const color = pcol(id, i).num;
       const root = this.add.container(x0 + i * cw, HUD_Y);
       const bg = this.add.graphics();
       bg.fillStyle(0x2d1b12, 0.88).fillRect(1, 0, cw - 2, 34);
@@ -502,7 +502,7 @@ export class SmashScene extends Phaser.Scene {
 
     switch (f.anim) {
       case 'run':
-        img.setY(-Math.abs(Math.sin(time / 70)) * 2).setAngle(f.face * 7);
+        img.setAngle(f.face * 7);
         break;
       case 'air':
         img.setScale(S * (f.vy < 0 ? 0.94 : 1), S * (f.vy < 0 ? 1.06 : 1));
@@ -544,6 +544,7 @@ export class SmashScene extends Phaser.Scene {
           if (f.anim === 'down') img.setScale(S * 1.1, S * 0.8);
         }
     }
+    playAvatar(img, f.anim === 'run' ? 'walk' : f.anim === 'air' ? 'jump' : f.anim === 'hurt' || f.anim === 'stun' || f.anim === 'dizzy' ? 'hit' : 'idle');
     // Wisch-Effekt des Angriffs
     const since = time - g.atkAt;
     if (since < 240 && ATTACK_ANIMS.has(g.atkAnim)) this.drawSwoosh(g, g.atkAnim, f.face, 1 - since / 240);

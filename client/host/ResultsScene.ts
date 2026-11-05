@@ -303,6 +303,7 @@ export class ResultsScene extends Phaser.Scene {
         const f = figure(this, p.look, slot.x + ox, top, 2);
         sc.add(f);
         if (slot.place === 1) {
+          f.play('cheer');
           this.tweens.add({ targets: f.getData('img'), y: -6, duration: 300, yoyo: true, repeat: -1 });
           sc.add(this.add.image(slot.x + ox, top - 62, ensureTex(this, 'crown', O.crown)).setScale(2));
         }

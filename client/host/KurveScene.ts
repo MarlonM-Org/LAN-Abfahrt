@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameState, KurvePower, KurveState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { KURVE, KURVE_POWER_INFO } from '../../shared/games';
+import { playerColor } from '../../shared/players';
 import { type TrailCursor, ingestTrail, walkLine } from '../../shared/kurve';
 import { C } from '../art/palette';
 import { paintSky } from '../art/ground';
@@ -10,7 +11,8 @@ import { bus, getState, playerById } from './store';
 import { Countdown, background, ensureTex, txt } from './ui';
 
 const A = KURVE.ARENA;
-const colorNum = (i: number) => parseInt((KURVE.COLORS[i] ?? '#ffffff').slice(1), 16);
+/** Spurfarbe = Spielerfarbe des Abends (der Raum gibt sie dem Spiel als Farbindex mit) */
+const colorNum = (i: number) => playerColor(i).num;
 
 /** Power-up-Symbole (13 × 13) */
 function powerIcon(type: KurvePower): Pix {
@@ -130,7 +132,7 @@ export class KurveScene extends Phaser.Scene {
     this.lastDeath = st.deaths.length ? st.deaths[st.deaths.length - 1].seq : this.lastDeath;
     for (const [id, h] of Object.entries(st.players)) {
       const name = (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, 6);
-      const label = txt(this, h.x, h.y - 16, name, { color: KURVE.COLORS[h.color] }).setDepth(40);
+      const label = txt(this, h.x, h.y - 16, name, { color: playerColor(h.color).hex }).setDepth(40);
       this.labels.set(id, label);
     }
   }
@@ -231,7 +233,7 @@ export class KurveScene extends Phaser.Scene {
       const name = (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, perRow > 5 ? 3 : 5);
       const alpha = h.alive || st.sub === 'countdown' ? 1 : 0.45;
       this.hud.add(this.add.rectangle(x + 3, y + 3, 7, 7, colorNum(h.color)).setStrokeStyle(1, 0x2d1b12).setAlpha(alpha));
-      this.hud.add(txt(this, x + 10, y, `${name} ${h.score}`, { origin: [0, 0], color: KURVE.COLORS[h.color] }).setAlpha(alpha));
+      this.hud.add(txt(this, x + 10, y, `${name} ${h.score}`, { origin: [0, 0], color: playerColor(h.color).hex }).setAlpha(alpha));
     });
   }
 

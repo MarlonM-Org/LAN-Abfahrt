@@ -1,13 +1,52 @@
 {
-  "updated": "2026-11-05 20:25",
+  "updated": "2026-11-05 22:40",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Review Phase 1: Zuschauer-Ebene",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/zuschauer",
+      "detail": "Emotes schweben am TV, Wetten auf den Rundensieger in Arena/Sumo/Bogen/Kurve/Smash, Rache-Möwen (Arena) und Wellen (Sumo) für Ausgeschiedene"
+    },
+    {
+      "title": "Review Phase 3: Party-Modus 2.0 (Stufe S)",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/party2",
+      "detail": "Alle würfeln gleichzeitig, Bonus-Cocktails mit Reveal, Endspurt doppelt, Finale = 2 Cocktails, Party speichern/fortsetzen, Nachzügler, Tageszeit"
+    },
+    {
+      "title": "Review Phase 4: Igel-Krieg Stufe M",
+      "kind": "igel",
+      "type": "Review-Umsetzung",
+      "branch": "review/igel-m",
+      "detail": "„Alle gleichzeitig“ ab 7, 10 Waffen, Kisten, Gasfässer, Spieler-Teams, Zielhilfe, Spruch-Knöpfe, Ton"
+    },
+    {
+      "title": "Review Reste: Juice in allen Szenen, Namensschilder, Parcours-Stick, zwei Rollenträger",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/juice-rest",
+      "detail": "Ton/Partikel in den übrigen Szenen, Namensschilder entzerren, Laptop-Knöpfe nicht übers HUD, leere Arenen beleben, Fangen/Geist mit zwei Rollenträgern"
+    }
+  ],
   "queue": [],
   "done": [
+    {
+      "title": "Review: Spielerfarbe pro Abend (12 Farben überall gleich) + Avatar-Animationsframes",
+      "pr": 61,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Regelkarte mit Übungsfeld und „Bereit!“ vor jedem Minispiel",
+      "pr": 59,
+      "date": "2026-11-05"
+    },
     {
       "title": "Umzugschaos (à la Moving Out)",
       "pr": 56,
