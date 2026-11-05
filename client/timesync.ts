@@ -30,6 +30,9 @@ export function startTimeSync(socket: Socket) {
   setInterval(burst, 15000);
 }
 
+/** Beste gemessene Laufzeit hin und zurück (ms) – für die Vorhersage am Handy */
+export const rttMs = () => (Number.isFinite(bestRtt) ? bestRtt : 40);
+
 /** Aktuelle Serverzeit in ms */
 export const serverNow = () => Date.now() + offset;
 

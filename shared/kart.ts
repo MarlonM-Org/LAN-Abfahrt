@@ -7,7 +7,8 @@ import type { Point } from './types';
 
 export const KART = {
   LAPS: 3,
-  COUNTDOWN_MS: 5000,
+  /** Etwas länger als früher: Zeit für „So fährst du“ und die Ansichts-Wahl des VIP */
+  COUNTDOWN_MS: 8000,
   /** Nach dem Sieger haben alle anderen noch so lange Zeit */
   AFTER_WINNER_MS: 20000,
   /** Notbremse, falls niemand ins Ziel kommt */
@@ -16,6 +17,11 @@ export const KART = {
   MAX_SPEED: 88,
   ACCEL: 120,
   BRAKE: 210,
+  /** Ohne Gas rollt das Kart aus */
+  COAST: 55,
+  /** Rückwärtsgang (BREMSE halten, wenn das Kart steht) */
+  REVERSE_SPEED: 34,
+  REVERSE_ACCEL: 70,
   SAND_SPEED: 40,
   TURN: 3.0,
   GRIP: 11,
@@ -40,7 +46,14 @@ export const KART = {
   SAFE_MS: 900,
   GULL_SPEED: 230,
   MAX_HAZARDS: 16,
+  /** Bis zu so vielen (menschlichen) Spielern ist TV-Splitscreen Standard, darüber rendert jedes Handy selbst */
+  SPLIT_MAX: 4,
+  /** Server-Takt der Physik (ms) – die Handys bekommen so oft einen Stand */
+  TICK_MS: 50,
 };
+
+/** Wo die Verfolger-Ansicht läuft: geteilter TV-Bildschirm oder auf jedem Handy */
+export type KartView = 'split' | 'phone';
 
 export interface TrackDef {
   name: string;
@@ -263,4 +276,146 @@ export function autopilot(track: Track, x: number, y: number, angle: number, spe
   const ty = t.y + Math.sin(t.a + Math.PI / 2) * lane;
   const diff = wrapAngle(Math.atan2(ty - y, tx - x) - angle);
   return { steer: Math.max(-1, Math.min(1, diff * 2.4)), brake: Math.abs(diff) > 1.1 && speed > 45 };
+}
+
+// ------------------------------------------------------------------ Fahrphysik (Server + Vorhersage am Handy)
+
+/** Eingaben eines Karts */
+export interface KartInput {
+  /** −1 … 1 */
+  steer: number;
+  gas: boolean;
+  /** Bremsen, im Stand rückwärts */
+  brake: boolean;
+  /** Drift-Knopf (gibt automatisch Gas) */
+  drift: boolean;
+}
+
+export const NO_INPUT: KartInput = { steer: 0, gas: false, brake: false, drift: false };
+
+/** Der Teil des Kart-Zustands, den die Physik braucht (Zeiten als Restdauer in ms, damit Server und Handy gleich rechnen) */
+export interface KartPhys {
+  x: number;
+  y: number;
+  angle: number;
+  vx: number;
+  vy: number;
+  /** −1/1 = driftet nach links/rechts */
+  driftDir: number;
+  /** Sekunden Drift-Ladung */
+  driftCharge: number;
+  boostMs: number;
+  spinMs: number;
+  offroad: boolean;
+}
+
+export interface StepOpts {
+  /** Ehrenrunde: langsamer */
+  finished?: boolean;
+  /** Spieler weg: Kart rollt aus */
+  frozen?: boolean;
+}
+
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+/**
+ * Ein Physik-Schritt für ein Kart – identisch auf dem Server und (als Vorhersage) auf dem Handy.
+ * Kollisionen mit anderen Karts, Items und Rundenzählung macht nur der Server.
+ * Liefert true, wenn gerade ein Mini-Turbo gezündet wurde.
+ */
+export function stepKart(c: KartPhys, inp: KartInput, dt: number, T: Track, o: StepOpts = {}): boolean {
+  let fired = false;
+  const steer = clamp(inp.steer, -1, 1);
+  const spinning = c.spinMs > 0;
+  const fx = Math.cos(c.angle);
+  const fy = Math.sin(c.angle);
+  let vf = c.vx * fx + c.vy * fy;
+  let vl = -c.vx * fy + c.vy * fx;
+  c.offroad = project(T, c.x, c.y).dist > T.half + 1;
+  const boosting = c.boostMs > 0;
+
+  if (spinning) {
+    vf *= Math.exp(-4 * dt);
+    vl *= Math.exp(-4 * dt);
+    c.driftDir = 0;
+    c.driftCharge = 0;
+  } else {
+    // Drift starten / beenden
+    if (c.driftDir === 0 && inp.drift && Math.abs(steer) > 0.35 && vf > KART.DRIFT_MIN_SPEED && !c.offroad) {
+      c.driftDir = Math.sign(steer);
+      c.driftCharge = 0;
+    } else if (c.driftDir !== 0 && (!inp.drift || vf < 25)) {
+      if (!inp.drift && c.driftCharge >= KART.DRIFT_CHARGE_S) {
+        c.boostMs = Math.max(c.boostMs, KART.MINI_TURBO_MS);
+        fired = true;
+      }
+      c.driftDir = 0;
+      c.driftCharge = 0;
+    }
+    const drifting = c.driftDir !== 0;
+    let max = c.offroad ? KART.SAND_SPEED * (boosting ? 1.7 : 1) : KART.MAX_SPEED * (boosting ? KART.BOOST_FACTOR : 1);
+    if (o.finished) max *= 0.6;
+    // DRIFT gibt mit Gas (Daumen rutscht am Handy von GAS nach oben auf DRIFT)
+    const gas = !o.frozen && (inp.gas || inp.drift || drifting || boosting || !!o.finished);
+    const brake = !o.frozen && inp.brake && !drifting && !boosting;
+    if (brake) {
+      // Erst bremsen, im Stand rückwärts
+      if (vf > 3) vf = Math.max(0, vf - KART.BRAKE * dt);
+      else vf = Math.max(-KART.REVERSE_SPEED, vf - KART.REVERSE_ACCEL * dt);
+    } else if (gas) {
+      if (vf < 0) vf = Math.min(0, vf + KART.BRAKE * dt);
+      else if (vf < max) vf = Math.min(max, vf + KART.ACCEL * (boosting ? 2.2 : 1) * dt);
+      else vf = Math.max(max, vf - (c.offroad ? 260 : 90) * dt);
+    } else {
+      // Ausrollen
+      const coast = (c.offroad ? 140 : KART.COAST) * dt;
+      if (vf > max) vf = Math.max(max, vf - (c.offroad ? 260 : 90) * dt);
+      else vf = vf > 0 ? Math.max(0, vf - coast) : Math.min(0, vf + coast);
+    }
+    const grip = drifting ? KART.DRIFT_GRIP : KART.GRIP;
+    vl *= Math.exp(-grip * dt);
+    let turn: number;
+    if (drifting) {
+      // Driften lenkt immer etwas in Driftrichtung; Gegenlenken macht den Bogen weiter
+      turn = clamp(c.driftDir * 0.5 + steer * 0.45, -0.95, 0.95) * KART.TURN;
+      // Lenken in Driftrichtung lädt schneller
+      c.driftCharge += dt * (Math.sign(steer) === c.driftDir ? 1.25 : 0.8);
+      // Beim Driften rutscht das Kart nach außen
+      vl -= c.driftDir * vf * 0.6 * dt;
+    } else {
+      // Im Stand dreht sich das Kart nur ein bisschen (wenn Gas/Bremse gedrückt), rückwärts andersherum
+      const minTurn = gas || brake ? 0.3 : 0;
+      turn = steer * KART.TURN * clamp(Math.abs(vf) / 40, minTurn, 1) * (vf < -2 ? -1 : 1);
+    }
+    c.angle = wrapAngle(c.angle + turn * dt);
+  }
+  const nfx = Math.cos(c.angle);
+  const nfy = Math.sin(c.angle);
+  c.vx = nfx * vf - nfy * vl;
+  c.vy = nfy * vf + nfx * vl;
+  c.x += c.vx * dt;
+  c.y += c.vy * dt;
+  c.spinMs = Math.max(0, c.spinMs - dt * 1000);
+  c.boostMs = Math.max(0, c.boostMs - dt * 1000);
+  keepInside(c, T);
+  return fired;
+}
+
+/** Bande hinter dem Sandstreifen; liefert die Projektion nach der Korrektur */
+export function keepInside(c: { x: number; y: number; vx: number; vy: number }, T: Track): Projection {
+  const limit = T.half + KART.SAND;
+  let p = project(T, c.x, c.y);
+  if (p.dist > limit) {
+    c.x = p.cx + p.nx * limit;
+    c.y = p.cy + p.ny * limit;
+    const vn = c.vx * p.nx + c.vy * p.ny;
+    if (vn > 0) {
+      c.vx -= p.nx * vn * 1.3;
+      c.vy -= p.ny * vn * 1.3;
+    }
+    c.vx *= 0.93;
+    c.vy *= 0.93;
+    p = project(T, c.x, c.y);
+  }
+  return p;
 }

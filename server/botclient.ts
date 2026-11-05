@@ -8,6 +8,8 @@ import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '.
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, PUNCH, type Mask, buildTerrain, carve, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
+import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
+import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { KURVE, ROOMS, TTT, TURM, turmCellOffsets } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
@@ -18,6 +20,7 @@ import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
+import { grillBot } from './grillbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -95,6 +98,7 @@ export class Bot {
   /** Kart-Rennen: eigene Ideallinie (seitlicher Versatz) und Item-Zeitpunkt */
   private kartLane = rand(-6, 6);
   private kartItemAt = 0;
+  private kartDrift = false;
   /** Kurzzeitgedächtnis für die Smash-Arena */
   private sm = { shieldUntil: 0, lastJump: 0, lastA: 0, lastB: 0, stick: '', stickAt: 0 };
   /** Wasserbomben-Schlacht: kleines Bot-Gedächtnis */
@@ -129,6 +133,35 @@ export class Bot {
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);
+    });
+  }
+
+  /** Boule am Strand: aufs Schweinchen legen – oder ab und zu die beste Gegnerkugel wegschießen */
+  private boulePlay(st: BouleState) {
+    this.once(`boule-${st.aimSeq}`, async () => {
+      const jack = st.jack;
+      if (!jack) return;
+      const mySide = st.sides.find((x) => x.members.includes(this.id))?.id;
+      let target = jack;
+      let shoot = false;
+      if (st.leader && st.leader !== mySide) {
+        const theirs = st.balls.filter((b) => b.side === st.leader).sort((a, b) => bouleDist(a, jack) - bouleDist(b, jack))[0];
+        if (theirs && bouleDist(theirs, jack) < 18 && Math.random() < 0.4) {
+          shoot = true;
+          target = theirs;
+        }
+      }
+      await sleep(rand(700, 1600));
+      if (shoot) {
+        this.send('style', { shoot: true });
+        await sleep(rand(300, 700));
+      }
+      const aim = bouleAim(target);
+      // beim Schießen etwas hinter die Kugel zielen, damit sie direkt getroffen wird
+      const dist = aim.dist + (shoot ? 14 : 0);
+      const boulePow = Math.max(0.18, Math.min(1, boulePowerFor(dist) + rand(-0.07, 0.07)));
+      const bouleAng = Math.max(-1, Math.min(1, aim.angle / BOULE.ANGLE_MAX + rand(-0.12, 0.12)));
+      this.send('throw', { seq: st.aimSeq, speed: boulePow, angle: bouleAng, spin: rand(-0.15, 0.15), shoot });
     });
   }
 
@@ -869,6 +902,8 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'boule' && m.state.sub === 'aim' && m.state.turn === this.id) this.boulePlay(m.state);
+
     if (m.kind === 'enten' && (m.state.sub === 'play' || m.state.sub === 'banner')) {
       const en = m.state;
       const me2 = en.players[this.id];
@@ -919,10 +954,14 @@ export class Bot {
       if (car && !car.finished) {
         this.once('kart', async () => {
           await sleep(rand(80, 130));
-          const ap = autopilot(getTrack(k.track), car.x, car.y, car.angle, 70, this.kartLane);
+          const speed = Math.hypot(car.vx, car.vy);
+          const ap = autopilot(getTrack(k.track), car.x, car.y, car.angle, Math.max(40, speed), this.kartLane);
           // etwas menschliche Unschärfe
           const steer = Math.max(-1, Math.min(1, ap.steer + rand(-0.15, 0.15)));
-          this.send('steer', { x: Math.round(steer * 100) / 100, brake: ap.brake && Math.random() < 0.7 });
+          // Driften in Kurven (mit Hysterese, damit die Ladung nicht verloren geht), bremsen nur wenn's eng wird
+          if (!this.kartDrift && Math.abs(ap.steer) > 0.55 && speed > 50 && !car.offroad) this.kartDrift = Math.random() < 0.6;
+          else if (this.kartDrift && (Math.abs(ap.steer) < 0.2 || speed < 30)) this.kartDrift = false;
+          this.send('steer', { x: Math.round(steer * 100) / 100, gas: true, brake: ap.brake && !this.kartDrift && Math.random() < 0.5, drift: this.kartDrift });
           if (car.item) {
             if (!this.kartItemAt) this.kartItemAt = Date.now() + rand(600, 3500);
             if (Date.now() >= this.kartItemAt) {
@@ -942,6 +981,14 @@ export class Bot {
       if (me2?.state === 'fight') this.once('smash', async () => {
         await sleep(rand(50, 110));
         this.smashBrain(m.state, me2);
+      });
+    }
+
+    if (m.kind === 'grill') {
+      const st = m.state;
+      this.once('grill', async () => {
+        grillBot(this, st);
+        await sleep(rand(90, 140));
       });
     }
 

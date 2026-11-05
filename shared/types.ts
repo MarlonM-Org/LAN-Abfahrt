@@ -1,6 +1,7 @@
 import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
+import type { GrillState } from './grill';
 
 export interface Look {
   skin: number;
@@ -51,6 +52,8 @@ export type MiniKind =
   | 'stillepost'
   | 'sup' | 'tidy' | 'fangen'
   | 'geist'
+  | 'grill'
+  | 'boule'
   | 'sumo'
   | 'tourist'
   | 'sprueche';
@@ -568,6 +571,68 @@ export interface BowlingState {
   last: BowlingRoll | null;
 }
 
+// ------------------------------------------------------------------ Boule am Strand
+
+/** Aufzeichnung eines Boule-Wurfs, damit der TV ihn abspielen kann */
+export interface BouleTrack {
+  /** Flugzeit bis zur Landung (ms) und Scheitelhöhe des Bogens (px) */
+  flightMs: number;
+  arc: number;
+  from: Point;
+  land: Point;
+  /** Sekunden zwischen zwei Keyframes (Rollen nach der Landung) */
+  dt: number;
+  frames: number;
+  /** pro Körper (0 = Schweinchen, i + 1 = balls[i], die neue Kugel ist die letzte): [x, y] fest oder x, y pro Keyframe (Zehntel-Pixel) */
+  paths: number[][];
+  /** Keyframes mit einem Zusammenstoß (Klack!) */
+  hits: number[];
+}
+
+export interface BouleBall {
+  owner: string;
+  side: string;
+  x: number;
+  y: number;
+}
+
+export interface BouleSide {
+  /** Spieler-ID (Jeder gegen jeden) bzw. 'A'/'B' (Teams) */
+  id: string;
+  name: string;
+  /** Kugelfarbe als Hex-Zahl */
+  color: number;
+  members: string[];
+  score: number;
+}
+
+export interface BouleState {
+  sub: 'intro' | 'place' | 'aim' | 'roll' | 'measure' | 'over';
+  endsIn: number;
+  teams: boolean;
+  sides: BouleSide[];
+  /** Kugeln pro Spieler und Aufnahme bzw. noch übrig in dieser Aufnahme */
+  ballsPer: Record<string, number>;
+  left: Record<string, number>;
+  /** aktuelle Aufnahme (1-basiert) */
+  end: number;
+  maxEnds: number;
+  target: number;
+  turn: string | null;
+  aimSeq: number;
+  /** Werfer hat "Schießen" gewählt */
+  aimShoot: boolean;
+  jack: Point | null;
+  balls: BouleBall[];
+  /** Seite, die gerade "liegt" (näheste Kugel) */
+  leader: string | null;
+  last: { seq: number; playerId: string; shoot: boolean; track: BouleTrack | null } | null;
+  /** Wertung der Aufnahme (in sub = 'measure'): Indizes in balls, die zählen, und Radius der besten Gegnerkugel */
+  endResult: { side: string | null; points: number; counting: number[]; radius: number } | null;
+  /** Punkte pro Aufnahme */
+  history: { side: string | null; points: number }[];
+}
+
 // ------------------------------------------------------------------ Controller-Spiele: Ententeich
 
 /** duck/gull/flamingo = Vögel (Punkte), float = Badegast/Schwimmring (Strafe!) */
@@ -882,6 +947,11 @@ export interface KartCar {
   drift: number;
   charged: boolean;
   offroad: boolean;
+  /** Für die Vorhersage am Handy: Geschwindigkeit, Drift-Ladung (s), Rest-Turbo (ms) */
+  vx: number;
+  vy: number;
+  dc: number;
+  bm: number;
 }
 
 export interface KartEvent {
@@ -900,6 +970,14 @@ export interface KartState {
   closing: boolean;
   track: number;
   laps: number;
+  /** split = Verfolger-Ansichten auf dem geteilten TV, phone = jedes Handy zeigt seine eigene (TV: Draufsicht) */
+  view: import('./kart').KartView;
+  /** Wer im Splitscreen eine Ansicht bekommt (max. 4, in dieser Reihenfolge) */
+  panes: string[];
+  /** Darf der VIP auf Splitscreen umschalten? (≤ 4 Menschen) */
+  splitOk: boolean;
+  /** Serverzeit des Physik-Schritts zu diesem Stand (für Interpolation/Vorhersage) */
+  t: number;
   karts: Record<string, KartCar>;
   boxes: { x: number; y: number; on: boolean }[];
   hazards: { id: number; kind: 'banana' | 'coconut'; x: number; y: number }[];
@@ -1452,6 +1530,8 @@ export type MiniSnapshot =
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
   | { kind: 'geist'; state: GeistState }
+  | { kind: 'grill'; state: GrillState }
+  | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState };

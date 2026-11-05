@@ -1,21 +1,40 @@
 import type { KartItem, KartState } from '../../../shared/types';
-import { KART_TRACKS } from '../../../shared/kart';
+import { KART, KART_TRACKS, type KartInput, wrapAngle } from '../../../shared/kart';
 import { itemIcon } from '../../art/kartsprites';
-import { type Screen, app, el, message, q, secondsLeft, send, store, toast } from '../core';
+import { Mode7Renderer } from '../../kart3d/render';
+import { KartWorld } from '../../kart3d/world';
+import { type Screen, app, el, me, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
 import { steerFromRoll, tiltRoll } from '../tilt';
 
-const OFFROAD = { beach: 'Sand bremst – zurück auf die Strecke!', harbor: 'Kopfsteinpflaster bremst – zurück auf die Strecke!', pool: 'Rasen bremst – zurück auf die Strecke!' };
+/**
+ * Kart-Rennen am Handy (quer halten):
+ *   links  – schwebender Stick (Daumen irgendwo aufsetzen, nach links/rechts schieben) oder Kipp-Lenkung
+ *   rechts – GAS (groß, unten rechts), BREMSE daneben (im Stand rückwärts), DRIFT direkt über GAS
+ *            (Daumen von GAS nach oben rutschen lassen; DRIFT gibt mit Gas), ITEM oben rechts
+ * Ansicht „Handy“: das Handy rendert seine eigene Verfolger-Ansicht (Mode 7) hinter den Knöpfen.
+ * Ansicht „TV“: der TV zeigt den Splitscreen, das Handy nur Platz/Runde/Item.
+ */
+
+const OFFROAD = { beach: 'Sand bremst!', harbor: 'Pflaster bremst!', pool: 'Rasen bremst!' };
 const ITEM_LABEL: Record<KartItem, string> = { coconut: 'Kokosnuss', banana: 'Banane', ice: 'Turbo-Eis', gull: 'Möwe' };
+const LS_TILT = 'lanabfahrt.kartTilt';
 
 /** Kipp-Lenkung bleibt über Bildschirmwechsel hinweg aktiv */
-const tilt = {
-  on: false,
-  center: 0,
-  roll: 0,
-  smooth: 0,
-  lastSample: 0,
-  unsub: null as (() => void) | null,
+const tilt = { on: false, center: 0, roll: 0, smooth: 0, lastSample: 0, unsub: null as (() => void) | null };
+
+/** „So fährst du“ nur einmal pro Rennen */
+let introFor = 0;
+
+// iOS: Pinch-Zoom-Gesten im Spiel unterbinden
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+const vibrate = (pattern: number | number[]) => {
+  try {
+    if ('vibrate' in navigator) navigator.vibrate(pattern);
+  } catch {
+    /* egal */
+  }
 };
 
 function screenAngle(): number {
@@ -25,7 +44,7 @@ function screenAngle(): number {
 
 async function startTilt(): Promise<boolean> {
   if (!(await enableMotion())) {
-    toast('Bewegungssensor nicht erlaubt – Touch-Lenkung');
+    toast('Bewegungssensor nicht erlaubt – Stick-Lenkung');
     return false;
   }
   tilt.unsub?.();
@@ -38,7 +57,6 @@ async function startTilt(): Promise<boolean> {
       tilt.center = tilt.roll;
     }
   });
-  // Kommen gar keine Daten (z. B. Laptop ohne Sensor), zurück auf Touch
   const started = performance.now();
   await new Promise((r) => setTimeout(r, 900));
   if (tilt.lastSample < started) {
@@ -48,6 +66,7 @@ async function startTilt(): Promise<boolean> {
     return false;
   }
   tilt.on = true;
+  localStorage.setItem(LS_TILT, '1');
   return true;
 }
 
@@ -55,178 +74,425 @@ function stopTilt() {
   tilt.unsub?.();
   tilt.unsub = null;
   tilt.on = false;
+  localStorage.removeItem(LS_TILT);
 }
 
 export function pickKart(s: KartState): Screen {
   const car = s.karts[store.playerId!];
   if (!car) return ['spectate', message('Du schaust zu')];
-  if (s.sub === 'over') return ['kart-over', message('Rennen vorbei!', 'Schau auf den Fernseher!')];
-  if (car.finished) return [`kart-fin-${car.place}`, message(`Im Ziel – Platz ${car.place}!`, 'Ehrenrunde fährt von allein. Schau auf den Fernseher!')];
+  if (s.sub === 'over') {
+    leaveFullscreen();
+    return ['kart-over', message('Rennen vorbei!', 'Schau auf den Fernseher!')];
+  }
+  if (car.finished) {
+    leaveFullscreen();
+    return [`kart-fin-${car.place}`, message(`Im Ziel – Platz ${car.place}!`, 'Ehrenrunde fährt von allein. Schau auf den Fernseher!')];
+  }
   const mode = tilt.on ? 'tilt' : 'touch';
-  return [`kart-drive-${mode}`, () => buildDrive(mode, () => window.dispatchEvent(new Event('kart-rerender')))];
+  return [`kart3-${s.view}-${mode}`, () => buildDrive(s.view, mode, () => window.dispatchEvent(new Event('kart-rerender')))];
 }
 
-function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
+// ------------------------------------------------------------------ Vollbild / Querformat
+
+let fullscreenTried = false;
+async function tryFullscreen() {
+  if (fullscreenTried) return;
+  fullscreenTried = true;
+  try {
+    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+    if (!document.fullscreenElement) await (root.requestFullscreen?.({ navigationUI: 'hide' }) ?? root.webkitRequestFullscreen?.());
+  } catch {
+    /* iPhone kann kein Vollbild – egal */
+  }
+  try {
+    const o = screen.orientation as ScreenOrientation & { lock?: (t: string) => Promise<void> };
+    await o.lock?.('landscape');
+  } catch {
+    /* nur in Vollbild auf Android – sonst Hinweis „quer halten“ */
+  }
+}
+
+function leaveFullscreen() {
+  fullscreenTried = false;
+  try {
+    if (document.fullscreenElement) void document.exitFullscreen?.();
+    (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+  } catch {
+    /* egal */
+  }
+}
+
+// ------------------------------------------------------------------ Fahr-Screen
+
+type Btn = 'gas' | 'brake' | 'drift';
+
+function buildDrive(view: KartState['view'], mode: 'tilt' | 'touch', rerender: () => void) {
+  const st0 = store.state?.mini?.kind === 'kart' ? store.state.mini.state : null;
+  if (!st0) return null;
   const support = motionSupport();
   const canTilt = support === 'ok' || support === 'needs-permission';
+  const phoneView = view === 'phone';
+  const vip = !!me()?.isVip;
   const root = el(`
-    <div class="kart kart-${mode}">
-      <div class="kart-top">
-        <span class="k-pos">–</span>
-        <span class="k-lap"></span>
-        <span class="k-item"><canvas width="16" height="16"></canvas><small></small></span>
+    <div class="k3 k3-${view} k3-${mode}">
+      <div class="k3-hud">
+        <div class="k3-place">–</div>
+        <div class="k3-lap"></div>
+        ${phoneView ? '' : '<p class="k3-tv">Dein Kart läuft auf dem TV</p>'}
+        <div class="k3-msg"></div>
       </div>
-      <p class="k-hint"></p>
-      <div class="kart-steer">
+      <div class="k3-center"></div>
+      <div class="k3-top">
+        ${canTilt ? `<button class="k3-small k3-tilt">${mode === 'tilt' ? 'STICK' : 'KIPPEN'}</button>` : '<span></span>'}
+        ${vip && st0.splitOk ? `<button class="k3-small k3-switch">Ansicht: ${phoneView ? 'Handy' : 'TV'} ⇄</button>` : '<span></span>'}
+        <button class="k3-item" disabled><canvas width="16" height="16"></canvas><small>ITEM</small></button>
+      </div>
+      <div class="k3-left">
         ${
           mode === 'tilt'
-            ? `<div class="k-wheel"><div class="k-wheel-in"></div></div>
-               <div class="k-tilt-btns"><button class="small k-center">Zentrieren</button><button class="small secondary k-touch">Touch</button></div>`
-            : `<div class="k-pad"><span>◀</span><div class="k-knob"></div><span>▶</span></div>
-               ${canTilt ? '<button class="small k-motion">Bewegungssensor aktivieren</button>' : ''}`
+            ? '<div class="k3-wheel"><div class="k3-wheel-in"></div></div><div class="k3-leftlabel">Handy kippen = lenken<br/>Tippen = Mitte setzen</div>'
+            : '<div class="k3-stick"><div class="k3-base"></div><div class="k3-knob"></div></div><div class="k3-leftlabel">◀ Daumen schieben ▶</div>'
         }
       </div>
-      <button class="big-btn k-brake">BREMSE<br/><small>+ lenken = DRIFT</small></button>
-      <button class="big-btn k-use">ITEM</button>
+      <div class="k3-right">
+        <div class="k3-btn k3-drift" data-b="drift">DRIFT<small>halten + lenken</small></div>
+        <div class="k3-btn k3-brake" data-b="brake">BREMSE<small>im Stand: zurück</small></div>
+        <div class="k3-btn k3-gas" data-b="gas">GAS</div>
+      </div>
+      <div class="k3-portrait">Dreh dein Handy quer!</div>
+      <div class="k3-intro hidden">
+        <h2>So fährst du</h2>
+        <div class="k3-intro-grid">
+          <div><b>◀ ▶</b> Links: Daumen schieben = lenken${canTilt ? ' – oder KIPPEN antippen und das Handy wie ein Lenkrad drehen' : ''}</div>
+          <div><b>GAS</b> gedrückt halten – <b>BREMSE</b> bremst, im Stand geht's rückwärts</div>
+          <div><b>DRIFT</b>: Daumen von GAS nach oben rutschen + lenken → Funken blau → orange → loslassen = Mini-Turbo!</div>
+          <div><b>ITEM</b> oben rechts antippen</div>
+        </div>
+        <p>Tippen zum Weiter</p>
+      </div>
     </div>
   `);
   app.append(root);
+  const rootEl = q(root, '.k3');
+  rootEl.addEventListener('contextmenu', (e) => e.preventDefault());
+  rootEl.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+  rootEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-  let steer = 0;
-  let brake = false;
-  let last = { steer: 9, brake: false, t: 0 };
+  // ---- Eingaben
+  const inp: KartInput = { steer: 0, gas: false, brake: false, drift: false };
+  let last = { steer: 9, gas: false, brake: false, drift: false, t: 0 };
   const push = (force = false) => {
     const now = performance.now();
-    if (!force && Math.abs(steer - last.steer) < 0.04 && brake === last.brake && now - last.t < 250) return;
-    last = { steer, brake, t: now };
-    send('steer', { x: steer, brake });
+    const boolChanged = inp.gas !== last.gas || inp.brake !== last.brake || inp.drift !== last.drift;
+    const steerChanged = Math.abs(inp.steer - last.steer) >= 0.03 && now - last.t >= 33;
+    if (!force && !boolChanged && !steerChanged && now - last.t < 300) return;
+    last = { steer: inp.steer, gas: inp.gas, brake: inp.brake, drift: inp.drift, t: now };
+    send('steer', { x: inp.steer, gas: inp.gas, brake: inp.brake, drift: inp.drift });
   };
 
-  // ---- Lenkung
+  // Linke Hälfte: schwebender Stick bzw. Kipp-Lenkung
+  const left = q(root, '.k3-left');
   if (mode === 'touch') {
-    const pad = q(root, '.k-pad');
-    const knob = q(root, '.k-knob');
+    const stick = q(root, '.k3-stick');
+    const knob = q(root, '.k3-knob');
     let active: number | null = null;
-    const move = (e: PointerEvent) => {
-      const r = pad.getBoundingClientRect();
-      const v = (e.clientX - (r.left + r.width / 2)) / (r.width * 0.36);
-      steer = Math.round(Math.max(-1, Math.min(1, v)) * 100) / 100;
-      knob.style.transform = `translateX(${steer * r.width * 0.36}px)`;
-      push();
-    };
-    pad.addEventListener('pointerdown', (e) => {
+    let baseX = 0;
+    const DEAD = 6;
+    const FULL = 58;
+    left.addEventListener('pointerdown', (e) => {
+      if (active !== null) return;
       e.preventDefault();
-      pad.setPointerCapture(e.pointerId);
+      left.setPointerCapture(e.pointerId);
       active = e.pointerId;
-      move(e);
+      baseX = e.clientX;
+      const r = left.getBoundingClientRect();
+      stick.style.left = `${e.clientX - r.left}px`;
+      stick.style.top = `${e.clientY - r.top}px`;
+      stick.classList.add('on');
+      knob.style.transform = '';
+      void tryFullscreen();
     });
-    pad.addEventListener('pointermove', (e) => e.pointerId === active && move(e));
+    left.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== active) return;
+      const d = e.clientX - baseX;
+      const mag = Math.max(0, Math.abs(d) - DEAD) / (FULL - DEAD);
+      inp.steer = Math.round(Math.sign(d) * Math.min(1, mag) * 100) / 100;
+      knob.style.transform = `translateX(${Math.max(-FULL, Math.min(FULL, d))}px)`;
+      // Stick „wandert“ mit, wenn der Daumen weit über den Anschlag hinausgeht
+      if (Math.abs(d) > FULL + 24) baseX = e.clientX - Math.sign(d) * (FULL + 24);
+      push();
+    });
     const up = (e: PointerEvent) => {
       if (e.pointerId !== active) return;
       active = null;
-      steer = 0;
-      knob.style.transform = '';
+      inp.steer = 0;
+      stick.classList.remove('on');
       push(true);
     };
-    pad.addEventListener('pointerup', up);
-    pad.addEventListener('pointercancel', up);
-    root.querySelector('.k-motion')?.addEventListener('click', async () => {
-      if (await startTilt()) {
-        toast('Handy quer halten wie ein Lenkrad!');
-        rerender();
-      }
-    });
+    left.addEventListener('pointerup', up);
+    left.addEventListener('pointercancel', up);
   } else {
-    q(root, '.k-center').addEventListener('click', () => {
+    left.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
       tilt.center = tilt.roll;
       toast('Mitte gesetzt');
-    });
-    q(root, '.k-touch').addEventListener('click', () => {
-      stopTilt();
-      rerender();
+      void tryFullscreen();
     });
   }
+  root.querySelector('.k3-tilt')?.addEventListener('click', async () => {
+    if (mode === 'tilt') {
+      stopTilt();
+      rerender();
+    } else if (await startTilt()) {
+      toast('Handy wie ein Lenkrad drehen!');
+      rerender();
+    }
+  });
+  root.querySelector('.k3-switch')?.addEventListener('click', () => socket.emit('vip:mini', 'view:toggle'));
 
-  // ---- Knöpfe (gedrückt halten)
-  const hold = (btn: HTMLElement, onDown: () => void, onUp?: () => void) => {
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      btn.setPointerCapture(e.pointerId);
-      btn.classList.add('down');
-      onDown();
+  // Rechte Hälfte: GAS / BREMSE / DRIFT mit Rüberrutschen (jeder Finger aktiviert den Knopf, über dem er gerade ist)
+  const right = q(root, '.k3-right');
+  const btns: Record<Btn, HTMLElement> = { gas: q(root, '.k3-gas'), brake: q(root, '.k3-brake'), drift: q(root, '.k3-drift') };
+  let rects: { b: Btn; x: number; y: number; w: number; h: number }[] = [];
+  const measure = () => {
+    rects = (Object.keys(btns) as Btn[]).map((b) => {
+      const r = btns[b].getBoundingClientRect();
+      return { b, x: r.left, y: r.top, w: r.width, h: r.height };
     });
-    const up = () => {
-      btn.classList.remove('down');
-      onUp?.();
-    };
-    btn.addEventListener('pointerup', up);
-    btn.addEventListener('pointercancel', up);
-    btn.addEventListener('contextmenu', (e) => e.preventDefault());
   };
-  hold(
-    q(root, '.k-brake'),
-    () => {
-      brake = true;
-      push(true);
-    },
-    () => {
-      brake = false;
-      push(true);
-    },
-  );
-  hold(q(root, '.k-use'), () => {
+  const hit = (x: number, y: number): Btn | null => {
+    if (!rects.length) measure();
+    let best: Btn | null = null;
+    let bd = 18; // Toleranz: Lücken zwischen den Knöpfen zählen zum nächsten
+    for (const r of rects) {
+      const dx = Math.max(r.x - x, 0, x - (r.x + r.w));
+      const dy = Math.max(r.y - y, 0, y - (r.y + r.h));
+      const d = Math.hypot(dx, dy);
+      if (d < bd) {
+        bd = d;
+        best = r.b;
+      }
+    }
+    return best;
+  };
+  const fingers = new Map<number, Btn | null>();
+  const applyButtons = () => {
+    const down = new Set<Btn>();
+    for (const b of fingers.values()) if (b) down.add(b);
+    let changed = false;
+    for (const b of Object.keys(btns) as Btn[]) {
+      const on = down.has(b);
+      btns[b].classList.toggle('down', on);
+      if (inp[b] !== on) {
+        inp[b] = on;
+        changed = true;
+      }
+    }
+    if (changed) push(true);
+  };
+  right.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    right.setPointerCapture(e.pointerId);
+    fingers.set(e.pointerId, hit(e.clientX, e.clientY));
+    applyButtons();
+    void tryFullscreen();
+  });
+  right.addEventListener('pointermove', (e) => {
+    if (!fingers.has(e.pointerId)) return;
+    const b = hit(e.clientX, e.clientY);
+    if (b !== fingers.get(e.pointerId)) {
+      fingers.set(e.pointerId, b);
+      applyButtons();
+    }
+  });
+  const release = (e: PointerEvent) => {
+    if (!fingers.delete(e.pointerId)) return;
+    applyButtons();
+  };
+  right.addEventListener('pointerup', release);
+  right.addEventListener('pointercancel', release);
+  window.addEventListener('resize', measure);
+  /** Aufräumen, wenn der Screen ersetzt wurde (Fensterlistener) */
+  const cleanup: (() => void)[] = [() => window.removeEventListener('resize', measure)];
+
+  // Item
+  const itemBtn = q<HTMLButtonElement>(root, '.k3-item');
+  itemBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    if (itemBtn.disabled) return;
     send('item');
-    navigator.vibrate?.(25);
+    vibrate(25);
   });
 
-  // ---- Kipp-Lenkung regelmäßig senden
-  const wheel = root.querySelector('.k-wheel-in') as HTMLElement | null;
-  const loop = setInterval(() => {
-    if (!root.isConnected) return clearInterval(loop);
+  // Intro „So fährst du“ (3 s, einmal pro Rennen)
+  const intro = q(root, '.k3-intro');
+  if (st0.sub === 'countdown' && introFor !== store.endsAt) {
+    introFor = store.endsAt;
+    intro.classList.remove('hidden');
+    rootEl.classList.add('introing');
+    const hide = () => {
+      intro.classList.add('hidden');
+      rootEl.classList.remove('introing');
+    };
+    intro.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      hide();
+    });
+    setTimeout(hide, 3200);
+  }
+
+  // ---- Ansicht am Handy: Mode-7-Renderer + Vorhersage
+  const world = new KartWorld(st0.track, store.playerId!);
+  world.onSnapshot(st0);
+  let renderer: Mode7Renderer | null = null;
+  let camA = st0.karts[store.playerId!]?.angle ?? 0;
+  let lastFrame = performance.now();
+  let frameMs = 0;
+  if (phoneView) {
+    renderer = new Mode7Renderer(st0.track, 320, 148);
+    renderer.canvas.className = 'k3-view';
+    rootEl.prepend(renderer.canvas);
+    const fit = () => {
+      const W = rootEl.clientWidth || 320;
+      const H = rootEl.clientHeight || 148;
+      const base = W >= H ? 320 : 224;
+      renderer!.resize(base, Math.round((base * H) / W));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    cleanup.push(() => window.removeEventListener('resize', fit));
+  }
+  // Diagnose (Playwright): Renderzeit pro Frame und Korrekturen der Vorhersage
+  (window as unknown as { __kartDebug?: () => unknown }).__kartDebug = () => ({ frameMs, corrections: [...world.corrections], diag: { ...world.diag } });
+  const lookOf = (id: string) => store.state?.players.find((p) => p.id === id)?.look;
+
+  let lastSnapT = 0;
+  let wasCharged = false;
+  let wasDrift = 0;
+  let seenEvent = st0.events[st0.events.length - 1]?.seq ?? 0;
+  let centerUntil = 0;
+  const center = q(root, '.k3-center');
+  const flash = (text: string, cls = '', ms = 900) => {
+    center.textContent = text;
+    center.className = `k3-center ${cls}`;
+    centerUntil = performance.now() + ms;
+  };
+
+  const frame = () => {
+    if (!root.isConnected) {
+      for (const fn of cleanup) fn();
+      return;
+    }
+    requestAnimationFrame(frame);
+    const now = performance.now();
+    const dt = Math.min(50, now - lastFrame);
+    lastFrame = now;
+    const st = store.state?.mini?.kind === 'kart' ? store.state.mini.state : null;
+    if (!st) return;
+    if (st.t !== lastSnapT) {
+      lastSnapT = st.t;
+      world.onSnapshot(st);
+    }
+    // Kipp-Lenkung
     if (mode === 'tilt') {
       const target = steerFromRoll(tilt.roll, tilt.center);
-      tilt.smooth += (target - tilt.smooth) * 0.5;
-      steer = Math.round(tilt.smooth * 100) / 100;
-      if (wheel) wheel.style.transform = `rotate(${steer * 90}deg)`;
+      tilt.smooth += (target - tilt.smooth) * Math.min(1, dt / 40);
+      inp.steer = Math.round(tilt.smooth * 100) / 100;
+      const wheel = root.querySelector('.k3-wheel-in') as HTMLElement | null;
+      if (wheel) wheel.style.transform = `rotate(${inp.steer * 90}deg)`;
     }
     push();
-  }, 50);
+    // Vorhersage + Haptik
+    const fired = world.predict(inp, dt);
+    const own = world.ownPhys;
+    if (own) {
+      const charged = own.driftDir !== 0 && own.driftCharge >= KART.DRIFT_CHARGE_S;
+      if (own.driftDir && !wasDrift) vibrate(8);
+      if (charged && !wasCharged) vibrate([15, 40, 15]);
+      wasCharged = charged;
+      wasDrift = own.driftDir;
+    }
+    if (fired) {
+      vibrate(30);
+      flash('TURBO!', 'turbo', 600);
+    }
+    if (!renderer) return;
+    const t0 = performance.now();
+    const poses = world.poses();
+    const mine = poses.find((p) => p.id === store.playerId);
+    if (mine) {
+      camA += wrapAngle(mine.angle - camA) * (1 - Math.exp(-dt / 160));
+      renderer.render(Mode7Renderer.chase(mine, camA), st, poses, { lookOf, now });
+    }
+    frameMs = frameMs * 0.9 + (performance.now() - t0) * 0.1;
+  };
+  requestAnimationFrame(frame);
 
-  const icon = q<HTMLCanvasElement>(root, '.k-item canvas');
+  // ---- HUD (wird bei jedem Server-Stand und alle 250 ms aufgerufen)
+  const icon = q<HTMLCanvasElement>(root, '.k3-item canvas');
   let shownItem: string | undefined;
+  let lastSub = '';
   return () => {
     const st = store.state?.mini?.kind === 'kart' ? store.state.mini.state : null;
     const c = st?.karts[store.playerId!];
     if (!st || !c) return;
     const n = Object.keys(st.karts).length;
-    q(root, '.k-pos').textContent = `${c.place}./${n}`;
-    q(root, '.k-lap').textContent = `Runde ${Math.max(1, c.lap)}/${st.laps}`;
+    q(root, '.k3-place').innerHTML = `${c.place}.<small>/${n}</small>`;
+    q(root, '.k3-lap').textContent = `Runde ${Math.max(1, c.lap)}/${st.laps}`;
     if (shownItem !== (c.item ?? '')) {
       shownItem = c.item ?? '';
       const ctx = icon.getContext('2d')!;
       ctx.clearRect(0, 0, 16, 16);
       ctx.drawImage(itemIcon(c.item).canvas, 0, 0);
-      q(root, '.k-item small').textContent = c.item ? ITEM_LABEL[c.item] : 'kein Item';
-      if (c.item) navigator.vibrate?.(15);
+      q(root, '.k3-item small').textContent = c.item ? ITEM_LABEL[c.item] : 'ITEM';
+      itemBtn.disabled = !c.item;
+      itemBtn.classList.toggle('has', !!c.item);
+      if (c.item) vibrate(15);
     }
-    q<HTMLButtonElement>(root, '.k-use').disabled = !c.item;
-    const hint =
+    // Eigene Treffer
+    const ev = st.events[st.events.length - 1];
+    if (ev && ev.seq !== seenEvent) {
+      seenEvent = ev.seq;
+      if (ev.who === store.playerId && (ev.kind === 'hit' || ev.kind === 'gull')) {
+        flash(ev.kind === 'gull' ? 'KRAH!' : 'AUA!', 'hit');
+        vibrate([40, 30, 40]);
+      }
+    }
+    // Mitte: Countdown / LOS / Meldungen
+    const now = performance.now();
+    if (st.sub === 'countdown') {
+      const s = secondsLeft();
+      center.textContent = s > 3 ? `${KART_TRACKS[st.track]?.name ?? ''} · ${st.laps} Runden` : String(Math.max(1, s));
+      center.className = `k3-center ${s > 3 ? 'small' : 'count'}`;
+    } else if (lastSub === 'countdown') {
+      flash('LOS!', 'go', 800);
+    } else if (centerUntil && now > centerUntil) {
+      center.textContent = '';
+      centerUntil = 0;
+    }
+    lastSub = st.sub;
+    const own = world.ownPhys;
+    const drifting = own ? own.driftDir !== 0 : c.drift !== 0;
+    const charged = own ? own.driftDir !== 0 && own.driftCharge >= KART.DRIFT_CHARGE_S : c.charged;
+    const msg =
       st.sub === 'countdown'
         ? mode === 'tilt'
-          ? `Start in ${secondsLeft()} – Handy gerade halten, „Zentrieren“ drücken.`
-          : `Start in ${secondsLeft()} – Gas gibt das Kart von allein!`
+          ? 'Handy gerade halten – links tippen setzt die Mitte'
+          : 'Gleich geht’s los – GAS gedrückt halten!'
         : c.spin > 0
           ? 'Uiii – du drehst dich!'
-          : c.charged
-            ? 'Mini-Turbo bereit – BREMSE loslassen!'
-            : c.drift
-              ? 'Drift ...'
+          : charged
+            ? 'Turbo bereit – DRIFT loslassen!'
+            : drifting
+              ? 'Drift …'
               : c.offroad
                 ? OFFROAD[KART_TRACKS[st.track]?.theme ?? 'beach']
                 : st.closing
-                  ? `Noch ${Math.ceil(st.endsIn / 1000)}s bis Rennende!`
+                  ? `Noch ${Math.ceil(st.endsIn / 1000)}s!`
                   : '';
-    q(root, '.k-hint').textContent = hint;
+    q(root, '.k3-msg').textContent = msg;
+    rootEl.classList.toggle('charged', charged);
+    rootEl.classList.toggle('drifting', drifting);
   };
 }
 
