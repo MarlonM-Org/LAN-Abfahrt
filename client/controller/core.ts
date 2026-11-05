@@ -5,7 +5,7 @@ import { AV_H, AV_W, drawAvatar, randomLook, sanitizeLook } from '../../shared/a
 import { TEAM_INFO } from '../../shared/flunky';
 import { playerColor } from '../../shared/players';
 
-export const LS = { id: 'lanabfahrt.playerId', name: 'lanabfahrt.name', look: 'lanabfahrt.look', kartView: 'lanabfahrt.kartView' };
+export const LS = { id: 'lanabfahrt.playerId', name: 'lanabfahrt.name', look: 'lanabfahrt.look', kartView: 'lanabfahrt.kartView', pseudoLand: 'lanabfahrt.pseudoLand' };
 
 /** Kart-Rennen: gespeicherte Ansichts-Wahl (eigene Verfolger-Ansicht am Handy oder TV-Splitscreen) */
 export function kartViewPref(): 'phone' | 'tv' | undefined {
