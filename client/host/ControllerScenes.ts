@@ -12,6 +12,7 @@ import { BLUE_INK, NameTags, RED_INK, background, ensureTex, ink, panel, prop, t
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { foam, gulls } from './ambient';
+import { pcol } from './playerColor';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -245,7 +246,7 @@ export class TidyScene extends Phaser.Scene {
   update() {
     const s = this.latest;
     if (s?.mini?.kind !== 'tidy') return;
-    const specs: { id: string; x: number; y: number; name: string; color: string }[] = [];
+    const specs: { id: string; x: number; y: number; name: string; color: string; dot?: number }[] = [];
     for (const [id, p] of Object.entries(s.mini.state.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
@@ -256,7 +257,7 @@ export class TidyScene extends Phaser.Scene {
       playAvatar(img, p.moving ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
       const n = this.names.get(id);
-      if (n) specs.push({ id, x: a.x, y: a.y - 30, name: n.name, color: n.color });
+      if (n) specs.push({ id, x: a.x, y: a.y - 30, name: n.name, color: pcol(id).hex, dot: TEAM_INFO[p.team].colorNum });
     }
     this.tags.update(specs);
   }
