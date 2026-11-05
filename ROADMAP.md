@@ -117,7 +117,7 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 - [ ] **Grill-Chaos** *(Vorbild: Overcooked)* – Gemeinsam Bestellungen der Urlaubs-Grillparty abarbeiten: schnippeln, grillen, Cocktails mixen, servieren.
   👥 2–8 · 📱 Joystick + Aktion
 - [ ] **Umzugschaos** *(Vorbild: Moving Out)* – Ferienhaus ausräumen, bevor der Vermieter kommt.
-- [ ] **Wackel-Prügelei** *(Vorbild: Gang Beasts)* – Labbrige Physik-Figuren, Ziel: andere vom Steg ins Meer schubsen.
+- [x] **Wackel-Prügelei** *(Vorbild: Gang Beasts)* – Labbrige Physik-Figuren, Ziel: andere vom Steg ins Meer schubsen.
 - [ ] **Auto-Fußball** *(Vorbild: Rocket League, von oben)* – Kann Fahrphysik mit dem Kart-Rennen teilen.
 
 ---

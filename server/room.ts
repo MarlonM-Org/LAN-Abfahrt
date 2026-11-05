@@ -71,6 +71,7 @@ import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
 import { KofferGame } from './koffer';
+import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
@@ -650,6 +651,9 @@ export class Room {
         break;
       case 'spion':
         this.mini = new SpionGame(ids, ctx);
+        break;
+      case 'wackel':
+        this.mini = new WackelGame(ids, ctx);
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);

@@ -185,7 +185,7 @@ export function defaultSongForScene(scene: string): string {
       return 'igelkrieg';
     case 'kart': case 'autoball':
       return 'rennen';
-    case 'arena': case 'smash': case 'sumo': case 'bogen':
+    case 'arena': case 'smash': case 'sumo': case 'bogen': case 'wackel':
       return 'arena';
     case 'wpistole': case 'enten':
       return 'western';

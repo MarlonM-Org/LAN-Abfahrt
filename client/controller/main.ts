@@ -41,6 +41,7 @@ import { pickWpistole } from './screens/wpistole';
 import { pickAngeln } from './screens/angeln';
 import { pickKoffer } from './screens/koffer';
 import { pickSuess } from './screens/suess';
+import { pickWackel } from './screens/wackel';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
 import { pickDarts } from './screens/darts';
@@ -340,6 +341,8 @@ function pickScreen(): Screen {
           return pickSuess(m.state);
         case 'spion':
           return pickSpion(m.state);
+        case 'wackel':
+          return pickWackel(m.state);
       }
       return outdatedScreen();
     }
