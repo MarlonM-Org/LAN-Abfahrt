@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 19:55",
+  "updated": "2026-11-05 20:35",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -26,17 +26,15 @@
       "type": "Review-Umsetzung",
       "branch": "review/netz-reconnect",
       "detail": "changed() sofort senden, meta-Event, private nur bei Änderung, 3 s Gnadenfrist statt sofort raus, Stick-Timeout, WebSocket"
-    },
-    {
-      "title": "Review Phase 1: Ton + Juice am TV",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/sound-juice",
-      "detail": "sfx.ts über den fxBus, juice.ts (Shake, Hit-Stop, Partikel, Banner), Sprecher, Ergebnis-Reveal"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Review: Soundeffekte, Juice-Modul (Partikel, Hit-Stop, Zeitlupe), Sprecher, Ergebnis-Reveal",
+      "pr": 50,
+      "date": "2026-11-05"
+    },
     {
       "title": "Zug überspringen (VIP-Menü ⋯ + Laptop S) + mehr Ruhe bei Timern",
       "pr": 48,
