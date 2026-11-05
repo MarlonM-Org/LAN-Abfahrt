@@ -1129,15 +1129,20 @@ export interface IgelHog {
   state: 'ok' | 'dead' | 'drowned';
   flying: boolean;
   walking: boolean;
+  /** Angezeigte HP: Schaden zählt erst in der Settle-Phase Punkt für Punkt herunter (wie bei Worms) */
+  shown: number;
 }
 
 export interface IgelFx {
   seq: number;
-  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water';
+  /** taunt = Zuschauer-Spruch als Sprechblase über dem Igel `hog` */
+  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt';
   x: number;
   y: number;
   r?: number;
   text?: string;
+  /** Igel, über dem die Sprechblase hängt (taunt) */
+  hog?: number;
 }
 
 export interface IgelState {
@@ -1167,6 +1172,10 @@ export interface IgelState {
   suddenDeath: boolean;
   /** ms bis Sudden Death (0 = läuft schon) */
   suddenIn: number;
+  /** Start-HP pro Igel (100, ab 8 Spielern 60) */
+  maxHp: number;
+  /** Zugzeit dieser Partie (nach Spielerzahl) */
+  turnMs: number;
   damage: Record<string, number>;
   /** Ausgeschiedene Spieler in Reihenfolge */
   out: string[];
