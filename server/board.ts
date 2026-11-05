@@ -1,5 +1,5 @@
 import type { BoardState, MiniKind, SkipInfo } from '../shared/types';
-import { BOARD_KINDS, BOARD_SIZE, BOARD_TIMING, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, fitsPlayers, miniLabel } from '../shared/games';
+import { BOARD_KINDS, BOARD_SIZE, BOARD_TIMING, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, MINI_LENGTH, fitsPlayers, miniLabel } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
 const { STEP_MS, INTRO_MS, ROLL_IDLE_MS, OFFLINE_ROLL_MS } = BOARD_TIMING;
@@ -60,6 +60,8 @@ export class Board {
     ids: string[],
     maxRounds: number,
     private ctx: BoardCtx,
+    /** VIP-Option „Lange Spiele“: auch Minispiele über 4 min ziehen (sonst nur kurz + mittel) */
+    private longGames = false,
   ) {
     this.state = {
       round: 1,
@@ -226,7 +228,10 @@ export class Board {
     const finales = FINALE_KINDS.filter((k) => fitsPlayers(k, n));
     const isFinale = s.round === s.maxRounds && finales.length > 0;
     // Nur Spiele, die zur Spielerzahl passen (z. B. Urlaubs-Fangen ab 3, max. 8 Spieler)
-    const fitting = BOARD_KINDS.filter((k) => fitsPlayers(k, n));
+    // … und standardmäßig nur kurze/mittlere (≤ 4 min), damit die Party nicht stockt
+    const fitsAll = BOARD_KINDS.filter((k) => fitsPlayers(k, n));
+    const short = fitsAll.filter((k) => MINI_LENGTH[k] !== 'lang');
+    const fitting = this.longGames || !short.length ? fitsAll : short;
     const pool: MiniKind[] = fitting.filter((k) => k !== this.lastMini);
     if (!pool.length) pool.push(...(fitting.length ? fitting : BOARD_KINDS));
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];

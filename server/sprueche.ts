@@ -48,7 +48,8 @@ export class SpruecheGame implements MiniGame {
     this.state = {
       sub: 'intro',
       round: 0,
-      rounds: SPRUECHE.ROUNDS,
+      // Ab 9 Spielern nur Runde 1 + Finale (sonst ca. 15 min)
+      rounds: ids.length >= 9 ? 2 : SPRUECHE.ROUNDS,
       final: false,
       multiplier: 1,
       endsIn: 0,
@@ -108,7 +109,7 @@ export class SpruecheGame implements MiniGame {
     const s = this.state;
     s.round = round;
     s.final = round >= s.rounds;
-    s.multiplier = quipMultiplier(round);
+    s.multiplier = s.final ? quipMultiplier(SPRUECHE.ROUNDS) : quipMultiplier(round);
     s.sub = 'intro';
     s.duel = null;
     s.finalAnswers = null;

@@ -10,19 +10,17 @@ export const IGEL = {
   H: 270,
   /** Anfangs-Wasserspiegel (y) */
   WATER_Y: 248,
-  /**
-   * Zugzeit (laufen + zielen) gehört wie beim Vorbild zum Spiel, ist aber großzügiger (vorher 30 s).
-   * Der VIP kann einen Zug im Menü überspringen.
-   */
-  TURN_MS: 45000,
-  /** Wer offline ist, verliert seinen Zug nach so kurzer Zeit */
-  OFFLINE_TURN_MS: 1500,
+  /** Zugzeit bis 4 Spieler – darüber siehe `igelTurnMs()` */
+  TURN_MS: 45000, // großzügiger (vorher 30 s), VIP kann im Menü überspringen
+  /** Zugzeit, wenn der Spieler gerade offline ist (kurze Trennung, App gewechselt) */
+  OFFLINE_TURN_MS: 5000,
   RETREAT_MS: 3000,
   COUNTDOWN_MS: 3500,
   SETTLE_MIN_MS: 700,
-  /** Danach: Sudden Death (Wasser steigt jede Runde) – vorher 5 min, wegen der längeren Züge 6 min */
+  /** Danach: Sudden Death (Wasser steigt nach jeder vollen Runde) – ab 7 Spielern `SUDDEN_MS_BIG` */
   SUDDEN_MS: 6 * 60_000,
-  /** Absolute Obergrenze, falls sich niemand trifft (vorher 8 min) */
+  SUDDEN_MS_BIG: 3 * 60_000,
+  /** Absolute Obergrenze, falls sich niemand trifft */
   HARD_CAP_MS: 10 * 60_000,
   WATER_RISE: 20,
   GRAVITY: 260,
@@ -34,7 +32,17 @@ export const IGEL = {
   JUMP_VX: 60,
   JUMP_VY: -125,
   HP: 100,
-  /** Ab dieser Aufprallgeschwindigkeit gibt es Fallschaden */
+  /** Ab 8 Spielern weniger Lebenspunkte, damit überhaupt jemand ausscheidet */
+  HP_BIG: 60,
+  /** Wind ändert sich pro Zug höchstens um ±WIND_DRIFT/2 (driftet statt neu gewürfelt) */
+  WIND_DRIFT: 0.4,
+  /** Settle-Phase: HP-Anzeige zählt mit mind. so vielen Punkten pro Sekunde herunter */
+  HP_TICK_PER_S: 40,
+  /** … und braucht dafür höchstens so lange */
+  HP_TICK_MAX_MS: 1600,
+  /** Zuschauer-Sprüche: Abklingzeit pro Spieler und Anzeigedauer am TV */
+  TAUNT_COOLDOWN_MS: 8000,
+  TAUNT_SHOW_MS: 2600,  /** Ab dieser Aufprallgeschwindigkeit gibt es Fallschaden */
   FALL_SAFE: 200,
   FALL_DMG: 0.12,
   TELE_RANGE: 230,
@@ -49,6 +57,14 @@ export const WEAPONS: Record<IgelWeapon, { name: string; short: string; ammo: nu
   punch: { name: 'Igel-Schlag', short: 'Schlag', ammo: -1, hint: 'Richtung wischen – haut Nachbarn weg' },
 };
 export const WEAPON_ORDER: IgelWeapon[] = ['bazooka', 'grenade', 'teleport', 'punch'];
+
+/** Zugzeit nach Spielerzahl: 30 s bis 4, 20 s bis 8, 15 s darüber */
+export const igelTurnMs = (n: number) => (n <= 4 ? IGEL.TURN_MS : n <= 8 ? 20000 : 15000);
+export const igelMaxHp = (n: number) => (n >= 8 ? IGEL.HP_BIG : IGEL.HP);
+export const igelSuddenMs = (n: number) => (n >= 7 ? IGEL.SUDDEN_MS_BIG : IGEL.SUDDEN_MS);
+
+/** Zuschauer-Sprüche (Action `taunt` mit `{ i }` = Index in diese Liste) */
+export const IGEL_TAUNTS = ['Rache!', 'Feigling!', 'Ups.', 'Für die Strandbar!'];
 
 export const BAZOOKA = { R: 21, DMG: 45, ARM_MS: 140 };
 export const GRENADE = { R: 19, DMG: 40, FUSE_MS: 3000, SPEED: 0.8 };

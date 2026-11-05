@@ -90,8 +90,71 @@ export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].m
 export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
-/** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
+/**
+ * Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter).
+ * Ohne Igel/Turm (zu lang) und ohne Date-Night-Kapitel (Abstieg, Wraps). Lange Spiele (`MINI_LENGTH`)
+ * zieht das Brett nur mit der VIP-Option „Lange Spiele“.
+ */
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
+
+export type MiniLength = 'kurz' | 'mittel' | 'lang';
+/**
+ * Ungefähre Spieldauer bei einer typischen Gruppe (8–12 Spieler), aus den Konstanten geschätzt:
+ * kurz ≤ 2 min, mittel ≤ 4 min, lang > 4 min. Das Spielbrett zieht standardmäßig nur kurz + mittel.
+ */
+export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
+  suess: 'mittel',
+  spion: 'mittel',
+  flunky: 'mittel',
+  wwe: 'mittel',
+  sprint: 'kurz',
+  murder: 'lang',
+  descent: 'kurz',
+  rhythm: 'kurz',
+  wrap: 'kurz',
+  stars: 'kurz',
+  nhie: 'mittel',
+  hilo: 'kurz',
+  bomb: 'kurz',
+  kingscup: 'mittel',
+  sup: 'kurz',
+  tidy: 'kurz',
+  flieger: 'mittel',
+  kurve: 'mittel',
+  arena: 'mittel',
+  // reihum: bei 12 Spielern ca. 6 min
+  bowling: 'lang',
+  enten: 'kurz',
+  // 2 × 100 s ab 6 Spielern, sonst 3 Runden
+  ttt: 'lang',
+  verstecken: 'mittel',
+  parcours: 'mittel',
+  kart: 'mittel',
+  turm: 'mittel',
+  igel: 'lang',
+  smash: 'mittel',
+  wasser: 'kurz',
+  stillepost: 'lang',
+  fangen: 'mittel',
+  geist: 'mittel',
+  grill: 'mittel',
+  boule: 'mittel',
+  sumo: 'kurz',
+  volley: 'mittel',
+  tourist: 'lang',
+  sprueche: 'lang',
+  pixel: 'mittel',
+  bogen: 'mittel',
+  darts: 'mittel',
+  // 6 Bahnen à ca. 75 s (Party-Modus: 5)
+  golf: 'lang',
+  autoball: 'mittel',
+  wpistole: 'kurz',
+  zauber: 'mittel',
+  angeln: 'mittel',
+  koffer: 'mittel',
+  werwolf: 'lang',
+};
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -441,7 +504,7 @@ export const ENTEN = {
 
 export const TTT = {
   ROLES_MS: 7000,
-  ROUND_MS: 180000,
+  ROUND_MS: 100000,
   ROUND_END_MS: 9000,
   SPEED: 62,
   PLAYER_R: 5,
@@ -599,8 +662,8 @@ export const ARCADE_COOP_POINTS = 7;
 const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'Rennen', sprint: 'Lauf', parcours: 'Lauf', golf: 'Turnier', bowling: 'Spiel', darts: 'Spiel' };
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
-/** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
+/** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele und ohne Date-Night-Kapitel) */
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [

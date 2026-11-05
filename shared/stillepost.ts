@@ -11,8 +11,8 @@ export const POST = {
   DRAW_MS: null as number | null,
   DESCRIBE_MS: null as number | null,
   VOTE_MS: null as number | null,
-  /** Mehr Schritte pro Kette werden zu lang (≈ 6–8 Minuten Spielzeit) */
-  MAX_STEPS: 8,
+  /** Mehr Schritte pro Kette werden zu lang (6 Schritte ≈ 5 Minuten Spielzeit) */
+  MAX_STEPS: 6,
   MAX_TEXT: 90,
   /** Zeichenfläche: Koordinaten 0 … GRID (ganzzahlig, 1 Byte) */
   GRID: 255,

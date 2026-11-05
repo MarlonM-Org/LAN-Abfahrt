@@ -25,7 +25,7 @@ interface Ball extends GolfBody {
 }
 
 /**
- * Urlaubs-Minigolf: 6 Löcher, alle putten GLEICHZEITIG auf demselben Loch (Bälle stoßen nicht zusammen).
+ * Urlaubs-Minigolf: alle Löcher (Party-Modus: 5), alle putten GLEICHZEITIG auf demselben Loch (Bälle stoßen nicht zusammen).
  * Physik läuft in Echtzeit auf dem Server (fester Takt, deterministisch), der TV bekommt nur die Ballpositionen.
  */
 export class GolfGame implements MiniGame {
@@ -46,11 +46,14 @@ export class GolfGame implements MiniGame {
   private steps = 0;
   private sentAt = 0;
   private timers = new Timers();
+  /** Party-Modus: nur 5 Bahnen (Pacing auf dem Spielbrett), sonst alle */
+  private holeCount: number;
 
   constructor(
     private ids: string[],
     private ctx: MiniCtx,
   ) {
+    this.holeCount = ctx.mode === 'party' ? Math.min(5, GOLF_HOLES.length) : GOLF_HOLES.length;
     this.order = shuffle(ids);
     const used = new Set<string>();
     this.order.forEach((id, i) => {
@@ -58,7 +61,7 @@ export class GolfGame implements MiniGame {
       if (used.has(col) || col === '#f4efe2' || col === '#3b3b4f') col = FALLBACK.find((c) => !used.has(c)) ?? col;
       used.add(col);
       this.colors[id] = hexNum(col);
-      this.scores[id] = GOLF_HOLES.map(() => null);
+      this.scores[id] = GOLF_HOLES.slice(0, this.holeCount).map(() => null);
     });
     this.timers.later(GOLF.INTRO_MS, () => this.startHole(0));
     this.timers.every(Math.round(GOLF.TICK_S * 1000), () => this.tick());
@@ -274,7 +277,7 @@ export class GolfGame implements MiniGame {
   private endHole() {
     if (this.sub !== 'play') return;
     this.sub = 'card';
-    const last = this.hole >= GOLF_HOLES.length - 1;
+    const last = this.hole >= this.holeCount - 1;
     const ms = last ? GOLF.LAST_CARD_MS : GOLF.CARD_MS;
     this.deadline = Date.now() + ms;
     this.ctx.onChange();
@@ -334,7 +337,7 @@ export class GolfGame implements MiniGame {
     this.sub = 'over';
     this.deadline = Date.now() + 4000;
     this.ctx.onChange();
-    const par = GOLF_HOLES.reduce((a, h) => a + h.par, 0);
+    const par = GOLF_HOLES.slice(0, this.holeCount).reduce((a, h) => a + h.par, 0);
     const rel = (n: number) => (n === par ? 'Par' : n > par ? `+${n - par}` : `${n - par}`);
     const ranked = [...this.ids].sort((a, b) => this.total(a) - this.total(b));
     const best = ranked[0];
@@ -372,14 +375,14 @@ export class GolfGame implements MiniGame {
         sub: this.sub,
         endsIn: endsIn(this.deadline),
         hole: this.hole,
-        holes: GOLF_HOLES.length,
+        holes: this.holeCount,
         // Lochzeit nach der Uhr (nicht nur nach dem letzten Takt) – TV/Handys zählen ab Empfang weiter
         t: Math.round((this.sub === 'play' ? Math.max(this.t, (Date.now() - this.playStart) / 1000) : this.t) * 1000) / 1000,
         order: this.order,
         colors: this.colors,
         balls,
         scores: this.scores,
-        par: GOLF_HOLES.map((h) => h.par),
+        par: GOLF_HOLES.slice(0, this.holeCount).map((h) => h.par),
         fx: this.fx,
       },
     };
