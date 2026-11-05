@@ -1,6 +1,7 @@
-import type { BowlingMark, BowlingRoll, BowlingState, BowlingTrack, MiniSnapshot } from '../shared/types';
+import type { BowlingMark, BowlingRoll, BowlingState, BowlingTrack, MiniSnapshot, SkipInfo } from '../shared/types';
+import { possessive } from '../shared/players';
 import { BOWL, PIN_POS, bowlingFrames, framePosition, pinsReset, scoreFrames } from '../shared/bowling';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
@@ -239,15 +240,33 @@ export class BowlingGame implements MiniGame {
     this.sub = 'aim';
     this.aimSeq += 1;
     this.aimX = 0;
-    this.deadline = Date.now() + (this.ctx.isConnected(id) ? BOWL.AIM_MS : 1500);
     const seq = this.aimSeq;
-    // Zeit abgelaufen oder Spieler weg → automatischer, eher schwacher Wurf
-    this.timers.later(this.deadline - Date.now(), () => {
-      if (this.sub === 'aim' && this.aimSeq === seq) {
-        this.throwBall({ start: Math.random() * 0.6 - 0.3, speed: 0.3, angle: Math.random() * 0.6 - 0.3, spin: 0 });
-      }
+    // Spieler weg (oder – falls gesetzt – Zeit abgelaufen) → automatischer, eher schwacher Wurf
+    this.deadline = phaseTimer(this.timers, this.ctx.isConnected(id) ? BOWL.AIM_MS : BOWL.OFFLINE_AIM_MS, () => {
+      if (this.sub === 'aim' && this.aimSeq === seq) this.autoThrow();
     });
     this.ctx.onChange();
+  }
+
+  private autoThrow() {
+    this.throwBall({ start: Math.random() * 0.6 - 0.3, speed: 0.3, angle: Math.random() * 0.6 - 0.3, spin: 0 });
+  }
+
+  /** VIP/Laptop: Erklärung überspringen bzw. für den Spieler, der dran ist, einen (schwachen) Wurf machen */
+  skippable(): SkipInfo | null {
+    if (this.sub === 'intro') return { label: 'Los geht’s', info: true };
+    if (this.sub === 'aim') return { label: `${possessive(this.ctx.nameOf(this.turn))} Wurf überspringen` };
+    return null;
+  }
+
+  skip() {
+    if (this.sub === 'intro') {
+      this.timers.clear();
+      this.beginAim();
+    } else if (this.sub === 'aim') {
+      this.timers.clear();
+      this.autoThrow();
+    }
   }
 
   input(id: string, action: string, payload: unknown) {
@@ -340,7 +359,7 @@ export class BowlingGame implements MiniGame {
       kind: 'bowling',
       state: {
         sub: this.sub,
-        endsIn: Math.max(0, this.deadline - Date.now()),
+        endsIn: endsIn(this.deadline),
         frames: this.frames,
         order: this.order,
         turn: this.turn,

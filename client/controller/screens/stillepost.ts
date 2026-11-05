@@ -1,6 +1,6 @@
 import type { PostDrawing, PostStroke, StillepostPrivate, StillepostState } from '../../../shared/types';
 import { POST, POST_BRUSHES, POST_COLORS, POST_ERASER, POST_PAPER, drawingPoints, paintDrawing, paintStroke } from '../../../shared/stillepost';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, socket, store, tapButton, toast } from '../core';
+import { type Screen, app, el, escapeHtml, message, nameOf, q, send, socket, store, tapButton, timerText, toast } from '../core';
 
 /** Lokaler Entwurf – überlebt einen Neuaufbau des Screens (z. B. kurzer WLAN-Aussetzer) */
 const local = { round: -1, task: '', strokes: [] as PostStroke[], text: '', color: 0, size: 1 };
@@ -72,7 +72,7 @@ function doneControls(root: HTMLElement, onDone: () => boolean) {
     },
     update(s: StillepostState, p: StillepostPrivate | null) {
       if (p && p.done !== done) set(p.done);
-      q(root, '.timer').textContent = `${secondsLeft()}s`;
+      q(root, '.timer').textContent = timerText();
       const missing = s.order.length - s.done.length;
       wait.textContent = done ? (missing > 0 ? `Warte noch auf ${missing} ...` : 'Alle fertig!') : `${s.done.length}/${s.order.length} fertig`;
     },
@@ -459,7 +459,7 @@ function buildVote(s: StillepostState, vip: boolean) {
   return () => {
     const st = post();
     if (!st) return;
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     refresh();
   };
 }

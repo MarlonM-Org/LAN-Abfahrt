@@ -1,7 +1,9 @@
-import type { FlunkyState, MiniSnapshot, Team } from '../shared/types';
+import type { FlunkyState, MiniSnapshot, SkipInfo, Team } from '../shared/types';
+import { possessive } from '../shared/players';
 import {
   DRINK_PER_TAP,
   FLIGHT_MS,
+  FLUNKY_AIM_IDLE_MS,
   RUN_TAPS,
   TEAM_INFO,
   clamp,
@@ -12,8 +14,6 @@ import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './miniga
 
 /** Mindestabstand zwischen zwei Taps eines Spielers (gegen Auto-Clicker / Multi-Touch-Spam) */
 const MIN_TAP_GAP_MS = 55;
-/** Wirft der Werfer so lange nicht (Handy weggelegt), geht der Wurf daneben und das andere Team ist dran */
-const AIM_IDLE_MS = 30_000;
 
 /**
  * Flunkyball: Ein Team wirft auf die Flasche in der Mitte.
@@ -158,9 +158,21 @@ export class FlunkyGame implements MiniGame {
     s.runProgress = 0;
     this.ctx.onChange();
     const turn = ++this.turnNo;
-    this.timers.later(AIM_IDLE_MS, () => {
-      if (this.turnNo === turn && s.sub === 'aim') this.advance();
-    });
+    if (FLUNKY_AIM_IDLE_MS !== null) {
+      this.timers.later(FLUNKY_AIM_IDLE_MS, () => {
+        if (this.turnNo === turn && s.sub === 'aim') this.advance();
+      });
+    }
+  }
+
+  /** VIP: Wurf überspringen (zählt als Fehlwurf, das andere Team ist dran). Trinken/Laufen ist Echtzeit – kein Überspringen. */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    return s.sub === 'aim' && s.throwerId ? { label: `${possessive(this.ctx.nameOf(s.throwerId))} Wurf überspringen` } : null;
+  }
+
+  skip() {
+    if (this.state.sub === 'aim') this.advance();
   }
 
   /** Team hat ausgetrunken – wer offline/entfernt ist, zählt nicht (sonst gewinnt das Team nie). */

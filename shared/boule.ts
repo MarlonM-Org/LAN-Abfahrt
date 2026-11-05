@@ -34,8 +34,12 @@ export const BOULE = {
   JACK_DMAX: 340,
   JACK_LAT: 45,
   TARGET: 7,
-  AIM_MS: 25000,
-  INTRO_MS: 5500,
+  /** Zielen: `null` = kein Limit (vorher 25 s) – der VIP kann den Wurf im Menü überspringen */
+  AIM_MS: null as number | null,
+  /** Wer offline ist, wirft nach so kurzer Zeit automatisch */
+  OFFLINE_AIM_MS: 1500,
+  /** Erklär-Screen (VIP kann überspringen; vorher 5,5 s) */
+  INTRO_MS: 8000,
   PLACE_MS: 1900,
   RESULT_MS: 1300,
   /** Messen: Basis + pro gezähltem Punkt */

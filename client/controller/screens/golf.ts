@@ -1,6 +1,6 @@
 import type { GolfState } from '../../../shared/types';
 import { GOLF, type GolfHole, golfBounds, golfHole, golfIdealPutt, moverSeg, spinnerBlades } from '../../../shared/golf';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store, toast } from '../core';
+import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, timerText, toast } from '../core';
 import { type MotionSample, enableMotion, motionSupport, onMotion } from '../motion';
 import { PUTT_SCALE, dragToPutt, swingToPutt } from '../golfPutt';
 import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, motionInfo, rememberFeedback } from '../motionFeedback';
@@ -293,7 +293,7 @@ function buildPlay(hole: number) {
       lastT = s.t;
       recvAt = performance.now();
     }
-    return s.t + (s.sub === 'play' ? Math.min(GOLF.HOLE_S, (performance.now() - recvAt) / 1000) : 0);
+    return s.t + (s.sub === 'play' ? Math.min(GOLF.HOLE_S ?? Infinity, (performance.now() - recvAt) / 1000) : 0);
   };
 
   let aim: { a: number; p: number; pull: number } | null = null;
@@ -485,7 +485,7 @@ function buildPlay(hole: number) {
     const s = golf();
     if (!s) return;
     const b = s.balls[id];
-    timeEl.textContent = s.sub === 'play' ? `0:${String(Math.min(59, secondsLeft())).padStart(2, '0')}` : '';
+    timeEl.textContent = s.sub === 'play' ? timerText((sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`) : '';
     if (!b) return;
     if (b.s !== lastStroke) {
       lastStroke = b.s;

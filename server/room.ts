@@ -69,7 +69,6 @@ import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
-import { KofferGame } from './koffer';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
 const MAX_PLAYERS = 12;
@@ -84,8 +83,10 @@ const VIP_GRACE_MS = Number(process.env.VIP_GRACE_MS ?? 60_000);
 const AUTO_RESULTS_MS = Number(process.env.AUTO_CONTINUE_MS ?? 12_000);
 const AUTO_STORY_MS = 10_000;
 const AUTO_MINI_MS = 5_000;
+/** Nur Bots da und ein Spiel wartet auf eine Eingabe, die nie kommt (z. B. Werwölfe uneinig) → so lange warten, dann überspringen */
+const AUTO_SKIP_MS = 60_000;
 
-export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board';
+export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board' | 'skip';
 
 interface Player extends PlayerPublic {
   socketId: string | null;
@@ -142,6 +143,9 @@ export class Room {
   /** Worauf gerade gewartet wird (Ergebnis, Story-Karte, …) und seit wann – für das Auto-Weiter */
   private gateKey: unknown = null;
   private gateSince = 0;
+  /** Dasselbe für überspringbare Schritte (Zug, Phase, Info-Screen), wenn kein Mensch überspringen kann */
+  private skipKey = '';
+  private skipSince = 0;
 
   constructor(
     private io: Server,
@@ -343,6 +347,13 @@ export class Room {
 
     socket.on('vip:mini', (action: string) => {
       if (isVip() && this.phase === 'mini') this.mini?.vipAction?.(String(action));
+    });
+
+    // VIP-Menü am Handy: Zug/Phase überspringen (gleiche Logik wie Taste S am Laptop)
+    socket.on('vip:skip', (ack?: (r: { ok: boolean; msg?: string }) => void) => {
+      const reply = (r: { ok: boolean; msg?: string }) => typeof ack === 'function' && ack(r);
+      if (!isVip()) return reply({ ok: false, msg: 'Nur der VIP darf überspringen.' });
+      reply(this.skipCurrent());
     });
 
     // Kart-Rennen: jeder Spieler wählt selbst, ob seine Verfolger-Ansicht auf dem TV oder dem Handy läuft (gilt auch für spätere Rennen)
@@ -682,9 +693,6 @@ export class Room {
       case 'angeln':
         this.mini = new AngelnGame(ids, ctx);
         break;
-      case 'koffer':
-        this.mini = new KofferGame(ids, ctx);
-        break;
     }
     this.results = null;
     this.phase = 'mini';
@@ -857,6 +865,7 @@ export class Room {
       this.advance();
       return { ok: true, msg: 'Weiter!' };
     }
+    if (cmd === 'skip') return this.skipCurrent();
     if (cmd === 'again') {
       if (!this.singleResults()) return { ok: false, msg: 'Nochmal geht nur im Ergebnis eines Einzelspiels.' };
       const err = this.nochmal();
@@ -887,6 +896,23 @@ export class Room {
       return { ok: true, msg: 'Bots entfernt.' };
     }
     return { ok: false, msg: 'Unbekannter Befehl.' };
+  }
+
+  /** Was gerade übersprungen werden kann (Minispiel-Zug/-Phase oder Würfeln auf dem Brett) */
+  private skippable() {
+    if (this.phase === 'mini') return this.mini?.skippable?.() ?? null;
+    if (this.phase === 'board') return this.board?.skippable() ?? null;
+    return null;
+  }
+
+  /** VIP-Menü bzw. Taste S am Laptop: aktuellen Zug/Phase überspringen */
+  private skipCurrent(): { ok: boolean; msg?: string } {
+    const info = this.skippable();
+    if (!info) return { ok: false, msg: 'Gerade gibt es nichts zum Überspringen.' };
+    if (this.phase === 'mini') this.mini?.skip?.();
+    else if (this.phase === 'board') this.board?.skip();
+    this.changed();
+    return { ok: true, msg: `${info.label} ✓` };
   }
 
   /** Laptop-Arcade-Auswahl: Spiel, 'random' (Zufall) oder 'top' (meiste Stimmen) starten */
@@ -968,7 +994,32 @@ export class Room {
     } else {
       this.gateKey = null;
     }
+
+    // Kein Mensch kann überspringen (nur Bots) → Info-Screens nach AUTO_MINI_MS, alles andere nach AUTO_SKIP_MS.
+    // Ohne Zeitlimits würde ein Bot-Spiel sonst hängen, wenn ein Bot eine Phase nicht kennt.
+    const skip = this.skippable();
+    if (skip && !this.humanCanAct(now)) {
+      const key = `${this.phase}|${this.mini?.kind ?? ''}|${skip.label}|${this.stepTag()}`;
+      if (key !== this.skipKey) {
+        this.skipKey = key;
+        this.skipSince = now;
+      } else if (now - this.skipSince >= (skip.info ? AUTO_MINI_MS : AUTO_SKIP_MS)) {
+        this.skipKey = '';
+        this.skipCurrent();
+        return;
+      }
+    } else {
+      this.skipKey = '';
+    }
     if (dirty) this.changed();
+  }
+
+  /** Grobe Kennung des aktuellen Schritts (Runde, Phase, Zug …) – damit gleich beschriftete Schritte nicht zusammenfallen */
+  private stepTag(): string {
+    if (this.phase === 'board' && this.board) return `${this.board.state.round}-${this.board.state.turnIdx}-${this.board.state.sub}`;
+    const st = this.mini?.snapshot().state as unknown as Record<string, unknown> | undefined;
+    if (!st) return '';
+    return ['sub', 'round', 'phaseNo', 'shown', 'chain', 'match', 'hole', 'turn', 'aimSeq'].map((k) => String(st[k] ?? '')).join('-');
   }
 
   private connectedHumans() {
@@ -1181,6 +1232,7 @@ export class Room {
       inGame: this.phase === 'mini' ? this.miniIds : null,
       customQuipCount: this.quips.all.length,
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
+      skippable: this.skippable(),
       session: this.session.state(this.present()),
       nochmal: this.nochmalState(),
       showBoard: this.phase === 'lobby' && this.showBoard,

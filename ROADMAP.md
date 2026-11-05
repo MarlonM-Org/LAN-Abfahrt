@@ -78,8 +78,8 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 ### Physik
 - [ ] ⭐ **Wackelturm** *(Vorbild: Tricky Towers)* – Jeder baut seinen eigenen Turm aus fallenden Blöcken (Koffer, Liegestühle, Surfbretter), wer zuerst die Ziellinie erreicht, gewinnt. Gemeine Zauber gegen andere.
   👥 2–4 pro Bildschirm (bei mehr: Turniermodus) · 📱 Drehen/Verschieben/Fallenlassen
-- [x] **Kofferpacken** – Gegen die Zeit möglichst viel in den Kofferraum stapeln (mit Physik, Sachen fallen raus).
-  👥 2–12 (ab 9 zu zweit pro Auto) · 📱 verschieben/drehen/fallen lassen
+- [ ] **Kofferpacken** – Gegen die Zeit möglichst viel in den Kofferraum stapeln (mit Physik, Sachen fallen raus).
+  👥 2–8 · 📱 Teil wählen/drehen
 
 ### Geheime Rollen & ungleiche Teams (einer gegen alle)
 - [ ] ⭐ **Geisterjagd** *(Vorbild: Luigi's Mansion aus Nintendo Land)* – Der Geist ist am TV unsichtbar, sieht sich nur auf dem eigenen Handy. Die anderen leuchten mit Taschenlampen, Vibration verrät seine Nähe.

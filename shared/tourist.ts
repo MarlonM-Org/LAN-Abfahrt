@@ -4,11 +4,16 @@
  * welcher Ort gerade gespielt wird, weiß nur der Server.
  */
 
+/**
+ * Zeiten. Die Rundenzeit (tourRoundMs) ist Spielzeit – läuft sie ab, hat der Tourist überlebt – und bleibt.
+ * Abstimmungen haben kein Limit mehr (`null`, vorher 30 s): Sie enden, wenn alle gestimmt haben, oder per VIP.
+ * Info-Screens sind länger (vorher Intro 7 s, Auflösung 12 s) und überspringbar.
+ */
 export const TOUR = {
-  INTRO_MS: 7000,
-  VOTE_MS: 30000,
-  VOTE_RESULT_MS: 4500,
-  REVEAL_MS: 12000,
+  INTRO_MS: 12000,
+  VOTE_MS: null as number | null,
+  VOTE_RESULT_MS: 6000,
+  REVEAL_MS: 20000,
   MAX_ROUNDS: 4,
   /** Ab so vielen Spielern gibt es zwei Touristen (die sich gegenseitig nicht kennen) */
   TWO_TOURISTS_FROM: 9,

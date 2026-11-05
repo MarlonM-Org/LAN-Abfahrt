@@ -1,4 +1,5 @@
-import type { MiniSnapshot } from '../shared/types';
+import type { MiniSnapshot, SkipInfo } from '../shared/types';
+import { possessive } from '../shared/players';
 import {
   KINGS,
   KINGS_CATEGORIES,
@@ -395,6 +396,32 @@ export class KingsCupGame implements MiniGame {
         }
         break;
     }
+  }
+
+  /** Generisches VIP-Menü / Taste S: was `skipTurn()` gerade bewirken würde */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (this.finished) return null;
+    const who = possessive(this.name(s.drawer));
+    switch (s.sub) {
+      case 'draw':
+        return { label: `${who} Zug überspringen` };
+      case 'pick':
+      case 'word':
+      case 'rule':
+        return { label: `${who} Wahl überspringen` };
+      case 'chain':
+        return { label: 'Runde beenden' };
+      case 'reveal':
+      case 'waterfall':
+      case 'result':
+        return { label: 'Weiter', info: true };
+    }
+    return null;
+  }
+
+  skip() {
+    this.skipTurn();
   }
 
   /**

@@ -1,5 +1,5 @@
 import type { WweState } from '../../../shared/types';
-import { type Screen, app, el, escapeHtml, nameOf, playerButtons, q, secondsLeft, send, store } from '../core';
+import { type Screen, app, el, escapeHtml, nameOf, playerButtons, q, send, store, timerText } from '../core';
 
 export function pickWwe(w: WweState): Screen {
   const id = store.playerId!;
@@ -14,7 +14,7 @@ const wwe = () => (store.state?.mini?.kind === 'wwe' ? store.state.mini.state : 
 
 function header(w: WweState) {
   return `
-    <p>Frage ${w.round}/${w.rounds} · <span class="timer"></span></p>
+    <p>Frage ${w.round}/${w.rounds}<span class="timer"></span></p>
     <h2 class="question">Wer würde eher ${escapeHtml(w.question.replace(/^\.\.\.\s*/, ''))}</h2>
   `;
 }
@@ -33,7 +33,7 @@ function buildQuestion(w: WweState) {
   );
   app.append(root);
   return () => {
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText((sec) => ` · ${sec}s`);
   };
 }
 
@@ -44,7 +44,7 @@ function buildVoted() {
   return () => {
     const s = wwe();
     if (!s) return;
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText((sec) => ` · ${sec}s`);
     const missing = Object.keys(s.points).length - s.voted.length;
     q(root, '.wait').textContent = missing > 0 ? `Warte noch auf ${missing} ...` : 'Alle haben abgestimmt!';
   };

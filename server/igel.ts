@@ -1,4 +1,5 @@
-import type { IgelFx, IgelHog, IgelState, IgelWeapon, MiniSnapshot } from '../shared/types';
+import type { IgelFx, IgelHog, IgelState, IgelWeapon, MiniSnapshot, SkipInfo } from '../shared/types';
+import { possessive } from '../shared/players';
 import {
   BAZOOKA,
   GRENADE,
@@ -163,7 +164,7 @@ export class IgelGame implements MiniGame {
     this.aim = null;
     this.walkDir = 0;
     this.sub = 'aim';
-    this.deadline = Date.now() + (this.ctx.isConnected(owner) ? IGEL.TURN_MS : 1500);
+    this.deadline = Date.now() + (this.ctx.isConnected(owner) ? IGEL.TURN_MS : IGEL.OFFLINE_TURN_MS);
     this.dirty = true;
   }
 
@@ -620,10 +621,21 @@ export class IgelGame implements MiniGame {
     };
   }
 
+  /** VIP/Laptop: Zug des aktiven Spielers beenden (ohne Schuss) */
+  skippable(): SkipInfo | null {
+    return this.sub === 'aim' && this.active ? { label: `${possessive(this.ctx.nameOf(this.active))} Zug überspringen` } : null;
+  }
+
+  skip() {
+    if (this.sub !== 'aim') return;
+    this.toSettle();
+    this.ctx.onChange();
+  }
+
   playerDisconnected(id: string) {
     if (id === this.active && this.sub === 'aim') {
       this.walkDir = 0;
-      this.deadline = Math.min(this.deadline, Date.now() + 1500);
+      this.deadline = Math.min(this.deadline, Date.now() + IGEL.OFFLINE_TURN_MS);
     }
   }
 

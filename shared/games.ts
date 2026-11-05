@@ -57,7 +57,6 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   wpistole: { title: 'Wasserpistolen-Duell', icon: '🔫', inspiredBy: 'Wild Gunman', tagline: 'Hand ans Holster ... ZIEHT! Wer zuerst spritzt, bleibt trocken.', minPlayers: 2 },
   zauber: { title: 'Zauber-Arena', icon: '🧙', inspiredBy: 'Spellsworn', tagline: 'Feuerbälle, Eilzauber, Lava – wer bleibt auf der Plattform?', minPlayers: 2 },
   angeln: { title: 'Angeln', icon: '🎣', tagline: 'Auswerfen, anschlagen, drillen – wer zieht den dicksten Hecht aus dem See?', minPlayers: 2 },
-  koffer: { title: 'Kofferpacken', icon: '🚗', tagline: 'Alles muss mit! Stapelt den Kofferraum voll, bevor Papa hupt.', minPlayers: 2 },
   werwolf: { title: 'Werwölfe im Ferienhaus', icon: '🐺', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6 },
 };
 
@@ -73,17 +72,30 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
 // ------------------------------------------------------------------ Spielbrett
 
 export const BOARD_SIZE = 24;
+
+/**
+ * Zeiten auf dem Spielbrett. `null` = kein Zeitlimit – der VIP kann im Menü „Für … würfeln“,
+ * offline gegangene Spieler würfeln nach OFFLINE_ROLL_MS automatisch.
+ */
+export const BOARD_TIMING = {
+  STEP_MS: 280,
+  /** Ansage des nächsten Minispiels (VIP kann sie überspringen) */
+  INTRO_MS: 6000,
+  /** vorher 45 s */
+  ROLL_IDLE_MS: null as number | null,
+  OFFLINE_ROLL_MS: 5000,
+};
 export const COCKTAIL_PRICE = 10;
 export const PARTY_ROUND_OPTIONS = [3, 5, 8];
 
@@ -123,19 +135,25 @@ export const ROOMS = [
   { name: 'Garten', task: 'Grill sauber machen' },
 ];
 
+/**
+ * Zeiten im Mörderspiel. Die Aufgaben-Phase ist Spielzeit (bleibt). Diskussion und Abstimmung haben kein
+ * Zeitlimit mehr (`null`; vorher 60 s / 30 s) – die Abstimmung endet, wenn alle gestimmt haben, der VIP kann
+ * beides im Menü beenden. Rollen-/Rauswurf-Screens sind länger (vorher 8 s / 6 s) und überspringbar.
+ */
 export const MURDER = {
-  ROLES_MS: 8000,
+  ROLES_MS: 12000,
   TASKS_MS: 60000,
-  MEETING_MS: 60000,
-  VOTE_MS: 30000,
-  EJECT_MS: 6000,
+  MEETING_MS: null as number | null,
+  VOTE_MS: null as number | null,
+  EJECT_MS: 10000,
   TASK_TAPS: 15,
   TASKS_PER_PLAYER: 9,
 };
 
 // ------------------------------------------------------------------ Wer würde eher …?
 
-export const WWE = { ROUNDS: 5, QUESTION_MS: 20000, REVEAL_MS: 7000 };
+/** `null` = kein Zeitlimit – aufgelöst wird, wenn alle abgestimmt haben (oder der VIP überspringt) */
+export const WWE = { ROUNDS: 5, QUESTION_MS: null as number | null, REVEAL_MS: 15000 };
 
 export const DEFAULT_QUESTIONS = [
   '... am Pool einschlafen und Sonnenbrand bekommen?',
@@ -167,9 +185,14 @@ export const SPRINT_POINTS = [3, 2, 1];
 
 // ------------------------------------------------------------------ Trinkspiel
 
-export const NHIE = { ROUNDS: 6, QUESTION_MS: 20000, REVEAL_MS: 6000 };
-export const HILO = { ROUNDS: 7, GUESS_MS: 12000, REVEAL_MS: 4000 };
-export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 4500, SIPS: 3, MIN_HOLD_MS: 900 };
+/**
+ * Zeiten der Trinkspiele. `null` = kein Zeitlimit: Die Runde wird aufgelöst, sobald alle (verbundenen)
+ * geantwortet haben – oder wenn der VIP im Menü überspringt. Auflösungen schalten großzügig von selbst weiter.
+ */
+export const NHIE = { ROUNDS: 6, QUESTION_MS: null as number | null, REVEAL_MS: 15000 };
+export const HILO = { ROUNDS: 7, GUESS_MS: null as number | null, REVEAL_MS: 12000 };
+/** Tick-Tack-Bumm: die Lunte ist Spielzeit (bleibt), nur die Pause nach dem Knall ist länger */
+export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 9000, SIPS: 3, MIN_HOLD_MS: 900 };
 
 export const DEFAULT_NHIE = [
   '... einen Flug oder Zug verpasst.',
@@ -538,12 +561,12 @@ const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'R
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber'] },
-  { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
+  { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'tourist', 'werwolf'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel'] },

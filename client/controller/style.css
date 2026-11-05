@@ -1434,14 +1434,24 @@ table.lb tr.off td { opacity: 0.55; }
 .an-catch .an-fish canvas { image-rendering: pixelated; }
 .an-fishname { font-size: 16px; margin: 0; }
 .an-catch.rare h2, .an-catch.rare .an-fishname { color: #c98a10; }
-
-/* ---------------------------------------------------------------- Kofferpacken (nutzt die Wackelturm-Knöpfe) */
-.koffer-fill { flex: 1; display: flex; flex-direction: column; gap: 6px; }
-.koffer-fill small { font-size: 9px; color: var(--ink); }
-.koffer-bar { height: 18px; border: 3px solid var(--wood-dark); background: #5a5560; box-shadow: inset 0 0 0 2px #3d3d48; }
-.koffer-bar i { display: block; height: 100%; width: 0; background: #f2c33a; box-shadow: inset 0 -3px 0 #c99a2b; transition: width 0.3s; }
-.koffer-team { font-size: 8px; color: var(--ink); margin: 0; }
-.koffer-pad.waiting .turm-btn { filter: grayscale(0.8) brightness(0.85); }
-.top-row .timer.alert { color: var(--red); }
-.koffer-over p { margin: 6px 0; }
-.koffer-over .koffer-big { font-size: 20px; color: var(--red); }
+/* ---------------------------------------------------------------- VIP-Menü (Überspringen) */
+/* Kleiner Reiter oben in der Mitte – hängt nur 22 px in den Bildschirm und liegt über keinem Spielknopf */
+.vm-tab {
+  position: fixed; top: env(safe-area-inset-top, 0px); left: 50%; transform: translateX(-50%); z-index: 8;
+  width: 46px; height: 22px; padding: 0; margin: 0; font-size: 12px; line-height: 1;
+  color: var(--ink); text-shadow: none; background: rgba(255, 246, 220, 0.82);
+  border: 2px solid var(--wood-dark); border-top: none; border-radius: 0 0 8px 8px; box-shadow: 0 2px 0 rgba(45, 27, 18, 0.35);
+  opacity: 0.8;
+}
+.vm-tab:active { transform: translateX(-50%) translateY(1px); }
+.vm-tab.open { opacity: 1; background: var(--gold); }
+.vm-sheet { position: fixed; inset: 0; z-index: 9; background: rgba(45, 27, 18, 0.35); }
+.vm-panel {
+  position: absolute; top: calc(26px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  width: min(320px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; padding: 10px;
+  background: var(--paper-light); border: 3px solid var(--wood-darker); box-shadow: 0 4px 0 var(--outline);
+}
+.vm-title { font-size: 8px; color: var(--ink-soft); text-align: center; }
+.vm-panel button { margin: 0; font-size: 9px; line-height: 1.5; }
+.vm-skip { background: #f0973a; }
+.vm-panel .vm-abort { color: var(--red); }

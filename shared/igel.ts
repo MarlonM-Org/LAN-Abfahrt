@@ -10,14 +10,20 @@ export const IGEL = {
   H: 270,
   /** Anfangs-Wasserspiegel (y) */
   WATER_Y: 248,
-  TURN_MS: 30000,
+  /**
+   * Zugzeit (laufen + zielen) gehört wie beim Vorbild zum Spiel, ist aber großzügiger (vorher 30 s).
+   * Der VIP kann einen Zug im Menü überspringen.
+   */
+  TURN_MS: 45000,
+  /** Wer offline ist, verliert seinen Zug nach so kurzer Zeit */
+  OFFLINE_TURN_MS: 1500,
   RETREAT_MS: 3000,
   COUNTDOWN_MS: 3500,
   SETTLE_MIN_MS: 700,
-  /** Danach: Sudden Death (Wasser steigt jede Runde) */
-  SUDDEN_MS: 5 * 60_000,
-  /** Absolute Obergrenze, falls sich niemand trifft */
-  HARD_CAP_MS: 8 * 60_000,
+  /** Danach: Sudden Death (Wasser steigt jede Runde) – vorher 5 min, wegen der längeren Züge 6 min */
+  SUDDEN_MS: 6 * 60_000,
+  /** Absolute Obergrenze, falls sich niemand trifft (vorher 8 min) */
+  HARD_CAP_MS: 10 * 60_000,
   WATER_RISE: 20,
   GRAVITY: 260,
   /** Windbeschleunigung bei wind = ±1 (px/s²) */

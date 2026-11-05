@@ -8,7 +8,6 @@ import type { WolfPrivate, WolfState } from './werwolf';
 import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
-import type { KofferState } from './koffer';
 
 export interface Look {
   skin: number;
@@ -73,8 +72,7 @@ export type MiniKind =
   | 'pixel'
   | 'wpistole'
   | 'zauber'
-  | 'angeln'
-  | 'koffer';
+  | 'angeln';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1861,8 +1859,7 @@ export type MiniSnapshot =
   | { kind: 'pixel'; state: PixelState }
   | { kind: 'wpistole'; state: WpistoleState }
   | { kind: 'zauber'; state: ZauberState }
-  | { kind: 'angeln'; state: AngelnState }
-  | { kind: 'koffer'; state: KofferState };
+  | { kind: 'angeln'; state: AngelnState };
 
 export interface GameState {
   phase: Phase;
@@ -1891,6 +1888,8 @@ export interface GameState {
   customQuipCount: number;
   /** Arcade: „Alle dürfen wählen“ – Stimmen der Spieler für das nächste Spiel (null = aus) */
   arcadeVote?: ArcadeVoteState | null;
+  /** Kann der VIP (bzw. der Laptop) gerade etwas überspringen? (Zug, Phase, Info-Screen) – sonst null */
+  skippable?: SkipInfo | null;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
   /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
@@ -1947,6 +1946,16 @@ export interface NochmalState {
   disabled?: string;
   /** Arcade-Modus: „Zufälliges Spiel“ anbieten */
   random: boolean;
+}
+
+/**
+ * Überspringen per VIP-Menü (Handy) bzw. Taste S am Laptop – nur in Zug-/Warte-Phasen, nie in Echtzeit-Spielen.
+ * `label` ist der fertige Knopftext („Bens Wurf überspringen“, „Abstimmung beenden“).
+ */
+export interface SkipInfo {
+  label: string;
+  /** Reiner Info-Screen (Auflösung, Intro, Zwischenstand) – niemand muss etwas tun */
+  info?: boolean;
 }
 
 /** Arcade-Abstimmung in der Lobby: jeder Spieler hat höchstens eine Stimme */

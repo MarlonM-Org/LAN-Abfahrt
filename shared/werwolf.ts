@@ -4,21 +4,27 @@
  * alles Geheime steht in `WolfPrivate` und geht nur per `privateFor()` an den jeweiligen Spieler.
  */
 
+/**
+ * Zeiten. `null` = kein Zeitlimit: Die Phase endet, sobald alle ihre Wahl getroffen haben – oder wenn der VIP
+ * im Menü (bzw. Taste S am Laptop) überspringt. Info-Screens (Morgen, Urteil) schalten großzügig von selbst weiter.
+ */
 export const WOLF = {
-  /** Rollen anschauen */
-  ROLES_MS: 14000,
-  /** Nacht: Werwölfe wählen, Seherin schaut, alle anderen tippen einen Verdacht */
-  NIGHT_MS: 35000,
-  /** Danach ist die Hexe dran (alle anderen zählen weiter Schäfchen) */
-  WITCH_MS: 15000,
-  /** Morgen: Wer ist gestorben? */
-  DAWN_MS: 9000,
-  /** Abstimmung am Tag */
-  VOTE_MS: 30000,
-  /** Auflösung der Abstimmung */
-  VERDICT_MS: 9000,
-  /** Der Jäger nimmt jemanden mit */
-  HUNTER_MS: 20000,
+  /** Rollen anschauen (vorher 14 s) */
+  ROLES_MS: 20000,
+  /** Nacht: Werwölfe wählen, Seherin schaut, alle anderen tippen einen Verdacht (vorher 35 s) */
+  NIGHT_MS: null as number | null,
+  /** Danach ist die Hexe dran (vorher 15 s) */
+  WITCH_MS: null as number | null,
+  /** Morgen: Wer ist gestorben? (vorher 9 s) */
+  DAWN_MS: 15000,
+  /** Diskussion am Tag: kein Limit mehr (vorher 2–3 min, siehe wolfDayMs) – der VIP beendet sie */
+  DAY_MS: null as number | null,
+  /** Abstimmung am Tag (vorher 30 s) */
+  VOTE_MS: null as number | null,
+  /** Auflösung der Abstimmung (vorher 9 s) */
+  VERDICT_MS: 15000,
+  /** Der Jäger nimmt jemanden mit (vorher 20 s) */
+  HUNTER_MS: null as number | null,
   OVER_MS: 8000,
   /** Mindestdauer der Nacht, auch wenn alle schon fertig sind (sonst wirkt es hektisch) */
   NIGHT_MIN_MS: 6000,
@@ -29,7 +35,7 @@ export const WOLF = {
   SURVIVE_POINTS: 1,
 };
 
-/** Diskussionszeit: 90 s + 10 s pro Spieler, zwischen 2 und 3 Minuten */
+/** Frühere Diskussionszeit (nur noch, falls WOLF.DAY_MS wieder ein Limit bekommt): 90 s + 10 s pro Spieler, 2–3 Minuten */
 export const wolfDayMs = (players: number) => Math.max(120000, Math.min(180000, 90000 + players * 10000));
 
 /** Werwölfe: etwa einer pro 4 Spieler (6 → 1, 7–10 → 2, 11–12 → 3) */

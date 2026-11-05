@@ -8,13 +8,17 @@ export const PIXEL = {
   ROUNDS: 3,
   /** Kantenlänge des Rasters */
   SIZE: 16,
-  INTRO_MS: 5000,
-  PAINT_MS: 75000,
-  VOTE_MS: 25000,
-  /** Ab 9 Bildern etwas mehr Zeit zum Anschauen */
-  VOTE_MS_MANY: 32000,
-  REVEAL_MS: 11000,
-  SCORES_MS: 7000,
+  /**
+   * Zeiten: `null` = kein Zeitlimit – Malen/Abstimmen endet, wenn alle fertig sind oder der VIP überspringt
+   * (vorher Malen 75 s, Abstimmen 25 s bzw. 32 s ab 9 Bildern). Info-Screens schalten großzügig weiter.
+   */
+  INTRO_MS: 10000,
+  PAINT_MS: null as number | null,
+  VOTE_MS: null as number | null,
+  VOTE_MS_MANY: null as number | null,
+  /** vorher 11 s / 7 s */
+  REVEAL_MS: 15000,
+  SCORES_MS: 12000,
   /** Weniger bemalte Felder → Bild kommt nicht in die Ausstellung */
   MIN_FILLED: 1,
 };
