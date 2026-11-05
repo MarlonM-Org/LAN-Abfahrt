@@ -167,6 +167,7 @@ export function defaultSongForScene(scene: string): string {
       return 'romantic';
     case 'flunky': case 'grill':
       return 'poolparty';
+    case 'schaetz':
     case 'pixel':
       return 'strandpromenade';
     case 'sprint': case 'tidy': case 'kurve': case 'koffer': case 'umzug':
@@ -193,6 +194,10 @@ export function defaultSongForScene(scene: string): string {
       return 'sport';
     case 'wasser': case 'angeln': case 'sup':
       return 'wasser';
+    case 'maexchen':
+      return 'poolparty';
+    case 'werwars':
+      return 'bar';
     default: // descent, wrap, parcours, …
       return 'action';
   }

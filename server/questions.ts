@@ -15,7 +15,7 @@ export class QuestionStore {
 
   constructor(
     file = 'questions.json',
-    private kind: 'wwe' | 'nhie' | 'post' | 'quip' = 'wwe',
+    private kind: 'wwe' | 'nhie' | 'post' | 'quip' | 'werwars' = 'wwe',
   ) {
     this.file = path.resolve(dir, '../data', file);
     try {
@@ -41,6 +41,11 @@ export class QuestionStore {
       // Stille Post: Startsatz ohne Satzzeichen-Zwang, erster Buchstabe groß
       q = q.slice(0, 90).replace(/[.!]+$/, '');
       q = q.charAt(0).toUpperCase() + q.slice(1);
+    } else if (this.kind === 'werwars') {
+      // Wer war's?: persönliche Frage ohne Doppelpunkt/Punkt am Ende, erster Buchstabe groß
+      q = q.slice(0, 80).replace(/[:.!]+$/, '').trim();
+      q = q.charAt(0).toUpperCase() + q.slice(1);
+      if (q.length < 4) return null;
     } else if (this.kind === 'wwe') {
       q = q.replace(/^wer würde eher\s*/i, '');
       if (!q.startsWith('...')) q = `... ${q}`;

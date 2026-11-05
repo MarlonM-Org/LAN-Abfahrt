@@ -43,12 +43,15 @@ import { pickKoffer } from './screens/koffer';
 import { pickSuess } from './screens/suess';
 import { pickUmzug } from './screens/umzug';
 import { pickWackel } from './screens/wackel';
+import { pickSchaetz } from './screens/schaetz';
+import { pickMaexchen } from './screens/maexchen';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
 import { pickDarts } from './screens/darts';
 import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
+import { pickWerwars } from './screens/werwars';
 import { pickIntro } from './screens/intro';
 import { buildKicked, initVipPlayersButton } from './players';
 import { initVipMenu } from './vipMenu';
@@ -378,6 +381,12 @@ function pickScreen(): Screen {
           return pickWackel(m.state);
         case 'funk':
           return pickFunk(m.state);
+        case 'schaetz':
+          return pickSchaetz(m.state, vip);
+        case 'maexchen':
+          return pickMaexchen(m.state);
+        case 'werwars':
+          return pickWerwars(m.state, vip);
       }
       return outdatedScreen();
     }

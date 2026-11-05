@@ -1,11 +1,12 @@
 import type { IgelState, IgelWeapon } from '../../../shared/types';
-import { GRENADE, IGEL, IGEL_COLORS, IGEL_TAUNTS, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, squadOf, windArrows } from '../../../shared/igel';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
+import { GRENADE, IGEL, IGEL_TAUNTS, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, squadOf, windArrows } from '../../../shared/igel';
+import { type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
 import { haptic } from '../haptic';
 import { onInputReset } from '../stick';
 
 const igel = () => (store.state?.mini?.kind === 'igel' ? store.state.mini.state : null);
-const teamColor = (st: IgelState, id: string) => IGEL_COLORS[Math.max(0, st.teams.indexOf(id)) % IGEL_COLORS.length];
+/** Spielerfarbe des Abends – wie `colorOf` in der IgelScene */
+const teamColor = (st: IgelState, id: string) => colorOfId(id, Math.max(0, st.teams.indexOf(id))).hex;
 const squadColor = (st: IgelState, id: string) => {
   const i = squadOf(st, id);
   return i >= 0 ? st.squads![i].color : null;

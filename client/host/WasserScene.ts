@@ -10,6 +10,7 @@ import { figure, type Figure } from './textures';
 import { BLUE_INK, NameTags, background, ensureTex, fitText, ink, panel, prop, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { pcol } from './playerColor';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const SUN_INK = '#b06d00';
@@ -283,13 +284,13 @@ export class WasserScene extends Phaser.Scene {
     const g = this.aimG;
     g.clear();
 
-    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; alpha?: number }[] = [];
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; dot?: number; alpha?: number }[] = [];
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
       a.x += (p.x - a.x) * 0.35;
       a.y += (p.y - a.y) * 0.35;
-      tagSpecs.push({ id, x: a.x, y: a.y - 36, name: this.names.get(id) ?? '?', color: hex(p.c), alpha: p.s === 'ok' ? 1 : 0.75 });
+      tagSpecs.push({ id, x: a.x, y: a.y - 36, name: this.names.get(id) ?? '?', color: pcol(id).hex, dot: p.c, alpha: p.s === 'ok' ? 1 : 0.75 });
 
       a.img.setFlipX(p.d < 0);
       a.f.play(p.s === 'soaked' ? 'hit' : p.m ? 'walk' : 'idle');

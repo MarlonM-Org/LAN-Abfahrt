@@ -155,20 +155,20 @@ Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), d
 ### Phase 2 · Look und Bewegung (M ×2)
 - [x] Avatar-Animations-Frames (Laufen, Sprung, Treffer, Jubel, Blinzeln) *(#61, dazu Spielerfarbe pro Abend; offen: Parallax, Ambient-Bewegung)* zentral in `shared/avatar.ts`, Squash & Stretch in `figure()`, Ambient-Bewegung (Wolken, Möwen, Palmen), Parallax in Smash, Igel, Volley, Bogen
 - [ ] `SnapBuffer` mit Wiedergabe-Uhr statt bildratenabhängiger Glättung (Hit-Stop, Zeitlupe, Wiederholung „TOR!“ fast gratis), Tick 30 Hz für Plattformer, Render-Auflösung ×2/×4 bei unveränderter Welt, Kamera für Igel, Kart-Regie, Sumo-Finale, Brett-Schwenk
-- [ ] Namensschilder entzerren, „Spieler (P)“/„♪ Musik“ nicht über dem HUD, Namen nicht hart kürzen, leere Arenen beleben (Boule, SUP, Golf, Flunky)
+- [x] Namensschilder entzerren, „Spieler (P)“/„♪ Musik“ nicht über dem HUD, Namen nicht hart kürzen, leere Arenen beleben (Boule, SUP, Golf, Flunky) *(#67)*
 
 ### Phase 3 · Party-Modus 2.0
-- [ ] (S) Alle würfeln gleichzeitig, Bonus-Cocktails am Ende mit Reveal, letzte zwei Runden doppelt, Finale-Sieg = 2 Cocktails, Brettstand in `data/party.json`, Nachzügler einsteigen lassen, Tageszeit über den Abend
+- [x] (S) Alle würfeln gleichzeitig, Bonus-Cocktails am Ende mit Reveal, letzte zwei Runden doppelt, Finale-Sieg = 2 Cocktails, Brettstand in `data/party.json`, Nachzügler einsteigen lassen, Tageszeit über den Abend *(#66)*
 - [ ] (M) Items-Laden (Doppelwürfel, Cocktail-Klau, Taxi zur Bar, Sonnencreme-Schild), Bar-Preisstaffel, eine Abzweigung, Duell-Feld „Teilen oder Klauen“ (Wasserpistolen-Duell, Sprint)
 - [ ] (M) Minispiel-Typen 2 gegen 2 und 1 gegen 3, Abend-Statistik und „Titel des Abends“ aus dem `FxLog`, Turnier als Playlist
 
 ### Phase 4 · Igel-Krieg → Worms
 - [x] (S) Wind driftet statt neu gewürfelt; Zugzeit 30/20/15 s nach Spielerzahl; Flut pro Runde statt pro Zug; HP 60 ab 8 Spielern; Sudden Death ab 7 Spielern nach 3 min; HP am Zugende herunterzählen; Kamera (Aktiver, Geschoss, Krater); Wind sichtbar (Wolken, Balken, Pfeil im Ziel-Pad); Zuschauer-Sprüche; FEUER-Knopf *(#46)*
-- [ ] (M) Modus „Alle gleichzeitig“ ab 7 Spielern; Waffen 4 → 10 (Wasser-Schrotflinte, Möwen-Luftschlag per Minikarte, Böller, Seeigel-Mine, Ananas-Splitterbombe, Paddel, Heilige Ananas, Surfbrett-Brücke); Kisten am Fallschirm; Gaskartuschen; Spieler-Teams; größere Insel
+- [x] (M) Modus „Alle gleichzeitig“ ab 7 Spielern; Waffen 4 → 10 (Wasser-Schrotflinte, Möwen-Luftschlag per Minikarte, Böller, Seeigel-Mine, Ananas-Splitterbombe, Paddel, Heilige Ananas, Surfbrett-Brücke); Kisten am Fallschirm; Gaskartuschen; Spieler-Teams; größere Insel *(#68 – größere Insel offen)*
 - [ ] (L) Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche
 
 ### Phase 5 · Portfolio umsteuern (neue Spiele, je S–M)
-- [ ] Wer war's? (Who's Who), Schätzkönig (Wits & Wagers), Mäxchen am Pool, Funkfrequenz (Wavelength) – je ein Abend auf dem Sprüche-/WWE-Fluss
+- [ ] Wer war's? (Who's Who, #71 ✓), Schätzkönig (Wits & Wagers), Mäxchen am Pool, Funkfrequenz (Wavelength) – je ein Abend auf dem Sprüche-/WWE-Fluss
 - [ ] Dann: Spion unter Gästen (läuft), Montagsmaler live, Strand-Band, Sektkorken (fürs Brett), Lügen-Lexikon, Strandkorb-Scharade, Geheimcode am Pool, Kofferbombe entschärfen, Urlaubs-Wahnsinn (WarioWare)
 - [ ] Verräter-Redesign „Stromausfall“ (Sichtbeschränkung mit der Dunkelheits-Technik der Geisterjagd)
 - [ ] Gestrichen/zusammengelegt: Wackel-Prügelei, Umzugschaos; Kofferpacken als Wackelturm-Variante

@@ -21,6 +21,7 @@ import { figure, playAvatar } from './textures';
 import { BLUE_INK, INK, NameTags, background, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { pcol } from './playerColor';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const SUN_INK = '#b06d00';
@@ -379,7 +380,7 @@ export class GrillScene extends Phaser.Scene {
 
     // Figuren
     this.hi.clear();
-    const tagSpecs: { id: string; x: number; y: number; name: string; color: string }[] = [];
+    const tagSpecs: { id: string; x: number; y: number; name: string; color: string; dot?: number }[] = [];
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
@@ -389,7 +390,7 @@ export class GrillScene extends Phaser.Scene {
       a.img.setY(!p.m && p.w ? -Math.abs(Math.sin(now / 45)) * 1.5 : 0);
       playAvatar(a.img, p.m ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 4).setDepth(a.y + 4);
-      tagSpecs.push({ id, x: a.x, y: a.y - 34, name: this.names.get(id) ?? '?', color: hex(p.c) });
+      tagSpecs.push({ id, x: a.x, y: a.y - 34, name: this.names.get(id) ?? '?', color: pcol(id).hex, dot: p.c });
       // Getragenes
       if (p.h) {
         const key = grillItemKey(p.h);

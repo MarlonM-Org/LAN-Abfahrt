@@ -8,6 +8,7 @@
     "dev": "tsx watch --ignore ./client --ignore ./dist server/index.ts",
     "build": "vite build",
     "start": "tsx server/index.ts --prod",
+    "online": "vite build && tsx server/index.ts --prod --online",
     "typecheck": "tsc --noEmit",
     "bots": "tsx scripts/bots.ts",
     "domain": "tsx scripts/domain.ts",

@@ -1,7 +1,7 @@
 import type { BogenState } from '../../../shared/types';
-import { BOGEN, BOGEN_COLORS, BOGEN_POWERS, bogenSnap } from '../../../shared/bogen';
+import { BOGEN, BOGEN_POWERS, bogenSnap } from '../../../shared/bogen';
 import { haptic } from '../haptic';
-import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, send, store } from '../core';
+import { type Screen, app, avatarCanvas, colorOfId, el, me, message, nameOf, q, send, store } from '../core';
 import { floatingStick, holdButton } from './smash';
 
 /** Pfeile als kleine Symbole (Wasserbomben-Pfeile blau) */
@@ -36,7 +36,7 @@ export function pickBogen(s: BogenState): Screen {
 
   return ['bg-play', () => {
     const idx = Object.keys(s.players).indexOf(id);
-    const color = BOGEN_COLORS[Math.max(0, idx) % BOGEN_COLORS.length];
+    const color = colorOfId(id, Math.max(0, idx)).hex;
     const root = el(`
       <div class="smash bogen" style="--bg-color:${color}">
         <div class="sm-top bg-top">

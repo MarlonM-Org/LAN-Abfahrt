@@ -7,6 +7,7 @@ import * as A from '../art/wackel';
 import { sumoRing } from '../art/sumo';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -428,6 +429,8 @@ export class WackelScene extends Phaser.Scene {
       const p = st.players[id];
       if (!pl) return;
       const cx = x0 + i * slot + slot / 2;
+      // Spielerfarbe des Abends hinter dem Porträt (wie Sumo/Arena) – passt zum Handy-Rahmen
+      this.hud.add(this.add.rectangle(cx, 3, 18, 17, pcol(id).num).setOrigin(0.5, 0).setAlpha(p.alive ? 1 : 0.35));
       this.hud.add(this.add.image(cx, 4, ensurePortrait(this, pl.look)).setOrigin(0.5, 0).setAlpha(p.alive ? 1 : 0.35));
       if (!p.alive && st.sub !== 'countdown') this.hud.add(ink(this, cx, 7, 'x', { color: '#2d64a8' }));
       for (let w = 0; w < st.winRounds; w++) {

@@ -15,7 +15,7 @@ import { type Screen, escapeHtml, store } from './core';
  */
 
 /** Sensor-/Tastatur-Spiele: hochkant Pflicht, kein „Trotzdem so“ */
-const STRICT: MiniKind[] = ['flunky', 'bowling', 'enten', 'boule', 'darts', 'golf', 'stillepost', 'sprueche', 'wpistole', 'angeln'];
+const STRICT: MiniKind[] = ['flunky', 'bowling', 'enten', 'boule', 'darts', 'golf', 'stillepost', 'sprueche', 'wpistole', 'angeln', 'werwars'];
 
 export function deviceOrient(): 'portrait' | 'landscape' {
   const t = screen.orientation?.type;

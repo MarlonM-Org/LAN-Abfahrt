@@ -1,5 +1,6 @@
 import type { KurveState } from '../../../shared/types';
-import { KURVE, KURVE_POWER_INFO } from '../../../shared/games';
+import { KURVE_POWER_INFO } from '../../../shared/games';
+import { playerColor } from '../../../shared/players';
 import { haptic } from '../haptic';
 import { spectatorBar } from '../spectator';
 import { type Screen, app, el, message, nameOf, q, send, store } from '../core';
@@ -49,11 +50,12 @@ export function pickKurve(s: KurveState): Screen {
   if (s.sub === 'over') return ['kv-over', message('Endstand!', 'Schau auf den Fernseher!')];
   // Ein einziger Screen für alle Runden – so bleiben gehaltene Finger beim Phasenwechsel erhalten
   return ['kv-play', () => {
-    const color = KURVE.COLORS[me.color] ?? '#fff';
+    // Spurfarbe = Spielerfarbe des Abends (der Server übernimmt `PlayerPublic.color`)
+    const color = playerColor(me.color);
     // Quer: die Daumen ruhen an den Rändern wie auf Schultertasten – je eine volle Bildhälfte
     const root = el(`
       <div class="lx kv-lx">
-        <div class="lx-head"><span class="lx-tag kv-color" style="background:${color}">Du bist <b>${KURVE.COLOR_NAMES[me.color] ?? '?'}</b></span><span class="round"></span><span class="score grow"></span></div>
+        <div class="lx-head"><span class="lx-tag kv-color" style="background:${color.hex};color:${color.ink}">Du bist <b>${color.name}</b></span><span class="round"></span><span class="score grow"></span></div>
         <div class="lx-left"><button class="big-btn kv-btn kv-left">◀<br/>LINKS</button></div>
         <div class="lx-mid"><p class="kv-status"></p></div>
         <div class="lx-right"><button class="big-btn kv-btn kv-right">RECHTS<br/>▶</button></div>
@@ -103,7 +105,7 @@ export function pickKurve(s: KurveState): Screen {
       q(root, '.score').textContent = `${p.score} Punkte`;
       const alive = Object.values(st.players).filter((h) => h.alive).length;
       let status: string;
-      if (st.sub === 'countdown') status = `Gleich geht’s los! Dein Kopf blinkt ${KURVE.COLOR_NAMES[p.color]} auf dem TV.`;
+      if (st.sub === 'countdown') status = `Gleich geht’s los! Dein Kopf blinkt ${playerColor(p.color).name} auf dem TV.`;
       else if (st.sub === 'roundEnd') status = st.roundWinner ? (st.roundWinner === id ? 'Du gewinnst die Runde!' : `${nameOf(st.roundWinner)} gewinnt die Runde.`) : 'Runde vorbei!';
       else if (!p.alive) status = 'Crash! Du bist raus – warte auf die nächste Runde.';
       else if (p.fx.length) status = p.fx.map((f) => (f === 'slow' ? 'Du wirst ausgebremst!' : KURVE_POWER_INFO[f].label)).join(' ');

@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 23:45",
+  "updated": "2026-11-06 00:25",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -7,29 +7,61 @@
   },
   "inProgress": [
     {
-      "title": "Review Phase 3: Party-Modus 2.0 (Stufe S)",
+      "title": "Review Nacharbeit: Handy-Farben, TV-Banner, Doku-Dubletten",
       "kind": "",
       "type": "Review-Umsetzung",
-      "branch": "review/party2",
-      "detail": "Alle würfeln gleichzeitig, Bonus-Cocktails mit Reveal, Endspurt doppelt, Finale = 2 Cocktails, Party speichern/fortsetzen, Nachzügler, Tageszeit"
+      "branch": "review/nacharbeit",
+      "detail": "Abendfarbe auch auf den Handy-Screens (Kurve, Bogen, Igel, Sumo, Kart), Namensschilder in Abendfarbe, Quer-Banner nicht mehr übers HUD, README/MiniKind aufräumen"
     },
     {
-      "title": "Review Phase 4: Igel-Krieg Stufe M",
-      "kind": "igel",
-      "type": "Review-Umsetzung",
-      "branch": "review/igel-m",
-      "detail": "„Alle gleichzeitig“ ab 7, 10 Waffen, Kisten, Gasfässer, Spieler-Teams, Zielhilfe, Spruch-Knöpfe, Ton"
-    },
-    {
-      "title": "Review Reste: Juice in allen Szenen, Namensschilder, Parcours-Stick, zwei Rollenträger",
+      "title": "Neues Spiel: Schätzkönig",
       "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/juice-rest",
-      "detail": "Ton/Partikel in den übrigen Szenen, Namensschilder entzerren, Laptop-Knöpfe nicht übers HUD, leere Arenen beleben, Fangen/Geist mit zwei Rollenträgern"
+      "type": "Neues Spiel",
+      "branch": "spiel/schaetz",
+      "detail": "à la Wits & Wagers: schätzen, dann Chips auf die beste Antwort setzen; 90-s-Variante fürs Brett"
+    },
+    {
+      "title": "Neues Spiel: Mäxchen am Pool",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/maexchen",
+      "detail": "Würfel-Bluff mit geheimer Hand, Schütteln zum Würfeln, auch als Trinkspiel"
+    },
+    {
+      "title": "Neues Spiel: Funkfrequenz",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/funk",
+      "detail": "à la Wavelength: Funker sieht das Ziel auf der Skala, Team dreht den Zeiger, Gegner wetten"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Wer war's? (à la Who's Who)",
+      "pr": 71,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Online spielen über Cloudflare-Tunnel (npm run online, Link teilen am Handy, keine Laptop-Rechte über den Tunnel)",
+      "pr": 70,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Party-Modus 2.0 (gleichzeitig würfeln, Bonus-Cocktails, Endspurt, Fortsetzen, Nachzügler, Tageszeit)",
+      "pr": 66,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review Reste: Juice in allen Szenen, Namensschilder, Laptop-Knöpfe, belebte Arenen, Parcours-Stick, zwei Rollenträger",
+      "pr": 67,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Igel-Krieg Stufe M („Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Fässer, Teams, Zielhilfe)",
+      "pr": 68,
+      "date": "2026-11-05"
+    },
     {
       "title": "Dev-Server: Fonts aus Worktrees mit Symlink-node_modules (fs.allow)",
       "pr": 65,
@@ -258,11 +290,19 @@
     },
     "igel": {
       "status": "umgesetzt",
-      "notes": "Review Stufe S: Wind driftet, Zugzeit/HP nach Spielerzahl, Flut pro Runde, Kamera, HP-Countdown, FEUER-Knopf, quer (#45, #46)"
+      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68)"
     },
     "ttt": {
       "status": "umgesetzt",
       "notes": "Runden auf 100 s / 2 Runden gekürzt, quer (#45, #46)"
+    },
+    "fangen": {
+      "status": "umgesetzt",
+      "notes": "Ab 7 Spielern zwei Animateure, faire Rollenwertung (#67)"
+    },
+    "geist": {
+      "status": "umgesetzt",
+      "notes": "Ab 7 Spielern zwei Geister, faire Rollenwertung (#67)"
     }
   },
   "general": [
@@ -321,6 +361,10 @@
     {
       "title": "Spiel-Review Phase 0+1 (Fairness, Netz, Pacing, Ton/Juice, Ausrichtung, Igel S) umgesetzt – offen: Regelkarte, Zuschauer-Rollen, Look, Spielbrett 2.0, Igel M, neue Spiele",
       "status": "in Arbeit"
+    },
+    {
+      "title": "Online mit Freunden spielen → npm run online (Cloudflare-Tunnel statt Port öffnen), „Link teilen“ in der Handy-Lobby",
+      "status": "umgesetzt"
     }
   ]
 }

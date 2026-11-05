@@ -72,9 +72,6 @@ export const BOGEN = {
   CHEST_MAX_MS: 11000,
 };
 
-/** Spielerfarben (nach Reihenfolge) – TV-Markierung und Handy-Rahmen */
-export const BOGEN_COLORS = ['#e0503f', '#3f8fe0', '#46b04a', '#f2c33a', '#9b5fc0', '#f0973a', '#2fb5a5', '#f07aa8'];
-
 /** Die acht Schussrichtungen (0 = rechts, im Uhrzeigersinn, y nach unten) */
 export const BOGEN_DIRS: { x: number; y: number }[] = Array.from({ length: 8 }, (_, i) => {
   const a = (i * Math.PI) / 4;

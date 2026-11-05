@@ -9,6 +9,7 @@ import { ensureAvatar, avatarSprite, playAvatar } from './textures';
 import { GOLD, INK, NameTags, background, ensureTex, ink, panel, prop, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { pcol } from './playerColor';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const short = (id: string) => (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '');
@@ -126,7 +127,7 @@ export class ParcoursScene extends Phaser.Scene {
       v.x += (r.x - v.x) * 0.45;
       v.y += (r.y - v.y) * 0.45;
       v.root.setPosition(Math.round(v.x), Math.round(v.y));
-      if (r.st !== 'dead' && v.root.visible) tagSpecs.push({ id, x: Math.round(v.x), y: Math.round(v.y) - 37, name: short(id), color: hex(P.COLORS[st.colors[id] ?? 0]) });
+      if (r.st !== 'dead' && v.root.visible) tagSpecs.push({ id, x: Math.round(v.x), y: Math.round(v.y) - 37, name: short(id), color: pcol(id, st.colors[id] ?? 0).hex });
       v.img.setFlipX(r.face < 0);
       const moving = r.st === 'run' && r.ground && Math.abs(r.x - v.x) > 0.3;
       playAvatar(v.img, r.st === 'dead' ? 'hit' : r.st === 'goal' ? 'cheer' : !r.ground ? 'jump' : moving ? 'walk' : 'idle');

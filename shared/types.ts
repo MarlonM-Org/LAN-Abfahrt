@@ -52,17 +52,17 @@ export type MiniKind =
   | 'sup' | 'tidy'
   | 'flieger' | 'kurve' | 'arena'
   | 'bowling'
-  | 'sup' | 'tidy' | 'enten'
-  | 'sup' | 'tidy' | 'ttt'
+  | 'enten'
+  | 'ttt'
   | 'verstecken'
-  | 'sup' | 'tidy' | 'parcours'
-  | 'sup' | 'tidy' | 'kart'
-  | 'sup' | 'tidy' | 'turm'
-  | 'sup' | 'tidy' | 'igel'
+  | 'parcours'
+  | 'kart'
+  | 'turm'
+  | 'igel'
   | 'smash'
-  | 'sup' | 'tidy' | 'wasser'
+  | 'wasser'
   | 'stillepost'
-  | 'sup' | 'tidy' | 'fangen'
+  | 'fangen'
   | 'geist'
   | 'grill'
   | 'boule'
@@ -84,7 +84,10 @@ export type MiniKind =
   | 'suess'
   | 'umzug'
   | 'wackel'
-  | 'funk';
+  | 'funk'
+  | 'schaetz'
+  | 'maexchen'
+  | 'werwars';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -482,7 +485,7 @@ export interface KurveHead {
   /** aktuelle Geschwindigkeit (px/s) – zum Glätten auf dem TV */
   v: number;
   alive: boolean;
-  /** Index in KURVE.COLORS */
+  /** Spurfarbe: Index in `PLAYER_COLORS` (= Spielerfarbe des Abends, `shared/players.ts`) */
   color: number;
   score: number;
   /** Gerade in einer Lücke (Kopf zieht keine Spur) */
@@ -2108,7 +2111,10 @@ export type MiniSnapshot =
   | { kind: 'spion'; state: SpionState }
   | { kind: 'umzug'; state: UmzugState }
   | { kind: 'wackel'; state: WackelState }
-  | { kind: 'funk'; state: FunkState };
+  | { kind: 'funk'; state: FunkState }
+  | { kind: 'schaetz'; state: SchaetzState }
+  | { kind: 'maexchen'; state: MaexState }
+  | { kind: 'werwars'; state: WerwarsState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -2117,6 +2123,8 @@ export type MiniSnapshot =
 export interface GameMeta {
   players: PlayerPublic[];
   joinUrl: string;
+  /** Online-Adresse über den Cloudflare-Tunnel (`npm run online` bzw. ONLINE_URL), sonst null */
+  onlineUrl: string | null;
   customNhieCount: number;
   botCount: number;
   /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
@@ -2126,8 +2134,16 @@ export interface GameMeta {
   customPostCount: number;
   /** Eigene Fragen fürs Sprüche-Duell */
   customQuipCount: number;
+  /** Eigene Fragen für „Wer war's?“ */
+  customWerwarsCount: number;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
+}
+
+/** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */
+export interface HostInfo {
+  local: boolean;
+  online: boolean;
 }
 
 /** Laufender Zustand (Phase, Minispiel, Brett, Ergebnis) – Event `state`, bis zu 25-mal pro Sekunde. */
@@ -2260,6 +2276,9 @@ export type PrivateState =
   | { kind: 'pixel'; state: PixelPrivate }
   | { kind: 'spion'; state: SpionPrivate }
   | { kind: 'funk'; state: FunkPrivate }
+  | { kind: 'schaetz'; state: SchaetzPrivate }
+  | { kind: 'maexchen'; state: MaexPrivate }
+  | { kind: 'werwars'; state: WerwarsPrivate }
   | null;
 
 export interface JoinRequest {
@@ -2363,4 +2382,181 @@ export interface FunkPrivate {
   target: number | null;
   /** Nur für Testspieler im funkenden Team: „gehörter“ Hinweis (das Ziel; der Bot streut selbst) */
   botHint?: number;
+}
+
+// ------------------------------------------------------------------ Schätzkönig (à la Wits & Wagers)
+
+/** Eine Karte auf dem Zahlenstrahl: gleiche Antworten teilen sich eine Karte */
+export interface SchaetzCard {
+  value: number;
+  /** Wer diese Zahl geschätzt hat */
+  by: string[];
+  /** Quote pro Chip (Mitte ×2, außen ×3/×4) */
+  odds: number;
+}
+
+export interface SchaetzState {
+  /**
+   * guess = Zahl eintippen · line = Karten fliegen auf den Zahlenstrahl · bet = Chips setzen ·
+   * truth = Gruppenfrage: VIP tippt die richtige Zahl ein · drum = Trommelwirbel · reveal = Auflösung ·
+   * scores = Zwischenstand · over = Ende
+   */
+  sub: 'guess' | 'line' | 'bet' | 'truth' | 'drum' | 'reveal' | 'scores' | 'over';
+  round: number;
+  rounds: number;
+  endsIn: number;
+  question: string;
+  unit: string;
+  /** Gruppenfrage über diesen Spieler (sonst null) */
+  subject: string | null;
+  players: string[];
+  /** Wer schon geschätzt hat (Zahlen bleiben bis `line` geheim) */
+  guessed: string[];
+  /** Aufsteigend sortiert, ab `line` */
+  cards: SchaetzCard[] | null;
+  /** Quote des Felds „Alle zu hoch“ (Index −1, ganz links) */
+  lowOdds: number;
+  /** Gesetzte Chips pro Spieler: Kartenindizes (−1 = „Alle zu hoch“), höchstens `SCHAETZ.CHIPS` */
+  chips: Record<string, number[]>;
+  /** Wer alle Chips gesetzt hat */
+  betDone: string[];
+  /** Richtige Antwort – erst ab `reveal` */
+  answer: number | null;
+  /** Gruppenfrage ohne Eingabe des VIP: Median der Schätzungen zählt */
+  answerByMedian: boolean;
+  /** Gewinnerkarte (−1 = „Alle zu hoch“), ab `reveal` */
+  winner: number | null;
+  /** Punkte dieser Runde pro Spieler (ab `reveal`) */
+  gain: Record<string, number> | null;
+  points: Record<string, number>;
+}
+
+export interface SchaetzPrivate {
+  round: number;
+  /** Eigene Schätzung dieser Runde */
+  guess: number | null;
+}
+
+// ------------------------------------------------------------------ Mäxchen am Pool (Würfel-Bluff)
+
+/** Eine Ansage: wer, welcher Wert (Rangfolge in `shared/maexchen.ts`) */
+export interface MaexClaim {
+  by: string;
+  value: number;
+}
+
+/** Auflösung einer Kette: Aufdecken (Phase `lift` → `reveal`) oder geglaubtes Mäxchen */
+export interface MaexReveal {
+  /** Wer angesagt hat */
+  by: string;
+  /** Wer aufdeckt bzw. das Mäxchen glaubt */
+  doubter: string;
+  claimed: number;
+  /** null = noch unter dem Becher (Phase `lift`) bzw. nie aufgedeckt (Mäxchen geglaubt) */
+  dice: [number, number] | null;
+  actual: number | null;
+  /** Ansage war höher als der echte Wurf (null = noch offen / nicht aufgedeckt) */
+  lied: boolean | null;
+  loser: string | null;
+  /** Leben bzw. Schlücke */
+  cost: number;
+  /** Mäxchen geglaubt, ohne aufzudecken */
+  accepted: boolean;
+  /** Verlierer ist dadurch ausgeschieden (Arcade) */
+  out: boolean;
+}
+
+export interface MaexState {
+  /** Sitzordnung im Uhrzeigersinn */
+  order: string[];
+  /** Wer gerade dran ist (würfelt/zweifelt bzw. sagt an) */
+  turn: string;
+  /**
+   * roll = glauben (schütteln) oder aufdecken, announce = Wert ansagen,
+   * lift = Becher wird gehoben (Trommelwirbel), reveal = Würfel offen
+   */
+  sub: 'roll' | 'announce' | 'lift' | 'reveal' | 'over';
+  /** Zählt jede Phase hoch (Screen-Keys, Countdown) */
+  phaseNo: number;
+  endsIn: number;
+  /** Runde um den Tisch (1-basiert) */
+  round: number;
+  rounds: number;
+  /** Letzte Ansage der laufenden Kette (null = neue Kette, jeder Wert erlaubt) */
+  claim: MaexClaim | null;
+  /** Alle Ansagen der laufenden Kette (für den TV-Verlauf) */
+  chain: MaexClaim[];
+  /** Becher geschüttelt (TV: Klackern) */
+  rollSeq: number;
+  reveal: MaexReveal | null;
+  /** Trinkspiel: Schlücke statt Leben */
+  drink: boolean;
+  /** Arcade: Leben pro Spieler (Trinkspiel: alle bleiben dabei, `lives` bleibt voll) */
+  lives: Record<string, number>;
+  sips: Record<string, number>;
+  /** Ausgeschiedene in Reihenfolge (Arcade) */
+  out: string[];
+  /** Erfolgreiche Bluffs (geglaubt, obwohl gelogen) – nur fürs Ergebnis */
+  bluffs: Record<string, number>;
+  /** Zuschauer-Ebene: Lebende, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+}
+
+/** Nur für den, der gerade unter seinen Becher schaut */
+export interface MaexPrivate {
+  phaseNo: number;
+  dice: [number, number];
+  value: number;
+}
+
+// ------------------------------------------------------------------ Wer war's?
+
+/** Auflösung einer Runde: wer war's, wer hat wen getippt, wer bekommt was */
+export interface WerwarsReveal {
+  author: string;
+  /** Tipper → getippter Spieler (nur echte Tipps, nicht die Schein-Tipps des Autors) */
+  guesses: Record<string, string>;
+  /** Wer richtig lag */
+  correct: string[];
+  /** Punkte dieser Runde pro Spieler */
+  gains: Record<string, number>;
+  /** 'hidden' = niemand hat den Autor erraten, 'sneaky' = höchstens ein Drittel lag richtig */
+  bonus: 'hidden' | 'sneaky' | null;
+}
+
+export interface WerwarsState {
+  sub: 'intro' | 'answer' | 'guess' | 'reveal' | 'scores' | 'over';
+  endsIn: number;
+  players: string[];
+  /** Fragen pro Spieler (2, ab 7 Spielern 1) */
+  need: number;
+  /** Schreibphase: beantwortete Fragen pro Spieler */
+  answered: Record<string, number>;
+  /** Raten: aktuelle Antwort (1 … rounds) */
+  round: number;
+  rounds: number;
+  question: string;
+  answer: string;
+  /**
+   * Wie viele schon getippt haben / tippen können – nur Zahlen, keine Namen: Der Autor tippt zum Schein mit,
+   * sonst verriete ihn die Liste derer, die (nicht) abstimmen.
+   */
+  votedCount: number;
+  voterCount: number;
+  reveal: WerwarsReveal | null;
+  points: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export interface WerwarsPrivate {
+  sub: WerwarsState['sub'];
+  round: number;
+  /** Schreibphase: offene Fragen (id = Fragenindex) */
+  todo: { id: number; question: string }[];
+  answered: number;
+  /** „Zufallsantwort“-Vorschlag (seq zählt hoch) */
+  suggest: { text: string; seq: number } | null;
+  /** Raten: Das ist meine eigene Antwort (dann ist der eigene Tipp nur Schein) */
+  mine: boolean;
+  myGuess: string | null;
 }
