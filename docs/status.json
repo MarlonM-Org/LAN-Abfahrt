@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 22:18",
+  "updated": "2026-11-06 00:25",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -12,13 +12,6 @@
       "type": "Review-Umsetzung",
       "branch": "review/nacharbeit",
       "detail": "Abendfarbe auch auf den Handy-Screens (Kurve, Bogen, Igel, Sumo, Kart), Namensschilder in Abendfarbe, Quer-Banner nicht mehr übers HUD, README/MiniKind aufräumen"
-    },
-    {
-      "title": "Neues Spiel: Wer war's?",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/werwars",
-      "detail": "à la Who's Who: anonyme Antworten auf persönliche Fragen, alle raten den Autor"
     },
     {
       "title": "Neues Spiel: Schätzkönig",
@@ -44,6 +37,11 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Wer war's? (à la Who's Who)",
+      "pr": 71,
+      "date": "2026-11-06"
+    },
     {
       "title": "Online spielen über Cloudflare-Tunnel (npm run online, Link teilen am Handy, keine Laptop-Rechte über den Tunnel)",
       "pr": 70,
