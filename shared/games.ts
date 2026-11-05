@@ -785,3 +785,24 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'funk'] },
 ];
+
+/** Turnier: vorgefertigte Playlists (laufen nacheinander, Gesamtwertung mit `arcadePoints`) */
+export interface TurnierPlaylist {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+  kinds: MiniKind[];
+}
+
+export const TURNIER_PLAYLISTS: TurnierPlaylist[] = [
+  { id: 'sport', name: 'Sportabend', icon: '🏅', desc: 'Zielen, werfen, putten – vier Disziplinen am Strand', kinds: ['darts', 'golf', 'bowling', 'boule'] },
+  { id: 'arena', name: 'Arena-Cup', icon: '⚔️', desc: 'Vier Arenen, ein Champion', kinds: ['arena', 'sumo', 'bogen', 'smash'] },
+  { id: 'kopf', name: 'Kopf & Bauch', icon: '🧠', desc: 'Schätzen, abstimmen, bluffen, funken', kinds: ['schaetz', 'wwe', 'maexchen', 'funk'] },
+];
+
+/** Turnier „Eigene“: so viele Spiele darf der VIP wählen */
+export const TURNIER_CUSTOM = { MIN: 3, MAX: 6 };
+
+/** Spiele, die in ein eigenes Turnier dürfen (wie die Zufallsauswahl, ohne reine Trinkspiele und Date-Night-Kapitel) */
+export const TURNIER_KINDS: MiniKind[] = ARCADE_RANDOM;

@@ -972,6 +972,13 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 :where(html.land-short) .wk-btns .wk-grab { max-height: 175px; }
 :where(html.land-short) .wackel .wk-wins { margin-right: 120px; }
 .mode-tabs.four { grid-template-columns: 1fr 1fr; }
+.mode-tabs.five { grid-template-columns: 1fr 1fr 1fr; }
+.tour-btn small { font-size: 7px; line-height: 1.6; display: block; margin-top: 4px; opacity: 0.95; }
+.tour-pick { font-size: 8px; line-height: 1.8; color: var(--ink-soft); min-height: 1em; }
+.tour-pick:empty { display: none; }
+.arcade-tile .votes .tour-num:empty { display: none; }
+.my-title { margin: 4px 0; line-height: 1.6; }
+.my-title small { color: var(--ink-soft); }
 table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
 table.lb td { padding: 4px 2px; border-bottom: 1px dashed var(--paper-dark); color: var(--ink); }
 table.lb td:not(:nth-child(2)):not(:first-child) { text-align: right; }

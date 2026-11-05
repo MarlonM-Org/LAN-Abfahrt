@@ -32,6 +32,11 @@ export interface MiniCtx {
   /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) */
   colorOf?(id: string): number | undefined;
   mode: import('../shared/types').GameMode;
+  /**
+   * Markantes Ereignis fürs Protokoll des Abends („Titel des Abends“, server/fx.ts): `p` = Spieler,
+   * `n` = Menge (Standard 1), `o` = zweiter Beteiligter. Typen siehe `FxEvent` in shared/types.ts.
+   */
+  log?(type: string, data?: { p?: string; n?: number; o?: string }): void;
 }
 
 export interface MiniGame {

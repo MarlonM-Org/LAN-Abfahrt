@@ -1,6 +1,6 @@
 import type { Look, MiniKind } from '../../../shared/types';
 import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
-import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, fitsPlayers, miniInspired } from '../../../shared/games';
+import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, TURNIER_CUSTOM, TURNIER_KINDS, TURNIER_PLAYLISTS, fitsPlayers, miniInspired } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, myColor, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
@@ -149,8 +149,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
 
   if (vip) {
     menu.append(el(`<p>Du bist der VIP – du wählst, was gespielt wird.</p>`));
-    const tabs = el(`<div class="mode-tabs four"></div>`);
-    for (const [m, label] of [['party', 'Party'], ['arcade', 'Arcade'], ['drink', 'Trinken'], ['date', 'Date ♥']] as const) {
+    const tabs = el(`<div class="mode-tabs five"></div>`);
+    for (const [m, label] of [['party', 'Party'], ['arcade', 'Arcade'], ['turnier', 'Turnier'], ['drink', 'Trinken'], ['date', 'Date ♥']] as const) {
       const b = el(`<button class="mode-tab ${m === mode ? 'active' : 'secondary'}">${label}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:mode', m));
       q(tabs, '.mode-tabs').append(b);
@@ -195,6 +195,20 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       reset.addEventListener('click', () => confirm('Ewige Arcade-Tabelle (alle Abende) löschen?') && socket.emit('vip:resetLeaderboard'));
       menu.append(reset);
     }
+  } else if (vip && mode === 'turnier') {
+    menu.append(el(`<h2>Turnier</h2><p>Eine Playlist aus 3–6 Spielen, nacheinander mit Regelkarte und Ergebnis. Punkte wie in der Arcade, am Ende Siegerehrung mit Podest und Titeln des Abends. Nachzügler steigen beim nächsten Spiel ein.</p>`));
+    for (const pl of TURNIER_PLAYLISTS) {
+      const games = pl.kinds.map((k) => `${MINI_INFO[k].icon} ${escapeHtml(MINI_INFO[k].title)}`).join(' → ');
+      const b = el(`<button class="drink-btn tour-btn">${pl.icon} ${escapeHtml(pl.name)}<br/><small>${games}</small></button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:start', { mode: 'turnier', playlist: pl.id }));
+      menu.append(b);
+      // Alle Spiele der Playlist müssen zur Spielerzahl passen
+      const min = Math.max(...pl.kinds.map((k) => MINI_INFO[k].minPlayers));
+      const maxes = pl.kinds.map((k) => MINI_INFO[k].maxPlayers).filter((m): m is number => m !== undefined);
+      const max = maxes.length ? Math.min(...maxes) : undefined;
+      gated.push({ btn: b, min, max, hint: max ? `max. ${max} Spieler` : undefined });
+    }
+    arcadeUpdate = turnierCustom(menu, gated);
   } else if (vip && mode === 'date') {
     menu.append(el(`<h2>Date Night</h2><p>Für genau 2 Spieler – ihr spielt zusammen und sammelt Herzen.</p>`));
     for (const v of DATE_VERSIONS) {
@@ -242,8 +256,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     menu.append(longTog);
     singles(PARTY_KINDS);
   } else {
-    const label = mode === 'date' ? 'Date Night ♥' : mode === 'drink' ? 'Trinkspiel' : 'Party-Abfahrt';
-    menu.append(el(`<div class="center"><h2>${label}</h2><p>Warte, bis der VIP ein Spiel startet ...</p></div>`));
+    const label = mode === 'date' ? 'Date Night ♥' : mode === 'drink' ? 'Trinkspiel' : mode === 'turnier' ? 'Turnier' : 'Party-Abfahrt';
+    menu.append(el(`<div class="center"><h2>${label}</h2><p>${mode === 'turnier' ? 'Warte, bis der VIP eine Playlist startet ...' : 'Warte, bis der VIP ein Spiel startet ...'}</p></div>`));
   }
 
   // Leaderboard des Abends (alle Modi): Tabelle auf Wunsch, VIP: auf dem TV zeigen + zurücksetzen
@@ -413,6 +427,64 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
         : leaders.length === 1
           ? `Starten: ${MINI_INFO[leaders[0][0]].icon} ${MINI_INFO[leaders[0][0]].title} (${best})`
           : `Meiste Stimmen (${leaders.length}× ${best}) – Zufall`;
+    }
+  };
+}
+
+/**
+ * Turnier „Eigene“: VIP tippt 3–6 Spiele in Reihenfolge an (nochmal tippen = raus), dann „Turnier starten“.
+ * Liefert den Updater (Spielerzahl → Kacheln ausgrauen, Startknopf beschriften).
+ */
+function turnierCustom(menu: HTMLElement, gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[]) {
+  menu.append(el(`<h2>Eigene Playlist</h2><p>Tippe ${TURNIER_CUSTOM.MIN}–${TURNIER_CUSTOM.MAX} Spiele in der Reihenfolge an, in der sie laufen sollen.</p>`));
+  const startBtn = el(`<button class="drink-btn"></button>`).firstElementChild as HTMLButtonElement;
+  const pick = el(`<p class="tour-pick"></p>`).firstElementChild as HTMLElement;
+  menu.append(startBtn, pick);
+  const chosen: MiniKind[] = [];
+  const tiles: { kind: MiniKind; btn: HTMLButtonElement; num: HTMLElement }[] = [];
+  startBtn.addEventListener('click', () => socket.emit('vip:start', { mode: 'turnier', playlist: 'custom', kinds: [...chosen] }));
+  const refresh = () => {
+    const n = chosen.length;
+    startBtn.disabled = n < TURNIER_CUSTOM.MIN || n > TURNIER_CUSTOM.MAX;
+    startBtn.textContent = n < TURNIER_CUSTOM.MIN ? `Turnier starten (${n}/${TURNIER_CUSTOM.MIN} gewählt)` : `Turnier starten: ${n} Spiele`;
+    pick.innerHTML = chosen.map((k, i) => `${i + 1}. ${MINI_INFO[k].icon} ${escapeHtml(MINI_INFO[k].title)}`).join('<br/>');
+    for (const t of tiles) {
+      const i = chosen.indexOf(t.kind);
+      t.btn.classList.toggle('mine', i >= 0);
+      t.num.textContent = i >= 0 ? String(i + 1) : '';
+    }
+  };
+  for (const g of ARCADE_GROUPS) {
+    const kinds = g.kinds.filter((k) => TURNIER_KINDS.includes(k));
+    if (!kinds.length) continue;
+    menu.append(el(`<h2>${escapeHtml(g.title)}</h2>`));
+    const grid = el(`<div class="arcade-grid"></div>`);
+    for (const kind of kinds) {
+      const info = MINI_INFO[kind];
+      const insp = miniInspired(kind);
+      const b = el(
+        `<button class="secondary arcade-tile"><span class="ic">${info.icon}</span><span class="t">${escapeHtml(info.title)}${info.orientation === 'landscape' ? ' <b class="or-mark" title="Handy quer halten">↔</b>' : ''}</span>${insp ? `<small class="insp">${escapeHtml(insp)}</small>` : ''}<span class="votes"><b class="tour-num"></b></span></button>`,
+      ).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => {
+        const i = chosen.indexOf(kind);
+        if (i >= 0) chosen.splice(i, 1);
+        else if (chosen.length < TURNIER_CUSTOM.MAX) chosen.push(kind);
+        else return toast(`Höchstens ${TURNIER_CUSTOM.MAX} Spiele.`);
+        refresh();
+      });
+      q(grid, '.arcade-grid').append(b);
+      gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
+      tiles.push({ kind, btn: b, num: q(b, '.tour-num') });
+    }
+    menu.append(grid);
+  }
+  refresh();
+  return (n: number) => {
+    // Gewählte Spiele, die nicht mehr zur Spielerzahl passen, fliegen raus
+    const bad = chosen.filter((k) => !fitsPlayers(k, n));
+    if (bad.length) {
+      for (const k of bad) chosen.splice(chosen.indexOf(k), 1);
+      refresh();
     }
   };
 }
