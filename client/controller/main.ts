@@ -31,6 +31,7 @@ import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
+import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
 import { buildKicked, initVipPlayersButton } from './players';
@@ -287,6 +288,8 @@ function pickScreen(): Screen {
           return pickBoule(m.state);
         case 'sumo':
           return pickSumo(m.state);
+        case 'volley':
+          return pickVolley(m.state);
         case 'tourist':
           return pickTourist(m.state);
         case 'sprueche':

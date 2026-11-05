@@ -43,6 +43,7 @@ import { Board } from './board';
 import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
 import { SumoGame } from './sumo';
+import { VolleyGame } from './volley';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
@@ -465,6 +466,9 @@ export class Room {
         break;
       case 'sumo':
         this.mini = new SumoGame(ids, ctx);
+        break;
+      case 'volley':
+        this.mini = new VolleyGame(ids, ctx);
         break;
       case 'tourist':
         this.mini = new TouristGame(ids, ctx);
