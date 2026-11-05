@@ -29,6 +29,7 @@ import { pickSmash } from './screens/smash';
 import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
+import { pickSpion } from './screens/spion';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
@@ -327,6 +328,8 @@ function pickScreen(): Screen {
           return pickAngeln(m.state);
         case 'koffer':
           return pickKoffer(m.state);
+        case 'spion':
+          return pickSpion(m.state);
       }
       return outdatedScreen();
     }
