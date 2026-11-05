@@ -21,18 +21,24 @@ import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint a
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
+import { golfBot } from './golfbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
 import type { FangenState } from '../shared/types';
 import type { SumoState } from '../shared/types';
 import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
+import type { VolleyState } from '../shared/types';
+import { VOLLEY, vollPredict, vollSide, vollSpot } from '../shared/volley';
 import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
 import type { BogenState } from '../shared/types';
 import { BOGEN, BOGEN_DIRS, BOGEN_STAGES, bogenDx, bogenDy, bogenLineFree, bogenRectSolid, bogenTile } from '../shared/bogen';
+import { DARTS, type DartsState, dartsTarget } from '../shared/darts';
+import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
+import type { WolfState } from '../shared/werwolf';
 
 export interface BotOptions {
   url: string;
@@ -135,6 +141,28 @@ export class Bot {
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);
+    });
+  }
+
+  /** Darts: meist auf die Triple 20, ab und zu aufs Bull – mit menschlicher Streuung bei Kraft und Ruhe */
+  private dartsPlay(st: DartsState) {
+    const me = st.players.find((p) => p.id === this.id);
+    if (!me || me.thrown >= DARTS.DARTS_PER_ROUND) return;
+    const n = me.thrown;
+    this.once(`darts-${st.round}-${n}`, async () => {
+      await sleep(rand(1500, 4500));
+      const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
+      if (!cur || cur.sub !== 'throw' || cur.round !== st.round) return;
+      const target = Math.random() < 0.7 ? dartsTarget(20, 'triple') : { x: 0, y: 0 };
+      this.send('throw', {
+        n,
+        ax: target.x + rand(-4, 4),
+        ay: target.y + rand(-4, 4),
+        t: Math.round(rand(500, 6000)),
+        amp: rand(DARTS.AMP_MIN, DARTS.AMP_MIN + 16),
+        power: DARTS.POWER_IDEAL + rand(-0.2, 0.2),
+        side: rand(-0.15, 0.15),
+      });
     });
   }
 
@@ -906,6 +934,8 @@ export class Bot {
 
     if (m.kind === 'boule' && m.state.sub === 'aim' && m.state.turn === this.id) this.boulePlay(m.state);
 
+    if (m.kind === 'darts' && m.state.sub === 'throw') this.dartsPlay(m.state);
+
     if (m.kind === 'enten' && (m.state.sub === 'play' || m.state.sub === 'banner')) {
       const en = m.state;
       const me2 = en.players[this.id];
@@ -986,6 +1016,8 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'golf') golfBot(this, m.state, () => (this.state?.mini?.kind === 'golf' ? this.state.mini.state : null));
+
     if (m.kind === 'grill') {
       const st = m.state;
       this.once('grill', async () => {
@@ -1053,6 +1085,10 @@ export class Bot {
 
     if (m.kind === 'bogen') bogenBot(this, m.state);
 
+    if (m.kind === 'autoball') afbBot(this, m.state);
+
+    if (m.kind === 'volley') vballBot(this, m.state);
+
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
       const p = this.priv?.kind === 'geist' ? this.priv.state : null;
@@ -1064,6 +1100,8 @@ export class Bot {
     }
 
     if (m.kind === 'tourist') tourBot(this, m.state);
+
+    if (m.kind === 'werwolf') wolfBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -2100,6 +2138,88 @@ function sumoBot(bot: Bot, st: SumoState) {
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
 }
 
+// ------------------------------------------------------------------ Strand-Volleyball
+
+interface VballBotMemory {
+  nextAt: number;
+  dir: number;
+  jumpAt: number;
+  /** Eigene Ungenauigkeit (px), damit nicht alle Bots gleich spielen */
+  slop: number;
+  /** Wie gern der Bot schmettert */
+  spikeChance: number;
+}
+
+const vballMem = new WeakMap<Bot, VballBotMemory>();
+
+/**
+ * Volleyball-Bot: rechnet aus, wo der Ball auf Schlaghöhe herunterkommt, und läuft
+ * knapp dahinter (dann prallt der Ball Richtung Netz ab). Von mehreren im Team geht nur,
+ * wer am nächsten dran ist – die anderen halten ihre Position. Springt, wenn der Ball nah
+ * ist und fällt, und schmettert manchmal, wenn er in der Luft nah am Netz ist.
+ */
+function vballBot(bot: Bot, st: VolleyState) {
+  let mem = vballMem.get(bot);
+  if (!mem) vballMem.set(bot, (mem = { nextAt: 0, dir: 0, jumpAt: 0, slop: rand(-4, 4), spikeChance: rand(0.2, 0.55) }));
+  const me = st.players[bot.id];
+  const setDir = (d: number) => {
+    if (d === mem!.dir) return;
+    mem!.dir = d;
+    bot.send('move', { dir: d });
+  };
+  if (!me || !me.court || (st.sub !== 'serve' && st.sub !== 'rally')) {
+    setDir(0);
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(50, 90);
+
+  const V = VOLLEY;
+  const d = me.team === 'A' ? 1 : -1;
+  const [lo, hi] = vollSide(me.team);
+  const ownSide = (x: number) => d * (V.NET_X - x) > 0;
+  const b = st.ball;
+  const mates = Object.entries(st.players)
+    .filter(([, p]) => p.team === me.team && p.court)
+    .sort((a, c) => (a[0] < c[0] ? -1 : 1));
+  const home = vollSpot(me.team, Math.max(0, mates.findIndex(([id]) => id === bot.id)));
+
+  let target = home;
+  const hitY = V.GROUND - V.P_BODY - V.P_R - V.BALL_R + 4;
+  const pred = st.sub === 'serve' ? { x: b.x, t: 1 } : vollPredict(b, hitY);
+  if (pred && ownSide(pred.x)) {
+    const closest = mates.reduce((best, cur) => (Math.abs(cur[1].x - pred.x) < Math.abs(best[1].x - pred.x) ? cur : best), mates[0]);
+    if (!closest || closest[0] === bot.id) {
+      // Etwas hinter den Ball (vom Netz aus gesehen), damit er nach vorn abprallt
+      target = pred.x - d * (6 + mem.slop);
+    }
+  } else if (!ownSide(b.x)) {
+    // Ball drüben: auf die Grundposition, leicht zur Mitte der eigenen Hälfte
+    target = home + d * 10;
+  }
+  target = Math.max(lo, Math.min(hi, target));
+  const dx = target - me.x;
+  setDir(Math.abs(dx) < 3 ? 0 : dx > 0 ? 1 : -1);
+
+  // Springen: Ball nah über einem und fällt (oder steigt nur noch langsam).
+  // Nah am Netz springt der Bot früher ab, um von oben zu schmettern.
+  const bx = Math.abs(b.x - me.x);
+  const above = me.y - b.y;
+  const falling = b.vy > -60 || st.sub === 'serve';
+  const nearNet = Math.abs(b.x - V.NET_X) < 80 && ownSide(b.x) && me.cd <= 0;
+  const [jLo, jHi] = nearNet && mem.spikeChance > 0.3 ? [50, 100] : [26, 78];
+  if (!me.air && bx < 22 && above > jLo && above < jHi && falling && now - mem.jumpAt > 350 && Math.random() < 0.85) {
+    mem.jumpAt = now;
+    bot.send('jump');
+  }
+  // Schmettern: in der Luft, Ball in Reichweite, oberhalb der Netzkante und nicht zu weit vom Netz
+  const reach = Math.hypot(b.x - me.x, b.y - (me.y - V.P_BODY));
+  if (me.air && me.cd <= 0 && reach < 36 && b.y < V.NET_TOP - 4 && Math.abs(b.x - V.NET_X) < 90 && ownSide(b.x) && Math.random() < mem.spikeChance + 0.2) {
+    bot.send('spike');
+  }
+}
+
 // ------------------------------------------------------------------ Wer ist der Tourist?
 
 /** Pro Bot und Runde: wann der Bot-Tourist rät bzw. der Bot jemanden anklagt */
@@ -2149,6 +2269,86 @@ function tourBot(bot: Bot, st: TourState) {
       if (cur()?.phaseNo === st.phaseNo) bot.send('vote', { yes: Math.random() < 0.6 });
     });
   }
+}
+
+// ------------------------------------------------------------------ Werwölfe im Ferienhaus
+
+/**
+ * Bots können nicht diskutieren: Wölfe wählen ein zufälliges Nicht-Wolf-Opfer (und schließen sich
+ * gern dem Rudel an), die Seherin schaut in Unbekannte, die Hexe heilt/vergiftet manchmal,
+ * am Tag stimmen alle zufällig ab. Der Leader-Bot (VIP) kürzt die Diskussion ab.
+ */
+function wolfBot(bot: Bot, st: WolfState) {
+  const p = bot.priv?.kind === 'werwolf' ? bot.priv.state : null;
+  if (!p || !(bot.id in st.alive)) return;
+  const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  const cur = () => (bot.state?.mini?.kind === 'werwolf' ? bot.state.mini.state : null);
+  const still = () => cur()?.phaseNo === st.phaseNo;
+  const others = Object.keys(st.alive).filter((id) => st.alive[id] && id !== bot.id);
+
+  if (st.sub === 'day' && bot.leader) {
+    bot.once(`wolf-day-${st.phaseNo}`, async () => {
+      await sleep(4000);
+      if (still()) bot.socket.emit('vip:mini', 'skip');
+    });
+  }
+  // Der Jäger ist schon tot, wenn er schießt
+  if (st.sub === 'hunter' && st.hunter === bot.id && !st.shotDone) {
+    bot.once(`wolf-shoot-${st.phaseNo}`, async () => {
+      await sleep(rand(1500, 4000));
+      const alive = Object.keys(st.alive).filter((id) => st.alive[id] && id !== bot.id);
+      if (still() && alive.length) bot.send('shoot', { target: pickOne(alive) });
+    });
+  }
+  if (!p.alive) return;
+
+  if (st.sub === 'night') {
+    if (p.role === 'wolf') {
+      const prey = others.filter((id) => !p.partners.includes(id));
+      const packPicks = Object.entries(p.pack).filter(([w]) => w !== bot.id).map(([, t]) => t);
+      if (!p.nightPick) {
+        bot.once(`wolf-night-${st.phaseNo}`, async () => {
+          await sleep(rand(1500, 5000));
+          const latest = bot.priv?.kind === 'werwolf' ? bot.priv.state : p;
+          const join = Object.entries(latest.pack).filter(([w]) => w !== bot.id).map(([, t]) => t);
+          if (still() && prey.length) bot.send('night', { target: join.length && Math.random() < 0.8 ? pickOne(join) : pickOne(prey) });
+        });
+      } else if (packPicks.some((t) => t !== p.nightPick)) {
+        // Uneinig → nach kurzem Zögern oft dem Rudel anschließen
+        bot.once(`wolf-agree-${st.phaseNo}`, async () => {
+          await sleep(rand(2000, 4000));
+          if (still() && Math.random() < 0.6) bot.send('night', { target: pickOne(packPicks) });
+        });
+      }
+    } else if (!p.nightPick) {
+      bot.once(`wolf-night-${st.phaseNo}`, async () => {
+        await sleep(rand(1500, 6000));
+        const fresh = p.role === 'seherin' ? others.filter((id) => !p.seen.some((x) => x.id === id)) : others;
+        const pool = fresh.length ? fresh : others;
+        if (still() && pool.length) bot.send('night', { target: pickOne(pool) });
+      });
+    }
+  }
+
+  if (st.sub === 'witch' && p.role === 'hexe' && !p.witchDone) {
+    bot.once(`wolf-witch-${st.phaseNo}`, async () => {
+      await sleep(rand(1500, 4000));
+      if (!still()) return;
+      if (p.victim && p.heal && Math.random() < 0.5) bot.send('heal', { on: true });
+      if (p.poison && others.length && Math.random() < 0.2) bot.send('poison', { target: pickOne(others) });
+      await sleep(300);
+      bot.send('witchDone');
+    });
+  }
+
+  if (st.sub === 'vote' && !p.myVote) {
+    bot.once(`wolf-vote-${st.phaseNo}`, async () => {
+      await sleep(rand(800, 3500));
+      const pool = p.role === 'wolf' ? others.filter((id) => !p.partners.includes(id)) : others;
+      if (still()) bot.send('vote', { target: Math.random() < 0.12 || !pool.length ? 'none' : pickOne(pool) });
+    });
+  }
+
 }
 
 /** Sprüche-Duell: Antworten der Bots (passen zu fast jeder Frage) */
@@ -2391,4 +2591,159 @@ function bogenBot(bot: Bot, st: BogenState) {
     const hold = rand(160, 320);
     setTimeout(() => bot.send('btn', { b: 'jump', down: false }), hold);
   }
+}
+
+// ------------------------------------------------------------------ Auto-Fußball
+
+interface AfbBotMemory {
+  nextAt: number;
+  /** Für die Geschwindigkeit (der Snapshot hat keine) */
+  px: number;
+  py: number;
+  pt: number;
+  speed: number;
+  stuckSince: number;
+  reverseUntil: number;
+  /** Eigene Ungenauigkeit beim Lenken */
+  slop: number;
+  idle: boolean;
+}
+
+const afbBotMem = new WeakMap<Bot, AfbBotMemory>();
+const afbClamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const afbWrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Auto-Fußball-Bot: fährt zu einem Punkt hinter dem Ball (auf der Linie Ball → gegnerisches Tor)
+ * und schiebt dann durch. Steht er vor dem Ball, fährt er außen herum. Pro Team verteidigt ein Bot
+ * (der dem eigenen Tor am nächsten ist), sobald der Ball in der eigenen Hälfte ist; weitere Bots
+ * halten Abstand und warten auf Abpraller.
+ */
+function afbBot(bot: Bot, st: AfbState) {
+  let mem = afbBotMem.get(bot);
+  if (!mem) afbBotMem.set(bot, (mem = { nextAt: 0, px: 0, py: 0, pt: 0, speed: 0, stuckSince: 0, reverseUntil: 0, slop: rand(-0.12, 0.12), idle: true }));
+  const me = st.cars[bot.id];
+  if (!me) return;
+  if (st.sub === 'over') {
+    if (!mem.idle) {
+      mem.idle = true;
+      bot.send('steer', { x: 0, gas: false, brake: false, boost: false });
+    }
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 130);
+  if (mem.pt) mem.speed = (Math.hypot(me.x - mem.px, me.y - mem.py) / Math.max(1, now - mem.pt)) * 1000;
+  mem.px = me.x;
+  mem.py = me.y;
+  mem.pt = now;
+  if (st.sub === 'countdown') {
+    mem.idle = false;
+    mem.stuckSince = 0;
+    bot.send('steer', { x: 0, gas: true, brake: false, boost: false });
+    return;
+  }
+
+  const dir = me.t === 'A' ? 1 : -1;
+  const ownX = me.t === 'A' ? AFB.X0 : AFB.X1;
+  const goalX = me.t === 'A' ? AFB.X1 + 12 : AFB.X0 - 12;
+  // Ball etwas vorausberechnen
+  const bx = st.ball.x + st.ball.vx * 0.2;
+  const by = st.ball.y + st.ball.vy * 0.2;
+  const isBot = (id: string) => !!bot.state?.players.find((p) => p.id === id)?.bot;
+  const team = Object.entries(st.cars).filter(([, c]) => c.t === me.t);
+  const teamBots = team.filter(([id]) => isBot(id));
+
+  // Rolle: Verteidiger (Ball in der eigenen Hälfte, ab 2 Autos im Team), Stürmer (am nächsten am Ball) oder Unterstützer
+  const ballOwnHalf = (bx - AFB_CX) * dir < 0;
+  const defender = team.length >= 2 && ballOwnHalf ? teamBots.sort((a, b) => Math.abs(a[1].x - ownX) - Math.abs(b[1].x - ownX))[0]?.[0] : undefined;
+  const others = team.filter(([id]) => id !== defender);
+  const striker = others.sort((a, b) => Math.hypot(a[1].x - bx, a[1].y - by) - Math.hypot(b[1].x - bx, b[1].y - by))[0]?.[0];
+
+  let ux = goalX - bx;
+  let uy = AFB_CY - by;
+  const ul = Math.hypot(ux, uy) || 1;
+  ux /= ul;
+  uy /= ul;
+  const rx = me.x - bx;
+  const ry = me.y - by;
+  const along = rx * ux + ry * uy;
+  const side = -rx * uy + ry * ux;
+  const reach = AFB.BALL_R + AFB.CAR_R;
+
+  let tx: number;
+  let ty: number;
+  let pushing = false;
+  let park = false;
+  const goalSide = (me.x - bx) * dir < 0;
+  const ballNearOwnGoal = Math.abs(bx - ownX) < 80;
+  if (bot.id === defender && !(ballNearOwnGoal && goalSide)) {
+    // Vor dem eigenen Tor zwischen Ball und Tor stehen
+    tx = ownX + dir * 26;
+    ty = afbClamp(AFB_CY + (by - AFB_CY) * 0.5, AFB_CY - st.goalHalf, AFB_CY + st.goalHalf);
+    park = true;
+  } else if (bot.id !== defender && bot.id !== striker && others.length > 1) {
+    // Unterstützer: mit Abstand hinter dem Ball, seitlich versetzt
+    const idx = others.findIndex(([id]) => id === bot.id);
+    const off = (idx % 2 ? 1 : -1) * (36 + 10 * Math.floor(idx / 2));
+    tx = bx - ux * 64 - uy * off;
+    ty = by - uy * 64 + ux * off;
+    park = true;
+  } else if (along < -4 && Math.abs(side) < 8 + Math.abs(along) * 0.3) {
+    // Hinter dem Ball auf Linie → durchschieben
+    tx = bx + ux * 30;
+    ty = by + uy * 30;
+    pushing = true;
+  } else if (along < 0) {
+    tx = bx - ux * (reach + 12);
+    ty = by - uy * (reach + 12);
+  } else {
+    // Vor dem Ball → außen herum, nicht ins eigene Tor schieben
+    const sgn = Math.sign(side) || 1;
+    tx = bx - ux * (reach + 18) - uy * sgn * 28;
+    ty = by - uy * (reach + 18) + ux * sgn * 28;
+  }
+  tx = afbClamp(tx, AFB.X0 - (pushing ? 20 : -10), AFB.X1 + (pushing ? 20 : -10));
+  ty = afbClamp(ty, AFB.Y0 + 10, AFB.Y1 - 10);
+
+  const dx = tx - me.x;
+  const dy = ty - me.y;
+  const dist = Math.hypot(dx, dy);
+  const diff = afbWrap(Math.atan2(dy, dx) - me.a);
+  let steer = afbClamp(diff * 2.2 + mem.slop, -1, 1);
+  let gas = true;
+  let brake = false;
+  let boost = false;
+  if (now < mem.reverseUntil) {
+    gas = false;
+    brake = true;
+    steer = -Math.sign(diff) || 1;
+  } else if (park && dist < 12) {
+    gas = false;
+    steer = 0;
+  } else if (Math.abs(diff) > 2.1 && dist < 60) {
+    // Ziel liegt hinter uns und nah: rückwärts drehen
+    gas = false;
+    brake = true;
+    steer = -Math.sign(diff);
+  } else if (Math.abs(diff) > 1.3 && mem.speed > 55) {
+    // scharfe Kurve: Bremse in voller Fahrt = Drift
+    gas = false;
+    brake = true;
+  } else {
+    const ballDist = Math.hypot(bx - me.x, by - me.y);
+    boost = me.b > 8 && Math.abs(diff) < 0.3 && ((pushing && ballDist < 70) || (dist > 150 && me.b > 45));
+    if (pushing && ballDist < reach + 10 && Math.abs(diff) < 0.35 && me.hc === 0 && Math.random() < 0.3) bot.send('hop');
+  }
+  // Festgefahren? Kurz zurücksetzen
+  if (gas && mem.speed < 6) {
+    if (!mem.stuckSince) mem.stuckSince = now;
+    else if (now - mem.stuckSince > 1100) {
+      mem.reverseUntil = now + rand(450, 750);
+      mem.stuckSince = 0;
+    }
+  } else mem.stuckSince = 0;
+  mem.idle = false;
+  bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
 }

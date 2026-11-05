@@ -1,6 +1,6 @@
 import '@fontsource/press-start-2p/400.css';
 import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
-import { type Screen, LS, app, el, me, message, socket, store, toast } from './core';
+import { type Screen, LS, app, el, kartViewPref, me, message, socket, store, toast } from './core';
 import { startTimeSync } from '../timesync';
 import { knownKind, watchServerVersion } from '../version';
 import { buildEdit, buildLobby } from './screens/lobby';
@@ -31,9 +31,14 @@ import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
+import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
 import { pickBogen } from './screens/bogen';
+import { pickDarts } from './screens/darts';
+import { pickGolf } from './screens/golf';
+import { pickAutoball } from './screens/autoball';
+import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
 
 let screenKey = '';
@@ -48,7 +53,7 @@ let retryInLobby = false;
 function join() {
   if (joinPending) return;
   joinPending = true;
-  socket.emit('player:join', { name: store.name, look: store.look, playerId: store.playerId }, (r: JoinResponse) => {
+  socket.emit('player:join', { name: store.name, look: store.look, playerId: store.playerId, kartView: kartViewPref() }, (r: JoinResponse) => {
     joinPending = false;
     if (r.ok && r.playerId) {
       store.playerId = r.playerId;
@@ -288,12 +293,22 @@ function pickScreen(): Screen {
           return pickBoule(m.state);
         case 'sumo':
           return pickSumo(m.state);
+        case 'volley':
+          return pickVolley(m.state);
         case 'tourist':
           return pickTourist(m.state);
         case 'sprueche':
           return pickSprueche(m.state, vip);
         case 'bogen':
           return pickBogen(m.state);
+        case 'darts':
+          return pickDarts(m.state);
+        case 'golf':
+          return pickGolf(m.state);
+        case 'autoball':
+          return pickAutoball(m.state);
+        case 'werwolf':
+          return pickWerwolf(m.state);
       }
       return outdatedScreen();
     }

@@ -4,7 +4,7 @@
  */
 import { el, q, toast } from './core';
 import { type MotionSample, enableMotion, motionSupport, onMotion } from './motion';
-import { type BowlThrow, type SwipePoint, swingToThrow, swipeToThrow } from './bowlingThrow';
+import { type BowlThrow, type SwipePoint, type ThrowResult, swingToThrow, swipeToThrow } from './bowlingThrow';
 
 const PREF_KEY = 'lanabfahrt.bowlMode';
 type Mode = 'motion' | 'touch' | 'ask';
@@ -18,6 +18,12 @@ export interface ThrowInputTexts {
   padText: string;
   /** zusätzliche CSS-Klasse für das Wisch-Feld */
   padClass?: string;
+  /** Beschriftung des Sensor-Knopfs (HTML), Standard „HALTEN & SCHWINGEN“ */
+  button?: string;
+  /** Beschriftung, solange der Knopf gehalten wird (HTML) */
+  holding?: string;
+  /** Umrechnung der Sensordaten (Standard: Bowling-Schwung) – z. B. Darts: kurzes Schnippen */
+  swing?: (samples: MotionSample[]) => ThrowResult;
 }
 
 function initialMode(): Mode {
@@ -79,10 +85,11 @@ export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: Thr
     area.append(box);
   };
 
+  const btnText = texts.button ?? 'HALTEN &amp;<br/>SCHWINGEN';
   const showMotion = () => {
     const box = el(`
       <p class="bw-hint">${texts.motionHint}</p>
-      <button class="big-btn bw-swing">HALTEN &amp;<br/>SCHWINGEN</button>
+      <button class="big-btn bw-swing">${btnText}</button>
       <button class="secondary small bw-switch">Lieber wischen</button>
     `);
     area.append(box);
@@ -110,15 +117,15 @@ export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: Thr
       samples = [];
       recording = true;
       btn.classList.add('holding');
-      btn.innerHTML = 'SCHWINGEN …<br/><small>und loslassen!</small>';
+      btn.innerHTML = texts.holding ?? 'SCHWINGEN …<br/><small>und loslassen!</small>';
       navigator.vibrate?.(15);
     });
     const release = () => {
       if (!recording) return;
       recording = false;
       btn.classList.remove('holding');
-      btn.innerHTML = 'HALTEN &amp;<br/>SCHWINGEN';
-      const r = swingToThrow(samples);
+      btn.innerHTML = btnText;
+      const r = (texts.swing ?? swingToThrow)(samples);
       if (r.ok) doThrow(r.t);
       else hint.textContent = r.reason;
     };
