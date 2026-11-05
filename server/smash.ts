@@ -904,6 +904,7 @@ export class SmashGame implements MiniGame {
         endsIn: Math.max(0, this.deadline - now),
         stage: this.stage.id,
         t: this.sub === 'fight' ? now - this.fightStart : this.sub === 'over' ? this.last - this.fightStart : 0,
+        ts: now,
         fighters: Object.fromEntries(
           [...this.fighters.values()].map((f) => [
             f.id,

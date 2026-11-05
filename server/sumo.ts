@@ -504,6 +504,7 @@ export class SumoGame implements MiniGame {
       kind: 'sumo',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: Math.max(0, this.deadline - now),
         round: this.round,
         winRounds: SUMO.WIN_ROUNDS,

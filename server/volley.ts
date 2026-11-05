@@ -359,6 +359,7 @@ export class VolleyGame implements MiniGame {
       kind: 'volley',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: Math.max(0, this.deadline - now),
         clock: Math.round(this.clockLeft(now)),
         score: { ...this.score },

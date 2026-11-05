@@ -539,6 +539,8 @@ export interface ArenaPlayer {
 
 export interface ArenaState {
   sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
+  t: number;
   /** countdown: bis zum Start · play: bis zur Flut (0 = Flut läuft) · roundOver: bis zur nächsten Runde */
   endsIn: number;
   round: number;
@@ -1328,6 +1330,8 @@ export interface SmashState {
   stage: 'beach' | 'pool';
   /** ms seit Kampfbeginn (für bewegliche Plattformen) */
   t: number;
+  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
+  ts: number;
   fighters: Record<string, SmashFighter>;
   /** Kurze Strahl-/Spritz-Angriffe (für die Darstellung) */
   beams: { id: string; type: 'wasser' | 'cocktail'; x: number; y: number; w: number; face: 1 | -1 }[];
@@ -1719,6 +1723,8 @@ export interface VolleyPlayer {
 
 export interface VolleyState {
   sub: 'intro' | 'serve' | 'rally' | 'point' | 'over';
+  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
+  t: number;
   /** Restzeit der aktuellen Phase (Intro, Aufschlag, Punkt) */
   endsIn: number;
   /** Restliche Spielzeit (ms) */
@@ -1765,6 +1771,8 @@ export interface SumoPlayer {
 
 export interface SumoState {
   sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
+  t: number;
   endsIn: number;
   round: number;
   winRounds: number;
@@ -1912,6 +1920,8 @@ export interface BogenFx {
 
 export interface BogenState {
   sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
+  t: number;
   endsIn: number;
   round: number;
   winRounds: number;

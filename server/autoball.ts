@@ -389,6 +389,7 @@ export class AutoballGame implements MiniGame {
       kind: 'autoball',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: this.sub === 'play' ? Math.round(this.clock) : Math.max(0, this.deadline - now),
         round: this.round,
         clock: Math.round(this.clock),

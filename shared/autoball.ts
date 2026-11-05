@@ -10,12 +10,13 @@ import type { Team } from './types';
 
 export const AFB = {
   /** Server-Takt; pro Takt mehrere Physik-Teilschritte (gegen Durchtunneln) */
-  TICK_MS: 50,
+  TICK_MS: 33,
   SUBSTEPS: 3,
   /** Erster Anstoß: Zeit für „So spielst du“ */
   INTRO_MS: 7000,
   COUNTDOWN_MS: 3000,
-  GOAL_MS: 3200,
+  /** Torpause: 2 s Wiederholung in Zeitlupe + Tafel mit dem Schützen */
+  GOAL_MS: 3800,
   MATCH_MS: 180000,
   /** Golden Goal bei Gleichstand – höchstens so lange, dann Unentschieden */
   OVERTIME_MS: 60000,
@@ -210,6 +211,8 @@ export interface AfbGoal {
 
 export interface AfbState {
   sub: 'countdown' | 'play' | 'goal' | 'over';
+  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
+  t: number;
   /** Countdown/Torjubel/Abpfiff: Restzeit; im Spiel: Restspielzeit */
   endsIn: number;
   /** Zähler für Anstöße (damit Handy-Countdowns neu starten) */

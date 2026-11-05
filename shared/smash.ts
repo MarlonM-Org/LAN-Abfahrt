@@ -4,7 +4,7 @@
  */
 
 export const SMASH = {
-  TICK_MS: 50,
+  TICK_MS: 33,
   SUBSTEPS: 4,
   COUNTDOWN_MS: 3500,
   TIME_MS: 180_000,
