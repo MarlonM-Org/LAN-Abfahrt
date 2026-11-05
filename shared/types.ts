@@ -1475,13 +1475,17 @@ export interface FangenState {
   endsIn: number;
   round: number;
   rounds: number;
-  /** Wer gerade Flüchtling ist (die Position bleibt geheim!) */
+  /** Wer gerade Flüchtling ist (die Position bleibt geheim!); bei zwei Animateuren der erste */
   runner: string;
+  /** Alle Animateure der Runde (ab 7 Spielern zwei) */
+  runners: string[];
   hunters: Record<string, FangenHunter>;
   prints: FangenPrint[];
   points: Record<string, number>;
-  /** Nur in "roundEnd" / "over" */
+  /** Nur in "roundEnd" / "over" (der erste Animateur) */
   outcome: FangenOutcome | null;
+  /** Ergebnisse pro Animateur – Gefangene erscheinen schon während der Jagd (dann ist die Position egal) */
+  outcomes: FangenOutcome[];
 }
 
 /** Nur an den Flüchtling: die eigene Position (die Fänger stehen öffentlich im GameState) */
@@ -1492,7 +1496,12 @@ export interface FangenPrivate {
   dir: 1 | -1;
   decoyLeft: number;
   decoyActive: boolean;
+  /** Schon gefangen (bei zwei Animateuren läuft die Runde weiter) */
+  caught?: boolean;
+  /** Der andere Animateur (ab 7 Spielern) */
+  mate?: { x: number; y: number; caught: boolean } | null;
 }
+
 
 // ------------------------------------------------------------------ Spion unter Gästen
 
@@ -1582,17 +1591,28 @@ export interface GeistState {
   endsIn: number;
   round: number;
   rounds: number;
-  /** Wer in dieser Runde der Geist ist (öffentlich – nur die Position ist geheim) */
+  /** Wer in dieser Runde der Geist ist (öffentlich – nur die Position ist geheim); bei zwei Geistern der erste */
   ghostId: string;
+  /** Alle Geister der Runde (ab 7 Spielern zwei) */
+  ghostIds: string[];
+  /** Summe der Geister-Leben (HUD) */
   health: number;
   maxHealth: number;
+  /** Leben pro Geist (0 = gebannt) */
+  ghostHp: Record<string, number>;
+  /** Startleben pro Geist */
+  ghostMax: number;
   hunters: Record<string, GeistHunter>;
-  /** Nur gesetzt, solange der Geist sichtbar ist (Licht, Blitz, Berührung) */
+  /** Nur gesetzt, solange der (erste) Geist sichtbar ist (Licht, Blitz, Berührung) */
   ghost: { x: number; y: number; why: 'light' | 'flash' | 'touch' } | null;
+  /** Alle gerade sichtbaren Geister */
+  ghosts: { id: string; x: number; y: number; why: 'light' | 'flash' | 'touch' }[];
   /** Zählt hoch bei jedem Blitz */
   flashSeq: number;
   /** Letzte Schreck-Aktion */
-  lastScare: { victim: string; seq: number } | null;
+  lastScare: { victim: string; seq: number; by?: string } | null;
+  /** Zuletzt gebannter Geist (Leben auf 0, bei zwei Geistern) */
+  lastBanish: { id: string; seq: number } | null;
   lastRevive: { id: string; seq: number } | null;
   roundWinner: 'ghost' | 'hunters' | null;
   roundReason: string | null;
@@ -1826,7 +1846,7 @@ export interface BogenState {
 
 /** Nur an den jeweiligen Spieler */
 export type GeistPrivate =
-  | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number }
+  | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number; hp?: number; out?: boolean; mates?: { x: number; y: number; out: boolean }[] }
   | { role: 'hunter'; fear: number };
 
 // ------------------------------------------------------------------ Date Night: Ablauf

@@ -1178,7 +1178,7 @@ export class Bot {
       this.once('fangen', async () => {
         await sleep(100);
         if (st.round !== this.fg.round) this.fg = { round: st.round, seen: new Set(), goal: null, until: 0 };
-        if (st.runner === this.id) fangenRunner(this, st);
+        if ((st.runners ?? [st.runner]).includes(this.id)) fangenRunner(this, st);
         else if (st.hunters[this.id] && st.sub === 'chase') fangenHunter(this, st, this.fg);
       });
     }
@@ -1437,8 +1437,11 @@ export class Bot {
     if (!me || me.down || me.empty) return me?.down || me?.empty ? { x: 0, y: 0 } : null;
     const ids = Object.keys(g.hunters).sort();
     const now = Date.now();
+    // Nächster sichtbarer Geist (ab 7 Spielern gibt es zwei; gebannte zählen nicht)
+    const seen = (g.ghosts ?? []).filter((o) => (g.ghostHp?.[o.id] ?? 1) > 0).sort((p, q) => Math.hypot(p.x - me.x, p.y - me.y) - Math.hypot(q.x - me.x, q.y - me.y))[0];
+    const ghost = seen ? { x: seen.x, y: seen.y, why: seen.why } : g.ghost;
     // Licht schalten
-    const ghostNear = g.ghost && g.ghost.why !== 'flash' ? Math.hypot(g.ghost.x - me.x, g.ghost.y - me.y) < GEIST.LIGHT_LEN + 30 : false;
+    const ghostNear = ghost && ghost.why !== 'flash' ? Math.hypot(ghost.x - me.x, ghost.y - me.y) < GEIST.LIGHT_LEN + 30 : false;
     const wantLight = (ghostNear || fear > 0.3) && me.battery > 0.12;
     if (wantLight !== me.light && (wantLight || fear < 0.15 || me.battery < 0.12)) {
       this.once('geist-light', async () => {
@@ -1459,7 +1462,7 @@ export class Bot {
       return this.geistSteer(me, help);
     }
     // Sichtbarer Geist → hinterher
-    if (g.ghost && g.ghost.why !== 'touch') return this.geistSteer(me, g.ghost);
+    if (ghost && ghost.why !== 'touch') return this.geistSteer(me, ghost);
     // Gänsehaut → umsehen (Leuchtturm)
     if (fear > 0.45) {
       const a = now / 380 + ids.indexOf(this.id);
@@ -1982,7 +1985,7 @@ const randomTileNear = (col: number, row: number, radius: number) => {
 /** Flüchtling: kennt alle Positionen (privat) und flieht per Breitensuche von den Fängern weg */
 function fangenRunner(bot: Bot, st: FangenState) {
   const p = bot.priv?.kind === 'fangen' ? bot.priv.state : null;
-  if (!p) return;
+  if (!p || p.caught) return;
   const me = tileOf(p.x, p.y);
   const hunters = Object.values(st.hunters).map((h) => tileOf(h.x, h.y));
   const dh = hunters.length ? bfsFrom(hunters) : null;
