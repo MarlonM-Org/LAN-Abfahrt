@@ -1,18 +1,11 @@
 {
-  "updated": "2026-11-05 22:40",
+  "updated": "2026-11-05 23:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
-    {
-      "title": "Review Phase 1: Zuschauer-Ebene",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/zuschauer",
-      "detail": "Emotes schweben am TV, Wetten auf den Rundensieger in Arena/Sumo/Bogen/Kurve/Smash, Rache-Möwen (Arena) und Wellen (Sumo) für Ausgeschiedene"
-    },
     {
       "title": "Review Phase 3: Party-Modus 2.0 (Stufe S)",
       "kind": "",
@@ -37,6 +30,11 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Review: Zuschauer-Ebene (Emotes am TV, Wetten auf den Rundensieger, Rache-Bomben und Wellen für Ausgeschiedene)",
+      "pr": 63,
+      "date": "2026-11-05"
+    },
     {
       "title": "Review: Spielerfarbe pro Abend (12 Farben überall gleich) + Avatar-Animationsframes",
       "pr": 61,
