@@ -131,3 +131,44 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 5. **Verräter im Ferienhaus** (TTT) + **Versteckspiel mit Möbeln** (Prop Hunt)
 6. **Igel-Krieg**, **Wackelturm**
 7. Große Brocken: **Kart-Rennen**, **Fallen-Parcours**, **Smash-Arena**
+
+---
+
+## 4 · Umsetzungsplan aus dem Spiel-Review (5. November 2026)
+
+Quelle: **Spiel-Review** (https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1), Einzelgutachten in `docs/review/`.
+Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), dann Pacing, dann Spielbrett, dann Igel, dann neue Spiele. Keine weitere Echtzeit-Arena vorher.
+
+### Phase 0 · Fehler und Fairness (S)
+- [ ] Fallen-Parcours: `MAX_RUNNERS` 12 (ab 9 Spielern laufen heute immer dieselben 8)
+- [ ] Zentrale Gnadenfrist bei Verbindungsverlust (3 s einfrieren/unverwundbar statt sofort raus in Arena, Sumo, Parcours; Kart/Smash nicht als Hindernis/Zielscheibe stehen lassen); Stick nach 700 ms ohne Update auf 0; Wake Lock bei `visibilitychange` erneuern
+- [ ] Netz: `Room.changed()` sofort senden (max. alle 40 ms) statt immer 40 ms warten; Spieler + Leaderboard als `meta`-Event nur bei Änderung; `private` nur bei Änderung; `transports: ['websocket']`
+- [ ] Punkte nach Spielerzahl (`PLACE_COINS`/`ARCADE_POINTS` → `round(10·(n−Platz)/(n−1))`, Trost-Münze), Startspieler im Brett rotieren, Koop-Münzen für Flieger (Ziel erreicht?) und Grill (Sterne), Sprint-Zeit serverseitig
+- [ ] Listen aufräumen: Igel, Turm, Descent, Wrap vom Brett; Date-Spiele aus `ARCADE_RANDOM`; `smash.maxPlayers = 8`; Spieldauer-Klasse (kurz/mittel/lang) fürs Brett; README-Dubletten
+- [ ] Pacing: TTT `ROUND_MS` 180 → 100 s und 2 Runden; Golf 5 Bahnen auf dem Brett; Sprüche ab 9 Spielern Runde 1 + Finale; Stille Post max. 6 Kettenschritte; Fangen/Geist ab 7 Spielern zwei Rollenträger
+
+### Phase 1 · Fundament für alle Spiele (M ×3)
+- [ ] **Ton + Juice:** `client/host/sfx.ts` (~25 Chiptune-Effekte über den vorhandenen `fxBus`, Panning nach x), `client/host/juice.ts` (shake-Stufen, flash, hitStop, slowMo, zoomPunch, burst mit Partikel-Emitter, float, banner), einheitliches `fx`-Feld im Snapshot; Versteckspiel-Pfeife auf den Synth; Sprecher per `speechSynthesis` (abschaltbar); Iris-Wipe zwischen Szenen; Ergebnis-Reveal mit Auto-Weiter. Zuerst Smash (Hit-Stop), Arena, Sumo, Bogen, Ententeich, Kart, Brett, Ergebnis
+- [ ] **Handy-Ausrichtung (Marlons Feedback):** Pflichtfeld `orientation` in `MiniInfo`, `client/controller/orientation.ts` (Ansage vor jedem Spiel, Overlay bei falscher Lage, Android-Lock im Vollbild, Laptop ausgenommen), ein schwebender Stick (`stick.ts`) statt drei, gemeinsames Querlayout `.lx`, `haptic()` mit iPhone-Ersatz (Klick-Ton + Rand-Blitz), Ansage auch am TV. Dann quer: Wasserbomben, Igel, Grill, Fangen, Geist, Verräter, Wackelturm, Versteckspiel; danach Arena, Sumo, Aufräumen, Kurve, Volley, Smash, Bogen
+- [ ] **Regelkarte + Zuschauer:** Raum-Phase `intro` mit `MINI_INFO.howTo` (Ziel + 3 Steuer-Piktogramme), Übungsfeld am Handy, „Bereit!“; Emote-Leiste und Wetten für Ausgeschiedene; eine Spielerfarbe pro Abend mit Kürzel; Ergebnis zweispaltig ab 9
+
+### Phase 2 · Look und Bewegung (M ×2)
+- [ ] Avatar-Animations-Frames (Laufen, Sprung, Treffer, Jubel, Blinzeln) zentral in `shared/avatar.ts`, Squash & Stretch in `figure()`, Ambient-Bewegung (Wolken, Möwen, Palmen), Parallax in Smash, Igel, Volley, Bogen
+- [ ] `SnapBuffer` mit Wiedergabe-Uhr statt bildratenabhängiger Glättung (Hit-Stop, Zeitlupe, Wiederholung „TOR!“ fast gratis), Tick 30 Hz für Plattformer, Render-Auflösung ×2/×4 bei unveränderter Welt, Kamera für Igel, Kart-Regie, Sumo-Finale, Brett-Schwenk
+- [ ] Namensschilder entzerren, „Spieler (P)“/„♪ Musik“ nicht über dem HUD, Namen nicht hart kürzen, leere Arenen beleben (Boule, SUP, Golf, Flunky)
+
+### Phase 3 · Party-Modus 2.0
+- [ ] (S) Alle würfeln gleichzeitig, Bonus-Cocktails am Ende mit Reveal, letzte zwei Runden doppelt, Finale-Sieg = 2 Cocktails, Brettstand in `data/party.json`, Nachzügler einsteigen lassen, Tageszeit über den Abend
+- [ ] (M) Items-Laden (Doppelwürfel, Cocktail-Klau, Taxi zur Bar, Sonnencreme-Schild), Bar-Preisstaffel, eine Abzweigung, Duell-Feld „Teilen oder Klauen“ (Wasserpistolen-Duell, Sprint)
+- [ ] (M) Minispiel-Typen 2 gegen 2 und 1 gegen 3, Abend-Statistik und „Titel des Abends“ aus dem `FxLog`, Turnier als Playlist
+
+### Phase 4 · Igel-Krieg → Worms
+- [ ] (S) Wind driftet statt neu gewürfelt; Zugzeit 30/20/15 s nach Spielerzahl; Flut pro Runde statt pro Zug; HP 60 ab 8 Spielern; Sudden Death ab 7 Spielern nach 3 min; HP am Zugende herunterzählen; Kamera (Aktiver, Geschoss, Krater); Wind sichtbar (Wolken, Balken, Pfeil im Ziel-Pad); Zuschauer-Sprüche; FEUER-Knopf
+- [ ] (M) Modus „Alle gleichzeitig“ ab 7 Spielern; Waffen 4 → 10 (Wasser-Schrotflinte, Möwen-Luftschlag per Minikarte, Böller, Seeigel-Mine, Ananas-Splitterbombe, Paddel, Heilige Ananas, Surfbrett-Brücke); Kisten am Fallschirm; Gaskartuschen; Spieler-Teams; größere Insel
+- [ ] (L) Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche
+
+### Phase 5 · Portfolio umsteuern (neue Spiele, je S–M)
+- [ ] Wer war's? (Who's Who), Schätzkönig (Wits & Wagers), Mäxchen am Pool, Funkfrequenz (Wavelength) – je ein Abend auf dem Sprüche-/WWE-Fluss
+- [ ] Dann: Spion unter Gästen (läuft), Montagsmaler live, Strand-Band, Sektkorken (fürs Brett), Lügen-Lexikon, Strandkorb-Scharade, Geheimcode am Pool, Kofferbombe entschärfen, Urlaubs-Wahnsinn (WarioWare)
+- [ ] Verräter-Redesign „Stromausfall“ (Sichtbeschränkung mit der Dunkelheits-Technik der Geisterjagd)
+- [ ] Gestrichen/zusammengelegt: Wackel-Prügelei, Umzugschaos; Kofferpacken als Wackelturm-Variante
