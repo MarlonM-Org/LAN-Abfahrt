@@ -398,7 +398,8 @@ export interface SupState {
   endsIn: number;
   length: number;
   boards: SupBoard[];
-  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly' }[];
+  /** `gone`: Boje/Qualle wurde gerammt und ist weg (Steine bleiben immer liegen) */
+  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly'; gone?: boolean }[];
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Aufräumen
@@ -1967,6 +1968,8 @@ export interface GameMeta {
   joinUrl: string;
   customNhieCount: number;
   botCount: number;
+  /** Stärke der Lobby-Bots (VIP stellt um) */
+  botSkill: import('./players').BotSkill;
   /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
   leaderboard: LeaderEntry[];
   customQuestionCount: number;

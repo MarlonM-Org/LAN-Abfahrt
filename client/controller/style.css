@@ -245,6 +245,7 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .mode-tabs.three { grid-template-columns: 1fr 1fr 1fr; }
 .drink-btn { background: #f0973a; box-shadow: inset 0 3px 0 #ffb867, inset 0 -4px 0 #c06a1f, 0 3px 0 var(--outline); }
 .bot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bot-row .bot-skill { grid-column: 1 / -1; }
 .q-kind .mode-tab { font-size: 8px; padding: 8px 2px; }
 .card-big { font-size: 40px; text-align: center; color: var(--red); background: var(--paper-light); border: 3px solid var(--wood-darker); padding: 18px; margin: 0 auto; min-width: 120px; }
 .big-btn.boom { background: #c0392b; box-shadow: inset 0 4px 0 #e86a5c, inset 0 -6px 0 #8a2419, 0 3px 0 var(--outline); }
@@ -1682,3 +1683,11 @@ table.lb tr.off td { opacity: 0.55; }
 .big-btn.su-drop small, .big-btn.su-sprint small { font-size: 8px; }
 .big-btn.su-sprint { min-height: 160px; font-size: 15px; background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
 .big-btn.su-drop:disabled, .big-btn.su-sprint:disabled { filter: saturate(0.4) brightness(0.85); }
+/* Auto-Fußball: runder Richtungs-Stick (statt Links/Rechts-Schiene) */
+.k3-stick2d .k3-base { left: -60px; top: -60px; width: 120px; height: 120px; border-radius: 50%; }
+/* Flunkyball: Wurf mit Sensor oder Wischen */
+.fl-area { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.fl-area .swipe-pad { flex: 1; }
+.fl-last { color: var(--red); text-align: center; }
+.fl-shake { text-align: center; color: var(--ink-soft); font-size: 9px; }
+.btn-grid .insp-line { display: block; font-size: 6px; color: var(--ink-soft); line-height: 1.4; margin-top: 3px; }

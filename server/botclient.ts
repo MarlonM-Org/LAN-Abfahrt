@@ -8,6 +8,7 @@ import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '.
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, PUNCH, type Mask, buildTerrain, carve, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
+import { type BotSkill, asBotSkill } from '../shared/players';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
@@ -61,12 +62,42 @@ export interface BotOptions {
   count?: number;
   /** Einzelspiel: so oft drückt der VIP-Bot im Ergebnis „Nochmal“ (Leaderboard des Abends testen) */
   nochmal?: number;
+  /** Stärke: leicht/normal (menschliche Reaktionszeit, kleine Fehler) oder profi (sofort, exakt) – Standard normal */
+  skill?: string;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/**
+ * „Menschliche“ Eingaben: Jede Bot-Eingabe geht mit Reaktionszeit raus, Stick-/Wurfwerte zittern etwas und
+ * ab und zu wird ein Sprung/Schlag verpasst. So spielen die Bots wie Menschen am Handy – und finden dabei
+ * auch Stellen, an denen man mit normaler Reaktionszeit hängen bleibt (Profi-Bots reagieren auf den Frame genau).
+ */
+const HUMAN: Record<BotSkill, { lag: [number, number]; noise: number; miss: number }> = {
+  leicht: { lag: [260, 480], noise: 0.22, miss: 0.16 },
+  normal: { lag: [140, 290], noise: 0.1, miss: 0.06 },
+  profi: { lag: [0, 0], noise: 0, miss: 0 },
+};
+/** Diese Eingaben können „verpasst“ werden (nur das Drücken, nie Loslassen oder Eingaben mit seq) */
+const MISSABLE = new Set(['jump', 'hop', 'dash', 'strike', 'attack', 'tap', 'paddle', 'btn', 'punch', 'grab', 'cast']);
+/** Werte im Bereich −1 … 1 bzw. 0 … 1, die zittern dürfen */
+const JITTER_SIGNED = new Set(['x', 'y', 'dx', 'dy', 'angle', 'spin']);
+const JITTER_UNIT = new Set(['power', 'speed']);
+const clamp1 = (v: number, lo: number) => Math.max(lo, Math.min(1, v));
+
+function humanize(payload: unknown, noise: number): unknown {
+  if (!noise || !payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  const out: Record<string, unknown> = { ...(payload as Record<string, unknown>) };
+  for (const [k, v] of Object.entries(out)) {
+    if (typeof v !== 'number' || v === 0) continue;
+    if (JITTER_SIGNED.has(k) && Math.abs(v) <= 1) out[k] = Math.round(clamp1(v + rand(-noise, noise), -1) * 100) / 100;
+    else if (JITTER_UNIT.has(k) && v >= 0 && v <= 1) out[k] = Math.round(clamp1(v + rand(-noise, noise) * 0.6, 0) * 100) / 100;
+  }
+  return out;
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class Bot {
@@ -78,6 +109,9 @@ export class Bot {
   phasesSeen = new Set<string>();
 
   leader: boolean;
+  private human = HUMAN.normal;
+  /** Eingaben bleiben in Reihenfolge: nie früher als die vorige */
+  private sendAt = 0;
   private resultCount = 0;
   private nochmalCount = 0;
   private resultsEntered = 0;
@@ -138,6 +172,7 @@ export class Bot {
     private opts: BotOptions,
   ) {
     this.leader = !!opts.leader;
+    this.setSkill(asBotSkill(opts.skill));
     this.socket = io(opts.url, { transports: ['websocket'], forceNew: true });
     // Regelmäßig "nachdenken" – der Zustand kommt nicht immer, wenn der Bot dran ist
     this.timer = setInterval(() => this.state && this.react(this.state), 200);
@@ -454,8 +489,23 @@ export class Bot {
     this.socket.disconnect();
   }
 
+  setSkill(skill: BotSkill) {
+    this.human = HUMAN[skill];
+  }
+
   send(action: string, payload?: unknown) {
-    this.socket.emit('mini:input', { action, payload });
+    const h = this.human;
+    if (!h.lag[1]) {
+      this.socket.emit('mini:input', { action, payload });
+      return;
+    }
+    const pl = payload as Record<string, unknown> | undefined;
+    const press = !pl || typeof pl !== 'object' || (pl.down === true && pl.b !== 'shield');
+    if (MISSABLE.has(action) && press && !(pl && 'seq' in pl) && Math.random() < h.miss) return;
+    const p = humanize(payload, h.noise);
+    const now = Date.now();
+    this.sendAt = Math.max(now + rand(h.lag[0], h.lag[1]), this.sendAt);
+    setTimeout(() => this.socket.connected && this.socket.emit('mini:input', { action, payload: p }), this.sendAt - now);
   }
 
   /** Führt eine Aktion pro Schlüssel nur einmal gleichzeitig aus */

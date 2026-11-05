@@ -23,7 +23,8 @@ export const KART = {
   REVERSE_SPEED: 34,
   REVERSE_ACCEL: 70,
   SAND_SPEED: 40,
-  TURN: 3.0,
+  /** Lenkrate (rad/s) bei mittlerem Tempo – bei Vollgas lenkt das Kart etwas weniger (siehe stepKart) */
+  TURN: 2.4,
   GRIP: 11,
   DRIFT_GRIP: 2.6,
   DRIFT_MIN_SPEED: 40,
@@ -386,7 +387,9 @@ export function stepKart(c: KartPhys, inp: KartInput, dt: number, T: Track | nul
     } else {
       // Im Stand dreht sich das Kart nur ein bisschen (wenn Gas/Bremse gedrückt), rückwärts andersherum
       const minTurn = gas || brake ? 0.3 : 0;
-      turn = steer * KART.TURN * clamp(Math.abs(vf) / 40, minTurn, 1) * (vf < -2 ? -1 : 1);
+      // Bei hohem Tempo weniger Einschlag (max. −30 %), damit man auf der Geraden nicht ins Schlingern kommt
+      const highSpeed = 1 - 0.3 * clamp((Math.abs(vf) - 45) / (KART.MAX_SPEED - 45), 0, 1);
+      turn = steer * KART.TURN * clamp(Math.abs(vf) / 40, minTurn, 1) * highSpeed * (vf < -2 ? -1 : 1);
     }
     c.angle = wrapAngle(c.angle + turn * dt);
   }

@@ -4,6 +4,7 @@ import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_R
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
+import { BOT_SKILLS, BOT_SKILL_LABEL } from '../../../shared/players';
 import { sessionPanel } from './leaderboard';
 
 /** VIP-Schalter im Party-Modus: auch lange Minispiele (> 4 min) aufs Brett – bleibt bis zum Neuladen */
@@ -115,7 +116,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     const row = el(`<div class="btn-grid"></div>`);
     for (const kind of kinds) {
       const info = MINI_INFO[kind];
-      const b = el(`<button class="secondary small">${info.title}${info.orientation === 'landscape' ? ' <b class="or-mark">↔</b>' : ''}</button>`).firstElementChild as HTMLButtonElement;
+      const insp = miniInspired(kind);
+      const b = el(`<button class="secondary small">${info.title}${info.orientation === 'landscape' ? ' <b class="or-mark">↔</b>' : ''}${insp ? `<small class="insp-line">${insp}</small>` : ''}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:start', { mode: kind }));
       q(row, '.btn-grid').append(b);
       gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
@@ -158,7 +160,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     for (const t of DATE_COMING_SOON) menu.append(el(`<button class="secondary" disabled>${t} – kommt bald</button>`));
     singles(DATE_KINDS, 'Einzelnes Kapitel');
   } else if (vip && mode === 'drink') {
-    menu.append(el(`<h2>Trinkspiel</h2><p>Partyklassiker reihum: Wer würde eher, Ich hab noch nie, Höher oder Tiefer, Tick-Tack-Bumm. Wasser zählt auch!</p>`));
+    menu.append(el(`<h2>Trinkspiel</h2><p>Partyklassiker reihum: Wer würde eher, Ich hab noch nie, Höher oder Tiefer, Wort-Bombe. Wasser zählt auch!</p>`));
     const b = el(`<button class="drink-btn">Los geht’s!</button>`).firstElementChild as HTMLButtonElement;
     b.addEventListener('click', () => socket.emit('vip:start', { mode: 'drink' }));
     menu.append(b);
@@ -194,6 +196,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   const slot = q(root, '.session-slot');
   slot.append(ses.root);
   let tvBtn: HTMLButtonElement | null = null;
+  let skillBtn: HTMLButtonElement | null = null;
   let resetSes: HTMLButtonElement | null = null;
   if (vip) {
     const row = el(`<div class="btn-row lb-vip"></div>`).firstElementChild as HTMLElement;
@@ -212,7 +215,13 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     add.addEventListener('click', () => socket.emit('vip:addBot'));
     const rm = el(`<button class="secondary small">Bots entfernen</button>`).firstElementChild as HTMLButtonElement;
     rm.addEventListener('click', () => socket.emit('vip:removeBots'));
-    row.append(add, rm);
+    // Stärke: Leicht → Normal → Profi (Normal = menschliche Reaktionszeit, gut zum Testen)
+    skillBtn = el(`<button class="secondary small bot-skill"></button>`).firstElementChild as HTMLButtonElement;
+    skillBtn.addEventListener('click', () => {
+      const cur = BOT_SKILLS.indexOf(store.state?.botSkill ?? 'normal');
+      socket.emit('vip:botSkill', BOT_SKILLS[(cur + 1) % BOT_SKILLS.length]);
+    });
+    row.append(add, rm, skillBtn);
   }
 
   // Eigene Fragen (Wer würde eher / Ich hab noch nie) bzw. Startsätze für Stille Post / Fragen fürs Sprüche-Duell
@@ -278,6 +287,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
         : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen`;
     arcadeUpdate?.(n);
     ses.update();
+    if (skillBtn) skillBtn.textContent = `Bot-Stärke: ${BOT_SKILL_LABEL[st?.botSkill ?? 'normal']}`;
     if (tvBtn) tvBtn.textContent = st?.showBoard ? 'TV: Lobby zeigen' : 'Auf dem TV zeigen';
     if (resetSes) resetSes.disabled = !st?.session.games;
     for (const g of gated) {

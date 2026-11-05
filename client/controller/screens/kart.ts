@@ -6,7 +6,7 @@ import { KartWorld } from '../../kart3d/world';
 import { onInputReset } from '../stick';
 import { type Screen, LS, app, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
-import { steerFromRoll, tiltLabel, tiltRoll } from '../tilt';
+import { steerCurve, steerFromRoll, steerSlew, tiltLabel, tiltRoll } from '../tilt';
 import { haptic } from '../haptic';
 
 /**
@@ -144,8 +144,11 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   rootEl.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
   rootEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-  // ---- Eingaben
+  // ---- Eingaben (Lenkung: Stick/Kippen → Kennlinie → begrenzte Lenkgeschwindigkeit, im Bildtakt)
   const inp: KartInput = { steer: 0, gas: false, brake: false, drift: false };
+  /** Roher Stick-Ausschlag −1 … 1 (vor Kennlinie) */
+  let rawSteer = 0;
+  let steerNow = 0;
   let last = { steer: 9, gas: false, brake: false, drift: false, t: 0 };
   const push = (force = false) => {
     const now = performance.now();
@@ -164,7 +167,7 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     let active: number | null = null;
     let baseX = 0;
     const DEAD = 6;
-    const FULL = 58;
+    const FULL = 72;
     left.addEventListener('pointerdown', (e) => {
       if (active !== null) return;
       e.preventDefault();
@@ -181,18 +184,16 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       if (e.pointerId !== active) return;
       const d = e.clientX - baseX;
       const mag = Math.max(0, Math.abs(d) - DEAD) / (FULL - DEAD);
-      inp.steer = Math.round(Math.sign(d) * Math.min(1, mag) * 100) / 100;
+      rawSteer = Math.sign(d) * Math.min(1, mag);
       knob.style.transform = `translateX(${Math.max(-FULL, Math.min(FULL, d))}px)`;
       // Stick „wandert“ mit, wenn der Daumen weit über den Anschlag hinausgeht
       if (Math.abs(d) > FULL + 24) baseX = e.clientX - Math.sign(d) * (FULL + 24);
-      push();
     });
     const up = (e: PointerEvent) => {
       if (e.pointerId !== active) return;
       active = null;
-      inp.steer = 0;
+      rawSteer = 0;
       stick.classList.remove('on');
-      push(true);
     };
     left.addEventListener('pointerup', up);
     left.addEventListener('pointercancel', up);
@@ -291,6 +292,8 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   onInputReset(right, () => {
     fingers.clear();
     applyButtons();
+    rawSteer = 0;
+    steerNow = 0;
     if (inp.steer) {
       inp.steer = 0;
       push(true);
@@ -435,13 +438,18 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     }
     // Kipp-Lenkung
     if (mode === 'tilt') {
-      const target = steerFromRoll(tilt.roll, tilt.center);
-      tilt.smooth += (target - tilt.smooth) * Math.min(1, dt / 40);
-      inp.steer = Math.round(tilt.smooth * 100) / 100;
+      // Volle Lenkung erst bei 38° – das Handy muss deutlich gedreht werden
+      const target = steerFromRoll(tilt.roll, tilt.center, 38, 3);
+      tilt.smooth += (target - tilt.smooth) * Math.min(1, dt / 60);
+      rawSteer = tilt.smooth;
+    }
+    steerNow = steerSlew(steerNow, steerCurve(rawSteer), dt);
+    inp.steer = Math.round(steerNow * 100) / 100;
+    if (mode === 'tilt') {
       const wheel = root.querySelector('.k3-wheel-in') as HTMLElement | null;
       if (wheel) wheel.style.transform = `rotate(${inp.steer * 90}deg)`;
       const degEl = root.querySelector('.k3-tiltdeg');
-      const lbl = tiltLabel(tilt.roll, tilt.center);
+      const lbl = tiltLabel(tilt.roll, tilt.center, 38, 3);
       if (degEl && degEl.textContent !== lbl) degEl.textContent = lbl;
     }
     push();

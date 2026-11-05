@@ -5,7 +5,7 @@ import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } 
 const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-// ================================================================== SUP-Rennen
+// ================================================================== Paddel-Duell (SUP)
 
 /**
  * Zu zweit auf einem Stand-Up-Paddle-Board: Einer paddelt links, einer rechts.
@@ -94,15 +94,24 @@ export class SupGame implements MiniGame {
         b.v *= 0.6;
       }
       for (const o of this.obstacles) {
+        if (o.gone) continue;
         const dx = b.x - o.x;
         const dy = b.y - o.y;
         const d = Math.hypot(dx, dy);
-        if (d < o.r + SUP.BOARD_R) {
-          b.x = o.x + (dx / (d || 1)) * (o.r + SUP.BOARD_R + 1);
-          b.y = o.y + (dy / (d || 1)) * (o.r + SUP.BOARD_R + 1);
-          b.v *= -0.3;
-          b.balance += o.type === 'jelly' ? 0.6 : 0.4;
+        if (d >= o.r + SUP.BOARD_R) continue;
+        if (o.type !== 'rock') {
+          // Boje/Qualle: wird weggeschoben bzw. taucht ab – kostet Tempo und Gleichgewicht, aber man bleibt nie hängen
+          o.gone = true;
+          b.v *= 0.55;
+          b.balance += (o.type === 'jelly' ? 0.45 : 0.25) * (Math.sign(b.balance) || 1);
+          continue;
         }
+        // Stein: zurückprallen und seitlich daran vorbeidrehen, damit man nicht immer wieder hineinfährt
+        b.x = o.x + (dx / (d || 1)) * (o.r + SUP.BOARD_R + 1);
+        b.y = o.y + (dy / (d || 1)) * (o.r + SUP.BOARD_R + 1);
+        b.v *= -0.3;
+        b.heading += (dy >= 0 ? 1 : -1) * 0.35;
+        b.balance += 0.4 * (Math.sign(b.balance) || 1);
       }
       if (Math.abs(b.balance) > 1) this.fall(b, now);
       if (b.x >= SUP.LENGTH) {

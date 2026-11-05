@@ -1,6 +1,9 @@
 import type { FlunkyState, Team } from '../../../shared/types';
-import { RUN_TAPS, TEAM_INFO, otherTeam } from '../../../shared/flunky';
+import { RUN_TAPS, TEAM_INFO, missHint, otherTeam } from '../../../shared/flunky';
 import { type Screen, app, el, message, nameOf, q, send, store, tapButton, teamBadge } from '../core';
+import type { BowlThrow } from '../bowlingThrow';
+import { mountThrowInput } from '../throwInput';
+import { motionSupport, onMotion, swingAcc } from '../motion';
 
 export function pickFlunky(f: FlunkyState): Screen {
   const id = store.playerId!;
@@ -34,48 +37,77 @@ function windText(w: number) {
   return `Wind ${(w < 0 ? '<' : '>').repeat(n)} – zieht nach ${w < 0 ? 'links' : 'rechts'}`;
 }
 
+/** Seitliche Streuung: Wurfrichtung −1 … 1 → Flunky-Winkel (Server klemmt auf ±0,8) */
+const ANGLE_K = 0.7;
+
+/**
+ * Werfen: wie beim Bowling/Boule wahlweise mit dem Bewegungssensor (Knopf halten, Arm schwingen, loslassen –
+ * Schwung = Weite, Drehen = Richtung) oder per Wischen. Die Wahl gilt für alle Wurfspiele.
+ */
 function buildAim(team: Team) {
+  const f0 = flunky();
+  const mine = f0?.lastThrow && f0.lastThrow.throwerId === store.playerId && !f0.lastThrow.hit ? f0.lastThrow : null;
   const root = el(`
     ${teamBadge(team)}
     <h2>Du wirfst!</h2>
     <p class="wind"></p>
-    <div class="swipe-pad">
-      <div class="arrow">^</div>
-      <p class="pad-text">Schnell nach oben wischen!<br/>Länge = Kraft, Richtung = Ziel</p>
-    </div>
+    ${mine ? `<p class="fl-last">Letzter Wurf: ${missHint(mine.team, mine.to)}</p>` : ''}
+    <div class="fl-area"></div>
   `);
   app.append(root);
-  const pad = q(root, '.swipe-pad');
-  const padText = q(root, '.pad-text');
-  let start: { x: number; y: number; id: number } | null = null;
-  let thrown = false;
-
-  pad.addEventListener('pointerdown', (e) => {
-    if (thrown) return;
-    pad.setPointerCapture(e.pointerId);
-    start = { x: e.clientX, y: e.clientY, id: e.pointerId };
-  });
-  pad.addEventListener('pointerup', (e) => {
-    if (!start || e.pointerId !== start.id || thrown) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
-    start = null;
-    if (-dy < 40) {
-      padText.textContent = 'Nach OBEN wischen!';
-      return;
-    }
-    const angle = Math.atan2(dx, -dy);
-    const power = Math.min(1, -dy / (pad.clientHeight * 0.9));
-    thrown = true;
-    navigator.vibrate?.(30);
-    padText.textContent = `Wurf! Kraft ${Math.round(power * 100)}%`;
-    send('throw', { angle, power });
-  });
+  const area = q(root, '.fl-area');
+  const input = mountThrowInput(
+    area,
+    root,
+    {
+      ask: 'Wirf wie beim echten Flunkyball: Knopf halten, Arm nach vorn schwingen, loslassen. Mittlerer Schwung trifft die Flasche – der Wind lenkt ab.',
+      motionHint: 'Halten, Arm schwingen, loslassen. Schwung = Weite (mittel trifft!), Drehen = Richtung.',
+      padText: 'Ball nach oben wischen!<br/>Länge = Kraft · schräg = Richtung',
+      // Wischen wie bisher: Länge = Kraft, Richtung = Ziel
+      swipe: (pts, padH) => {
+        const a = pts[0];
+        const b = pts[pts.length - 1];
+        const up = a.y - b.y;
+        if (up < 40) return { ok: false, reason: 'Nach OBEN wischen!' };
+        const angle = Math.max(-1, Math.min(1, Math.atan2(b.x - a.x, up) / ANGLE_K));
+        return { ok: true, t: { speed: Math.min(1, up / (padH * 0.9)), angle, spin: 0 } };
+      },
+      button: 'HALTEN &amp;<br/>WERFEN',
+    },
+    (t: BowlThrow) => {
+      navigator.vibrate?.(30);
+      send('throw', { angle: t.angle * ANGLE_K, power: t.speed });
+      area.innerHTML = '';
+      area.append(el(`<div class="center"><h2>Wurf!</h2><p>Kraft ${Math.round(t.speed * 100)} % – schau auf den Fernseher!</p></div>`));
+    },
+  );
 
   return () => {
     const f = flunky();
     if (f) q(root, '.wind').textContent = windText(f.wind);
+    if (!f || f.sub !== 'aim') input.stop();
   };
+}
+
+/**
+ * Schütteln zählt wie Tippen (Trinken/Laufen), sobald der Bewegungssensor freigegeben ist
+ * (meldet sich selbst ab, wenn der Screen weg ist). Liefert den Hinweistext (leer ohne Sensor).
+ */
+function shakeToTap(root: HTMLElement, onShake: () => void): string {
+  if (motionSupport() !== 'ok') return '';
+  let last = 0;
+  let armed = true;
+  const off = onMotion((m) => {
+    if (!root.isConnected) return off();
+    const a = swingAcc(m);
+    // Spitze über 7 m/s² zählt, danach erst wieder nach Beruhigung (< 3) – ein Schüttler = ein Schluck
+    if (armed && a > 7 && m.t - last > 110) {
+      armed = false;
+      last = m.t;
+      onShake();
+    } else if (a < 3) armed = true;
+  });
+  return '<p class="fl-shake">…oder Handy schütteln!</p>';
 }
 
 function buildDrink(team: Team) {
@@ -88,10 +120,12 @@ function buildDrink(team: Team) {
     <div class="meter"><div></div></div>
   `);
   app.append(root);
-  tapButton(q(root, '.big-btn'), () => {
+  const tap = () => {
     send('tap');
     navigator.vibrate?.(8);
-  });
+  };
+  tapButton(q(root, '.big-btn'), tap);
+  q(root, '.big-btn').insertAdjacentHTML('afterend', shakeToTap(root, tap));
   const fill = q(root, '.meter > div');
   return () => {
     fill.style.width = `${flunky()?.beer[store.playerId!] ?? 0}%`;
@@ -107,10 +141,12 @@ function buildRun(team: Team) {
     <div class="meter"><div></div></div>
   `);
   app.append(root);
-  tapButton(q(root, '.big-btn'), () => {
+  const tap = () => {
     send('tap');
     navigator.vibrate?.(8);
-  });
+  };
+  tapButton(q(root, '.big-btn'), tap);
+  q(root, '.big-btn').insertAdjacentHTML('afterend', shakeToTap(root, tap));
   const fill = q(root, '.meter > div');
   fill.style.background = 'var(--sea)';
   return () => {

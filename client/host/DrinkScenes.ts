@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { cardLabel } from '../../shared/games';
+import { MINI_INFO, cardLabel } from '../../shared/games';
 import { C } from '../art/palette';
 import { Pix, rng } from '../art/pix';
 import { paintWoodFloor } from '../art/ground';
@@ -177,7 +177,7 @@ export class BombScene extends DrinkScene {
   protected draw(s: GameState) {
     if (s.mini?.kind !== 'bomb') return;
     const b = s.mini.state;
-    this.header(`Tick-Tack-Bumm · Runde ${b.round}/${b.rounds}`, b.category);
+    this.header(`${MINI_INFO.bomb.title} · Runde ${b.round}/${b.rounds}`, b.category);
     const ids = Object.keys(b.sips);
     this.row(ids, () => null);
     const n = ids.length;

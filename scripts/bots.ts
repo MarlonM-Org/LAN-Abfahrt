@@ -9,6 +9,8 @@
  *   npm run bots -- 4 --game=kart --nochmal=2 → danach zweimal „Nochmal“ (Leaderboard des Abends zählt weiter)
  *   npm run bots -- 2 --date        → zwei Bots spielen die komplette Date Night
  *   npm run bots -- 4 --drink       → Bots spielen ein paar Runden Trinkspiel
+ *   npm run bots -- 3 --players=4  → zum Mitspielen am eigenen Handy: du bist VIP und startest das Spiel selbst
+ *   npm run bots -- 3 --skill=leicht → Bot-Stärke: leicht | normal (Standard, mit menschlicher Reaktionszeit) | profi (wie früher)
  */
 import { Bot } from '../server/botclient';
 
@@ -18,6 +20,8 @@ const GAME = args.find((a) => a.startsWith('--game='))?.slice(7);
 const NOCHMAL = Number(args.find((a) => a.startsWith('--nochmal='))?.slice(10) ?? 0);
 const DATE = args.includes('--date');
 const DRINK = args.includes('--drink');
+const PLAYERS = Number(args.find((a) => a.startsWith('--players='))?.slice(10) ?? COUNT);
+const SKILL = args.find((a) => a.startsWith('--skill='))?.slice(8);
 const LEAD = args.includes('--party') || !!GAME || DATE || DRINK;
 const URL = process.env.URL ?? 'http://localhost:3000';
 const NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -30,7 +34,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       leader: LEAD && i === 0,
       game: DRINK ? 'drink' : GAME,
       date: DATE,
-      count: COUNT,
+      count: Math.max(COUNT, PLAYERS),
+      skill: SKILL,
       nochmal: NOCHMAL,
       log: (m) => console.log(m),
       onDone: () => process.exit(0),

@@ -36,6 +36,26 @@ export function steerFromRoll(rollDeg: number, centerDeg: number, fullDeg = 28, 
 }
 
 /**
+ * Lenk-Kennlinie für Fahrspiele: kleine Ausschläge lenken nur sanft, voller Ausschlag bleibt voll.
+ * `expo` 1 = linear, 1.8 ≈ feinfühlig um die Mitte (wie „Expo“ bei RC-Fernsteuerungen).
+ */
+export function steerCurve(v: number, expo = 1.8): number {
+  const a = Math.min(1, Math.abs(v));
+  return Math.round(Math.sign(v) * Math.pow(a, expo) * 100) / 100;
+}
+
+/**
+ * Lenkung folgt dem Ziel nur mit begrenzter Geschwindigkeit (pro Sekunde), damit ein schneller Daumen-Ruck
+ * das Kart nicht schlagartig herumreißt. Zurück zur Mitte geht es doppelt so schnell.
+ */
+export function steerSlew(cur: number, target: number, dtMs: number, perSec = 4.5): number {
+  const toCenter = Math.abs(target) < Math.abs(cur) && Math.sign(target) !== -Math.sign(cur);
+  const max = (perSec * (toCenter ? 2 : 1) * dtMs) / 1000;
+  const d = target - cur;
+  return Math.abs(d) <= max ? target : cur + Math.sign(d) * max;
+}
+
+/**
  * Anzeige für die Kipp-Lenkung: gemessener Winkel relativ zur Mitte, z. B. „◀ 12°“ oder „8° ▶“.
  * Innerhalb der Totzone „0°“, ab voller Lenkung mit „MAX“.
  */

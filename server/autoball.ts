@@ -15,6 +15,26 @@ interface Inp {
   gas: boolean;
   brake: boolean;
   boost: boolean;
+  /** Richtungs-Stick (Bildschirm-Richtung auf dem TV, Länge 0 … 1) – ersetzt Lenken + Gas, wenn gesetzt */
+  dir?: { x: number; y: number };
+}
+
+const NO_INP = (): Inp => ({ steer: 0, gas: false, brake: false, boost: false });
+
+/**
+ * Richtungs-Steuerung: Der Stick zeigt, wohin das Auto auf dem TV fahren soll (oben = nach oben).
+ * Von oben gesehen ist das viel leichter als „links/rechts aus Sicht des Autos“ – fährt das Auto
+ * nach unten, wäre Links sonst plötzlich Rechts. Das Auto dreht sich zur Stick-Richtung und gibt Gas.
+ */
+function dirToKart(c: KartPhys, d: { x: number; y: number }, brake: boolean): KartInput {
+  const mag = Math.hypot(d.x, d.y);
+  if (mag < 0.2) return { steer: 0, gas: false, brake, drift: false };
+  const want = Math.atan2(d.y, d.x);
+  const diff = Math.atan2(Math.sin(want - c.angle), Math.cos(want - c.angle));
+  const vf = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+  // Ziel fast genau hinter dem Auto und langsam: rückwärts herumdrehen (Wendemanöver)
+  if (Math.abs(diff) > 2.5 && vf < 25 && !brake) return { steer: -Math.sign(diff), gas: false, brake: true, drift: false };
+  return { steer: clamp(diff * 2.4, -1, 1), gas: !brake, brake, drift: false };
 }
 
 interface Car extends KartPhys {
@@ -202,6 +222,17 @@ export class AutoballGame implements MiniGame {
       }
       // BREMSE in voller Fahrt + lenken = Drift (wie DRIFT im Kart), sonst bremsen bzw. rückwärts
       const vf = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+      if (inp.dir) {
+        const k = dirToKart(c, inp.dir, inp.brake);
+        if (inp.gas && !k.brake) k.gas = true;
+        // BREMSE in voller Fahrt + Kurve = Drift (wie mit dem Lenk-Stick)
+        if (inp.brake && (c.driftDir !== 0 || (vf > KART.DRIFT_MIN_SPEED && Math.abs(k.steer) > 0.35))) {
+          kin.set(c.id, { steer: k.steer, gas: false, brake: false, drift: true });
+          continue;
+        }
+        kin.set(c.id, k);
+        continue;
+      }
       const drift = inp.brake && (c.driftDir !== 0 || (vf > KART.DRIFT_MIN_SPEED && Math.abs(inp.steer) > 0.35));
       kin.set(c.id, { steer: inp.steer, gas: inp.gas, brake: inp.brake && !drift, drift });
     }
@@ -318,8 +349,10 @@ export class AutoballGame implements MiniGame {
     if (!c) return;
     const pl = asRecord(payload);
     if (action === 'steer') {
-      // { x: Lenkung, gas, brake, boost } – fehlende Felder bleiben, wie sie sind
+      // { x: Lenkung, gas, brake, boost } bzw. { dx, dy: Richtungs-Stick, … } – fehlende Felder bleiben, wie sie sind
       c.inp.steer = clamp(Number(pl.x) || 0, -1, 1);
+      if (typeof pl.dx === 'number' && typeof pl.dy === 'number') c.inp.dir = { x: clamp(pl.dx || 0, -1, 1), y: clamp(pl.dy || 0, -1, 1) };
+      else if ('x' in pl) c.inp.dir = undefined;
       if (typeof pl.gas === 'boolean') c.inp.gas = pl.gas;
       if (typeof pl.brake === 'boolean') c.inp.brake = pl.brake;
       if (typeof pl.boost === 'boolean') c.inp.boost = pl.boost;
@@ -338,7 +371,7 @@ export class AutoballGame implements MiniGame {
     this.sub = 'over';
     this.winner = winner;
     this.deadline = Date.now() + AFB.END_MS;
-    for (const c of this.cars.values()) c.inp = { steer: 0, gas: false, brake: false, boost: false };
+    for (const c of this.cars.values()) c.inp = NO_INP();
     this.ctx.onChange();
     const ids = this.ids.filter((id) => this.cars.has(id));
     const teamOf = (id: string) => this.cars.get(id)!.team;
@@ -406,7 +439,7 @@ export class AutoballGame implements MiniGame {
 
   playerDisconnected(id: string) {
     const c = this.cars.get(id);
-    if (c) c.inp = { steer: 0, gas: false, brake: false, boost: false };
+    if (c) c.inp = NO_INP();
   }
 
   dispose() {

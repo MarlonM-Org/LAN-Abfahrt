@@ -1,5 +1,5 @@
 import type { EntenState } from '../../../shared/types';
-import { ENTEN } from '../../../shared/games';
+import { ENTEN, MINI_INFO } from '../../../shared/games';
 import { WORLD } from '../../../shared/flunky';
 import { type Screen, app, el, message, q, send, store, tapButton, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
@@ -41,7 +41,7 @@ export function pickEnten(s: EntenState): Screen {
 
 function buildAsk() {
   const root = el(`
-    <h2>Ententeich</h2>
+    <h2>${MINI_INFO.enten.title}</h2>
     <p>Halte dein Handy wie eine Lichtpistole: Oberkante zeigt auf den Fernseher, Display nach oben.</p>
     <button class="big-btn en-motion">Bewegungssensor<br/>aktivieren</button>
     <button class="secondary en-touch">Lieber Touchpad</button>

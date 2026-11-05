@@ -8,8 +8,9 @@ import { steerFromRoll, tiltLabel } from '../tilt';
 import { startTilt, stopTilt, tilt, vibrate } from './kart';
 
 /**
- * Auto-Fußball am Handy (quer halten) – gleiches Layout wie das Kart-Rennen:
- *   links  – schwebender Stick (oder Kipp-Lenkung)
+ * Auto-Fußball am Handy (quer halten) – ähnlich wie das Kart-Rennen:
+ *   links  – schwebender RICHTUNGS-Stick: zeigt, wohin das Auto auf dem TV fahren soll (oben = oben),
+ *            das Auto dreht sich selbst dorthin und gibt Gas. (Kipp-Lenkung bleibt relativ wie ein Lenkrad.)
  *   rechts – GAS (groß), BREMSE daneben (im Stand rückwärts, in voller Fahrt + lenken = Drift),
  *            BOOST direkt über GAS (Daumen hochrutschen), HÜPFER über BREMSE
  * Der TV zeigt das Spielfeld, das Handy nur Spielstand, Uhr und Boost-Tank.
@@ -57,21 +58,21 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
         ${
           mode === 'tilt'
             ? '<div class="k3-wheel"><div class="k3-wheel-in"></div><b class="k3-tiltdeg">0°</b></div><div class="k3-leftlabel">Handy kippen = lenken<br/>Tippen = Mitte setzen</div>'
-            : '<div class="k3-stick"><div class="k3-base"></div><div class="k3-knob"></div></div><div class="k3-leftlabel">◀ Daumen schieben ▶</div>'
+            : '<div class="k3-stick k3-stick2d"><div class="k3-base"></div><div class="k3-knob"></div></div><div class="k3-leftlabel">Daumen in die Richtung schieben,<br/>in die dein Auto auf dem TV fahren soll</div>'
         }
       </div>
       <div class="k3-right">
         <div class="k3-btn afb-hop" data-b="hop">HÜPFER</div>
         <div class="k3-btn k3-drift afb-boost" data-b="boost">BOOST<div class="afb-bar"><i></i></div></div>
         <div class="k3-btn k3-brake" data-b="brake">BREMSE<small>+ lenken<br/>= Drift</small></div>
-        <div class="k3-btn k3-gas" data-b="gas">GAS</div>
+        <div class="k3-btn k3-gas" data-b="gas">GAS${mode === 'touch' ? '<small>Stick fährt<br/>von selbst</small>' : ''}</div>
       </div>
       <div class="k3-intro hidden">
         <h2>So spielst du</h2>
         <div class="k3-intro-grid">
           <div><b>${teamName(team)}</b> ${dirText} – schiebt den Wasserball ins andere Tor!</div>
-          <div><b>◀ ▶</b> Links: Daumen schieben = lenken${canTilt ? ' (oder KIPPEN)' : ''}</div>
-          <div><b>GAS</b> halten – <b>BREMSE</b> bremst, im Stand geht's rückwärts</div>
+          <div><b>Stick</b> links: in die Richtung schieben, in die dein Auto <b>auf dem TV</b> fahren soll – es fährt von selbst los</div>
+          <div><b>BREMSE</b> bremst, im Stand geht's rückwärts${canTilt ? ' · KIPPEN = Lenkrad statt Stick (dann GAS halten)' : ''}</div>
           <div><b>BOOST</b>: Daumen von GAS hochrutschen – der Tank lädt sich von selbst</div>
           <div><b>HÜPFER</b>: über Autos springen, Ball härter treffen</div>
           <div><b>BREMSE</b> in voller Fahrt + lenken = Drift, loslassen = Mini-Turbo</div>
@@ -87,15 +88,16 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
   rootEl.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   // ---- Eingaben
-  const inp = { steer: 0, gas: false, brake: false, boost: false };
-  let last = { steer: 9, gas: false, brake: false, boost: false, t: 0 };
+  const inp = { steer: 0, dx: 0, dy: 0, gas: false, brake: false, boost: false };
+  let last = { steer: 9, dx: 9, dy: 9, gas: false, brake: false, boost: false, t: 0 };
   const push = (force = false) => {
     const now = performance.now();
     const boolChanged = inp.gas !== last.gas || inp.brake !== last.brake || inp.boost !== last.boost;
-    const steerChanged = Math.abs(inp.steer - last.steer) >= 0.03 && now - last.t >= 33;
+    const steerChanged = Math.max(Math.abs(inp.steer - last.steer), Math.abs(inp.dx - last.dx), Math.abs(inp.dy - last.dy)) >= 0.03 && now - last.t >= 33;
     if (!force && !boolChanged && !steerChanged && now - last.t < 300) return;
     last = { ...inp, t: now };
-    send('steer', { x: inp.steer, gas: inp.gas, brake: inp.brake, boost: inp.boost });
+    if (mode === 'touch') send('steer', { dx: inp.dx, dy: inp.dy, gas: inp.gas, brake: inp.brake, boost: inp.boost });
+    else send('steer', { x: inp.steer, gas: inp.gas, brake: inp.brake, boost: inp.boost });
   };
 
   // Links: schwebender Stick bzw. Kipp-Lenkung
@@ -105,33 +107,52 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
     const knob = q(root, '.k3-knob');
     let active: number | null = null;
     let baseX = 0;
-    const DEAD = 6;
-    const FULL = 58;
+    let baseY = 0;
+    const DEAD = 8;
+    const FULL = 50;
+    const place = () => {
+      const r = left.getBoundingClientRect();
+      stick.style.left = `${baseX - r.left}px`;
+      stick.style.top = `${baseY - r.top}px`;
+    };
     left.addEventListener('pointerdown', (e) => {
       if (active !== null) return;
       e.preventDefault();
       left.setPointerCapture(e.pointerId);
       active = e.pointerId;
       baseX = e.clientX;
-      const r = left.getBoundingClientRect();
-      stick.style.left = `${e.clientX - r.left}px`;
-      stick.style.top = `${e.clientY - r.top}px`;
+      baseY = e.clientY;
+      place();
       stick.classList.add('on');
       knob.style.transform = '';
     });
     left.addEventListener('pointermove', (e) => {
       if (e.pointerId !== active) return;
-      const d = e.clientX - baseX;
-      const mag = Math.max(0, Math.abs(d) - DEAD) / (FULL - DEAD);
-      inp.steer = Math.round(Math.sign(d) * Math.min(1, mag) * 100) / 100;
-      knob.style.transform = `translateX(${Math.max(-FULL, Math.min(FULL, d))}px)`;
-      if (Math.abs(d) > FULL + 24) baseX = e.clientX - Math.sign(d) * (FULL + 24);
+      let dx = e.clientX - baseX;
+      let dy = e.clientY - baseY;
+      let d = Math.hypot(dx, dy);
+      // Ring wandert mit, wenn der Daumen über den Rand hinauszieht
+      if (d > FULL + 20) {
+        const over = d - (FULL + 20);
+        baseX += (dx / d) * over;
+        baseY += (dy / d) * over;
+        place();
+        dx = e.clientX - baseX;
+        dy = e.clientY - baseY;
+        d = Math.hypot(dx, dy);
+      }
+      const mag = d < DEAD ? 0 : Math.min(1, (d - DEAD) / (FULL - DEAD));
+      inp.dx = d ? Math.round((dx / d) * mag * 100) / 100 : 0;
+      inp.dy = d ? Math.round((dy / d) * mag * 100) / 100 : 0;
+      const k = Math.min(1, FULL / (d || 1));
+      knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
       push();
     });
     const up = (e: PointerEvent) => {
       if (e.pointerId !== active) return;
       active = null;
-      inp.steer = 0;
+      inp.dx = 0;
+      inp.dy = 0;
       stick.classList.remove('on');
       push(true);
     };
@@ -228,8 +249,10 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
   onInputReset(right, () => {
     fingers.clear();
     applyButtons();
-    if (inp.steer) {
+    if (inp.steer || inp.dx || inp.dy) {
       inp.steer = 0;
+      inp.dx = 0;
+      inp.dy = 0;
       push(true);
     }
   });
@@ -328,7 +351,9 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
     const name = g?.scorer ? store.state?.players.find((p) => p.id === g.scorer)?.name : null;
     const msg =
       st.sub === 'countdown'
-        ? 'GAS gedrückt halten – gleich geht’s los!'
+        ? mode === 'touch'
+          ? 'Gleich geht’s los – Stick in Fahrtrichtung!'
+          : 'GAS gedrückt halten – gleich geht’s los!'
         : st.sub === 'goal' && g
           ? g.own
             ? `Eigentor${name ? ` von ${name}` : ''}!`
