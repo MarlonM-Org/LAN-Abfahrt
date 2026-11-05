@@ -16,6 +16,7 @@ import type {
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
+import { freePlayerColor } from '../shared/players';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, placeCoins } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
@@ -255,7 +256,9 @@ export class Room {
         // Bekannte ID vom Handy weiterverwenden (z. B. nach langer Pause) – so erkennt der Raum den Gastgeber wieder
         const reuse = msg.bot !== true && typeof msg.playerId === 'string' && /^[0-9a-f-]{36}$/i.test(msg.playerId);
         const id = reuse ? msg.playerId! : randomUUID();
-        p = { id, name, look: sanitizeLook(msg.look), connected: false, isVip: false, socketId: null, joinedAt: now, connectedSince: now, disconnectedAt: 0 };
+        // Spielerfarbe des Abends: erste freie – bleibt an der ID, solange der Spieler im Raum ist
+        const color = freePlayerColor([...this.players.values()].map((o) => o.color));
+        p = { id, name, look: sanitizeLook(msg.look), color, connected: false, isVip: false, socketId: null, joinedAt: now, connectedSince: now, disconnectedAt: 0 };
         this.players.set(p.id, p);
       }
       p.name = name;
@@ -687,6 +690,7 @@ export class Room {
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
       lookOf: (id) => this.players.get(id)?.look,
+      colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
     };
     switch (kind) {
@@ -736,7 +740,7 @@ export class Room {
         this.mini = new FliegerGame(ids, ctx);
         break;
       case 'kurve':
-        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.look.shirt));
+        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.color));
         break;
       case 'arena':
         this.mini = new ArenaGame(ids, ctx);
@@ -1418,10 +1422,11 @@ export class Room {
     return {
       players: [...this.players.values()]
         .sort((a, b) => a.joinedAt - b.joinedAt)
-        .map(({ id, name, look, connected, isVip, disconnectedAt, removed, isBot }) => ({
+        .map(({ id, name, look, color, connected, isVip, disconnectedAt, removed, isBot }) => ({
           id,
           name,
           look,
+          color,
           connected,
           isVip,
           ...(!connected && disconnectedAt ? { offlineMs: now - disconnectedAt } : {}),

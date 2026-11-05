@@ -17,7 +17,7 @@ import {
 import { C } from '../art/palette';
 import { flameIcon, grillIngPix, grillItemKey, grillItemPix, knifeIcon, paintGrillGarden, smokePuff, starPix } from '../art/grill';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { BLUE_INK, INK, background, ensureTex, ink, panel, txt } from './ui';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -357,7 +357,8 @@ export class GrillScene extends Phaser.Scene {
       a.x += (p.x - a.x) * 0.4;
       a.y += (p.y - a.y) * 0.4;
       if (Math.abs(p.fx) > 0.2) a.img.setFlipX(p.fx < 0);
-      a.img.setY(p.m ? -Math.abs(Math.sin(now / 80)) * 2 : p.w ? -Math.abs(Math.sin(now / 45)) * 1.5 : 0);
+      a.img.setY(!p.m && p.w ? -Math.abs(Math.sin(now / 45)) * 1.5 : 0);
+      playAvatar(a.img, p.m ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 4).setDepth(a.y + 4);
       // Getragenes
       if (p.h) {

@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import type { BogenFx, BogenPlayer, BogenState, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { BOGEN, BOGEN_COLORS, BOGEN_POWERS, BOGEN_STAGES, bogenDx, bogenDy, bogenWrapX, bogenWrapY } from '../../shared/bogen';
+import { BOGEN, BOGEN_POWERS, BOGEN_STAGES, bogenDx, bogenDy, bogenWrapX, bogenWrapY } from '../../shared/bogen';
 import { arrowPix, bogenBackdrop, bowPix, chestPix, quiverIconPix } from '../art/bogen';
 import { sumoRing } from '../art/sumo';
 import { bus, getState, playerById } from './store';
-import { ensureAvatar, ensurePortrait } from './textures';
+import { avatarSprite, ensurePortrait, playAvatar } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, ensureTex, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -18,7 +19,7 @@ const SPR_H = 27;
 
 interface Fig {
   root: C;
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
   bow: Phaser.GameObjects.Image;
   ring: Phaser.GameObjects.Image;
   pips: Phaser.GameObjects.Graphics;
@@ -242,9 +243,9 @@ export class BogenScene extends Phaser.Scene {
     let g = this.figs.get(id);
     if (g) return g;
     const pl = playerById(id);
-    const color = BOGEN_COLORS[idx % BOGEN_COLORS.length];
+    const color = pcol(id, idx).hex;
     const root = this.add.container(0, 0).setVisible(false);
-    const img = this.add.image(0, 0, pl ? ensureAvatar(this, pl.look) : '__WHITE').setOrigin(0.5, 1);
+    const img = (pl ? avatarSprite(this, pl.look) : this.add.sprite(0, 0, '__WHITE')).setOrigin(0.5, 1);
     const ring = this.add.image(0, -8, ensureTex(this, 'bogen_ring', () => sumoRing('#e0503f'))).setVisible(false);
     const bow = this.add.image(0, -12, ensureTex(this, 'bogen_bow', bowPix)).setOrigin(0.5, 0.5);
     const pips = this.add.graphics();
@@ -304,7 +305,7 @@ export class BogenScene extends Phaser.Scene {
       g.root.setAlpha(0.75);
       if (time - g.trailAt > 30) {
         g.trailAt = time;
-        const ghost = this.add.image(g.root.x, g.root.y, img.texture.key).setOrigin(0.5, 1).setFlipX(p.f < 0).setTintFill(0xffffff).setAlpha(0.6);
+        const ghost = this.add.image(g.root.x, g.root.y, img.texture.key, img.frame.name).setOrigin(0.5, 1).setFlipX(p.f < 0).setTintFill(0xffffff).setAlpha(0.6);
         this.fxL.add(ghost);
         this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
       }
@@ -313,8 +314,9 @@ export class BogenScene extends Phaser.Scene {
     } else if (!p.ground) {
       img.setScale(p.vy < 0 ? 0.92 : 1.04, p.vy < 0 ? 1.08 : 0.96);
     } else if (Math.abs(p.vx) > 20) {
-      img.setY(-Math.abs(Math.sin(time / 65)) * 2).setAngle(p.f * 5);
+      img.setAngle(p.f * 5);
     }
+    playAvatar(img, !p.ground && !p.wall ? 'jump' : p.dash || (p.ground && Math.abs(p.vx) > 20) ? 'walk' : 'idle', p.dash ? 2 : 1);
 
     // Bogen in Zielrichtung
     const deg = p.aim >= 0 ? p.aim * 45 : p.f > 0 ? 0 : 180;
@@ -368,7 +370,7 @@ export class BogenScene extends Phaser.Scene {
     ids.forEach((id, i) => {
       const pl = playerById(id);
       const p = st.players[id];
-      const color = hexNum(BOGEN_COLORS[i % BOGEN_COLORS.length]);
+      const color = pcol(id, i).num;
       const x = x0 + i * cw;
       const out = !p.alive && st.sub !== 'countdown';
       const card = this.add.container(x, 0).setAlpha(out ? 0.45 : 1);
@@ -397,7 +399,7 @@ export class BogenScene extends Phaser.Scene {
         card.add(r);
       }
       // Name (nur bei breiten Karten)
-      if (cw >= 90 && pl) card.add(txt(this, 40, 6, pl.name.replace(/^Bot\s+/, '').slice(0, Math.floor((pipX - 44) / 8)), { origin: [0, 0], color: BOGEN_COLORS[i % BOGEN_COLORS.length] }));
+      if (cw >= 90 && pl) card.add(txt(this, 40, 6, pl.name.replace(/^Bot\s+/, '').slice(0, Math.floor((pipX - 44) / 8)), { origin: [0, 0], color: pcol(id, i).hex }));
       this.cardsL.add(card);
     });
   }

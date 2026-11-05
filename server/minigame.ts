@@ -29,6 +29,8 @@ export interface MiniCtx {
   isBot?(id: string): boolean;
   /** Aussehen eines Spielers (z. B. Shirt-Farbe als Spur) */
   lookOf?(id: string): import('../shared/types').Look | undefined;
+  /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) */
+  colorOf?(id: string): number | undefined;
   mode: import('../shared/types').GameMode;
 }
 

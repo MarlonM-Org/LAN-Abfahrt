@@ -26,6 +26,8 @@ export interface PlayerPublic {
   id: string;
   name: string;
   look: Look;
+  /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) – bleibt, solange der Spieler im Raum ist */
+  color: number;
   connected: boolean;
   isVip: boolean;
   /** Offline: seit wie vielen ms (Stand dieses Snapshots) */
