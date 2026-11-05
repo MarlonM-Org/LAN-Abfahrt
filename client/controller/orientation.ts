@@ -60,8 +60,10 @@ const PASSIVE = /(^|-)(over|spectate|watch|wait|out)(-|$)/;
 export function syncOrientation(screenT: Screen) {
   const s = store.state;
   const [key, , override] = screenT;
-  if (store.joined && s?.phase === 'mini' && s.mini && s.mini.kind in MINI_INFO) {
-    const k = s.mini.kind;
+  // Regelkarte (Phase `intro`) zählt schon zum Spiel: gleiche Haltung, Overlay greift dort bereits
+  const gameKind = s?.phase === 'mini' ? s.mini?.kind : s?.phase === 'intro' ? s.intro?.kind : undefined;
+  if (store.joined && gameKind && gameKind in MINI_INFO) {
+    const k = gameKind;
     if (k !== kind) {
       kind = k;
       allowedFor = null;
@@ -187,7 +189,7 @@ function relock() {
 function onTap() {
   if (orientExempt() || !hasFullscreen()) return;
   // Erst im Spiel ins Vollbild (Lobby mit Namensfeld bleibt normal); danach bleibt es die Session über
-  const inGame = store.state?.phase === 'mini';
+  const inGame = store.state?.phase === 'mini' || store.state?.phase === 'intro';
   if (!document.fullscreenElement && (inGame ? want !== 'any' : fsWanted)) void enterFullscreen();
 }
 document.addEventListener('pointerdown', onTap, true);

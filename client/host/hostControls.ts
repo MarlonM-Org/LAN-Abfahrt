@@ -192,6 +192,7 @@ export function installHostControls(socket: Socket) {
     const waits =
       (phase === 'results' && !!s?.results) ||
       (phase === 'story' && !!s?.date?.card) ||
+      (phase === 'intro' && !!s?.intro) ||
       (s?.mini?.kind === 'murder' && s.mini.state.sub === 'meeting') ||
       (!!sp && (sp.sub === 'reveal' || sp.sub === 'vote' || sp.sub === 'tally'));
     btn('abort').disabled = phase === 'lobby';
