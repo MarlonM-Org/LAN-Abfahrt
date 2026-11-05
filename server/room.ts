@@ -80,6 +80,8 @@ interface Player extends PlayerPublic {
   /** Zeitpunkt der letzten Trennung (0 = verbunden) */
   disconnectedAt: number;
   isBot?: boolean;
+  /** Kart-Rennen: eigene Verfolger-Ansicht am Handy statt im TV-Splitscreen (vom Handy gespeichert) */
+  kartView?: 'phone' | 'tv';
 }
 
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
@@ -177,6 +179,7 @@ export class Room {
       p.connected = true;
       p.disconnectedAt = 0;
       p.isBot = msg.bot === true;
+      if (msg.kartView === 'phone' || msg.kartView === 'tv') p.kartView = msg.kartView;
       if (!p.isBot && !this.hostId) this.hostId = p.id;
       playerId = p.id;
       socket.join('players');
@@ -266,6 +269,14 @@ export class Room {
 
     socket.on('vip:mini', (action: string) => {
       if (isVip() && this.phase === 'mini') this.mini?.vipAction?.(String(action));
+    });
+
+    // Kart-Rennen: jeder Spieler wählt selbst, ob seine Verfolger-Ansicht auf dem TV oder dem Handy läuft (gilt auch für spätere Rennen)
+    socket.on('kart:view', (view: string) => {
+      const p = playerId ? this.players.get(playerId) : undefined;
+      if (!p) return;
+      p.kartView = view === 'phone' ? 'phone' : 'tv';
+      if (this.phase === 'mini' && this.mini instanceof KartGame) this.mini.setPhoneView(p.id, p.kartView === 'phone');
     });
 
     socket.on('board:roll', () => {
@@ -434,7 +445,7 @@ export class Room {
         this.mini = new ParcoursGame(ids, ctx);
         break;
       case 'kart':
-        this.mini = new KartGame(ids, ctx);
+        this.mini = new KartGame(ids, ctx, undefined, (id) => this.players.get(id)?.kartView === 'phone');
         break;
       case 'turm':
         this.mini = new TurmGame(ids, ctx);

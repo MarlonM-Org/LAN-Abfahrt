@@ -529,6 +529,11 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 /* ---------------------------------------------------------------- Kart-Rennen (quer, Mode-7-Ansicht hinter den Knöpfen) */
 #app:has(.k3) { padding: 0; border: 0; box-shadow: none; background: #000; }
 #app:has(.k3) .abort { position: fixed; top: calc(6px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 4px 8px; font-size: 7px; color: #fff4d6; border-color: rgba(255,255,255,0.35); background: rgba(0,0,0,0.35); }
+/* Oben in der Mitte sitzt der TV/Handy-Umschalter – „Abbrechen“ (VIP) rückt links daneben */
+@media (orientation: landscape) {
+  #app:has(.k3:not(.k3-nosplit)) .abort { top: calc(13px + env(safe-area-inset-top, 0px)); left: calc(50% - 92px); transform: translateX(-100%); }
+}
+#app:has(.k3-split) .abort { color: var(--ink-soft); border-color: var(--paper-dark); background: rgba(255,246,220,0.6); }
 .k3 {
   position: fixed; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
   background: var(--paper); font-size: 10px;
@@ -542,14 +547,31 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .k3-place small { font-size: 11px; color: #fff4d6; }
 .k3-lap { margin-top: 6px; font-size: 9px; }
 .k3-msg { margin-top: 6px; font-size: 8px; color: #ffd25e; max-width: 46vw; line-height: 1.5; }
-.k3-split .k3-hud { color: var(--ink); text-shadow: none; left: 0; right: 0; top: 16vh; text-align: center; }
+.k3-split .k3-hud { color: var(--ink); text-shadow: none; left: 0; right: 0; top: max(16vh, calc(54px + var(--st))); text-align: center; }
 .k3-split .k3-place { font-size: 44px; color: var(--red); }
 .k3-split .k3-place small { font-size: 14px; color: var(--ink-soft); }
 .k3-split .k3-lap { font-size: 12px; margin-top: 10px; }
 .k3-split .k3-msg { color: var(--red); margin: 8px auto 0; max-width: 70vw; }
 .k3-tv { font-size: 7px; color: var(--ink-soft); margin-top: 6px; }
+.k3-phone .k3-tv { display: none; }
+/* TV/Handy-Umschalter: Pille oben in der Mitte (außerhalb von Stick-, GAS- und ITEM-Bereich), aktive Hälfte gold */
+.k3-viewsw {
+  position: absolute; left: 50%; top: calc(8px + var(--st)); transform: translateX(-50%); z-index: 6;
+  display: flex; width: 168px; height: 32px; padding: 0; min-height: 0; border-radius: 16px; overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.7); background: rgba(0,0,0,0.5); box-shadow: 0 2px 0 var(--outline); text-shadow: none;
+}
+.k3-viewsw:active, .k3-viewsw.down { transform: translateX(-50%) translateY(2px); box-shadow: none; }
+.k3-seg { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 7px; color: rgba(255,244,214,0.75); white-space: nowrap; }
+.k3-viewsw:not(.on-phone) .k3-seg-tv, .k3-viewsw.on-phone .k3-seg-phone { background: var(--gold); color: var(--ink); }
+.k3-split .k3-viewsw { background: var(--paper-light); border-color: var(--wood-dark); }
+.k3-split .k3-seg { color: var(--ink-soft); }
+.k3-nosplit .k3-viewsw { display: none; }
+.k3-viewnote { display: none; position: absolute; left: 50%; top: calc(40px + var(--st)); transform: translateX(-50%); z-index: 6; pointer-events: none;
+  padding: 6px 10px; border-radius: 12px; background: rgba(0,0,0,0.45); font-size: 7px; color: #fff4d6; text-shadow: 1px 1px 0 var(--outline); white-space: nowrap; }
+.k3-nosplit:not(.k3-racing) .k3-viewnote { display: block; }
 .k3-center { position: absolute; left: 0; right: 0; top: 30%; text-align: center; z-index: 4; pointer-events: none; color: #fff4d6; text-shadow: 3px 3px 0 var(--outline); font-size: 14px; }
-.k3-split .k3-center { top: 8vh; color: var(--ink); text-shadow: none; }
+/* TV-Modus: Platz/Runde unter der Ansichts-Pille, Countdown/Meldungen darunter (überlappen sich nicht mehr) */
+.k3-split .k3-center { top: 62%; color: var(--ink); text-shadow: none; }
 .k3-center.count { font-size: 44px; color: var(--gold); }
 .k3-center.go { font-size: 36px; color: #b9e39a; }
 .k3-center.turbo { font-size: 24px; color: #ffd25e; }
@@ -603,6 +625,9 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .k3 { --bw: clamp(84px, 24vmin, 120px); }
   #app:has(.k3) .abort { top: 46%; }
   .k3-portrait { top: 60%; }
+  /* Hochkant: Pille unter KIPPEN/ITEM (sonst zu schmal nebeneinander) */
+  .k3-viewsw { top: calc(100px + var(--st)); }
+  .k3-viewnote { top: calc(100px + var(--st)); }
 }
 
 /* ---------------------------------------------------------------- Wackelturm */
