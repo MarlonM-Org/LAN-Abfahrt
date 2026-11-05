@@ -1,6 +1,6 @@
 import type { MiniSnapshot, Team } from '../shared/types';
 import { TEAM_INFO } from '../shared/flunky';
-import { SHIRTS } from '../shared/avatar';
+import { playerColor } from '../shared/players';
 import {
   GRILL as G,
   GRILL_CRATES,
@@ -40,7 +40,6 @@ const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
-const hexNum = (s: string) => parseInt(s.slice(1), 16);
 const clone = (i: GrillItem | null): GrillItem | null => (i ? { ...i, p: i.p.map((p) => ({ ...p })), g: r2(i.g), u: r2(i.u) } : null);
 
 interface Slot {
@@ -130,7 +129,6 @@ export class GrillGame implements MiniGame {
       const k = this.teams ? i % 2 : 0;
       const kit = this.kitchens[k];
       kit.size++;
-      const look = ctx.lookOf?.(id);
       this.players.set(id, {
         id,
         k,
@@ -145,7 +143,7 @@ export class GrillGame implements MiniGame {
         actUntil: 0,
         working: false,
         target: null,
-        color: kit.team ? TEAM_INFO[kit.team].colorNum : hexNum(SHIRTS[look?.shirt ?? i % SHIRTS.length] ?? '#f2c33a'),
+        color: kit.team ? TEAM_INFO[kit.team].colorNum : playerColor(ctx.colorOf?.(id) ?? i).num,
         no: 0,
         served: 0,
         chops: 0,

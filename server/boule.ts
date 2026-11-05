@@ -1,15 +1,11 @@
 import type { BouleBall, BouleSide, BouleState, BouleTrack, MiniSnapshot, Point, SkipInfo, Team } from '../shared/types';
-import { possessive } from '../shared/players';
+import { playerColor, possessive } from '../shared/players';
 import { BOULE, bouleDist, bouleDistance, bouleSetup } from '../shared/boule';
 import { TEAM_INFO } from '../shared/flunky';
-import { SHIRTS } from '../shared/avatar';
 import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
-const hexNum = (h: string) => parseInt(h.slice(1), 16);
-/** Ersatzfarben, falls zwei Spieler dieselbe Shirt-Farbe haben */
-const FFA_FALLBACK = ['#e0503f', '#3f8fe0', '#46b04a', '#9b5fc0', '#f0973a', '#2fb5a5', '#f07aa8'];
 
 // ================================================================== Physik
 
@@ -196,13 +192,9 @@ export class BouleGame implements MiniGame {
       order.forEach((id, i) => t[i % 2 === 0 ? 'A' : 'B'].push(id));
       this.sides = (['A', 'B'] as Team[]).map((k) => ({ id: k, name: TEAM_INFO[k].name, color: TEAM_INFO[k].colorNum, members: t[k], score: 0 }));
     } else {
-      const used = new Set<string>();
       this.sides = order.map((id, i) => {
-        let col = SHIRTS[ctx.lookOf?.(id)?.shirt ?? -1] ?? FFA_FALLBACK[i];
-        // helle/dunkle Shirts (weiß, fast schwarz) heben sich schlecht ab, doppelte Farben auch
-        if (used.has(col) || col === '#f4efe2' || col === '#3b3b4f') col = FFA_FALLBACK.find((c) => !used.has(c)) ?? col;
-        used.add(col);
-        return { id, name: ctx.nameOf(id), color: hexNum(col), members: [id], score: 0 };
+        // Kugelfarbe = Spielerfarbe des Abends
+        return { id, name: ctx.nameOf(id), color: playerColor(ctx.colorOf?.(id) ?? i).num, members: [id], score: 0 };
       });
     }
     const setup = bouleSetup(this.sides.map((s) => s.members.length));

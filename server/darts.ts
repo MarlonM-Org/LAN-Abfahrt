@@ -1,14 +1,10 @@
 import type { MiniSnapshot, SkipInfo } from '../shared/types';
 import { DARTS, type DartsDart, type DartsPlayer, type DartsState, dartsLanding, dartsNoise, dartsPhase, dartsPowerHint, dartsScore, dartsWobble } from '../shared/darts';
-import { SHIRTS } from '../shared/avatar';
+import { playerColor } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, waitLabel } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
-const hexNum = (h: string) => parseInt(h.slice(1), 16);
-/** Ersatzfarben, falls zwei Spieler dieselbe Shirt-Farbe haben (oder Weiß/Schwarz, das man auf der Scheibe nicht sieht) */
-const FALLBACK = ['#e0503f', '#3f8fe0', '#46b04a', '#f2c33a', '#9b5fc0', '#f0973a', '#2fb5a5', '#f07aa8', '#a6e04a', '#ff3fc8', '#2340a0', '#ffffff'];
-const BAD = new Set(['#f4efe2', '#3b3b4f']);
 
 /** Normierte Wurf-Eingabe vom Handy */
 export interface DartThrow {
@@ -60,12 +56,9 @@ export class DartsGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    const used = new Set<string>();
     this.players = ids.map((id, i) => {
-      let col = SHIRTS[ctx.lookOf?.(id)?.shirt ?? -1] ?? FALLBACK[i % FALLBACK.length];
-      if (used.has(col) || BAD.has(col)) col = FALLBACK.find((c) => !used.has(c)) ?? col;
-      used.add(col);
-      return { id, color: hexNum(col), total: 0, round: 0, thrown: 0, history: [] };
+      // Spielerfarbe des Abends (Pfeile, Tafel)
+      return { id, color: playerColor(ctx.colorOf?.(id) ?? i).num, total: 0, round: 0, thrown: 0, history: [] };
     });
     this.timers.later(DARTS.INTRO_MS, () => this.startRound());
   }

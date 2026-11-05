@@ -7,6 +7,7 @@ import { heart } from '../art/objects';
 import { paintSky, paintWater } from '../art/ground';
 import { gustStreak, summitCross, turmPiece } from '../art/turm';
 import { bus, getState, playerById } from './store';
+import { pcol } from './playerColor';
 import { GOLD, background, ensureTex, ink, panel, txt } from './ui';
 
 const B = TURM.BLOCK;
@@ -14,7 +15,6 @@ const HUD = 22;
 const LABEL = 20;
 /** Benötigte Bahnbreite in Blöcken (Plattform + etwas Luft für überstehende Teile) */
 const VIEW_W = TURM.PLATFORM_W + 3;
-const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const meters = (h: number) => `${(h / B).toFixed(1).replace('.', ',')}m`;
 
 interface LaneLayout {
@@ -125,7 +125,7 @@ export class TurmScene extends Phaser.Scene {
     this.cell = Phaser.Math.Clamp(Math.round(B * s), 4, 16);
     const platW = Math.round(TURM.PLATFORM_W * B * s);
     const rows = new Set(geo.lanes.map((l) => l.baseY));
-    background(this, `turm_${n}`, WORLD.W, WORLD.H, (p) => {
+    background(this, `turm_${n}_${st.lanes.map((l, i) => pcol(l.id, i).index).join('.')}`, WORLD.W, WORLD.H, (p) => {
       paintSky(p, 0, 0, WORLD.W, WORLD.H, ['#7cc4f0', '#a8dcf5', '#d6effa', '#fbe7bd']);
       p.disc(420, 40, 14, '#fff1b0').disc(420, 40, 11, '#ffe27a');
       for (const baseY of rows) {
@@ -149,7 +149,7 @@ export class TurmScene extends Phaser.Scene {
         // Bahn-Trenner
         if (l.cx - l.laneW / 2 > 1) for (let y = l.top + 2; y < l.labelY; y += 4) p.px(Math.round(l.cx - l.laneW / 2), y, 'rgba(255,255,255,0.45)');
         // Farbmarke der Bahn
-        p.rect(l.cx - l.laneW / 2 + 2, l.labelY + 2, 3, LABEL - 4, hex(TURM.COLORS[i % TURM.COLORS.length]));
+        p.rect(l.cx - l.laneW / 2 + 2, l.labelY + 2, 3, LABEL - 4, pcol(st.lanes[i]?.id, i).hex);
       });
     });
     const crossKey = ensureTex(this, 'summitCross', summitCross);
@@ -372,7 +372,7 @@ export class TurmScene extends Phaser.Scene {
         this.place(sp, lay.cx + sp.x * s, lay.baseY - sp.y * s);
       }
       // Bestmarke
-      const color = TURM.COLORS[i % TURM.COLORS.length];
+      const color = pcol(lane.id, i).num;
       if (lane.best > 0) {
         const by = Math.round(lay.baseY - lane.best * s);
         const half = (TURM.PLATFORM_W / 2 + 1) * B * s;

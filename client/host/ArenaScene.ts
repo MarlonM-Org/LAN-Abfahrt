@@ -2,13 +2,13 @@ import Phaser from 'phaser';
 import type { ArenaState, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { ARENA, cellIdx } from '../../shared/arena';
-import { SHIRTS } from '../../shared/avatar';
 import { C } from '../art/palette';
 import { paintGrass, paintSand } from '../art/ground';
 import { arenaPalm, arenaRock, coconut, cooler, floodTile, hedge, itemIcon, lounger, sandcastle, splash, waterBalloon } from '../art/arena';
 import { flower, umbrella } from '../art/objects';
 import { bus, getState, playerById } from './store';
-import { ensurePortrait, figure } from './textures';
+import { type Figure, ensurePortrait, figure } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, background, ensureTex, ink, panel, prop, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -16,10 +16,9 @@ import { sfx } from './sfx';
 const T = ARENA.TILE;
 const px = (x: number) => ARENA.OX + x * T + T / 2;
 const py = (y: number) => ARENA.OY + y * T + T / 2;
-const hexNum = (h: string) => parseInt(h.slice(1), 16);
 
 interface Fig {
-  f: Phaser.GameObjects.Container;
+  f: Figure;
   ring: Phaser.GameObjects.Ellipse;
   x: number;
   y: number;
@@ -120,7 +119,7 @@ export class ArenaScene extends Phaser.Scene {
       a.y += (p.y - a.y) * 0.45;
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       if (p.dir === 'l' || p.dir === 'r') img.setFlipX(p.dir === 'l');
-      img.setY(p.moving ? -Math.abs(Math.sin(now / 70)) * 2 : 0);
+      a.f.play(p.moving ? 'walk' : 'idle');
       a.f.setPosition(px(a.x), py(a.y) + 7).setDepth(py(a.y) + 7).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
       a.ring.setPosition(px(a.x), py(a.y) + 6);
     }
@@ -149,7 +148,7 @@ export class ArenaScene extends Phaser.Scene {
       if (!a) {
         const pl = playerById(id);
         if (!pl) continue;
-        const color = hexNum(SHIRTS[pl.look.shirt] ?? '#ffffff');
+        const color = pcol(id).num;
         const ring = this.add.ellipse(px(p.x), py(p.y) + 6, 14, 6).setStrokeStyle(1, color).setDepth(2);
         const f = figure(this, pl.look, px(p.x), py(p.y) + 7);
         a = { f, ring, x: p.x, y: p.y, alive: true };
@@ -220,7 +219,7 @@ export class ArenaScene extends Phaser.Scene {
     for (const b of st.bombs) {
       if (this.bombs.has(b.id)) continue;
       const pl = playerById(b.owner);
-      const shirt = SHIRTS[pl?.look.shirt ?? 0] ?? '#3f8fe0';
+      const shirt = pcol(b.owner).hex;
       const balloon = (pl?.look.shirt ?? 0) % 2 === 1;
       const key = balloon ? ensureTex(this, `wb_${shirt}`, () => waterBalloon(shirt)) : ensureTex(this, 'coconut', coconut);
       const img = this.add.image(px(b.x), py(b.y) + 1, key).setDepth(py(b.y) + 1);
@@ -361,6 +360,7 @@ export class ArenaScene extends Phaser.Scene {
     this.juice.burst(x, y, 'splash', 14);
     sfx('splash', { x, pitch: 0.9 });
     this.juice.shake(1);
+    a.f.play('hit');
     this.tweens.add({ targets: a.f, angle: 90, alpha: 0, y: a.f.y + 4, duration: 600, onComplete: () => a.f.setVisible(false) });
     for (let i = 0; i < 8; i++) {
       const d = this.add.circle(x, y, 2, i % 2 ? 0xeaf8ff : 0x93d3f3).setDepth(1600);
@@ -393,6 +393,7 @@ export class ArenaScene extends Phaser.Scene {
       const p = st.players[id];
       if (!pl) return;
       const cx = x0 + i * slot + slot / 2;
+      this.hud.add(this.add.rectangle(cx, 4, 18, 17, pcol(id).num).setOrigin(0.5, 0).setAlpha(p.alive ? 1 : 0.35));
       const img = this.add.image(cx, 5, ensurePortrait(this, pl.look)).setOrigin(0.5, 0).setAlpha(p.alive ? 1 : 0.35);
       this.hud.add(img);
       if (!p.alive && st.sub !== 'countdown') this.hud.add(ink(this, cx, 8, 'x', { color: '#2d64a8' }));

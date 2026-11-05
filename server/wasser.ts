@@ -5,7 +5,6 @@ import {
   WASSER_BASE,
   WASSER_BLOCKERS,
   WASSER_COVER,
-  WASSER_FFA_COLORS,
   WASSER_HOSE,
   WASSER_PISTOL_SPOTS,
   type WasserBalloon,
@@ -16,6 +15,7 @@ import {
   flightMs,
   segHitsRect,
 } from '../shared/wasser';
+import { playerColor } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 const TICK_MS = 50;
@@ -101,7 +101,7 @@ export class WasserGame implements MiniGame {
         x: team === 'A' ? base.towel.x + 30 + (k % 2) * 14 : base.towel.x - 30 - (k % 2) * 14,
         y,
         team: this.ffa ? null : team,
-        color: this.ffa ? WASSER_FFA_COLORS[i % WASSER_FFA_COLORS.length] : TEAM_INFO[team].colorNum,
+        color: this.ffa ? playerColor(this.ctx.colorOf?.(id) ?? i).num : TEAM_INFO[team].colorNum,
         wet: 0,
         ammo: W.MAX_AMMO,
         status: 'ok',

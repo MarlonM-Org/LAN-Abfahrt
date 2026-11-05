@@ -246,6 +246,10 @@ Alle Texte stehen in `shared/dates.ts` und können frei angepasst werden; neue V
 
 Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – keine Bilddateien. Eine Übersicht aller Sprites gibt es im Dev-Modus unter <http://localhost:3000/art.html>.
 
+**Spielerfarbe:** Jeder bekommt beim Beitritt eine von 12 Farben für den ganzen Abend (`PLAYER_COLORS` in `shared/players.ts`, Rot, Blau, Grün, Gelb, Lila, Orange, Türkis, Weiß, Grau, Pink, Weinrot, Braun). Der Raum vergibt die erste freie und merkt sie sich, solange der Spieler im Raum ist (`PlayerPublic.color`, Bots auch). Die Töne sind auf Abstand geprüft (kein Blau neben Hellblau, kein Gelb neben Limette). Die Spiele nutzen die Farbe statt der Shirt-Farbe für Ring, Namensschild, Spur, Fadenkreuz, Kugel/Ball und den Rahmen ums HUD-Porträt. Auf dem TV liefert `pcol(id)` (`client/host/playerColor.ts`) die Farbe, auf dem Server `ctx.colorOf(id)`. Am Handy hat der Rahmen die eigene Farbe, und die Lobby zeigt „Du bist ORANGE“. Das Shirt bleibt frei wählbar.
+
+**Avatar-Animation:** `shared/avatar.ts` baut aus denselben Look-Daten neben dem Standbild ein Spritesheet (`AV_SHEET_ROWS`, eine Zeile pro Animation): Stehen mit Blinzeln, Laufen (4 Frames mit Bein- und Armwechsel), Sprung, Treffer-Gesicht und Jubel (Arme hoch). `figure()` in `client/host/textures.ts` liefert einen Container mit `play('idle' | 'walk' | 'jump' | 'hit' | 'cheer')`. Für Szenen ohne Container gibt es `avatarSprite()` und `playAvatar()`. Absprung und Landung haben Squash & Stretch (scaleY 1,15 bzw. 0,85). Szenen rufen `play('walk')` auf, wenn sich die Figur bewegt (Snapshot-Flag oder Positionsänderung). Laufen schaltet erst nach kurzer Ruhe auf Stehen um, damit geglättete Positionen nicht flackern. Der Sieger auf dem Podium jubelt. Alle Frames zeigt `art.html`.
+
 ## Ideen / Roadmap
 
 - [x] Spielbrett im Mario-Party-Stil

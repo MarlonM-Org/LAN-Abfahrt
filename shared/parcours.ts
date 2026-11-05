@@ -3,6 +3,8 @@
  * Wird vom Server (Physik), von den Bots und vom TV (Zeichnen) benutzt.
  */
 
+import { PLAYER_COLORS } from './players';
+
 export type PartType = 'platform' | 'plank' | 'spring' | 'urchin' | 'cannon' | 'fan' | 'ice' | 'bomb' | 'mover';
 
 export interface Rect {
@@ -69,8 +71,8 @@ export const PARCOURS = {
   GHOST_SPEED: 150,
   GRID: 4,
   BOMB_R: 24,
-  /** Spielerfarben (bis 12) */
-  COLORS: [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8, 0x8d5629, 0xfdf7ea, 0x5a6f8a, 0xb7d94a],
+  /** Spielerfarben (bis 12) – Index = Spielerfarbe des Abends (`PLAYER_COLORS`) */
+  COLORS: PLAYER_COLORS.map((c) => parseInt(c.hex.slice(1), 16)),
   MAX_RUNNERS: 12,
 };
 

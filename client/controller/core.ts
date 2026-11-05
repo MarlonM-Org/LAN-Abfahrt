@@ -3,6 +3,7 @@ import type { GameState, Look, PlayerPublic, PrivateState, Team } from '../../sh
 import type { PhoneOrientation } from '../../shared/games';
 import { AV_H, AV_W, drawAvatar, randomLook, sanitizeLook } from '../../shared/avatar';
 import { TEAM_INFO } from '../../shared/flunky';
+import { playerColor } from '../../shared/players';
 
 export const LS = { id: 'lanabfahrt.playerId', name: 'lanabfahrt.name', look: 'lanabfahrt.look', kartView: 'lanabfahrt.kartView' };
 
@@ -48,6 +49,20 @@ export function send(action: string, payload?: unknown) {
 export function me(): PlayerPublic | undefined {
   return store.state?.players.find((p) => p.id === store.playerId);
 }
+
+/** Eigene Spielerfarbe des Abends (Rahmen von #app, „Du bist ORANGE“ in der Lobby) */
+export function myColor() {
+  const m = me();
+  return m ? playerColor(m.color) : null;
+}
+
+// Rahmen von #app dauerhaft in der eigenen Farbe – nach dem Zusammenführen von meta/state in main.ts
+function paintMyColor() {
+  const c = myColor();
+  if (c) app.style.setProperty('--me-color', c.hex);
+  else app.style.removeProperty('--me-color');
+}
+socket.on('meta', () => requestAnimationFrame(paintMyColor));
 
 export function nameOf(id: string | null | undefined): string {
   return store.state?.players.find((p) => p.id === id)?.name ?? '?';
