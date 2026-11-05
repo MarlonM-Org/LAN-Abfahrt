@@ -880,6 +880,7 @@ export class Room {
         break;
       case 'maexchen':
         this.mini = new MaexGame(ids, ctx);
+        break;
       case 'werwars':
         this.mini = new WerwarsGame(ids, ctx, this.werwarsQ.all);
         break;
