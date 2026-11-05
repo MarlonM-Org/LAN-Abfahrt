@@ -1,18 +1,11 @@
 {
-  "updated": "2026-11-05 23:50",
+  "updated": "2026-11-05 23:55",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
-    {
-      "title": "Online spielen über Cloudflare-Tunnel",
-      "kind": "",
-      "type": "Feature",
-      "branch": "feature/online-tunnel",
-      "detail": "npm run online startet Server + Tunnel und zeigt den Link; über den Tunnel keine Laptop-Rechte und Musik nur lesen; TV-Ansicht bei Freunden zeigt den Online-QR-Code"
-    },
     {
       "title": "Review Nacharbeit: Handy-Farben, TV-Banner, Doku-Dubletten",
       "kind": "",
@@ -51,6 +44,11 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Online spielen über Cloudflare-Tunnel (npm run online, Link teilen am Handy, keine Laptop-Rechte über den Tunnel)",
+      "pr": 70,
+      "date": "2026-11-05"
+    },
     {
       "title": "Review: Party-Modus 2.0 (gleichzeitig würfeln, Bonus-Cocktails, Endspurt, Fortsetzen, Nachzügler, Tageszeit)",
       "pr": 66,
@@ -367,8 +365,8 @@
       "status": "in Arbeit"
     },
     {
-      "title": "Online mit Freunden spielen (Cloudflare-Tunnel statt Port öffnen)",
-      "status": "in Arbeit"
+      "title": "Online mit Freunden spielen → npm run online (Cloudflare-Tunnel statt Port öffnen), „Link teilen“ in der Handy-Lobby",
+      "status": "umgesetzt"
     }
   ]
 }
