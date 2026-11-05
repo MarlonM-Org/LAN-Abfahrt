@@ -7,7 +7,7 @@ Aktueller Stand (v0.3):
 
 **Vier Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Arcade**, **Trinkspiel** und **Date Night**.
 
-**Arcade:** Alle Spiele einzeln auswählbar – oder „Zufälliges Spiel“. Nach jeder Runde: „Nächstes Spiel (zufällig)“, „Nochmal“ oder „Spiel auswählen“. Jede Runde bringt Punkte nach Platzierung (10/6/3/1, bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
+**Arcade:** Alle Spiele einzeln auswählbar – oder „Zufälliges Spiel“. Nach jeder Runde: „Nächstes Spiel (zufällig)“, „Nochmal“ oder „Spiel auswählen“. Jede Runde bringt Punkte nach Platzierung, gestreckt nach Spielerzahl (Erster 10, Letzter 1, dazwischen linear `round(10 · (n − Platz) / (n − 1))`; bei 2 Spielern 10/5; bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
 
 **Alle dürfen wählen (Arcade):** Der VIP schaltet am Handy „Alle dürfen wählen“ an – dann sehen alle Handys die Arcade-Übersicht (Kacheln mit Icon, Titel und kleinem „à la …“-Untertitel) und tippen ihr Wunschspiel an (nochmal tippen = Stimme zurückziehen). Der VIP sieht auf jeder Kachel die Stimmen (Zahl + Mini-Avatare) und startet mit einem Tipp das meistgewählte Spiel („Starten: …“, bei Gleichstand Zufall), einen „Zufall aus Favoriten“ (mehr Stimmen = höhere Chance) oder einfach jedes beliebige Spiel. Der TV zeigt unten den aktuellen Top-Wunsch. Nach jedem Spiel beginnt die Abstimmung von vorn.
 
@@ -19,7 +19,7 @@ Aktueller Stand (v0.3):
 - **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
   - Alle würfeln am Handy, Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus
   - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los
-  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern)
+  - Nach jeder Runde ein Minispiel, Münzen nach Platzierung mit derselben Staffel wie in Arcade (bei 12 Spielern 10/9/8/7/6/5/5/4/3/2/1/1, der Startspieler wechselt jede Runde); Koop-Spiele zahlen allen dasselbe nach Ergebnis (Urlaubsflieger: Bali erreicht 8, je fehlender Etappe weniger, Absturz am Start 1, MVP +2; Grill-Chaos gemeinsam: 1/2/3 Sterne = 3/6/10 Münzen) – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern)
   - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
 - **Minispiele** (auch einzeln spielbar):
   - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
