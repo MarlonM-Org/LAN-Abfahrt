@@ -61,6 +61,7 @@ export type MiniKind =
   | 'volley'
   | 'tourist'
   | 'sprueche'
+  | 'bogen'
   | 'darts'
   | 'golf'
   | 'autoball'
@@ -1522,6 +1523,79 @@ export interface SumoState {
   roundWinner: string | null;
 }
 
+// ------------------------------------------------------------------ Bogen-Arena
+
+export interface BogenPlayer {
+  /** Füße, Arena-Koordinaten (0…480 × 0…250) */
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  f: 1 | -1;
+  /** Zielrichtung 0–7 (siehe BOGEN_DIRS), −1 = geradeaus in Blickrichtung */
+  aim: number;
+  alive: boolean;
+  ground: boolean;
+  /** Hängt an einer Wand (rutscht) */
+  wall: 0 | 1 | -1;
+  /** Weicht gerade aus (fängt Pfeile) */
+  dash: boolean;
+  /** Restliche Abklingzeit des Ausweichens (ms) */
+  cd: number;
+  arrows: number;
+  /** Übrige Wasserbomben-Pfeile bzw. Doppelpfeil-Schüsse */
+  bombs: number;
+  double: number;
+  shield: boolean;
+  /** Kurz unverwundbar (nach geplatztem Schild) */
+  inv: boolean;
+  /** Zählt bei jedem Schuss hoch (Effekt am TV) */
+  shots: number;
+  wins: number;
+  /** Treffer über alle Runden (Pfeil, Kopfsprung, Bombe) */
+  kills: number;
+}
+
+export interface BogenArrow {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** 0 = fliegt, 1 = steckt, 2 = fällt/liegt */
+  s: 0 | 1 | 2;
+  /** Winkel in Grad (für steckende/liegende Pfeile) */
+  a: number;
+  bomb: boolean;
+}
+
+export interface BogenFx {
+  seq: number;
+  type: 'hit' | 'stomp' | 'boom' | 'catch' | 'chest' | 'shield' | 'pickup';
+  x: number;
+  y: number;
+  /** Betroffene(r) */
+  id?: string;
+  /** Verursacher */
+  by?: string;
+  power?: import('./bogen').BogenPower;
+}
+
+export interface BogenState {
+  sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  endsIn: number;
+  round: number;
+  winRounds: number;
+  maxRounds: number;
+  /** Index in BOGEN_STAGES */
+  stage: number;
+  players: Record<string, BogenPlayer>;
+  arrows: BogenArrow[];
+  chest: { x: number; y: number } | null;
+  fx: BogenFx[];
+  roundWinner: string | null;
+}
+
 /** Nur an den jeweiligen Spieler */
 export type GeistPrivate =
   | { role: 'ghost'; x: number; y: number; lit: boolean; cooldown: number }
@@ -1640,6 +1714,7 @@ export type MiniSnapshot =
   | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'bogen'; state: BogenState }
   | { kind: 'darts'; state: DartsState }
   | { kind: 'golf'; state: GolfState }
   | { kind: 'autoball'; state: AfbState }

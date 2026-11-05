@@ -34,6 +34,7 @@ import { pickSumo } from './screens/sumo';
 import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
+import { pickBogen } from './screens/bogen';
 import { pickDarts } from './screens/darts';
 import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
@@ -298,6 +299,8 @@ function pickScreen(): Screen {
           return pickTourist(m.state);
         case 'sprueche':
           return pickSprueche(m.state, vip);
+        case 'bogen':
+          return pickBogen(m.state);
         case 'darts':
           return pickDarts(m.state);
         case 'golf':
