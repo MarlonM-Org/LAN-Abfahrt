@@ -1,18 +1,11 @@
 {
-  "updated": "2026-11-05 21:40",
+  "updated": "2026-11-05 22:15",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
-    {
-      "title": "Review Phase 1: Regelkarte + Übungsfeld + Bereit!",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/regelkarte",
-      "detail": "Intro-Phase vor jedem Minispiel: Ziel, 3 Piktogramme, Übungsfeld am Handy, BEREIT-Knopf, bei bekannten Spielen 5 s"
-    },
     {
       "title": "Review Phase 1: Zuschauer-Ebene",
       "kind": "",
@@ -51,6 +44,11 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Review: Regelkarte mit Übungsfeld und „Bereit!“ vor jedem Minispiel",
+      "pr": 59,
+      "date": "2026-11-05"
+    },
     {
       "title": "Umzugschaos (à la Moving Out)",
       "pr": 56,
