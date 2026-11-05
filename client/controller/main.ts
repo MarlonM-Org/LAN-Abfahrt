@@ -29,6 +29,7 @@ import { pickSmash } from './screens/smash';
 import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
+import { pickSpion } from './screens/spion';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
@@ -39,6 +40,7 @@ import { pickPixel } from './screens/pixel';
 import { pickWpistole } from './screens/wpistole';
 import { pickAngeln } from './screens/angeln';
 import { pickKoffer } from './screens/koffer';
+import { pickSuess } from './screens/suess';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
 import { pickDarts } from './screens/darts';
@@ -329,6 +331,10 @@ function pickScreen(): Screen {
           return pickAngeln(m.state);
         case 'koffer':
           return pickKoffer(m.state);
+        case 'suess':
+          return pickSuess(m.state);
+        case 'spion':
+          return pickSpion(m.state);
       }
       return outdatedScreen();
     }

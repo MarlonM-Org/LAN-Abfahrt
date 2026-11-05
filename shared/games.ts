@@ -25,52 +25,54 @@ export const ORIENT_TEXT: Record<PhoneOrientation, string> = {
 };
 
 export const MINI_INFO: Record<MiniKind, MiniInfo> = {
-  flunky: { title: 'Flunkyball', icon: '🍺', tagline: 'Werfen, trinken, laufen!', minPlayers: 2, orientation: 'portrait' },
-  wwe: { title: 'Wer würde eher ...?', icon: '🗳️', tagline: 'Stimmt ab – wer ist gemeint?', minPlayers: 2, orientation: 'portrait' },
-  sprint: { title: 'Liegestuhl-Sprint', icon: '🏖️', tagline: 'Handtuch drauf, sobald die Sonne aufgeht!', minPlayers: 2, orientation: 'any' },
-  murder: { title: 'Mord im Ferienhaus', icon: '🔪', inspiredBy: 'Among Us', tagline: 'Einer von euch ist nicht zum Entspannen hier ...', minPlayers: 4, orientation: 'portrait' },
-  descent: { title: 'Der Abstieg', icon: '⛰️', tagline: 'Den Abhang runter zum Rhein – springen!', minPlayers: 1, orientation: 'any' },
-  rhythm: { title: 'Das erste Gespräch', icon: '💬', tagline: 'Bleibt im Takt – dann funkt es!', minPlayers: 1, maxPlayers: 2, orientation: 'portrait' },
-  wrap: { title: 'Wraps mit Sriracha-Mayo', icon: '🌯', tagline: 'Zutaten in der richtigen Reihenfolge greifen!', minPlayers: 1, orientation: 'portrait' },
-  stars: { title: 'Tanz unter den Sternen', icon: '✨', tagline: 'Verbindet die Sterne zu Sternbildern!', minPlayers: 1, maxPlayers: 2, orientation: 'any' },
-  nhie: { title: 'Ich hab noch nie ...', icon: '🙊', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2, orientation: 'portrait' },
-  hilo: { title: 'Höher oder Tiefer', icon: '🃏', tagline: 'Falsch geraten? Schluck!', minPlayers: 2, orientation: 'portrait' },
-  bomb: { title: 'Tick-Tack-Bumm', icon: '⏰', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2, orientation: 'portrait' },
-  kingscup: { title: 'Kings Cup', icon: '👑', tagline: 'Karte ziehen, Regel befolgen – auf den König!', minPlayers: 2, orientation: 'portrait' },
-  sup: { title: 'SUP-Rennen', icon: '🏄', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1, orientation: 'portrait' },
-  tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1, orientation: 'landscape' },
-  flieger: { title: 'Urlaubsflieger', icon: '✈️', inspiredBy: 'Spaceteam', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2, orientation: 'portrait' },
-  kurve: { title: 'Kurven-Duell', icon: '🌀', inspiredBy: '„Achtung, die Kurve!“', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2, orientation: 'landscape' },
-  arena: { title: 'Bomben-Arena', icon: '💣', inspiredBy: 'Bomberman', tagline: 'Kokosnüsse legen, Sandburgen sprengen – wer bleibt trocken?', minPlayers: 2, orientation: 'landscape' },
-  bowling: { title: 'Strand-Bowling', icon: '🎳', tagline: 'Handy schwingen wie eine Bowlingkugel – Strike!', minPlayers: 2, orientation: 'portrait' },
-  enten: { title: 'Ententeich', icon: '🦆', inspiredBy: 'Duck Hunt', tagline: 'Handy auf den TV richten und abdrücken – aber nicht auf die Badegäste!', minPlayers: 2, orientation: 'portrait' },
-  ttt: { title: 'Verräter im Ferienhaus', icon: '🏊', inspiredBy: 'Trouble in Terrorist Town', tagline: 'Poolnudeln raus – wer spielt falsch?', minPlayers: 4, orientation: 'landscape' },
-  verstecken: { title: 'Versteckspiel mit Möbeln', icon: '🪴', inspiredBy: 'Prop Hunt', tagline: 'Werdet zur Kühlbox – und bloß nicht bewegen!', minPlayers: 3, orientation: 'landscape' },
-  parcours: { title: 'Fallen-Parcours', icon: '🏁', inspiredBy: 'Ultimate Chicken Horse', tagline: 'Baut Fallen – und schafft es selbst zur Cocktailbar!', minPlayers: 2, orientation: 'landscape' },
-  kart: { title: 'Kart-Rennen', icon: '🏎️', inspiredBy: 'Mario Kart', tagline: 'Verfolger-Kamera wie auf dem SNES – Gas, Drift, Items!', minPlayers: 2, orientation: 'landscape' },
-  turm: { title: 'Wackelturm', icon: '🗼', inspiredBy: 'Tricky Towers', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2, orientation: 'landscape' },
-  igel: { title: 'Igel-Krieg', icon: '🦔', inspiredBy: 'Worms', tagline: 'Kokosnüsse, Wasserbomben – wer bleibt auf der Insel?', minPlayers: 2, orientation: 'landscape' },
-  smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
-  wasser: { title: 'Wasserbomben-Schlacht', icon: '💦', tagline: 'Zielen, werfen, platsch – wer wird klatschnass?', minPlayers: 2, orientation: 'landscape' },
-  stillepost: { title: 'Stille Post mit Bildern', icon: '🖍️', inspiredBy: 'Gartic Phone', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3, orientation: 'portrait' },
-  fangen: { title: 'Urlaubs-Fangen', icon: '🕵️', inspiredBy: 'Mario Chase', tagline: 'Der Animateur ist unsichtbar – nur sein Handy kennt die Karte!', minPlayers: 3, orientation: 'landscape' },
-  geist: { title: 'Geisterjagd', icon: '👻', inspiredBy: "Luigi's Ghost Mansion", tagline: 'Stromausfall! Ein unsichtbarer Geist spukt durchs Haus ...', minPlayers: 3, orientation: 'landscape' },
-  grill: { title: 'Grill-Chaos', icon: '🔥', inspiredBy: 'Overcooked', tagline: 'Schnippeln, grillen, servieren – bevor die Gäste meckern!', minPlayers: 2, orientation: 'landscape' },
-  boule: { title: 'Boule am Strand', icon: '🥥', tagline: 'Legen oder schießen – wer liegt am Schweinchen?', minPlayers: 2, orientation: 'portrait' },
-  sumo: { title: 'Sumo-Steg', icon: '🤼', tagline: 'Rempeln, schubsen, platsch – wer bleibt auf dem Steg?', minPlayers: 2, orientation: 'landscape' },
-  volley: { title: 'Strand-Volleyball', icon: '🏐', inspiredBy: 'Slime Volleyball', tagline: 'Baggern, springen, schmettern – Team Sonne gegen Team Meer!', minPlayers: 2, orientation: 'landscape' },
-  tourist: { title: 'Wer ist der Tourist?', icon: '🧳', inspiredBy: 'Spyfall', tagline: 'Alle kennen den Ort – nur einer nicht. Fragt euch durch!', minPlayers: 4, orientation: 'portrait' },
-  sprueche: { title: 'Sprüche-Duell', icon: '🗯️', inspiredBy: 'Quiplash', tagline: 'Schreibt die lustigste Antwort – die anderen stimmen ab!', minPlayers: 3, orientation: 'portrait' },
-  pixel: { title: 'Pixel-Galerie', icon: '🖼️', tagline: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage entscheidet!', minPlayers: 3, orientation: 'portrait' },
-  bogen: { title: 'Bogen-Arena', icon: '🏹', inspiredBy: 'TowerFall', tagline: 'Saugnapfpfeile, ein Treffer – und du bist raus!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
-  darts: { title: 'Darts an der Strandbar', icon: '🎯', tagline: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', minPlayers: 2, orientation: 'portrait' },
-  golf: { title: 'Urlaubs-Minigolf', icon: '⛳', tagline: 'Alle putten gleichzeitig – Leuchtturm, Looping, Lagune!', minPlayers: 2, orientation: 'portrait' },
-  autoball: { title: 'Auto-Fußball', icon: '⚽', inspiredBy: 'Rocket League', tagline: 'Gas, Boost, Hüpfer – schiebt den Wasserball ins Tor!', minPlayers: 2, orientation: 'landscape' },
-  wpistole: { title: 'Wasserpistolen-Duell', icon: '🔫', inspiredBy: 'Wild Gunman', tagline: 'Hand ans Holster ... ZIEHT! Wer zuerst spritzt, bleibt trocken.', minPlayers: 2, orientation: 'portrait' },
-  zauber: { title: 'Zauber-Arena', icon: '🧙', inspiredBy: 'Spellsworn', tagline: 'Feuerbälle, Eilzauber, Lava – wer bleibt auf der Plattform?', minPlayers: 2, orientation: 'landscape' },
-  angeln: { title: 'Angeln', icon: '🎣', tagline: 'Auswerfen, anschlagen, drillen – wer zieht den dicksten Hecht aus dem See?', minPlayers: 2, orientation: 'portrait' },
-  koffer: { title: 'Kofferpacken', icon: '🚗', tagline: 'Alles muss mit! Stapelt den Kofferraum voll, bevor Papa hupt.', minPlayers: 2, orientation: 'landscape' },
-  werwolf: { title: 'Werwölfe im Ferienhaus', icon: '🐺', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6, orientation: 'portrait' },
+  flunky: { title: 'Flunkyball', icon: '🍺', tagline: 'Werfen, trinken, laufen!', minPlayers: 2 , orientation: 'portrait' },
+  wwe: { title: 'Wer würde eher ...?', icon: '🗳️', tagline: 'Stimmt ab – wer ist gemeint?', minPlayers: 2 , orientation: 'portrait' },
+  sprint: { title: 'Liegestuhl-Sprint', icon: '🏖️', tagline: 'Handtuch drauf, sobald die Sonne aufgeht!', minPlayers: 2 , orientation: 'any' },
+  murder: { title: 'Mord im Ferienhaus', icon: '🔪', inspiredBy: 'Among Us', tagline: 'Einer von euch ist nicht zum Entspannen hier ...', minPlayers: 4 , orientation: 'portrait' },
+  descent: { title: 'Der Abstieg', icon: '⛰️', tagline: 'Den Abhang runter zum Rhein – springen!', minPlayers: 1 , orientation: 'any' },
+  rhythm: { title: 'Das erste Gespräch', icon: '💬', tagline: 'Bleibt im Takt – dann funkt es!', minPlayers: 1, maxPlayers: 2 , orientation: 'portrait' },
+  wrap: { title: 'Wraps mit Sriracha-Mayo', icon: '🌯', tagline: 'Zutaten in der richtigen Reihenfolge greifen!', minPlayers: 1 , orientation: 'portrait' },
+  stars: { title: 'Tanz unter den Sternen', icon: '✨', tagline: 'Verbindet die Sterne zu Sternbildern!', minPlayers: 1, maxPlayers: 2 , orientation: 'any' },
+  nhie: { title: 'Ich hab noch nie ...', icon: '🙊', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2 , orientation: 'portrait' },
+  hilo: { title: 'Höher oder Tiefer', icon: '🃏', tagline: 'Falsch geraten? Schluck!', minPlayers: 2 , orientation: 'portrait' },
+  bomb: { title: 'Tick-Tack-Bumm', icon: '⏰', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 , orientation: 'portrait' },
+  kingscup: { title: 'Kings Cup', icon: '👑', tagline: 'Karte ziehen, Regel befolgen – auf den König!', minPlayers: 2 , orientation: 'portrait' },
+  sup: { title: 'SUP-Rennen', icon: '🏄', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 , orientation: 'portrait' },
+  tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 , orientation: 'landscape' },
+  flieger: { title: 'Urlaubsflieger', icon: '✈️', inspiredBy: 'Spaceteam', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2 , orientation: 'portrait' },
+  kurve: { title: 'Kurven-Duell', icon: '🌀', inspiredBy: '„Achtung, die Kurve!“', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2 , orientation: 'landscape' },
+  arena: { title: 'Bomben-Arena', icon: '💣', inspiredBy: 'Bomberman', tagline: 'Kokosnüsse legen, Sandburgen sprengen – wer bleibt trocken?', minPlayers: 2 , orientation: 'landscape' },
+  bowling: { title: 'Strand-Bowling', icon: '🎳', tagline: 'Handy schwingen wie eine Bowlingkugel – Strike!', minPlayers: 2 , orientation: 'portrait' },
+  enten: { title: 'Ententeich', icon: '🦆', inspiredBy: 'Duck Hunt', tagline: 'Handy auf den TV richten und abdrücken – aber nicht auf die Badegäste!', minPlayers: 2 , orientation: 'portrait' },
+  ttt: { title: 'Verräter im Ferienhaus', icon: '🏊', inspiredBy: 'Trouble in Terrorist Town', tagline: 'Poolnudeln raus – wer spielt falsch?', minPlayers: 4 , orientation: 'landscape' },
+  verstecken: { title: 'Versteckspiel mit Möbeln', icon: '🪴', inspiredBy: 'Prop Hunt', tagline: 'Werdet zur Kühlbox – und bloß nicht bewegen!', minPlayers: 3 , orientation: 'landscape' },
+  parcours: { title: 'Fallen-Parcours', icon: '🏁', inspiredBy: 'Ultimate Chicken Horse', tagline: 'Baut Fallen – und schafft es selbst zur Cocktailbar!', minPlayers: 2 , orientation: 'landscape' },
+  kart: { title: 'Kart-Rennen', icon: '🏎️', inspiredBy: 'Mario Kart', tagline: 'Verfolger-Kamera wie auf dem SNES – Gas, Drift, Items!', minPlayers: 2 , orientation: 'landscape' },
+  turm: { title: 'Wackelturm', icon: '🗼', inspiredBy: 'Tricky Towers', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2 , orientation: 'landscape' },
+  igel: { title: 'Igel-Krieg', icon: '🦔', inspiredBy: 'Worms', tagline: 'Kokosnüsse, Wasserbomben – wer bleibt auf der Insel?', minPlayers: 2 , orientation: 'landscape' },
+  smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2 , orientation: 'landscape' },
+  wasser: { title: 'Wasserbomben-Schlacht', icon: '💦', tagline: 'Zielen, werfen, platsch – wer wird klatschnass?', minPlayers: 2 , orientation: 'landscape' },
+  stillepost: { title: 'Stille Post mit Bildern', icon: '🖍️', inspiredBy: 'Gartic Phone', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3 , orientation: 'portrait' },
+  fangen: { title: 'Urlaubs-Fangen', icon: '🕵️', inspiredBy: 'Mario Chase', tagline: 'Der Animateur ist unsichtbar – nur sein Handy kennt die Karte!', minPlayers: 3 , orientation: 'landscape' },
+  geist: { title: 'Geisterjagd', icon: '👻', inspiredBy: "Luigi's Ghost Mansion", tagline: 'Stromausfall! Ein unsichtbarer Geist spukt durchs Haus ...', minPlayers: 3 , orientation: 'landscape' },
+  grill: { title: 'Grill-Chaos', icon: '🔥', inspiredBy: 'Overcooked', tagline: 'Schnippeln, grillen, servieren – bevor die Gäste meckern!', minPlayers: 2 , orientation: 'landscape' },
+  boule: { title: 'Boule am Strand', icon: '🥥', tagline: 'Legen oder schießen – wer liegt am Schweinchen?', minPlayers: 2 , orientation: 'portrait' },
+  sumo: { title: 'Sumo-Steg', icon: '🤼', tagline: 'Rempeln, schubsen, platsch – wer bleibt auf dem Steg?', minPlayers: 2 , orientation: 'landscape' },
+  volley: { title: 'Strand-Volleyball', icon: '🏐', inspiredBy: 'Slime Volleyball', tagline: 'Baggern, springen, schmettern – Team Sonne gegen Team Meer!', minPlayers: 2 , orientation: 'landscape' },
+  tourist: { title: 'Wer ist der Tourist?', icon: '🧳', inspiredBy: 'Spyfall', tagline: 'Alle kennen den Ort – nur einer nicht. Fragt euch durch!', minPlayers: 4 , orientation: 'portrait' },
+  sprueche: { title: 'Sprüche-Duell', icon: '🗯️', inspiredBy: 'Quiplash', tagline: 'Schreibt die lustigste Antwort – die anderen stimmen ab!', minPlayers: 3 , orientation: 'portrait' },
+  pixel: { title: 'Pixel-Galerie', icon: '🖼️', tagline: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage entscheidet!', minPlayers: 3 , orientation: 'portrait' },
+  bogen: { title: 'Bogen-Arena', icon: '🏹', inspiredBy: 'TowerFall', tagline: 'Saugnapfpfeile, ein Treffer – und du bist raus!', minPlayers: 2, maxPlayers: 8 , orientation: 'landscape' },
+  darts: { title: 'Darts an der Strandbar', icon: '🎯', tagline: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', minPlayers: 2 , orientation: 'portrait' },
+  golf: { title: 'Urlaubs-Minigolf', icon: '⛳', tagline: 'Alle putten gleichzeitig – Leuchtturm, Looping, Lagune!', minPlayers: 2 , orientation: 'portrait' },
+  autoball: { title: 'Auto-Fußball', icon: '⚽', inspiredBy: 'Rocket League', tagline: 'Gas, Boost, Hüpfer – schiebt den Wasserball ins Tor!', minPlayers: 2 , orientation: 'landscape' },
+  wpistole: { title: 'Wasserpistolen-Duell', icon: '🔫', inspiredBy: 'Wild Gunman', tagline: 'Hand ans Holster ... ZIEHT! Wer zuerst spritzt, bleibt trocken.', minPlayers: 2 , orientation: 'portrait' },
+  zauber: { title: 'Zauber-Arena', icon: '🧙', inspiredBy: 'Spellsworn', tagline: 'Feuerbälle, Eilzauber, Lava – wer bleibt auf der Plattform?', minPlayers: 2 , orientation: 'landscape' },
+  angeln: { title: 'Angeln', icon: '🎣', tagline: 'Auswerfen, anschlagen, drillen – wer zieht den dicksten Hecht aus dem See?', minPlayers: 2 , orientation: 'portrait' },
+  spion: { title: 'Spion unter Gästen', icon: '🕶️', inspiredBy: 'Hidden in Plain Sight', tagline: 'Alle sehen gleich aus – nur dein Handy weiß, wer du bist!', minPlayers: 3 , orientation: 'portrait' },
+  koffer: { title: 'Kofferpacken', icon: '🚗', tagline: 'Alles muss mit! Stapelt den Kofferraum voll, bevor Papa hupt.', minPlayers: 2 , orientation: 'landscape' },
+  suess: { title: 'Süßigkeiten-Klau', icon: '🍬', inspiredBy: 'Animal Crossing: Sweet Day', tagline: 'Plündert die Minibar – aber je voller die Taschen, desto langsamer!', minPlayers: 3 , orientation: 'landscape' },
+  werwolf: { title: 'Werwölfe im Ferienhaus', icon: '🐺', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6 , orientation: 'portrait' },
 };
 
 /** „🏎️ Kart-Rennen“ – Titel mit Icon für Listen und Ansagen */
@@ -85,11 +87,11 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -121,8 +123,30 @@ export const FIELD_TYPES: FieldType[] = Array.from({ length: BOARD_SIZE }, (_, i
 
 export const FIELD_COINS = { blue: 3, red: -3 };
 
-/** Münzen nach Platzierung im Minispiel */
-export const PLACE_COINS = [10, 6, 3, 1];
+/**
+ * Punkte-Staffel nach Spielerzahl: Platz 1 bekommt 10, der Letzte 1 (Trost), dazwischen linear
+ * `round(10 · (n − Platz) / (n − 1))`. Bei 2 Spielern 10/5, allein 10.
+ * `place` ist der Wettkampfrang (1 + Spieler in besseren Gruppen), `n` die Zahl der gewerteten Spieler.
+ */
+function placeScale(place: number, n: number) {
+  if (n <= 1) return 10;
+  if (n === 2) return place <= 1 ? 10 : 5;
+  const p = Math.min(Math.max(1, place), n);
+  return Math.max(1, Math.round((10 * (n - p)) / (n - 1)));
+}
+
+/** Münzen nach Platzierung im Minispiel (Party-Modus) */
+export const placeCoins = (place: number, n: number) => placeScale(place, n);
+
+/** Rang (1-basiert, bei Gleichstand gleicher Rang) jeder Gruppe: [[a, b], [c]] → [1, 3] */
+export const groupPlaces = (groups: string[][]) => {
+  let seen = 0;
+  return groups.map((g) => {
+    const place = seen + 1;
+    seen += g.length;
+    return place;
+  });
+};
 
 // ------------------------------------------------------------------ Mord im Ferienhaus
 
@@ -540,23 +564,25 @@ export function turmSnapX(shape: number, rot: number, x: number): number {
 // ------------------------------------------------------------------ Arcade
 
 /**
- * Leaderboard-Punkte nach Platzierungsgruppe (1. 10, 2. 7, 3. 5, 4. 4, 5. 3, 6. 2, Rest 1).
+ * Leaderboard-Punkte nach Platz und Spielerzahl (gleiche Staffel wie `placeCoins`: 1. 10 … Letzter 1).
  * Teamsiege: alle Sieger stehen in Gruppe 1 und bekommen die vollen Punkte.
  */
-export const ARCADE_POINTS = [10, 7, 5, 4, 3, 2, 1];
+export const arcadePoints = (place: number, n: number) => placeScale(place, n);
+/** Feste Punkte für gemeinsame Spiele ohne Herzen (alle in einer Gruppe) */
+export const ARCADE_COOP_POINTS = 7;
 
 /** Wort für ein Spiel einer Serie („Kart-Rennen · Rennen 3“) */
 const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'Rennen', sprint: 'Lauf', parcours: 'Lauf', golf: 'Turnier', bowling: 'Spiel', darts: 'Spiel' };
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
-  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber'] },
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill'] },
-  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'tourist', 'werwolf'] },
+  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel'] },
 ];
