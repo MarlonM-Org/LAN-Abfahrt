@@ -37,6 +37,7 @@ export const MINI_INFO: Record<MiniKind, { title: string; tagline: string; minPl
   volley: { title: 'Strand-Volleyball', tagline: 'Baggern, springen, schmettern – Team Sonne gegen Team Meer!', minPlayers: 2 },
   tourist: { title: 'Wer ist der Tourist?', tagline: 'Alle kennen den Ort – nur einer nicht. Fragt euch durch!', minPlayers: 4 },
   sprueche: { title: 'Sprüche-Duell', tagline: 'Schreibt die lustigste Antwort – die anderen stimmen ab!', minPlayers: 3 },
+  autoball: { title: 'Auto-Fußball', tagline: 'Gas, Boost, Hüpfer – schiebt den Wasserball ins Tor!', minPlayers: 2 },
   werwolf: { title: 'Werwölfe im Ferienhaus', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6 },
 };
 
@@ -47,11 +48,11 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'tourist', 'sprueche', 'autoball', 'volley', 'werwolf'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'autoball', 'volley'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -484,11 +485,11 @@ export function turmCellOffsets(shape: number, angle: number): { x: number; y: n
 export const ARCADE_POINTS = [10, 6, 3, 1];
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'autoball', 'volley'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
-  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'volley'] },
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'autoball', 'volley'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'enten', 'igel', 'turm'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'tourist', 'werwolf'] },

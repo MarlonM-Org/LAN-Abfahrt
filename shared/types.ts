@@ -2,6 +2,7 @@ import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
+import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
 
 export interface Look {
@@ -59,6 +60,7 @@ export type MiniKind =
   | 'volley'
   | 'tourist'
   | 'sprueche'
+  | 'autoball'
   | 'werwolf';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
@@ -1587,6 +1589,7 @@ export type MiniSnapshot =
   | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'autoball'; state: AfbState }
   | { kind: 'werwolf'; state: WolfState };
 
 export interface GameState {
