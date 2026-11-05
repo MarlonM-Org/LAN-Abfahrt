@@ -2,6 +2,7 @@ import '@fontsource/press-start-2p/400.css';
 import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
 import { type Screen, LS, app, el, me, message, socket, store, toast } from './core';
 import { startTimeSync } from '../timesync';
+import { knownKind, watchServerVersion } from '../version';
 import { buildEdit, buildLobby } from './screens/lobby';
 import { pickBoard } from './screens/board';
 import { pickResults } from './screens/results';
@@ -15,6 +16,7 @@ import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
 import { pickBowling } from './screens/bowling';
+import { pickBoule } from './screens/boule';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
 import { pickVerstecken } from './screens/verstecken';
@@ -28,14 +30,24 @@ import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
+import { pickSumo } from './screens/sumo';
+import { pickTourist } from './screens/tourist';
+import { pickSprueche } from './screens/sprueche';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
 
 // ---------------------------------------------------------------- Netzwerk
 
+let joinPending = false;
+/** Beitritt abgelehnt, weil gerade ein Spiel lief → in der Lobby automatisch nochmal */
+let retryInLobby = false;
+
 function join() {
+  if (joinPending) return;
+  joinPending = true;
   socket.emit('player:join', { name: store.name, look: store.look, playerId: store.playerId }, (r: JoinResponse) => {
+    joinPending = false;
     if (r.ok && r.playerId) {
       store.playerId = r.playerId;
       localStorage.setItem(LS.id, r.playerId);
@@ -45,21 +57,55 @@ function join() {
     } else {
       toast(r.error ?? 'Beitreten hat nicht geklappt.');
       store.joined = false;
+      retryInLobby = !!store.state && store.state.phase !== 'lobby';
     }
     render();
   });
 }
 
 startTimeSync(socket);
+watchServerVersion(socket, () => toast('Handy-Code ist älter als der Server – am Laptop „npm run build“ ausführen.'));
 
 socket.on('connect', () => {
   if (store.name && !store.editing) join();
   else render();
 });
-socket.on('disconnect', () => {
+socket.on('disconnect', (reason) => {
   store.joined = false;
+  joinPending = false;
+  // Vom Server getrennt → socket.io verbindet nicht von selbst neu
+  if (reason === 'io server disconnect') socket.connect();
   render();
 });
+
+/**
+ * iOS/Android frieren die Seite ein, sobald man die App wechselt – der Socket ist danach oft
+ * tot, ohne dass es jemand merkt (bis zu ~45 s). Beim Zurückkommen deshalb sofort prüfen
+ * und notfalls neu verbinden; der Server erkennt uns an der playerId wieder.
+ */
+let lastCheck = 0;
+function checkConnection() {
+  if (document.visibilityState === 'hidden') return;
+  const now = Date.now();
+  if (now - lastCheck < 1000) return;
+  lastCheck = now;
+  if (!socket.connected) {
+    socket.connect();
+    return;
+  }
+  socket.timeout(2500).emit('time:ping', now, (err: unknown) => {
+    if (err && socket.connected) {
+      // Verbindung hängt → hart neu verbinden
+      socket.disconnect();
+      socket.connect();
+    }
+  });
+  if (!store.joined && store.name && !store.editing) join();
+}
+document.addEventListener('visibilitychange', checkConnection);
+window.addEventListener('pageshow', checkConnection);
+window.addEventListener('focus', checkConnection);
+window.addEventListener('online', checkConnection);
 socket.on('toast', (msg: string) => toast(msg));
 socket.on('private', (p: PrivateState) => {
   store.priv = p;
@@ -74,6 +120,11 @@ socket.on('state', (s: GameState) => {
   if (store.joined && !s.players.some((p) => p.id === store.playerId)) {
     store.joined = false;
     if (store.name && !store.editing) join();
+  }
+  // Beitritt wurde abgelehnt (z. B. lief gerade ein Spiel) → in der Lobby erneut versuchen
+  if (!store.joined && retryInLobby && s.phase === 'lobby' && store.name && !store.editing) {
+    retryInLobby = false;
+    join();
   }
   render();
 });
@@ -90,14 +141,37 @@ function timerKey(s: GameState | null) {
 /** Baut den Screen nur neu, wenn sich der Screen-Key ändert – sonst nur Werte aktualisieren.
  *  So gehen keine Taps oder Wischgesten verloren, während Updates reinkommen. */
 function render() {
-  const [key, build] = pickScreen();
+  let screen: Screen;
+  try {
+    screen = pickScreen();
+  } catch (e) {
+    // Ohne Fallback bliebe bei einem Fehler einfach der alte Screen (z. B. das Lobby-Menü) stehen
+    console.error(e);
+    screen = ['error', message('Hoppla!', 'Anzeigefehler – lade die Seite neu.')];
+  }
+  const [key, build] = screen;
   if (key !== screenKey) {
     screenKey = key;
     app.innerHTML = '';
-    updater = build();
-    addVipAbort();
+    try {
+      updater = build();
+    } catch (e) {
+      console.error(e);
+      updater = null;
+      message('Hoppla!', 'Anzeigefehler – lade die Seite neu.')();
+    }
   }
-  updater?.();
+  syncVipAbort();
+  try {
+    updater?.();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+/** Spiel, das dieser (veraltete) Handy-Code nicht kennt */
+function outdatedScreen(): Screen {
+  return ['outdated', message('Handy-Code veraltet', 'Seite neu laden. Hilft das nicht: am Laptop „npm run build“ ausführen und den Server neu starten.')];
 }
 
 function pickScreen(): Screen {
@@ -119,6 +193,7 @@ function pickScreen(): Screen {
     case 'mini': {
       const m = s.mini;
       if (!m) return ['wait', message('Warte ...')];
+      if (!knownKind(m.kind)) return outdatedScreen();
       if (!(store.playerId && s.players.some((p) => p.id === store.playerId))) return ['wait', message('Warte ...')];
       switch (m.kind) {
         case 'flunky':
@@ -181,9 +256,19 @@ function pickScreen(): Screen {
           return pickGeist(m.state);
         case 'grill':
           return pickGrill(m.state);
+        case 'boule':
+          return pickBoule(m.state);
+        case 'sumo':
+          return pickSumo(m.state);
+        case 'tourist':
+          return pickTourist(m.state);
+        case 'sprueche':
+          return pickSprueche(m.state, vip);
       }
+      return outdatedScreen();
     }
   }
+  return outdatedScreen();
 }
 
 function inCouple() {
@@ -199,10 +284,14 @@ function afterEdit() {
   render();
 }
 
-/** Der VIP kann jederzeit abbrechen und zurück in die Lobby. */
-function addVipAbort() {
+/** Der VIP kann jederzeit abbrechen und zurück in die Lobby. Wird bei jedem Render abgeglichen,
+ *  weil sich der VIP-Status ändern kann, ohne dass der Screen neu gebaut wird (z. B. nach Wiederverbinden). */
+function syncVipAbort() {
   const s = store.state;
-  if (!s || s.phase === 'lobby' || !me()?.isVip || store.editing) return;
+  const show = !!s && store.joined && s.phase !== 'lobby' && !!me()?.isVip && !store.editing;
+  const existing = app.querySelector<HTMLButtonElement>(':scope > button.abort');
+  if (!show) return existing?.remove();
+  if (existing) return;
   const b = el(`<button class="abort">Abbrechen</button>`).firstElementChild as HTMLButtonElement;
   b.addEventListener('click', () => {
     if (confirm('Spiel wirklich abbrechen und zurück in die Lobby?')) socket.emit('vip:lobby');

@@ -75,7 +75,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     <p class="count"></p>
     <div class="menu"></div>
     <div class="panel q-panel">
-      <p class="label-left">${mode === 'drink' ? 'Eigene Frage / Aussage' : 'Eigener Startsatz'}</p>
+      <p class="label-left">${mode === 'drink' ? 'Eigene Frage / Aussage' : 'Eigener Startsatz / Spruch'}</p>
       <div class="mode-tabs q-kind"></div>
       <input type="text" maxlength="120" class="q-input" />
       <button class="small" data-act="addq">Hinzufügen</button>
@@ -86,7 +86,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   `);
   q(root, '.row-center').append(avatarCanvas(6, store.look));
   const menu = q(root, '.menu');
-  const gated: { btn: HTMLButtonElement; min: number; max?: number }[] = [];
+  const gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[] = [];
   if (mode === 'date') q(root, '.q-panel').classList.add('hidden');
 
   if (vip) {
@@ -108,7 +108,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       const b = el(`<button class="secondary small">${info.title}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:start', { mode: kind }));
       q(row, '.btn-grid').append(b);
-      gated.push({ btn: b, min: info.minPlayers });
+      gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
     }
     menu.append(row);
   };
@@ -171,10 +171,11 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     row.append(add, rm);
   }
 
-  // Eigene Fragen (Wer würde eher / Ich hab noch nie) bzw. Startsätze für Stille Post
-  type QKind = 'wwe' | 'nhie' | 'post';
-  const qKinds: [QKind, string][] = mode === 'drink' ? [['nhie', 'Ich hab noch nie'], ['wwe', 'Wer würde eher']] : [['post', 'Stille Post: Startsatz']];
-  const qNames: Record<QKind, string> = { nhie: 'Ich hab noch nie', wwe: 'Wer würde eher', post: 'Stille Post:' };
+  // Eigene Fragen (Wer würde eher / Ich hab noch nie) bzw. Startsätze für Stille Post / Fragen fürs Sprüche-Duell
+  type QKind = 'wwe' | 'nhie' | 'post' | 'quip';
+  const qKinds: [QKind, string][] =
+    mode === 'drink' ? [['nhie', 'Ich hab noch nie'], ['wwe', 'Wer würde eher']] : [['post', 'Stille Post'], ['quip', 'Sprüche-Duell']];
+  const qNames: Record<QKind, string> = { nhie: 'Ich hab noch nie', wwe: 'Wer würde eher', post: 'Stille Post:', quip: 'Sprüche-Duell:' };
   let qKind: QKind = qKinds[0][0];
   const qInput = q<HTMLInputElement>(root, '.q-input');
   const kindTabs = q(root, '.q-kind');
@@ -185,7 +186,13 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     kindBtns.forEach((b) => b.classList.toggle('active', b.dataset.k === k));
     kindBtns.forEach((b) => b.classList.toggle('secondary', b.dataset.k !== k));
     qInput.placeholder =
-      k === 'wwe' ? 'Wer würde eher ... den Flug verpassen?' : k === 'post' ? 'z. B. Ein Hai beim Kindergeburtstag' : 'Ich hab noch nie ... im Zelt geschlafen.';
+      k === 'wwe'
+        ? 'Wer würde eher ... den Flug verpassen?'
+        : k === 'post'
+          ? 'z. B. Ein Hai beim Kindergeburtstag'
+          : k === 'quip'
+            ? 'z. B. Das beste Mitbringsel: ___'
+            : 'Ich hab noch nie ... im Zelt geschlafen.';
   };
   for (const [k, label] of qKinds) {
     const b = el(`<button class="mode-tab small" data-k="${k}">${label}</button>`).firstElementChild as HTMLButtonElement;
@@ -222,8 +229,17 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     q(root, '.q-count').textContent =
       mode === 'drink'
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`
-        : `${st?.customPostCount ?? 0} eigene Startsätze`;
-    for (const g of gated) g.btn.disabled = n < g.min || (g.max !== undefined && n > g.max);
+        : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen`;
+    for (const g of gated) {
+      const tooMany = g.max !== undefined && n > g.max;
+      g.btn.disabled = n < g.min || tooMany;
+      // Kurzer Hinweis, warum ein Spiel ausgegraut ist (z. B. „max. 8 Spieler“)
+      if (g.hint) {
+        const small = g.btn.querySelector('small.max-hint');
+        if (tooMany && !small) g.btn.insertAdjacentHTML('beforeend', `<small class="max-hint"><br/>${g.hint}</small>`);
+        else if (!tooMany && small) small.remove();
+      }
+    }
   };
 }
 

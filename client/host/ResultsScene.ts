@@ -130,7 +130,16 @@ export class ResultsScene extends Phaser.Scene {
       }
     }
     const rest = r.rows.filter((rw) => rw.place > 3);
-    if (rest.length) {
+    if (rest.length > 5) {
+      // Viele Spieler (bis 12): Plätze ab 4 als zwei Listen links und rechts neben dem Podest
+      const half = Math.ceil(rest.length / 2);
+      rest.forEach((rw, i) => {
+        const left = i < half;
+        const line = `${rw.place}. ${(playerById(rw.playerId)?.name ?? '?').slice(0, 9)}`;
+        const t = ink(this, left ? 6 : WORLD.W - 6, 72 + (left ? i : i - half) * 13, line, { origin: [left ? 0 : 1, 0] });
+        this.layer.add(t.setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
+      });
+    } else if (rest.length) {
       const line = rest.map((rw) => `${rw.place}. ${playerById(rw.playerId)?.name ?? '?'}`).join('  ');
       this.layer.add(ink(this, WORLD.W / 2, 72, line).setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1));
     }

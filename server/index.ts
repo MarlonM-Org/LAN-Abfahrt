@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { domainConfigFromEnv, prepareDomain } from './domain';
 import { getLanAddress } from './net';
+import { MusicStore, musicRouter } from './music';
 import { Room } from './room';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -47,6 +48,10 @@ if (httpsServer) io.attach(httpsServer);
 const room = new Room(io, joinUrl, `http://localhost:${PORT}`);
 io.on('connection', (socket) => room.handle(socket));
 
+// Musik-Bibliothek (eigene Songs + Szenen-Zuordnung) – REST für TV-Menü und /musik.html
+const music = new MusicStore();
+app.use('/api/music', musicRouter(music, io));
+
 if (PROD) {
   app.use(express.static(path.resolve(dir, '../dist')));
 } else {
@@ -67,6 +72,7 @@ if (PROD) {
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log('\n  🎉 LAN-Abfahrt läuft!\n');
   console.log(`  TV / Spielbrett:  http://localhost:${PORT}/tv.html`);
+  console.log(`  Musik-Werkstatt:  http://localhost:${PORT}/musik.html`);
   console.log(`  Handys:           ${joinUrl}  (oder QR-Code auf dem TV scannen)\n`);
   if (PUBLIC_DOMAIN && !tls) {
     console.log(`  ⚠️  PUBLIC_DOMAIN gesetzt, aber kein Zertifikat unter ${TLS_CERT} – HTTPS bleibt aus.\n`);
