@@ -119,6 +119,13 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
   }
 
   function toggle(open = panel.hidden) {
+    // Ergebnis eines Einzelspiels: „Anderes Spiel“ → erst zurück in die Lobby, dann Auswahl öffnen
+    const st = getState();
+    if (open && st?.phase === 'results' && st.nochmal) {
+      socket.timeout(3000).emit('host:cmd', 'menu', (err: unknown, r?: { ok: boolean; msg?: string }) => {
+        if (err || !r?.ok) say(r?.msg ?? 'Server antwortet nicht.');
+      });
+    }
     panel.hidden = !open;
     msg.textContent = '';
     if (open) {
@@ -167,6 +174,7 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
         e.stopImmediatePropagation();
         return toggle();
       }
+      // Im Ergebnis eines Einzelspiels: Enter startet bei geschlossener Auswahl „Nochmal“ (hostControls)
       if (panel.hidden) return;
       const dirs: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (e.key === 'Escape') toggle(false);

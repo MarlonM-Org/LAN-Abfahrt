@@ -17,6 +17,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - Zustand wird komplett als `GameState` gebroadcastet (gedrosselt auf ~25/s in `Room.changed()`).
 - Neues Minispiel = Klasse in `server/` die `MiniGame` implementiert (siehe `server/minigame.ts`), neuer `MiniKind` + Eintrag in `MINI_INFO` (`shared/games.ts`, inkl. Pflichtfeld `icon` (Emoji) und optional `inspiredBy` – Vorbild nur als „à la …“-Untertitel, Spiel nie nach dem Original benennen) + in `ARCADE_GROUPS` einsortieren, Zweig in `Room.startMini()`, Phaser-Szene in `client/host/` (in `main.ts` registrieren), Screen-Modul in `client/controller/screens/` (in `controller/main.ts` einhängen) und Bot-Verhalten in `scripts/bots.ts`.
 - Minispiele melden ihr Ende über `ctx.finish({ groups, details, subtitle })` – Münzen/Ergebnis-Screen macht der Raum.
+- Einzelspiele aus der Lobby (Arcade, Laptop-Auswahl, Einzelspiel-Liste – nicht Spielbrett/Date-Night/Trinkrunde) zählen fürs Leaderboard des Abends (`server/session.ts`, nur im Speicher) und die ewige Tabelle (`server/leaderboard.ts`); im Ergebnis bietet `GameState.nochmal` „Nochmal“ an (Kart: nächste Strecke).
 - Geheime Infos nur über `privateFor()` → Event `private`, nie in `GameState`.
 - Handy-UI: Screens nur neu bauen, wenn sich der Screen-Key ändert (`pickScreen()`), sonst nur Werte updaten – sonst gehen Taps/Wischgesten verloren.
 - Phaser-Szenen werden beim Neustart wiederverwendet: Instanzfelder in `create()` zurücksetzen.

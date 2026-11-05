@@ -53,6 +53,8 @@ export interface BotOptions {
   game?: string;
   date?: boolean;
   count?: number;
+  /** Einzelspiel: so oft drückt der VIP-Bot im Ergebnis „Nochmal“ (Leaderboard des Abends testen) */
+  nochmal?: number;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
@@ -71,6 +73,7 @@ export class Bot {
 
   leader: boolean;
   private resultCount = 0;
+  private nochmalCount = 0;
   private resultsEntered = 0;
   private lastPhase = '';
   /** Stille Post: bereits erledigte Schritte/Abstimmungen */
@@ -661,6 +664,21 @@ export class Bot {
         await sleep(4000);
         this.resultCount++;
         const drink = this.opts.game === 'drink';
+        const cur = this.state ?? s;
+        if (cur.session?.games && cur.results?.points) {
+          const table = cur.session.rows.map((r) => `${r.rank}. ${r.name} ${r.points}${r.last !== null ? ` (+${r.last})` : ''}`).join(' | ');
+          const ser = cur.session.series;
+          this.opts.log?.(`Leaderboard nach ${cur.session.games} ${cur.session.games === 1 ? 'Spiel' : 'Spielen'}${ser ? ` [Serie ${ser.label}]` : ''}: ${table}`);
+        }
+        if (this.opts.game && !drink && this.nochmalCount < (this.opts.nochmal ?? 0)) {
+          if (cur.nochmal && !cur.nochmal.disabled) {
+            this.nochmalCount++;
+            this.opts.log?.(`Nochmal ${this.nochmalCount}/${this.opts.nochmal}: ${cur.nochmal.next}${cur.nochmal.detail ? ` · ${cur.nochmal.detail}` : ''}`);
+            this.socket.emit('vip:continue', 'again');
+            return;
+          }
+          this.opts.log?.(`Nochmal nicht möglich: ${cur.nochmal?.disabled ?? 'kein Einzelspiel-Ergebnis'}`);
+        }
         const done = s.results?.final || (this.opts.game && !drink);
         if (done && !this.opts.date) {
           const rows = s.results!.rows.map((r) => `${r.place}. ${s.players.find((p) => p.id === r.playerId)?.name} (${r.detail})`).join(' | ');
