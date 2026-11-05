@@ -1,6 +1,7 @@
 import type { ZauberState } from '../../../shared/types';
 import { ZAUBER } from '../../../shared/zauber';
 import { SHIRTS } from '../../../shared/avatar';
+import { haptic } from '../haptic';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store } from '../core';
 import { floatingStick, holdButton } from './smash';
 
@@ -23,7 +24,7 @@ export function pickZauber(s: ZauberState): Screen {
   if (!mine.alive && s.sub === 'play') {
     const msg = message('Verpufft!', 'Puff – du bist für diese Runde raus. Feuer die anderen an!');
     return [`zb-dead-${s.round}`, () => {
-      navigator.vibrate?.([60, 40, 140]);
+      haptic([60, 40, 140]);
       return msg();
     }];
   }
@@ -124,7 +125,7 @@ export function pickZauber(s: ZauberState): Screen {
       q(root, '.zauber').classList.toggle('in-lava', p.lava);
       if (p.hits > hits) {
         hits = p.hits;
-        navigator.vibrate?.([40, 30, 70]);
+        haptic([40, 30, 70]);
       }
     };
   }];

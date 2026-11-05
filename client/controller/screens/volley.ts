@@ -1,6 +1,7 @@
 import type { VolleyState } from '../../../shared/types';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { VOLLEY } from '../../../shared/volley';
+import { haptic } from '../haptic';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store } from '../core';
 
 /** Halte-Knopf für mehrere Finger: gedrückt, solange mindestens ein Pointer drauf ist */
@@ -66,34 +67,27 @@ export function pickVolley(s: VolleyState): Screen {
     const team = TEAM_INFO[mine.team];
     const other = TEAM_INFO[mine.team === 'A' ? 'B' : 'A'];
     const look = me()?.look;
+    // Quer wie am Gamepad: links ◀ ▶, rechts SCHMETTERN über SPRUNG
     const root = el(`
-      <div class="vb">
-        <div class="vb-head team-${mine.team}">
-          <span class="vb-av"></span>
-          <div class="vb-info">
-            <div class="vb-team">${team.name}</div>
-            <div class="vb-score"></div>
-          </div>
+      <div class="lx vb vb-lx">
+        <div class="lx-head"><span class="vb-av"></span><span class="lx-tag team-${mine.team}">${team.name}</span><span class="vb-score grow"></span></div>
+        <div class="lx-left vb-move">
+          <button class="big-btn vb-btn vb-left">◀</button>
+          <button class="big-btn vb-btn vb-right">▶</button>
         </div>
-        <p class="vb-status"></p>
-        <div class="vb-pad">
-          <div class="vb-move">
-            <button class="big-btn vb-btn vb-left">◀</button>
-            <button class="big-btn vb-btn vb-right">▶</button>
-          </div>
-          <div class="vb-act">
-            <button class="big-btn vb-btn vb-spike">SCHMETTERN<i class="vb-cd"></i></button>
-            <button class="big-btn vb-btn vb-jump">SPRUNG</button>
-          </div>
+        <div class="lx-mid"><p class="vb-status"></p></div>
+        <div class="lx-right vb-act">
+          <button class="big-btn vb-btn vb-spike">SCHMETTERN<i class="vb-cd"></i></button>
+          <button class="big-btn vb-btn vb-jump">SPRUNG</button>
         </div>
       </div>
     `);
-    if (look) q(root, '.vb-av').append(avatarCanvas(2, look));
+    if (look) q(root, '.vb-av').append(avatarCanvas(1, look));
     let lastDir = 0;
     const emit = (force = false) => {
       const dir = (right.held ? 1 : 0) - (left.held ? 1 : 0);
       if (!force && dir === lastDir) return;
-      if (dir !== lastDir && dir !== 0) navigator.vibrate?.(8);
+      if (dir !== lastDir && dir !== 0) haptic(8);
       lastDir = dir;
       send('move', { dir });
     };
@@ -101,12 +95,12 @@ export function pickVolley(s: VolleyState): Screen {
     const right = holdButton(q(root, '.vb-right'), () => emit());
     pressButton(q(root, '.vb-jump'), () => {
       send('jump');
-      navigator.vibrate?.(10);
+      haptic(10);
     });
     const spikeBtn = q<HTMLButtonElement>(root, '.vb-spike');
     pressButton(spikeBtn, () => {
       send('spike');
-      navigator.vibrate?.(20);
+      haptic(20);
     });
     // Falls ein Paket verloren geht: Richtung regelmäßig wiederholen
     const keepAlive = setInterval(() => {
@@ -116,6 +110,7 @@ export function pickVolley(s: VolleyState): Screen {
     const release = () => {
       if (!root.isConnected) {
         window.removeEventListener('blur', release);
+        window.removeEventListener('input-reset', release);
         document.removeEventListener('visibilitychange', release);
         return;
       }
@@ -124,6 +119,8 @@ export function pickVolley(s: VolleyState): Screen {
       emit();
     };
     window.addEventListener('blur', release);
+    // Handy gedreht / Ausrichtungs-Overlay: gehaltene Knöpfe loslassen
+    window.addEventListener('input-reset', release);
     document.addEventListener('visibilitychange', release);
     app.append(root);
 
@@ -144,18 +141,18 @@ export function pickVolley(s: VolleyState): Screen {
       else status = p.air ? 'In der Luft: SCHMETTERN!' : 'Unter den Ball laufen und springen!';
       if (st.golden && st.sub !== 'intro') status = `GOLDEN POINT! ${status}`;
       q(root, '.vb-status').textContent = status;
-      root.querySelector('.vb-pad')!.classList.toggle('bench', !p.court);
+      root.querySelector('.vb-lx')!.classList.toggle('bench', !p.court);
       const frac = p.cd > 0 ? p.cd / VOLLEY.SPIKE_CD_MS : 0;
       (q(root, '.vb-cd') as HTMLElement).style.transform = `scaleY(${frac})`;
       spikeBtn.classList.toggle('ready', p.court && p.air && p.cd <= 0);
       if (p.touches > touches) {
         touches = p.touches;
-        navigator.vibrate?.(p.spikes ? 25 : 15);
+        haptic(p.spikes ? 25 : 15);
       }
       const total = st.score.A + st.score.B;
       if (total > points) {
         points = total;
-        if (st.lastPoint?.team === p.team) navigator.vibrate?.([30, 40, 30]);
+        if (st.lastPoint?.team === p.team) haptic([30, 40, 30]);
       }
     };
   }];

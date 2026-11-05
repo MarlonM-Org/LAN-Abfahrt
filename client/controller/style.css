@@ -323,52 +323,46 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .fl-seg button.active { background: #3f8fe0; color: #fff4d6; text-shadow: 1px 1px 0 #1d4f8a; box-shadow: inset 0 3px 0 #7fbcf0, inset 0 -3px 0 #2d64a8, 0 1px 0 var(--outline); transform: translateY(2px); }
 .fl-status { font-size: 9px; }
 .fl-fuel.low { color: #c0392b; animation: shake 0.3s infinite; }
-/* ---------------------------------------------------------------- Kurven-Duell */
-.kv-color { text-align: center; padding: 10px 6px; color: var(--outline); border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5); }
-.kv-status { color: var(--ink); min-height: 2.6em; text-align: center; }
-.kv-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
-.kv-btns.out { opacity: 0.35; }
-.big-btn.kv-btn { min-height: 58vh; font-size: 18px; line-height: 2; -webkit-touch-callout: none; }
+/* ---------------------------------------------------------------- Kurven-Duell (quer: zwei volle Bildhälften) */
+.lx.kv-lx { --lx-l: 40%; --lx-r: 40%; }
+.kv-color { color: var(--outline); text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.5); }
+.kv-lx .lx-left, .kv-lx .lx-right { display: grid; }
+.kv-status { color: var(--ink); text-align: center; }
+.kv-lx.out .kv-btn { opacity: 0.35; }
+.big-btn.kv-btn { font-size: 16px; line-height: 2; -webkit-touch-callout: none; touch-action: none; user-select: none; -webkit-user-select: none; }
 .big-btn.kv-left { background: #3f8fe0; box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
 .big-btn.kv-right { background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
 .big-btn.kv-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
-/* ---------------------------------------------------------------- Bomben-Arena */
-.arena-head { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border: 4px solid; background: var(--paper-light); color: var(--ink); }
-.arena-head canvas { display: block; }
-.arena-round { font-size: 10px; margin-bottom: 6px; }
-.arena-stats { font-size: 8px; color: var(--ink-soft); line-height: 1.5; }
-.arena-hint { text-align: center; min-height: 1.4em; }
-.arena-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; flex: 1; }
-.arena-controls .stick-area { min-height: 0; }
-.arena-controls .stick-pad { width: 150px; height: 150px; }
-.big-btn.arena-bomb {
-  min-height: 34vh; font-size: 18px; background: #8a5a2b;
-  box-shadow: inset 0 4px 0 #b47a42, inset 0 -6px 0 #5a3418, 0 3px 0 var(--outline);
-}
+/* ---------------------------------------------------------------- Bomben-Arena + Sumo-Steg + Aufräumen (quer: Stick links, ein Knopf rechts) */
+.lx.ar-lx, .lx.td-lx { --lx-l: 44%; --lx-r: 34%; }
+.ar-lx { border-color: var(--ar-color, var(--wood-dark)); }
+.ar-lx .arena-av canvas { display: block; height: 22px; width: auto; }
+.arena-round { font-size: 9px; }
+.arena-stats { font-size: 7px; color: var(--ink-soft); }
+.lx-mid .arena-hint { min-height: 1.4em; }
+.lx .big-btn.arena-bomb { font-size: 16px; background: #8a5a2b; box-shadow: inset 0 4px 0 #b47a42, inset 0 -6px 0 #5a3418, 0 3px 0 var(--outline); }
 .big-btn.arena-bomb:disabled { opacity: 0.5; }
+.td-lx .big-btn.dash { font-size: 15px; }
 
 /* ---------------------------------------------------------------- Sumo-Steg */
 .big-btn.su-dash {
-  position: relative; overflow: hidden; min-height: 34vh; font-size: 15px; background: #3f8fe0;
+  position: relative; overflow: hidden; font-size: 15px; background: #3f8fe0;
   box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline);
 }
 .big-btn.su-dash:disabled { filter: saturate(0.4) brightness(0.9); }
 .su-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
 
-/* ---------------------------------------------------------------- Strand-Volleyball */
-.vb { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
-.vb-head { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); color: var(--ink); }
-.vb-head canvas { display: block; }
-.vb-team { font-size: 11px; margin-bottom: 6px; }
-.vb-score { font-size: 9px; }
-.vb-status { color: var(--ink); text-align: center; min-height: 2.6em; margin: 0; font-size: 9px; line-height: 1.5; }
-.vb-pad { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
-.vb-pad.bench { opacity: 0.4; }
-.vb-move { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.vb-act { display: grid; grid-template-rows: 2fr 3fr; gap: 8px; }
-.big-btn.vb-btn { min-height: 0; height: auto; -webkit-touch-callout: none; position: relative; overflow: hidden; }
-.big-btn.vb-left, .big-btn.vb-right { min-height: 52vh; font-size: 26px; background: #e8a14a; box-shadow: inset 0 4px 0 #f6c27a, inset 0 -6px 0 #b0702a, 0 3px 0 var(--outline); }
-.big-btn.vb-jump { font-size: 15px; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+/* ---------------------------------------------------------------- Strand-Volleyball (quer) */
+.lx.vb-lx { --lx-l: 40%; --lx-r: 36%; }
+.vb-av canvas { display: block; height: 22px; width: auto; }
+.vb-score { font-size: 8px; }
+.vb-status { color: var(--ink); text-align: center; margin: 0; }
+.vb-lx.bench .vb-btn { opacity: 0.4; }
+.vb-move { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; touch-action: none; }
+.vb-act { grid-template-rows: minmax(0, 2fr) minmax(0, 3fr); touch-action: none; }
+.big-btn.vb-btn { -webkit-touch-callout: none; position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.big-btn.vb-left, .big-btn.vb-right { font-size: 26px; background: #e8a14a; box-shadow: inset 0 4px 0 #f6c27a, inset 0 -6px 0 #b0702a, 0 3px 0 var(--outline); }
+.big-btn.vb-jump { font-size: 14px; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
 .big-btn.vb-spike { font-size: 10px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
 .big-btn.vb-spike.ready { filter: brightness(1.15); }
 .big-btn.vb-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
@@ -878,10 +872,10 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .sm-btn .cd { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: rgba(45, 27, 18, 0.55); pointer-events: none; }
 .sm-btn.b.cooling { color: #d8c8e8; }
 
-@media (orientation: landscape) and (max-height: 520px) {
-  body { padding: 4px; }
-  #app:has(.smash) { padding: 6px 10px; gap: 4px; min-height: calc(100dvh - 8px); }
-  #app:has(.smash) .abort { position: fixed; top: 6px; right: 8px; padding: 4px 8px; font-size: 8px; z-index: 5; }
+/* Smash/Bogen/Zauber sind Quer-Spiele: das Querlayout ist der Standard, hochkant nur Notbehelf (Tablet/Laptop) */
+@media (orientation: landscape) {
+  body:has(.smash) { padding: 4px max(4px, env(safe-area-inset-right, 0px)) 4px max(4px, env(safe-area-inset-left, 0px)); }
+  #app:has(.smash) { padding: 6px 20px; gap: 4px; min-height: calc(100dvh - 8px); }
   .smash { gap: 4px; }
   .sm-top { gap: 8px; }
   .sm-av canvas { height: 22px; }
@@ -917,7 +911,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .bg-btns .bg-shoot.empty { filter: saturate(0.3) brightness(0.9); }
 .bg-btns .bg-jump { grid-column: 1; grid-row: 2; transform: none; }
 .bg-btns .bg-jump.pressed { transform: translateY(2px) scale(0.97); }
-@media (orientation: landscape) and (max-height: 520px) {
+@media (orientation: landscape) {
   .bg-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
   .bg-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
   .bg-btns .bg-shoot { max-height: 170px; }
@@ -937,8 +931,8 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .zauber.in-lava .sm-info b { color: #c8410f; }
 .zauber .sm-zone { background: repeating-linear-gradient(45deg, rgba(155, 95, 192, 0.1) 0 8px, transparent 8px 16px), #e9dcf0; border-color: #7a5a9a; }
 .zauber.in-lava .sm-zone { background: repeating-linear-gradient(45deg, rgba(240, 120, 40, 0.25) 0 8px, transparent 8px 16px), #f7d2b0; border-color: #c8410f; }
-.zauber .sm-ring { border-color: #7a5a9a; background: radial-gradient(circle, rgba(250, 244, 255, 0.92) 0 55%, rgba(199, 155, 255, 0.85) 56%); }
-.zauber .sm-knob { background: var(--zb-color, #9b5fc0); border-color: var(--outline); box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.4); }
+.zauber .st-ring { border-color: #7a5a9a; background: radial-gradient(circle, rgba(250, 244, 255, 0.92) 0 55%, rgba(199, 155, 255, 0.85) 56%); }
+.zauber .st-knob { background: var(--zb-color, #9b5fc0); border-color: var(--outline); box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.4); }
 .zb-aim { position: absolute; top: 24px; left: 50%; transform: translate(-50%, -50%); font-size: 22px; line-height: 1; color: var(--zb-color, #9b5fc0); text-shadow: 2px 2px 0 var(--outline); pointer-events: none; }
 .zb-btns { display: grid; grid-template-columns: 1fr 1.25fr; align-items: end; gap: 10px; padding-bottom: 6px; }
 .zb-btns .sm-btn { color: #fff4d6; text-shadow: 2px 2px 0 var(--outline); }
@@ -949,7 +943,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .zb-btns .sm-btn.cooling { color: rgba(255, 244, 214, 0.6); }
 @media (orientation: portrait) {
 }
-@media (orientation: landscape) and (max-height: 520px) {
+@media (orientation: landscape) {
   .zb-btns { grid-template-columns: 1fr 1.2fr; align-items: center; justify-items: center; padding-bottom: 0; }
   .zb-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
   .zb-btns .zb-cast { max-height: 175px; }
@@ -1548,8 +1542,8 @@ table.lb tr.off td { opacity: 0.55; }
 }
 .lx-mid p { font-size: 8px; line-height: 1.6; color: var(--ink); }
 .lx-right { grid-area: right; min-width: 0; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 8px; }
-.lx .big-btn { min-height: 0; flex: none; font-size: 13px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; -webkit-touch-callout: none; }
-.lx .big-btn small { font-size: 7px; line-height: 1.4; }
+:where(.lx) .big-btn { min-height: 0; flex: none; font-size: 13px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; -webkit-touch-callout: none; }
+:where(.lx) .big-btn small { font-size: 7px; line-height: 1.4; }
 .lx .meter { height: 12px; border-width: 2px; }
 
 /* Schwebender Stick (stick.ts) */
