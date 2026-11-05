@@ -129,6 +129,8 @@ Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst 
 - Der **Gastgeber** (wer den Raum als Erster betreten hat) bekommt den VIP zurück, sobald er wieder da ist.
 - Kann nur noch ein Bot weiterdrücken, schaltet der Server nach ein paar Sekunden selbst weiter (Ergebnis nach 12 s, Date-Night-Karten nach 10 s, Stille-Post-Vorführung nach 5 s) – es bleibt nichts hängen.
 - In der Lobby bleiben Menschen 5 Minuten (ausgegraut, „offline seit …“) im Raum, bevor sie automatisch entfernt werden (siehe „Offline-Spieler“ oben). Wer früher weg soll: entfernen (VIP-Handy oder **P** am Laptop).
+- **Mitten im Spiel gibt es 3 Sekunden Gnadenfrist:** Ist das Handy innerhalb von 3 s wieder da (WLAN-Wackler, kurz die App gewechselt), merkt das Spiel gar nichts. Danach wird die Figur in den Action-Spielen **eingefroren und unverwundbar** (auf dem TV halbtransparent): Bomben-Arena und Sumo-Steg lassen sie erst nach **15 s ohne Verbindung** ausscheiden, im Fallen-Parcours bleibt der Läufer stehen (nach 15 s zählt er nicht mehr mit), im Kart-Rennen fährt das Kart als Geist ohne Zusammenstöße, in der Smash-Arena kann niemand den Kämpfer treffen. Wer zurückkommt, spielt einfach weiter.
+- Bleibt ein gehaltener Stick (oder Lenkung/Richtung) **0,7 s ohne Nachschub** – z. B. Bildschirm gesperrt, während der Daumen draufliegt –, lässt der Server ihn los. Niemand läuft mehr minutenlang gegen die Wand.
 
 Zum Testen lassen sich die Zeiten verkürzen: `VIP_GRACE_MS=15000 AUTO_CONTINUE_MS=5000 npm run dev`.
 
@@ -163,7 +165,9 @@ client/   tv.html + host/        (Phaser-Szenen pro Phase/Minispiel, music.ts + 
 scripts/  bots.ts                (Testspieler)
 ```
 
-Der Server ist die einzige Quelle der Wahrheit: Handys schicken nur Eingaben (`board:roll`, `mini:input`), der Server berechnet alles und verteilt den Zustand (`state`) an TV und Handys. Geheimes (z. B. die Rolle im Mörderspiel) geht per `private` nur an den jeweiligen Spieler.
+Der Server ist die einzige Quelle der Wahrheit: Handys schicken nur Eingaben (`board:roll`, `mini:input`), der Server berechnet alles und verteilt den Zustand an TV und Handys: `state` (Phase, Minispiel, Brett – sofort nach jeder Änderung, höchstens alle 40 ms) und `meta` (Spielerliste, Leaderboards, Zähler – nur wenn sich etwas ändert); TV, Handy und Bots setzen beides wieder zum `GameState` zusammen. Geheimes (z. B. die Rolle im Mörderspiel) geht per `private` nur an den jeweiligen Spieler, und nur, wenn es sich geändert hat. Handys und TV verbinden sich direkt per WebSocket (Polling nur als Notlösung).
+
+**Für wenig Verzögerung:** Spielemodus am TV einschalten, 5-GHz-WLAN für die Handys, Laptop per Kabel am Router.
 
 ## Testen ohne Freunde
 
