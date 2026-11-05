@@ -46,7 +46,7 @@ import { DescentGame } from './descent';
 import { RhythmGame } from './rhythm';
 import { WrapGame } from './wrap';
 import { StarsGame } from './stars';
-import { Board } from './board';
+import { Board, type PartySave, partyResumeInfo, resumeSave } from './board';
 import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
 import { SumoGame } from './sumo';
@@ -247,7 +247,8 @@ export class Room {
       }
       if (!p) {
         // Im Ergebnis eines Einzelspiels darf man dazukommen – bei „Nochmal“ geht es sonst nie zurück in die Lobby
-        if (this.phase !== 'lobby' && !(this.phase === 'results' && this.singleActive)) {
+        // Party: Nachzügler dürfen jederzeit rein und steigen zur nächsten Brett-Runde ein
+        if (this.phase !== 'lobby' && !(this.phase === 'results' && this.singleActive) && !this.board) {
           return reply({ ok: false, error: 'Gerade läuft ein Spiel – du bist ab der nächsten Runde dabei!' });
         }
         // Gleicher Name, alte ID offline (z. B. Browserdaten gelöscht) → alten grauen Eintrag ersetzen
@@ -300,8 +301,11 @@ export class Room {
         this.startDate(def.id, [ids[0], ids[1]]);
       } else if (req.mode === 'party') {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
+        // Gespeicherten Brettstand (data/party.json) fortsetzen – Spieler werden über ID bzw. Namen wiedererkannt
+        const from = req.resume === true ? resumeSave(ids.map((id) => ({ id, name: this.nameOf(id) }))) : undefined;
+        if (from === null) return socket.emit('toast', 'Keine passende gespeicherte Party gefunden.');
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
-        this.startParty(ids, rounds, req.longGames === true);
+        this.startParty(ids, rounds, req.longGames === true, from ?? undefined);
       } else if (req.mode === 'top' || req.mode === 'favorites') {
         const kind = this.votedKind(req.mode);
         if (!kind) return socket.emit('toast', 'Noch keine (passenden) Stimmen.');
@@ -487,7 +491,7 @@ export class Room {
 
   // ---------------------------------------------------------------- Ablauf
 
-  private startParty(ids: string[], rounds: number, longGames = false) {
+  private startParty(ids: string[], rounds: number, longGames = false, from?: PartySave) {
     this.session.endSeries();
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
@@ -497,7 +501,15 @@ export class Room {
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
       isGone: (id) => !!this.players.get(id)?.removed,
-    }, longGames);
+      // Nachzügler steigen zur nächsten Brett-Runde ein
+      present: () => this.connectedIds(),
+      // Nach den Bonus-Cocktails: Endstand
+      onFinish: () => {
+        this.results = this.finalResults();
+        this.phase = 'results';
+        this.changed();
+      },
+    }, longGames, from);
     this.results = null;
     this.phase = 'board';
     this.changed();
@@ -875,6 +887,9 @@ export class Room {
         coins: r.coins ? r.coins[Math.min(gi, r.coins.length - 1)] : placeCoins(ranks[gi], ranked),
       })),
     );
+    // Party-Finale (Mord/Verräter): Sieger bekommen zusätzlich Cocktails – das Brett bucht sie in afterMini
+    const finaleCocktails = this.board?.finaleCocktails(kind) ?? 0;
+    if (finaleCocktails) for (const row of rows) if (row.place === 1) row.detail = [row.detail, `+${finaleCocktails} Cocktails`].filter(Boolean).join(' · ');
     const hearts = r.hearts !== undefined ? { hearts: r.hearts, maxHearts: HEARTS_PER_CHAPTER } : {};
     if (r.hearts !== undefined || r.sips) for (const row of rows) row.coins = 0;
     if (r.sips && this.drinkRun) {
@@ -951,14 +966,10 @@ export class Room {
       return this.changed();
     }
     if (!res || res.final || !this.board) return this.backToLobby();
-    this.board.afterMini(Object.fromEntries(res.rows.map((row) => [row.playerId, row.coins])));
-    if (this.board.finished) {
-      this.results = this.finalResults();
-      this.phase = 'results';
-    } else {
-      this.results = null;
-      this.phase = 'board';
-    }
+    // Nach dem Finale zeigt das Brett erst die Bonus-Cocktails und meldet sich dann über onFinish (→ Endstand)
+    this.board.afterMini(res.rows);
+    this.results = null;
+    this.phase = 'board';
     this.changed();
   }
 
@@ -1470,6 +1481,7 @@ export class Room {
       nochmal: this.nochmalState(),
       intro: this.introState(),
       showBoard: this.phase === 'lobby' && this.showBoard,
+      partyResume: this.phase === 'lobby' ? partyResumeInfo() : null,
       emotes: this.emotes.state(),
     };
   }
