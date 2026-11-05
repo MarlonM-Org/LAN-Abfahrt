@@ -18,6 +18,7 @@ import {
   platformPos,
 } from '../shared/smash';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { BetBook } from './spectator';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -134,6 +135,8 @@ export class SmashGame implements MiniGame {
   private nextItem = 0;
   private outOrder: string[] = [];
   private winner: string | null = null;
+  /** Zuschauer: Wer raus ist, tippt auf den Sieger des Kampfs (eine „Runde“) */
+  private bets = new BetBook();
   private timers = new Timers();
   private last = Date.now();
 
@@ -214,6 +217,10 @@ export class SmashGame implements MiniGame {
   input(id: string, action: string, payload: unknown) {
     const f = this.fighters.get(id);
     if (!f) return;
+    if (action === 'bet') {
+      if (this.bets.place(id, payload, this.ids, this.aliveIds(), this.sub === 'fight')) this.ctx.onChange();
+      return;
+    }
     const pl = asRecord(payload);
     const num = (v: unknown) => clamp(Number(v) || 0, -1, 1);
     if (action === 'stick') {
@@ -830,7 +837,10 @@ export class SmashGame implements MiniGame {
       if (f.state === 'out') return this.outOrder.indexOf(id);
       return 1e6 + f.stocks * 1000 - Math.min(999, f.pct);
     };
-    const groups = groupByScore(this.ids, score);
+    // Wetten auflösen: Sieger nach dem reinen Kampfstand, danach zählt der Bonus (nie über Platz 1)
+    const plain = groupByScore(this.ids, score);
+    this.bets.resolve(plain[0]?.length === 1 ? plain[0][0] : null);
+    const groups = this.bets.rank(this.ids, score);
     groups.forEach((g, gi) =>
       g.forEach((id) => {
         const f = this.fighters.get(id);
@@ -845,7 +855,7 @@ export class SmashGame implements MiniGame {
       this.ctx.finish({
         groups,
         details: Object.fromEntries(
-          all.map((f) => [f.id, f.state === 'out' ? `raus · ${ko(f.kos)}` : `${f.stocks} Leben, ${Math.round(f.pct)}% · ${ko(f.kos)}`]),
+          all.map((f) => [f.id, (f.state === 'out' ? `raus · ${ko(f.kos)}` : `${f.stocks} Leben, ${Math.round(f.pct)}% · ${ko(f.kos)}`) + this.bets.detail(f.id)]),
         ),
         subtitle: this.winner
           ? `${this.ctx.nameOf(this.winner)} beherrscht die ${this.stage.name}!`
@@ -857,6 +867,10 @@ export class SmashGame implements MiniGame {
   }
 
   // ---------------------------------------------------------------- Zustand
+
+  private aliveIds() {
+    return [...this.fighters.values()].filter((f) => f.state !== 'out').map((f) => f.id);
+  }
 
   private anim(f: Fighter, now: number): SmashAnim {
     if (f.dizzy && now < f.stunUntil) return 'dizzy';
@@ -922,6 +936,7 @@ export class SmashGame implements MiniGame {
         items: this.items.map(({ id, type, x, y }) => ({ id, type, x: r1(x), y: r1(y) })),
         fx: this.fx,
         winner: this.winner,
+        spectator: this.bets.info(this.aliveIds(), 1, this.sub === 'fight', this.sub === 'over' ? this.winner : undefined),
       },
     };
   }
