@@ -1,6 +1,7 @@
-import type { IntroState, MiniKind } from '../../../shared/types';
-import { MINI_HOWTO, MINI_INFO, ORIENT_TEXT, howToPractice, miniInspired } from '../../../shared/games';
-import { type Screen, app, avatarCanvas, el, escapeHtml, me, message, q, socket, store } from '../core';
+import type { IntroState, MiniKind, MiniTeams, Team } from '../../../shared/types';
+import { TEAM_INFO } from '../../../shared/flunky';
+import { MINI_HOWTO, MINI_INFO, ORIENT_TEXT, howToPractice, miniInspired, teamHandicapText } from '../../../shared/games';
+import { type Screen, app, avatarCanvas, colorOfId, el, escapeHtml, me, message, nameOf, q, socket, store } from '../core';
 import { onInputReset, stickZone } from '../stick';
 import { haptic } from '../haptic';
 import { toLocalPerf } from '../../timesync';
@@ -16,13 +17,27 @@ export function pickIntro(it: IntroState, vip: boolean): Screen {
   if (!store.playerId || !it.ids.includes(store.playerId)) {
     return ['intro-watch', message('Gleich geht’s los', 'Diese Runde schaust du zu – beim nächsten Spiel bist du dabei!')];
   }
-  return [`intro-${it.kind}`, () => buildIntro(it.kind, vip), orient];
+  return [`intro-${it.kind}${it.teams ? `-${it.teams.label}` : ''}`, () => buildIntro(it.kind, vip, it.teams ?? null), orient];
+}
+
+/** Team-Spiel vom Brett: „2 gegen 2 · Du: Team Meer mit Ben – gegen Anna, Clara“ (Namen in Spielerfarbe) */
+function teamsHtml(teams: MiniTeams, kind: MiniKind): string {
+  const id = store.playerId;
+  const mine: Team | null = id && teams.A.includes(id) ? 'A' : id && teams.B.includes(id) ? 'B' : null;
+  const name = (pid: string) => `<b style="color:${colorOfId(pid).hex}">${escapeHtml(nameOf(pid))}</b>`;
+  const list = (ids: string[]) => (ids.length ? ids.map(name).join(', ') : '–');
+  const tag = (t: Team) => `<span class="it-team team-${t}">${escapeHtml(TEAM_INFO[t].name)}</span>`;
+  const hc = teamHandicapText(teams, kind);
+  const body = mine
+    ? `Du: ${tag(mine)}${teams[mine].filter((p) => p !== id).length ? ` mit ${list(teams[mine].filter((p) => p !== id))}` : ' (allein!)'} – gegen ${list(teams[mine === 'A' ? 'B' : 'A'])}`
+    : `${tag('A')} ${list(teams.A)} – gegen ${tag('B')} ${list(teams.B)}`;
+  return `<p class="it-teams">⚔️ <b>${escapeHtml(teams.label)}</b> nach Feldfarbe · ${body}${hc ? `<br>Handicap: ${escapeHtml(hc)}` : ''}</p>`;
 }
 
 /** Knöpfe, die die Figur bewegen, solange man sie hält */
 const MOVE: Record<string, number> = { '◀': -1, LINKS: -1, '▶': 1, RECHTS: 1 };
 
-function buildIntro(kind: MiniKind, vipAtBuild: boolean) {
+function buildIntro(kind: MiniKind, vipAtBuild: boolean, teams: MiniTeams | null) {
   injectCss();
   const info = MINI_INFO[kind];
   const how = MINI_HOWTO[kind];
@@ -43,6 +58,7 @@ function buildIntro(kind: MiniKind, vipAtBuild: boolean) {
       </div>
       <div class="it-info">
         <p class="it-goal">${escapeHtml(how.goal)}</p>
+        ${teams ? teamsHtml(teams, kind) : ''}
         <ul class="it-ctrls">${how.controls.map((c) => `<li><span>${c.icon}</span>${escapeHtml(c.text)}</li>`).join('')}</ul>
         <p class="it-orient">${ORIENT_TEXT[info.orientation]}</p>
       </div>
@@ -247,6 +263,8 @@ const CSS = `
 .it-timer { flex: none; font-size: 12px; color: var(--red); }
 .it-info { grid-area: info; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .it-goal { font-size: 9px; line-height: 1.6; color: var(--ink); text-align: left; }
+.it-teams { font-size: 8px; line-height: 1.7; color: var(--ink); text-align: left; }
+.it-team { padding: 1px 4px; border: 2px solid var(--wood-darker); color: var(--ink); white-space: nowrap; }
 .it-ctrls { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .it-ctrls li { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 8px; line-height: 1.5; color: var(--ink); background: var(--paper-light); border: 2px solid var(--paper-dark); }
 .it-ctrls li span { font-size: 16px; line-height: 1; flex: none; width: 22px; text-align: center; }
@@ -317,6 +335,7 @@ const CSS = `
   .it-title b { font-size: 9px; }
   .it-info { overflow: hidden; gap: 4px; justify-content: center; }
   .it-goal { font-size: 8px; line-height: 1.5; }
+  .it-teams { font-size: 7px; line-height: 1.5; }
   .it-ctrls { gap: 3px; }
   .it-ctrls li { padding: 2px 5px; font-size: 7px; line-height: 1.4; }
   .it-ctrls li span { font-size: 13px; }

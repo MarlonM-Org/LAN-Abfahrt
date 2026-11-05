@@ -1,4 +1,4 @@
-import type { FieldType, KurvePower, MiniKind, Point, TttItemKind, TttRole, TttShopItem } from './types';
+import type { FieldType, KurvePower, MiniKind, MiniTeams, Point, Team, TttItemKind, TttRole, TttShopItem } from './types';
 
 export interface MiniInfo {
   title: string;
@@ -314,6 +314,39 @@ export const FIELD_TYPES: FieldType[] = Array.from({ length: BOARD_SIZE }, (_, i
 });
 
 export const FIELD_COINS = { blue: 3, red: -3 };
+
+/**
+ * Team-Minispiele vom Brett (Mario-Party-Prinzip): Steht nach der Würfelrunde mindestens je ein Spieler auf Rot und
+ * auf Blau, spielen die Farben gegeneinander – mit dieser Wahrscheinlichkeit (sonst wie immer Jeder gegen jeden).
+ */
+export const BOARD_TEAM_CHANCE = 0.65;
+/** Minispiele, die feste Teams übernehmen können (gleich große Teams, z. B. 2 gegen 2) */
+export const TEAM_KINDS: MiniKind[] = ['flunky', 'volley', 'autoball', 'wasser', 'grill'];
+/** … und davon die, die auch mit ungleichen Teams funktionieren (1 gegen 3; Flunky/Grill nicht) */
+export const UNEVEN_TEAM_KINDS: MiniKind[] = ['volley', 'autoball', 'wasser'];
+
+/** „2 gegen 2“, „1 gegen 3“ – das kleinere Team zuerst */
+export const teamLabel = (a: number, b: number) => `${Math.min(a, b)} gegen ${Math.max(a, b)}`;
+
+/**
+ * Handicap bei ungleichen Teams: das kleinere startet mit so vielen Punkten (Toren) Vorsprung, wie ihm Spieler
+ * fehlen. Dazu bekommt es bei Sieg doppelte Münzen (`Room.finishMini()`); Auto-Fußball lädt dem kleineren Team
+ * außerdem wie bisher den Boost schneller.
+ */
+export function teamHandicap(a: number, b: number): Record<Team, number> {
+  const d = a - b;
+  return { A: d < 0 ? -d : 0, B: d > 0 ? d : 0 };
+}
+
+/** Text für Regelkarte und Handy: „Team Meer startet mit 2 Punkten Vorsprung“ (leer bei gleich großen Teams) */
+export function teamHandicapText(teams: MiniTeams, kind: MiniKind): string {
+  const hc = teamHandicap(teams.A.length, teams.B.length);
+  const t: Team | null = hc.A ? 'A' : hc.B ? 'B' : null;
+  if (!t) return '';
+  const n = hc[t];
+  const unit = kind === 'autoball' ? (n === 1 ? 'Tor' : 'Toren') : n === 1 ? 'Punkt' : 'Punkten';
+  return `${t === 'A' ? 'Team Sonne' : 'Team Meer'} startet mit ${n} ${unit} Vorsprung`;
+}
 
 /**
  * Punkte-Staffel nach Spielerzahl: Platz 1 bekommt 10, der Letzte 1 (Trost), dazwischen linear
