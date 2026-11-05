@@ -80,7 +80,7 @@ ul.done a{color:#b9a8ff;text-decoration:none;font-size:13px}.d{color:var(--mut);
 @media (max-width:640px){body{padding:14px}.notes{display:none}}
 </style></head><body><div class="wrap">
 <h1>LAN-ABFAHRT · STATUS</h1>
-<div class="meta">Stand: ${esc(data.updated)} · <a href="${REPO}" style="color:#b9a8ff">Repo</a></div>
+<div class="meta">Stand: ${esc(data.updated)} · <a href="${REPO}" style="color:#b9a8ff">Repo</a>${data.analysis ? ` · <a href="${esc(data.analysis.url)}" style="color:#b9a8ff">${esc(data.analysis.title)}</a>` : ''}</div>
 <div class="stats">
 <div class="stat"><b>${total}</b><span>Spiele in main</span></div>
 <div class="stat"><b>${data.inProgress.length}</b><span>gerade in Arbeit</span></div>
