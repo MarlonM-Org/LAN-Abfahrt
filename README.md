@@ -230,6 +230,15 @@ Alle laufen auch im Party-Modus auf dem Spielbrett (lange wie Bowling nur mit �
 
 Jedes Spiel legt fest, wie das Handy gehalten wird (`orientation` in `shared/games.ts`): **quer** für alles mit Stick + Knöpfen (zwei Daumen wie am Gamepad – Kart, Wasserbomben, Igel-Krieg, Grill-Chaos, Smash …), **hochkant** für Sensor-Würfe, Listen, Text und Malen (Bowling, Darts, Golf, Stille Post …), **egal** für einen einzelnen Riesenknopf. Vor jedem Spiel zeigt das Handy eine kurze Ansage-Karte, der TV blendet „📱↔ Handys QUER halten“ bzw. hochkant ein, das Brett-Intro nennt es auch, und in den Spiellisten steht ↔ hinter Quer-Spielen. Hält jemand das Handy falsch, legt sich ein Hinweis mit Dreh-Animation über das Spiel (Eingaben werden dabei losgelassen); dreht es sich nicht, ist meist die Ausrichtungssperre im Kontrollzentrum an (iPhone). Auf Android geht das Handy beim ersten Tipp in einem Spiel ins Vollbild und wird in die richtige Lage gesperrt – das bleibt für die ganze Session. Laptops und Tablets bekommen nie einen Hinweis. Alle Quer-Spiele nutzen dasselbe Layout (Kopfzeile, links ein schwebender Stick – Daumen irgendwo aufsetzen –, rechts die Knöpfe), ausgelegt auf 300 px Höhe. Zum Testen am Laptop: `/?orient` erzwingt Hinweis und Ansage auch mit Maus.
 
+### Zuschauer
+
+Wer ausgeschieden ist oder erst nach dem Spielstart dazukommt, starrt nicht mehr auf „Du schaust zu“: Jeder Zuschauer-/Warte-Screen am Handy hat unten eine **Zuschauer-Leiste** (`client/controller/spectator.ts`) mit dem **Live-Stand** (wer lebt noch – Avatare, grau = raus; bei Teamspielen der Spielstand, sonst die Punkte-Spitze) und vier **Emotes** 😂 😱 👏 🍅. Ein Emote steigt auf dem TV mit dem Mini-Porträt des Spielers vom unteren Rand auf und verblasst (eigenes DOM-Overlay über allen Szenen, 2 s Abklingzeit pro Spieler).
+
+- **Wetten** (Bomben-Arena, Sumo-Steg, Bogen-Arena, Kurven-Duell, Smash-Arena): Wer raus ist, tippt in der Leiste einmal pro Runde auf einen der Lebenden. Richtig getippt = **+1 Punkt** im Spiel (fließt in die Platzierung ein, hebt aber nie über Platz 1; im Ergebnis steht „🎲 +1“). Der TV zeigt unten rechts „🎲 3 Wetten auf Lena“, bei einem Treffer gibt’s Konfetti.
+- **Geister-Aktionen:** In der **Bomben-Arena** werfen Ausgeschiedene alle 8 s eine Wasserbombe auf eine Randkachel (bzw. die Kante der Flut) – Stick verschiebt das Zielkreuz auf der Mini-Karte, Knopf wirft. Im **Sumo-Steg** schicken sie alle 5 s per Knopf eine **Welle** vom Rand quer über den Steg, die jedem, den sie erwischt, einen kleinen Stoß gibt (wer davon ins Wasser fällt, zählt als „geschubst“ für den Geist).
+
+Bots machen beim Testen mit (gelegentliche Emotes, Wetten, Geister-Aktionen): `npm run bots -- 8 --game=sumo`.
+
 ## Trinkspiel
 
 Partyklassiker reihum, ohne Punkte – gezählt werden nur Schlücke (Wasser zählt auch!):
