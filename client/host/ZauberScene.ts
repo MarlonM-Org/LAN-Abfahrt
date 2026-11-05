@@ -6,6 +6,7 @@ import { SHIRTS } from '../../shared/avatar';
 import { paintZauberLava, zauberBolt, zauberGlow, zauberPuffIcon, zauberStone, zauberWizard } from '../art/zauber';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, background, ensureTex, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -188,9 +189,11 @@ export class ZauberScene extends Phaser.Scene {
       if (!a) {
         const pl = playerById(id);
         if (!pl) continue;
-        const color = SHIRTS[pl.look.shirt] ?? '#9b5fc0';
+        // Robe = Shirt (frei wählbar), Ring/Zielpunkt/Blitz = Spielerfarbe des Abends (wie der Handy-Rahmen)
+        const robe = SHIRTS[pl.look.shirt] ?? '#9b5fc0';
+        const color = pcol(id).hex;
         const headKey = ensurePortrait(this, pl.look);
-        const tex = ensureTex(this, `zb_wiz_${headKey}`, () => zauberWizard(color, this.textures.get(headKey).getSourceImage() as HTMLCanvasElement));
+        const tex = ensureTex(this, `zb_wiz_${headKey}`, () => zauberWizard(robe, this.textures.get(headKey).getSourceImage() as HTMLCanvasElement));
         const root = this.add.container(p.x, p.y);
         root.add(this.add.ellipse(0, 0, 14, 5, 0x000000, 0.3));
         const img = this.add.image(0, 1, tex).setOrigin(0.5, 1);

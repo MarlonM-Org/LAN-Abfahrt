@@ -172,6 +172,8 @@ button:disabled { opacity: 0.45; filter: grayscale(0.4); }
 .yellow { color: #b9770e; }
 .pink { color: var(--pink); }
 .label-left { text-align: left; margin-bottom: 4px; color: var(--ink); }
+.online-invite .invite-text { font-size: 9px; line-height: 1.6; text-align: left; margin: 0; }
+.online-invite .invite-url { font-size: 9px; word-break: break-all; user-select: all; -webkit-user-select: all; color: var(--ink); margin: 0; }
 .row-center { display: flex; justify-content: center; }
 .menu { display: flex; flex-direction: column; gap: 10px; }
 .btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -1603,7 +1605,7 @@ table.lb tr.off td { opacity: 0.55; }
   gap: 4px 10px;
   padding: max(3px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px));
   background: var(--paper); background-image: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px); background-size: 9px 9px;
-  border: 3px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--wood);
+  border: 3px solid var(--me-color, var(--wood-dark)); box-shadow: inset 0 0 0 2px var(--wood);
   touch-action: none; user-select: none; -webkit-user-select: none; font-size: 9px; line-height: 1.5;
 }
 .lx-head { grid-area: head; display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; white-space: nowrap; color: var(--ink); font-size: 8px; }
