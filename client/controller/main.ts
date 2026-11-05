@@ -29,6 +29,7 @@ import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
 import { pickGeist } from './screens/geist';
+import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
@@ -253,6 +254,8 @@ function pickScreen(): Screen {
           return pickFangen(m.state);
         case 'geist':
           return pickGeist(m.state);
+        case 'grill':
+          return pickGrill(m.state);
         case 'boule':
           return pickBoule(m.state);
         case 'sumo':

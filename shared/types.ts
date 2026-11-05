@@ -1,6 +1,7 @@
 import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
+import type { GrillState } from './grill';
 
 export interface Look {
   skin: number;
@@ -45,6 +46,7 @@ export type MiniKind =
   | 'stillepost'
   | 'sup' | 'tidy' | 'fangen'
   | 'geist'
+  | 'grill'
   | 'boule'
   | 'sumo'
   | 'tourist'
@@ -1509,6 +1511,7 @@ export type MiniSnapshot =
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
   | { kind: 'geist'; state: GeistState }
+  | { kind: 'grill'; state: GrillState }
   | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
   | { kind: 'tourist'; state: TourState }
