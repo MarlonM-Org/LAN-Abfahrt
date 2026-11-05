@@ -135,9 +135,9 @@ export class ResultsScene extends Phaser.Scene {
     const ser = s.session.series;
     const leader = s.session.rows[0];
     if (ser && ser.round > 1) {
-      const best = Object.entries(ser.totals).sort((a, b) => b[1] - a[1])[0];
-      const name = best ? (s.session.rows.find((r) => r.id === best[0])?.name ?? '?') : '?';
-      return `${MINI_INFO[ser.kind].title}: ${ser.round} Spiele in Folge – ${name} führt die Serie (${best?.[1] ?? 0} Pkt)`;
+      // Reihenfolge der Tabelle als Gleichstands-Regel
+      const best = [...s.session.rows].sort((a, b) => (ser.totals[b.id] ?? 0) - (ser.totals[a.id] ?? 0))[0];
+      return `${MINI_INFO[ser.kind].title}: ${ser.round} Spiele in Folge – ${best?.name ?? '?'} führt die Serie (${best ? (ser.totals[best.id] ?? 0) : 0} Pkt)`;
     }
     return leader && leader.points > 0 ? `${leader.name} führt mit ${leader.points} Punkten` : 'Punkte aus allen Einzelspielen des Abends';
   }

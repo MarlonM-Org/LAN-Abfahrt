@@ -29,7 +29,8 @@ export function seriesTitle(s: SessionState): string | null {
 export function drawSessionBoard(scene: Phaser.Scene, layer: Phaser.GameObjects.Container, s: SessionState, box: BoardBox, opts: { title?: string; animate?: boolean } = {}) {
   const { x, y, w } = box;
   const rows = s.rows.slice(0, 12);
-  const withSeries = !!s.series && s.series.round > 1;
+  // Serien-Spalte nur, wenn heute auch andere Spiele gezählt haben (sonst = Gesamtpunkte)
+  const withSeries = !!s.series && s.series.round > 1 && s.games > s.series.round;
   const avail = box.maxBottom - y - 34;
   const rowH = Math.max(11, Math.min(18, Math.floor(avail / Math.max(1, rows.length))));
   const h = 34 + Math.max(1, rows.length) * rowH;
@@ -54,9 +55,18 @@ export function drawSessionBoard(scene: Phaser.Scene, layer: Phaser.GameObjects.
     // Bewegung seit dem letzten Spiel
     if (r.prevRank !== null) {
       const d = r.prevRank - r.rank;
-      const mark = d > 0 ? `▲${d}` : d < 0 ? `▼${-d}` : '–';
-      objs.push(ink(scene, x + 34, ry, mark, { origin: [0, 0], color: d > 0 ? GREEN_INK : d < 0 ? RED_INK : SOFT }));
-    } else if (r.games) {
+      if (d === 0) objs.push(ink(scene, x + 34, ry, '–', { origin: [0, 0], color: SOFT }));
+      else {
+        // Dreieck selbst zeichnen (▲▼ fehlen in der Pixel-Schrift)
+        const g = scene.add.graphics();
+        g.fillStyle(d > 0 ? 0x2f7d32 : 0xa8342a);
+        const tx = x + 37, ty = ry + 4;
+        if (d > 0) g.fillTriangle(tx - 3, ty + 3, tx + 3, ty + 3, tx, ty - 2);
+        else g.fillTriangle(tx - 3, ty - 2, tx + 3, ty - 2, tx, ty + 3);
+        objs.push(g);
+        objs.push(ink(scene, x + 42, ry, String(Math.abs(d)), { origin: [0, 0], color: d > 0 ? GREEN_INK : RED_INK }));
+      }
+    } else if (r.games && s.games > 1) {
       objs.push(ink(scene, x + 34, ry, 'neu', { origin: [0, 0], color: SOFT }));
     }
     const portrait = scene.add.image(x + 70, ry + Math.min(rowH, 14) - 1, ensurePortrait(scene, r.look)).setOrigin(0.5, 1);

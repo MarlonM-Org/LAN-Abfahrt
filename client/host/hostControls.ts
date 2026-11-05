@@ -186,7 +186,8 @@ export function installHostControls(socket: Socket) {
     btn('continue').disabled = !waits;
     btn('removeBots').disabled = phase !== 'lobby' || !s?.botCount;
     const single = phase === 'results' && !!s?.nochmal;
-    btn('pick').disabled = phase !== 'lobby' && !single;
+    btn('pick').disabled = phase !== 'lobby';
+    btn('pick').hidden = single;
     btn('again').hidden = !single;
     btn('menu').hidden = !single;
     btn('again').disabled = !!s?.nochmal?.disabled;
