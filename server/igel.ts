@@ -860,6 +860,7 @@ export class IgelGame implements MiniGame {
     h.hp -= real;
     this.addFx({ type: 'dmg', x: h.x, y: h.y - 12, text: `-${dmg}` });
     if (attacker && !this.sameSide(attacker, h.owner)) this.damage[attacker] = (this.damage[attacker] ?? 0) + real;
+    if (attacker) this.ctx.log?.(attacker === h.owner ? 'selfhit' : this.sameSide(attacker, h.owner) ? 'teamhit' : 'igelhit', { p: attacker, o: h.owner });
     // Wer sich selbst verletzt (Fallschaden, Mine), dessen Zug ist vorbei (nur Rundlauf)
     if (!this.simul && h.id === this.activeHog && this.sub === 'aim') this.toSettle();
   }

@@ -5,11 +5,15 @@ Party-Spiel für unsere Freundesgruppe – im Stil von Mario Party / Jackbox:
 
 Aktueller Stand (v0.3):
 
-**Vier Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Arcade**, **Trinkspiel** und **Date Night**.
+**Fünf Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Arcade**, **Turnier**, **Trinkspiel** und **Date Night**.
 
 **Arcade:** Alle Spiele einzeln auswählbar – oder „Zufälliges Spiel“. Nach jeder Runde: „Nächstes Spiel (zufällig)“, „Nochmal“ oder „Spiel auswählen“. Jede Runde bringt Punkte nach Platzierung, gestreckt nach Spielerzahl (Erster 10, Letzter 1, dazwischen linear `round(10 · (n − Platz) / (n − 1))`; bei 2 Spielern 10/5; bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
 
 **Alle dürfen wählen (Arcade):** Der VIP schaltet am Handy „Alle dürfen wählen“ an – dann sehen alle Handys die Arcade-Übersicht (Kacheln mit Icon, Titel und kleinem „à la …“-Untertitel) und tippen ihr Wunschspiel an (nochmal tippen = Stimme zurückziehen). Der VIP sieht auf jeder Kachel die Stimmen (Zahl + Mini-Avatare) und startet mit einem Tipp das meistgewählte Spiel („Starten: …“, bei Gleichstand Zufall), einen „Zufall aus Favoriten“ (mehr Stimmen = höhere Chance) oder einfach jedes beliebige Spiel. Der TV zeigt unten den aktuellen Top-Wunsch. Nach jedem Spiel beginnt die Abstimmung von vorn.
+
+**Turnier:** Eine Playlist aus 3–6 Spielen läuft nacheinander wie Einzelspiele (Regelkarte, Ergebnis, Punkte fürs Leaderboard des Abends und die ewige Tabelle), dazu ein eigener **Zwischenstand** der Playlist (TV im Wechsel mit dem Spielergebnis, Handy als Tabelle) und am Ende die **Siegerehrung mit Podest**. Vorgefertigt (`TURNIER_PLAYLISTS` in `shared/games.ts`): **Sportabend** (Darts, Minigolf, Bowling, Boule), **Arena-Cup** (Bomben-Arena, Sumo, Bogen-Arena, Smash) und **Kopf & Bauch** (Schätzkönig, Wer würde eher, Mäxchen, Funkfrequenz) – oder **Eigene**: der VIP tippt 3–6 Spiele in Reihenfolge an. Am Laptop startet die Arcade-Auswahl (`A`) die Playlists ebenfalls. Nachzügler steigen beim nächsten Spiel ein (Punkte ab dann); passt ein Spiel nicht mehr zur Spielerzahl, wird es übersprungen. Testen: `npm run bots -- 6 --turnier` (Arena-Cup), `--turnier=sport` bzw. `--turnier=sumo,sprint,maexchen`.
+
+**Titel des Abends:** Der Server führt ein Ereignisprotokoll des Abends (`FxLog` in `server/fx.ts` – die Minispiele melden markante Momente über `ctx.log()`: K.O.s und Selbst-Rauswürfe in der Smash-Arena, Treffer in der Bomben-Arena, Tore und Eigentore im Auto-Fußball, Treffer und Selbsttreffer im Igel-Krieg, Rauswürfe auf dem Sumo-Steg, Rennsiege im Kart, Versteckzeiten im Versteckspiel; der Raum zählt Siege, Siegesserien, letzte Plätze, Münzen gewonnen/verloren auf dem Brett und gewonnene Zuschauer-Wetten dazu). Daraus entstehen bis zu fünf **Titel** („Meiste K.O.s“, „Eigentor-König“, „Igel-Kamikaze“, „Unsichtbar“, „Pechvogel“, „Längste Siegesserie“, „Lieblingsspiel der Gruppe“, „Wett-König“, „Torjäger“, „Rausschmeißer“ …) – nur, wo es Daten gibt, höchstens zwei pro Person. Der TV zeigt sie am Ende der Party und des Turniers (im Wechsel mit dem Podest) sowie im Arcade-Ergebnis als dritte Seite nach dem Leaderboard, Kachel für Kachel mit Konfetti und Sprecher; das Handy zeigt die eigenen Titel. „Leaderboard des Abends zurücksetzen“ leert auch das Protokoll.
 
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 12 Spieler, Pixel-Avatar-Editor auf dem Handy
@@ -19,13 +23,14 @@ Aktueller Stand (v0.3):
 - **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
   - **Alle würfeln gleichzeitig:** Jede Runde öffnet ein 10-Sekunden-Würfelfenster, in dem jeder am Handy würfelt (wer nicht würfelt, für den würfelt der Server am Ende; der VIP kann „Für alle würfeln“). Danach laufen die Züge nacheinander im Schnelldurchlauf, Ereignisse in Reihenfolge – bei 12 Spielern rund 25 s statt über einer Minute
   - Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus; in den **letzten zwei Runden** zählen blaue und rote Felder doppelt („Endspurt!“)
-  - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los
+  - **Entscheidungen am Handy** (Timeout → der Server entscheidet): An der **Cocktailbar** fragt das Handy „Cocktail für 10 kaufen?“ (8 s, ohne Antwort = Ja) – der Preis steigt pro Spieler mit jedem gekauften Cocktail **10 / 15 / 20**; die Bar wandert nach jedem Kauf (bevorzugt auf den langen Weg). Im **Strandladen** (🛍️-Feld oben, beim Vorbeilaufen) gibt es Items – höchstens eins im Rucksack: 🎲 **Doppelwürfel** (5 – nächster Wurf mit zwei Würfeln), 🦜 **Cocktail-Klau** (12 – klaut dem Führenden einen Cocktail, hat niemand einen: +10 Münzen), 🚕 **Taxi zur Bar** (8 – fährt statt zu würfeln direkt zur Bar, mit Kauf-Frage), 🧴 **Sonnencreme-Schild** (4 – neutralisiert das nächste rote Feld oder Pech-Ereignis, wirkt von allein). Doppelwürfel, Klau und Taxi setzt man im Würfelfenster vor dem Würfeln ein; der TV zeigt Items neben Figur und Tafel. An der **Gabelung** unten rechts wählt man in 6 s **Abkürzung** durch den Garten (3 Felder kürzer, ein rotes Feld, nie eine Bar) oder den **langen Weg** über die untere Reihe (Bar, `?`-Feld, Duell, zwei rote Felder); ohne Antwort geht es zur Bar, wenn sie dort steht und bezahlbar ist, sonst per Zufall (`BOARD_FIELDS` in `shared/games.ts` ist der Wege-Graph, `server/board.ts` läuft die Züge in Etappen)
+  - **Duell „Teilen oder Klauen“** (⚔️-Felder): Wer dort landet, duelliert mit einem Mitspieler (meist dem Führenden) um einen Pott von **10 Münzen aus der Bank**. Beide wählen 10 s lang geheim am Handy (ohne Wahl: Teilen), der TV deckt die Karten nacheinander auf: beide teilen = je 5, einer klaut = er bekommt 10, beide klauen = nichts und je −3 Strafe. Die eigene Wahl kommt nur per `private` zurück, nie im `GameState`
   - Nach jeder Runde ein Minispiel (standardmäßig nur kurze und mittlere bis ca. 4 min, siehe `MINI_LENGTH` in `shared/games.ts`; der VIP-Schalter **„Lange Spiele“** neben der Rundenwahl nimmt auch Golf, Bowling & Co. dazu), Münzen nach Platzierung mit derselben Staffel wie in Arcade (bei 12 Spielern 10/9/8/7/6/5/5/4/3/2/1/1, der Startspieler wechselt jede Runde); Koop-Spiele zahlen allen dasselbe nach Ergebnis (Urlaubsflieger: Bali erreicht 8, je fehlender Etappe weniger, Absturz am Start 1, MVP +2; Grill-Chaos gemeinsam: 1/2/3 Sterne = 3/6/10 Münzen) – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern): Das Sieger-Team bekommt zusätzlich **2 Cocktails**
-  - **Bonus-Cocktails** nach dem Finale, mit eigenem Reveal vor dem Endstand (je +1 Cocktail, Gleichstand = alle): **Minispiel-Star** (meiste Münzen aus Minispielen), **Pechvogel** (am öftesten auf Rot), **Wanderer** (die meisten Felder gelaufen)
+  - **Bonus-Cocktails** nach dem Finale, mit eigenem Reveal vor dem Endstand (je +1 Cocktail): **Minispiel-Star** (meiste Münzen aus Minispielen), **Pechvogel** (am öftesten auf Rot), **Wanderer** (die meisten Felder gelaufen). Bei Gleichstand bekommt den Cocktail, wer in der Wertung (Cocktails, dann Münzen) am weitesten hinten liegt – Aufholhilfe; steht auch das gleich, entscheidet die Startreihenfolge. Der TV nennt den Gleichstand auf der Karte
   - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
   - **Tageszeit:** Der TV taucht das Brett über den Abend in Morgenlicht, Mittag und Sonnenuntergang (letzte Runde); zum Finale wird es Nacht mit Mond, Sternen und Lichterkette am Ferienhaus
   - **Nachzügler** dürfen während der Party beitreten und steigen zur nächsten Brett-Runde am Start mit dem Median der Münzen ein
-  - **Brettstand gespeichert:** Zu Beginn jeder Runde schreibt der Server `data/party.json` (Spieler, Positionen, Münzen, Cocktails, Runde, Statistik). Nach einem Server-Neustart (oder Abbruch) bietet die Lobby dem VIP **„Party fortsetzen?“** an – Spieler werden über ID bzw. Namen wiedererkannt. Testen: `npm run bots -- 8 --party --rounds=5`, Server neu starten, dann `npm run bots -- 8 --resume`
+  - **Brettstand gespeichert:** Zu Beginn jeder Runde schreibt der Server `data/party.json` (Spieler, Positionen, Münzen, Cocktails, Items, Runde, Statistik; ältere Stände ohne Items laden weiterhin). Nach einem Server-Neustart (oder Abbruch) bietet die Lobby dem VIP **„Party fortsetzen?“** an – Spieler werden über ID bzw. Namen wiedererkannt. Testen: `npm run bots -- 8 --party --rounds=5`, Server neu starten, dann `npm run bots -- 8 --resume`
 - **Minispiele** (auch einzeln spielbar):
   - 📋 **Regelkarte** vor jedem Minispiel (Spielbrett, Arcade, Einzelspiel – nicht bei Date-Night-Kapiteln, Trinkspielen und „Nochmal“): Der TV zeigt Icon, Titel, „à la …“, einen Satz Ziel, bis zu drei Steuer-Kacheln, wie das Handy gehalten wird, und alle Mitspieler mit Häkchen. Am Handy stehen dieselben Punkte plus ein **Übungsfeld** mit den echten Bedienelementen des Spiels (schwebender Stick, Knöpfe mit Vibration) und einer Mini-Figur, die darauf reagiert – schon in der richtigen Haltung (Quer-Spiele quer, mit Dreh-Hinweis). Los geht’s, sobald alle **BEREIT!** gedrückt haben, spätestens nach 15 s; lief das Spiel heute schon, nur 5 s ohne Bereit-Pflicht. VIP („▶ Jetzt starten“) und Laptop (Weiter/Enter) kürzen ab, Bots sind sofort bereit. Texte: `MINI_HOWTO` in `shared/games.ts` – das Übungsfeld liest die Knöpfe direkt daraus („BOMBE: legen“ = Knopf BOMBE, 🕹️ = Stick)
   - 🍺 **Flunkyball** – Wischen zum Werfen (Wind beachten), Tippen zum Trinken bzw. Laufen
@@ -38,7 +43,7 @@ Aktueller Stand (v0.3):
   - 🏎️ **Kart-Rennen** (2–12 Karts, Verfolger-Kamera im SNES-Mode-7-Look) – drei Runden auf Strandpromenade, Hafen oder Pool-Runde. Bis 4 Spieler: Splitscreen auf dem TV – jeder kann aber am Handy oben in der Mitte (📺 TV / 📱 Handy) auf die eigene Ansicht am Handy umschalten, auch mitten im Rennen; der TV teilt dann für die übrigen neu auf (1 Ansicht = ganzer Schirm), und fährt keiner mehr auf dem TV, zeigt er die Übersicht. Die Wahl merkt sich das Handy für die nächsten Rennen. Ab 5 Spielern rendert jedes Handy seine eigene Ansicht (quer halten) und der TV zeigt die Übersicht. Am Handy: links schwebender Stick (oder – über HTTPS – Kipp-Lenkung), rechts GAS halten, BREMSE (im Stand rückwärts), DRIFT direkt über GAS (Daumen hochrutschen, halten + lenken, Funken blau → orange, loslassen = Mini-Turbo), ITEM oben rechts. Items aus den ?-Boxen: Kokosnuss, Bananenschale, Turbo-Eis und für die Letzten die Möwe, die dem Führenden sein Item klaut
   - 🦔 **Igel-Krieg** (2–12 Spieler, à la Worms) – Igel auf einer zerstörbaren Urlaubsinsel (Pixel-Terrain, Seed + Operationsliste: Krater und Surfbretter), Handy quer: links Waffenraster + ◀ SPRUNG ▶, Mitte Minikarte, rechts Ziel-Pad (ziehen = Richtung + Kraft, Windpfeil oben) und FEUER. Der TV zeigt die Ziellinie samt den ersten 20 % der Flugbahn gestrichelt, Kamera folgt Igel und Geschoss, Schaden zählt am Zugende hörbar herunter. **Modi:** bis 4 Spieler jeder für sich mit 2 Igeln; ab 5 Spielern **Teams** Sonne/Meer/Sand/Palme (5–6 → 2, 7–9 → 3, 10–12 → 4 Teams), jeder steuert seinen eigenen Igel, Team-HP-Balken im HUD – wer raus ist, bleibt dabei, solange sein Team lebt (im Rundlauf steuert er dann reihum einen Igel seines Teams). Bis 6 Spieler **Rundlauf** (Teams ziehen A1, B1, A2, B2 …, 45 s Zugzeit bis 4 Spieler, 20 s bei 5–6), ab 7 Spielern **„Alle gleichzeitig“**: alle zielen 15 s parallel (TV zeigt alle Ziellinien in Spielerfarbe, ✓ = bereit), dann fliegen alle Geschosse zugleich, 3 s Rückzug für alle, abrechnen – eine Runde ≈ 25 s für alle. **12 Waffen:** Kokosnuss-Bazooka (Wind), Wasserbombe (hüpft, Zünder 1–5 s am Handy), Ananas-Splitterbombe (zerfällt in 5), Heilige Ananas (einmal pro Spiel, Riesenkrater, Fanfare), Wasser-Schrotflinte (2 Sofortschüsse), Möwen-Luftschlag (Ziel auf der Minikarte antippen, 3 Bomben von oben), Böller (ablegen, 5 s, weglaufen), Seeigel-Mine (nach 2 s scharf, geht bei Nähe hoch), Paddel-Schlag (schlägt weit, wenig Schaden), Igel-Schlag, Muschel-Teleport, Surfbrett-Brücke (Brett ins Gelände). **Insel:** 3–5 Gaskartuschen vom Grill (explodieren bei Treffer, Kettenreaktion) und 3–6 scharfe Seeigel-Minen; mit 30 % pro Zug/Runde schwebt eine **Kiste** am Sonnenschirm herab (zufällige Waffe oder +25 HP – drüberlaufen sammelt ein). Wind driftet von Zug zu Zug, nach 6 min (ab 7 Spielern 3 min) steigt die Flut pro voller Runde, Obergrenze 10 min. Zuschauer und Wartende rufen per Knopf Sprüche („Rache!“, „Feigling!“ …) als Sprechblase über ihren Igel (8 s Abklingzeit). Ergebnis: Team-Platzierung, im Team nach Schaden. Testen: `npm run bots -- 8 --game=igel` (`IGEL_SIMUL=1` erzwingt den Simultan-Modus, `IGEL_SUDDEN_MS=20000` die frühe Flut, `IGEL_BOT_CHAOS=1` lässt die Bots alle Waffen ausprobieren)
   - 🖍️ **Stille Post mit Bildern** (ab 3 Spielern) – Satz schreiben, reihum malen und beschreiben, dann führt der TV jede Kette vor und alle verteilen Likes. Eine Kette hat höchstens 6 Schritte. **Eigene Startsätze** lassen sich in der Lobby (Party-Modus) hinzufügen (`data/stillepost.json`)
-  - 💬 **Sprüche-Duell** (ab 3 Spielern, à la Quiplash) – Fragen mit Lücke („Der neue Cocktail an der Strandbar heißt ___“) am Handy beantworten; jede Frage bekommen genau zwei Spieler, jeder beantwortet zwei. Danach zeigt der TV Duell für Duell beide Antworten anonym, alle anderen stimmen ab – Autoren, Prozente und Punkte (Stimmen × Runden-Multiplikator) werden aufgedeckt, alle Stimmen für eine Antwort = **ABRÄUMER!**-Bonus. Kein Einfall? Knopf „Sicherheits-Spruch“. Zwei Runden plus Finale (alle dieselbe Frage, je 3 Stimmen), ab 9 Spielern nur eine Runde plus Finale. **Eigene Fragen** lassen sich in der Lobby hinzufügen (`data/sprueche.json`)
+  - 🗯️ **Sprüche-Duell** (ab 3 Spielern, à la Quiplash) – Fragen mit Lücke („Der neue Cocktail an der Strandbar heißt ___“) am Handy beantworten; jede Frage bekommen genau zwei Spieler, jeder beantwortet zwei. Danach zeigt der TV Duell für Duell beide Antworten anonym, alle anderen stimmen ab – Autoren, Prozente und Punkte (Stimmen × Runden-Multiplikator) werden aufgedeckt, alle Stimmen für eine Antwort = **ABRÄUMER!**-Bonus. Kein Einfall? Knopf „Sicherheits-Spruch“. Zwei Runden plus Finale (alle dieselbe Frage, je 3 Stimmen), ab 9 Spielern nur eine Runde plus Finale. **Eigene Fragen** lassen sich in der Lobby hinzufügen (`data/sprueche.json`)
   - 🖼️ **Pixel-Galerie** (ab 3 Spielern) – alle bekommen dasselbe Thema („Ein Flamingo im Liegestuhl“, „Oma beim Kart fahren“ …) und malen in 75 Sekunden ein 16 × 16-Pixelbild am Handy: 12 Farben, Stift (tippen oder wischen), Farbeimer, Radierer, Zurück. Der TV zeigt solange nur die Staffeleien mit Füllstand. Dann die **Vernissage**: alle Bilder anonym im Goldrahmen, jeder stimmt am Handy für sein Lieblingsbild (nicht das eigene), danach werden Künstler und Stimmen aufgedeckt. 3 Runden (≈ 5 Minuten), gewertet nach erhaltenen Stimmen
   - 🕵️ **Urlaubs-Fangen** (ab 3 Spielern, inspiriert von „Mario Chase“) – einer ist der Animateur und auf dem TV **unsichtbar**, nur sein Handy zeigt die ganze Karte. Alle anderen jagen ihn per Joystick durch die Ferienanlage, achten auf kurz aufblitzende Fußspuren und den „warm/kalt“-Ring unter jedem Fänger – und rufen sich zu. Fänger haben einen Sprint, der Animateur eine Ablenkung (falsche Spur). Jeder Runde ein neuer Animateur (max. 4 Runden; bekommt nicht jeder die Rolle, werden Animateur-Punkte nur unter Animateuren verglichen und Fänger-Punkte auf gleich viele Runden hochgerechnet – gilt genauso für die Geisterjagd)
   - 👻 **Geisterjagd** (ab 3 Spielern, à la „Luigi's Ghost Mansion“) – Stromausfall im Ferienhaus (Küche, Wohnzimmer, Bad, Schlafzimmer, Flur, Keller): Ein Spieler ist der Geist und auf dem TV **unsichtbar**, ab 7 Spielern spuken zwei. Die Jäger laufen per Joystick, ihre Taschenlampe zeigt in Laufrichtung; **LICHT AN** kostet Akku (leer nach ca. 9 s, lädt im Dunkeln wieder auf). Im Lichtkegel wird der Geist kurz sichtbar, langsamer und verliert Leben – mehrere Lampen stapeln sich abgeschwächt. Der Geist erschreckt Jäger durch Berührung von außerhalb des Lichts (sie liegen am Boden, bis ein Mitspieler 2 s neben ihnen steht); alle 15–25 s verrät ihn ein Blitz. Brummt das Handy bzw. steigt die Gänsehaut, ist er nah. Runde (90 s) gewonnen: Geist gebannt → +3 für jeden Jäger, alle Jäger am Boden oder Zeit um → +5 für den Geist; dazu +1 pro Schreck bzw. Wiederbelebung und +1 pro 15 Lichtschaden. Bis zu 3 Runden mit wechselndem Geist (Wertung wie beim Fangen fair hochgerechnet). Testen: `npm run bots -- 6 --game=geist`.
@@ -52,6 +57,84 @@ Aktueller Stand (v0.3):
   - 🧮 **Schätzkönig** (3–12 Spieler, à la Wits & Wagers) – Quiz ohne Expertenwissen: Der TV stellt eine Schätzfrage („Wie hoch ist die Zugspitze?“, „Wie viele Minuten hat ein Tag?“ – rund 80 Fragen zu Deutschland, Urlaub, Essen, Tieren, Alltag und Rekorden in `shared/schaetz.ts`), alle tippen 25 s lang eine Zahl ins Zahlenfeld am Handy. Dann fliegen die Antworten als Pergament-Karten mit Avatar sortiert auf einen Zahlenstrahl (gleiche Zahlen teilen sich eine Karte, ab 7 Karten im Zickzack), und jeder setzt in 20 s **2 Chips** auf die Karte, die am nächsten dran ist, **ohne drüber** zu liegen – auch auf die eigene. Außen liegende Karten zahlen mehr (Mitte ×2, nach außen ×3/×4, ganz links „Alle zu hoch“ ×5). Trommelwirbel, der Sprecher sagt die richtige Zahl an, Konfetti über der Gewinnerkarte: Jeder Chip darauf zahlt die Quote, der Autor bekommt +3. Arcade: 4 Fragen, davon eine **Gruppenfrage** über einen Mitspieler („Wie viele Minuten hat Marlon heute im Bad verbracht?“, „Wie viel Prozent Akku hat Bens Handy?“) – die richtige Zahl tippt am Ende der VIP ein (ohne Eingabe zählt nach 45 s der Median). Auf dem Spielbrett (wie alle Spiele mit Party-Variante auch als Einzelspiel aus dem Party-Menü) nur eine Frage, ≈ 90 s. Testen: `npm run bots -- 6 --game=schaetz` (Bots schätzen mit zufälligem Fehler, setzen Chips zufällig und lösen als VIP Gruppenfragen auf)
   - 🎲 **Mäxchen am Pool** (2–12 Spieler, à la Mäxchen/Meiern, hochkant) – Würfel-Bluff am Pooltisch: Reihum schüttelt man das Handy (ohne Sensor/HTTPS: Becher antippen), der Server würfelt zwei Würfel, und **nur das eigene Handy** zeigt sie unter dem Becher (gedrückt halten = heimlich anheben). Dann sagt man einen Wert aus der Rangfolge an (31 < 32 < … < 65 < Päsche 11 … 66 < **Mäxchen** 21) – ehrlich oder geblufft, aber höher als die letzte Ansage. Der Nächste glaubt (schüttelt selbst und muss überbieten) oder drückt **AUFDECKEN!**: Der TV hebt den Becher mit Trommelwirbel in Zeitlupe, der Sprecher sagt an („Lena sagt: Mäxchen!“). Wer gelogen hat bzw. zu Unrecht zweifelt, verliert ein Leben (3 Leben), bei angesagtem Mäxchen zwei; ein Mäxchen zu glauben kostet eins, ohne aufzudecken. 15 s pro Entscheidung, sonst wird automatisch geglaubt bzw. ehrlich (oder knapp gelogen) angesagt. Schluss nach 6 Runden um den Tisch oder wenn nur noch einer Leben hat; Ausgeschiedene wetten auf den Sieger. Auch im Trinkspiel (dort Schlücke statt Leben, 2 Runden). Testen: `npm run bots -- 6 --game=maexchen`
   - 🕵️‍♀️ **Wer war’s?** (3–12 Spieler, à la „Who's Who“ / Mr. & Mrs.) – erst beantwortet jeder am Handy 60 Sekunden lang zwei persönliche Fragen, die nur er sieht („Mein peinlichster Urlaubsmoment“, „Was ich heimlich im Koffer habe“, „Mein erstes Konzert“ … – 48 Fragen im Pool, ab 7 Spielern nur eine Frage pro Kopf). Kein Einfall? Knopf „🎲 Zufallsantwort“. Dann schreibt der TV die Antworten gemischt und anonym Buchstabe für Buchstabe auf eine Pergament-Tafel (der Sprecher liest mit), alle tippen in 20 s am Handy auf den Avatar des vermuteten Autors – der Autor tippt zum Schein mit, damit ihn keiner daran erkennt, dass er nicht abstimmt. Auflösung mit Spotlight und Konfetti: richtig geraten +2, der Autor +3, wenn ihn niemand erkannt hat, +1, wenn höchstens ein Drittel richtig lag. **Eigene Fragen** lassen sich in der Lobby hinzufügen (Reiter „Wer war’s?“, `data/werwars.json`). Testen: `npm run bots -- 6 --game=werwars`
+
+## Alle Spiele auf einen Blick
+
+<!-- games:start -->
+_Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) – 54 Spiele. Handy: ↔ = quer halten (Stick + Knöpfe), ↕ = hochkant (Sensor, Listen, Text). Dauer bei 8–12 Spielern: kurz ≤ 2 min, mittel ≤ 4 min, lang > 4 min (`MINI_LENGTH`). Brett: ✓ = kommt im Party-Modus nach einer Brett-Runde dran (lange nur mit „Lange Spiele“), Finale = Finalspiel, – = nur einzeln/Arcade._
+
+| Spiel | Vorbild | Spieler | Handy | Dauer | Brett |
+|---|---|---|---|---|---|
+| **Action** | | | | | |
+| 🍺 Flunkyball |  | ab 2 | ↕ hochkant | mittel | ✓ |
+| 🏖️ Liegestuhl-Sprint |  | ab 2 | egal | kurz | ✓ |
+| 🏄 SUP-Rennen |  | ab 1 | ↕ hochkant | kurz | ✓ |
+| 🧺 Aufräumen! |  | ab 1 | ↔ quer | kurz | ✓ |
+| 🌀 Kurven-Duell | à la „Achtung, die Kurve!“ | ab 2 | ↔ quer | mittel | ✓ |
+| 💣 Bomben-Arena | à la Bomberman | ab 2 | ↔ quer | mittel | ✓ |
+| 🏎️ Kart-Rennen | à la Mario Kart | ab 2 | ↔ quer | mittel | ✓ |
+| 🥊 Smash-Arena | à la Super Smash Bros. | 2–8 | ↔ quer | mittel | ✓ |
+| 🏁 Fallen-Parcours | à la Ultimate Chicken Horse | ab 2 | ↔ quer | mittel | ✓ |
+| 💦 Wasserbomben-Schlacht |  | ab 2 | ↔ quer | kurz | ✓ |
+| 🤼 Sumo-Steg |  | ab 2 | ↔ quer | kurz | ✓ |
+| 🏹 Bogen-Arena | à la TowerFall | 2–8 | ↔ quer | mittel | ✓ |
+| ⚽ Auto-Fußball | à la Rocket League | ab 2 | ↔ quer | mittel | ✓ |
+| 🏐 Strand-Volleyball | à la Slime Volleyball | ab 2 | ↔ quer | mittel | ✓ |
+| 🧙 Zauber-Arena | à la Spellsworn | ab 2 | ↔ quer | mittel | ✓ |
+| 🍬 Süßigkeiten-Klau | à la Animal Crossing: Sweet Day | ab 3 | ↔ quer | mittel | ✓ |
+| 🤸 Wackel-Prügelei | à la Gang Beasts | 2–8 | ↔ quer | mittel | ✓ |
+| **Zielen & Werfen** | | | | | |
+| 🎳 Strand-Bowling |  | ab 2 | ↕ hochkant | lang | ✓ |
+| 🥥 Boule am Strand |  | ab 2 | ↕ hochkant | mittel | ✓ |
+| 🎯 Darts an der Strandbar |  | ab 2 | ↕ hochkant | mittel | ✓ |
+| ⛳ Urlaubs-Minigolf |  | ab 2 | ↕ hochkant | lang | ✓ |
+| 🦆 Ententeich | à la Duck Hunt | ab 2 | ↕ hochkant | kurz | ✓ |
+| 🔫 Wasserpistolen-Duell | à la Wild Gunman | ab 2 | ↕ hochkant | kurz | ✓ |
+| 🎣 Angeln |  | ab 2 | ↕ hochkant | mittel | ✓ |
+| 🦔 Igel-Krieg | à la Worms | ab 2 | ↔ quer | lang | – |
+| 🗼 Wackelturm | à la Tricky Towers | ab 2 | ↔ quer | mittel | – |
+| 🚗 Kofferpacken |  | ab 2 | ↔ quer | mittel | ✓ |
+| **Gemeinsam** | | | | | |
+| ✈️ Urlaubsflieger | à la Spaceteam | ab 2 | ↕ hochkant | mittel | ✓ |
+| 🔥 Grill-Chaos | à la Overcooked | ab 2 | ↔ quer | mittel | ✓ |
+| 📦 Umzugschaos | à la Moving Out | ab 2 | ↔ quer | mittel | ✓ |
+| **Geheime Rollen** | | | | | |
+| 🔪 Mord im Ferienhaus | à la Among Us | ab 4 | ↕ hochkant | lang | Finale |
+| 🏊 Verräter im Ferienhaus | à la Trouble in Terrorist Town | ab 4 | ↔ quer | lang | Finale |
+| 🪴 Versteckspiel mit Möbeln | à la Prop Hunt | ab 3 | ↔ quer | mittel | – |
+| 🕵️ Urlaubs-Fangen | à la Mario Chase | ab 3 | ↔ quer | mittel | ✓ |
+| 👻 Geisterjagd |  | ab 3 | ↔ quer | mittel | ✓ |
+| 🕶️ Spion unter Gästen | à la Hidden in Plain Sight | ab 3 | ↕ hochkant | mittel | ✓ |
+| 🧳 Wer ist der Tourist? | à la Spyfall | ab 4 | ↕ hochkant | lang | – |
+| 🐺 Werwölfe im Ferienhaus |  | ab 6 | ↕ hochkant | lang | – |
+| **Partyklassiker** | | | | | |
+| 🗳️ Wer würde eher ...? |  | ab 2 | ↕ hochkant | mittel | – |
+| 🙊 Ich hab noch nie ... |  | ab 2 | ↕ hochkant | mittel | – |
+| 🃏 Höher oder Tiefer |  | ab 2 | ↕ hochkant | kurz | – |
+| ⏰ Tick-Tack-Bumm |  | ab 2 | ↕ hochkant | kurz | – |
+| 👑 Kings Cup |  | ab 2 | ↕ hochkant | mittel | – |
+| 🖍️ Stille Post mit Bildern | à la Gartic Phone | ab 3 | ↕ hochkant | lang | – |
+| 🗯️ Sprüche-Duell | à la Quiplash | ab 3 | ↕ hochkant | lang | – |
+| 🖼️ Pixel-Galerie |  | ab 3 | ↕ hochkant | mittel | – |
+| 🕵️‍♀️ Wer war’s? |  | ab 3 | ↕ hochkant | mittel | – |
+| 🎲 Mäxchen am Pool | à la Mäxchen | ab 2 | ↕ hochkant | lang | – |
+| 🧮 Schätzkönig | à la Wits & Wagers | ab 3 | ↕ hochkant | kurz | ✓ |
+| 📻 Funkfrequenz | à la Wavelength | ab 4 | ↕ hochkant | lang | – |
+| **Trinkspiel** | | | | | |
+| 🗳️ Wer würde eher ...? |  | ab 2 | ↕ hochkant | mittel | – |
+| 🙊 Ich hab noch nie ... |  | ab 2 | ↕ hochkant | mittel | – |
+| 🃏 Höher oder Tiefer |  | ab 2 | ↕ hochkant | kurz | – |
+| ⏰ Tick-Tack-Bumm |  | ab 2 | ↕ hochkant | kurz | – |
+| 👑 Kings Cup |  | ab 2 | ↕ hochkant | mittel | – |
+| 🎲 Mäxchen am Pool | à la Mäxchen | ab 2 | ↕ hochkant | lang | – |
+| **Date Night (zu zweit)** | | | | | |
+| ⛰️ Der Abstieg |  | ab 1 | egal | kurz | – |
+| 💬 Das erste Gespräch |  | 1–2 | ↕ hochkant | kurz | – |
+| 🌯 Wraps mit Sriracha-Mayo |  | ab 1 | ↕ hochkant | kurz | – |
+| ✨ Tanz unter den Sternen |  | 1–2 | egal | kurz | – |
+<!-- games:end -->
+
+Ausführliche Beschreibungen: Minispiele oben, [Controller-Spiele](#controller-spiele-handy--gamepad), [Trinkspiel](#trinkspiel) und [Date Night](#date-night) weiter unten.
 
 ## Starten
 
@@ -262,7 +345,7 @@ Alle laufen auch im Party-Modus auf dem Spielbrett (lange wie Bowling nur mit �
 
 ### Handy-Ausrichtung
 
-Jedes Spiel legt fest, wie das Handy gehalten wird (`orientation` in `shared/games.ts`): **quer** für alles mit Stick + Knöpfen (zwei Daumen wie am Gamepad – Kart, Wasserbomben, Igel-Krieg, Grill-Chaos, Smash …), **hochkant** für Sensor-Würfe, Listen, Text und Malen (Bowling, Darts, Golf, Stille Post …), **egal** für einen einzelnen Riesenknopf. Vor jedem Spiel zeigt das Handy eine kurze Ansage-Karte, die Regelkarte am TV nennt die Haltung; startet ein Spiel ohne Regelkarte (Trinkspiel, Date Night, „Nochmal“), blendet der TV 4 s lang unten „📱↔ Handys QUER halten“ bzw. hochkant ein, und in den Spiellisten steht ↔ hinter Quer-Spielen. Hält jemand das Handy falsch, legt sich ein Hinweis mit Dreh-Animation über das Spiel (Eingaben werden dabei losgelassen); dreht es sich nicht, ist meist die Ausrichtungssperre im Kontrollzentrum an (iPhone). Auf Android geht das Handy beim ersten Tipp in einem Spiel ins Vollbild und wird in die richtige Lage gesperrt – das bleibt für die ganze Session. Laptops und Tablets bekommen nie einen Hinweis. Alle Quer-Spiele nutzen dasselbe Layout (Kopfzeile, links ein schwebender Stick – Daumen irgendwo aufsetzen –, rechts die Knöpfe), ausgelegt auf 300 px Höhe. Zum Testen am Laptop: `/?orient` erzwingt Hinweis und Ansage auch mit Maus.
+Jedes Spiel legt fest, wie das Handy gehalten wird (`orientation` in `shared/games.ts`): **quer** für alles mit Stick + Knöpfen (zwei Daumen wie am Gamepad – Kart, Wasserbomben, Igel-Krieg, Grill-Chaos, Smash …), **hochkant** für Sensor-Würfe, Listen, Text und Malen (Bowling, Darts, Golf, Stille Post …), **egal** für einen einzelnen Riesenknopf. Vor jedem Spiel zeigt das Handy eine kurze Ansage-Karte, die Regelkarte am TV nennt die Haltung; startet ein Spiel ohne Regelkarte (Trinkspiel, Date Night, „Nochmal“), blendet der TV 4 s lang unten „📱↔ Handys QUER halten“ bzw. hochkant ein, und in den Spiellisten steht ↔ hinter Quer-Spielen. Hält jemand das Handy falsch, legt sich ein Hinweis mit Dreh-Animation über das Spiel (Eingaben werden dabei losgelassen); dreht es sich nicht, ist meist die Ausrichtungssperre im Kontrollzentrum an (iPhone) – dann bietet der Hinweis **„Trotzdem spielen“** an: Die Anzeige wird per CSS um 90° gedreht (Pseudo-Quer, Sperre kann anbleiben, Stick und Knöpfe rechnen mit), die Wahl bleibt im Handy gespeichert und lässt sich über die Ansage-Karte („nicht mehr drehen“) wieder abschalten; liegt das Handy wirklich quer, gilt wieder die echte Lage. Auf Android geht das Handy beim ersten Tipp in einem Spiel ins Vollbild und wird in die richtige Lage gesperrt – das bleibt für die ganze Session. Laptops und Tablets bekommen nie einen Hinweis. Alle Quer-Spiele nutzen dasselbe Layout (Kopfzeile, links ein schwebender Stick – Daumen irgendwo aufsetzen –, rechts die Knöpfe), ausgelegt auf 300 px Höhe. Zum Testen am Laptop: `/?orient` erzwingt Hinweis und Ansage auch mit Maus.
 
 ### Zuschauer
 
@@ -298,8 +381,8 @@ Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – k
 - [x] Spielbrett im Mario-Party-Stil
 - [x] Mord im Ferienhaus, Wer würde eher …?, Liegestuhl-Sprint
 - [ ] Echte Pixel-Avatare aus Fotos der Freunde
-- [ ] Weitere Minispiele: Sonnencreme-Kartoffel, Grill-Duell, Badezimmer-Rennen, Koffer packen
-- [ ] Items auf dem Spielbrett (z. B. „Doppelt würfeln“, „Cocktail klauen“)
+- [ ] Weitere Minispiele: Sonnencreme-Kartoffel, Badezimmer-Rennen (Grill-Chaos und Kofferpacken gibt es schon)
+- [x] Items auf dem Spielbrett (Doppelwürfel, Cocktail-Klau, Taxi, Schild), Bar-Preisstaffel, Abkürzung, Duell „Teilen oder Klauen“
 - [x] Sounds & Musik (8-Bit-Loops, Musik-Werkstatt mit Einsingen und MIDI-Import)
 
 Ausführliche Spiele-Ideen (Arena, Bewegungssensor, geheime Rollen, Physik …) nach Aufwand sortiert: **[ROADMAP.md](ROADMAP.md)**

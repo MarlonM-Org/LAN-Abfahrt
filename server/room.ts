@@ -9,12 +9,15 @@ import type {
   JoinResponse,
   KickResponse,
   MiniKind,
+  MiniTeams,
   Phase,
   PlayerPublic,
   NochmalState,
+  PrivateState,
   ResultsState,
   ServerHello,
   StartRequest,
+  TurnierState,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
 import { freePlayerColor } from '../shared/players';
@@ -36,7 +39,7 @@ import { IgelGame } from './igel';
 import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { SessionBoard } from './session';
-import { ARCADE_COOP_POINTS, ARCADE_RANDOM, arcadePoints, fitsPlayers, seriesLabel } from '../shared/games';
+import { ARCADE_COOP_POINTS, ARCADE_RANDOM, COCKTAIL_PRICE, TURNIER_CUSTOM, TURNIER_KINDS, TURNIER_PLAYLISTS, arcadePoints, fitsPlayers, seriesLabel } from '../shared/games';
 import { KART_TRACKS } from '../shared/kart';
 import { WasserGame } from './wasser';
 import { GrillGame } from './grill';
@@ -83,6 +86,7 @@ import { MaexGame } from './maexchen';
 import { WerwarsGame } from './werwars';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 import { EmoteFeed } from './spectator';
+import { FxLog } from './fx';
 
 const MAX_PLAYERS = 12;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -140,6 +144,9 @@ interface Player extends PlayerPublic {
   kartView?: 'phone' | 'tv';
 }
 
+/** Start-Optionen eines Minispiels: Kart-Strecke („Nochmal“ fährt die nächste), feste Teams vom Spielbrett */
+type MiniOpts = { track?: number; teams?: MiniTeams | null };
+
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
 export class Room {
   private players = new Map<string, Player>();
@@ -185,10 +192,22 @@ export class Room {
   private lastKind: MiniKind | null = null;
   /** Wer im laufenden Minispiel mitspielt */
   private miniIds: string[] | null = null;
+  /** Vorgegebene Teams des laufenden Minispiels (Spielbrett: nach Feldfarbe), sonst null */
+  private miniTeams: MiniTeams | null = null;
   /** Gekickte Spieler-IDs (Handy mit alter ID bekommt „Du wurdest entfernt“) */
   private kicks = new KickList();
   /** Zuschauer-Emotes (😂 😱 👏 🍅) – für alle Spiele, unabhängig vom Minispiel */
   private emotes = new EmoteFeed();
+  /** Ereignisprotokoll des Abends → „Titel des Abends“ (server/fx.ts); leert sich mit dem Leaderboard des Abends */
+  private fx = new FxLog();
+  /** Laufende Siegesserie pro Spieler (Minispiele in Folge gewonnen) */
+  private streaks = new Map<string, number>();
+  /** Münzstand des Bretts beim letzten Flush – Unterschiede gehen als coingain/coinloss ins Protokoll */
+  private boardCoins: { coins: Record<string, number>; cocktails: Record<string, number> } | null = null;
+  /** Turnier: Playlist, Fortschritt (Zwischenstand in `turnierBoard`) */
+  private turnier: { playlist: string; name: string; icon: string; kinds: MiniKind[]; index: number; played: number } | null = null;
+  /** Zwischenstand des Turniers – dieselbe Tabelle wie das Leaderboard des Abends, nur für diese Playlist */
+  private turnierBoard = new SessionBoard();
   private offlineBucket = '';
   /** Gastgeber = erster Mensch, der beigetreten ist. Kommt er zurück, ist er wieder VIP. */
   private hostId: string | null = null;
@@ -322,6 +341,9 @@ export class Room {
         if (from === null) return socket.emit('toast', 'Keine passende gespeicherte Party gefunden.');
         const rounds = PARTY_ROUND_OPTIONS.includes(Number(req.rounds)) ? Number(req.rounds) : 5;
         this.startParty(ids, rounds, req.longGames === true, from ?? undefined);
+      } else if (req.mode === 'turnier') {
+        const err = this.startTurnier(req);
+        if (err) socket.emit('toast', err);
       } else if (req.mode === 'top' || req.mode === 'favorites') {
         const kind = this.votedKind(req.mode);
         if (!kind) return socket.emit('toast', 'Noch keine (passenden) Stimmen.');
@@ -410,7 +432,7 @@ export class Room {
     });
 
     socket.on('vip:mode', (mode: string) => {
-      if (isVip() && this.phase === 'lobby' && (mode === 'party' || mode === 'date' || mode === 'drink' || mode === 'arcade')) {
+      if (isVip() && this.phase === 'lobby' && (mode === 'party' || mode === 'date' || mode === 'drink' || mode === 'arcade' || mode === 'turnier')) {
         this.mode = mode;
         this.arcadeVotes?.clear();
         this.changed();
@@ -448,6 +470,16 @@ export class Room {
     socket.on('board:roll', () => {
       if (playerId && this.phase === 'board') this.board?.roll(playerId);
     });
+    // Brett-Entscheidungen: Item vor dem Würfeln, Antwort auf Bar/Laden/Gabelung, geheime Duell-Wahl
+    socket.on('board:item', () => {
+      if (playerId && this.phase === 'board') this.board?.useItem(playerId);
+    });
+    socket.on('board:answer', (msg: { seq: number; choice?: unknown }) => {
+      if (playerId && this.phase === 'board') this.board?.answer(playerId, Number(asRecord(msg).seq), asRecord(msg).choice);
+    });
+    socket.on('board:duel', (msg: { seq: number; pick?: unknown }) => {
+      if (playerId && this.phase === 'board') this.board?.duelPick(playerId, Number(asRecord(msg).seq), asRecord(msg).pick);
+    });
 
     socket.on('mini:input', (msg: { action: string; payload?: unknown }) => {
       if (!playerId || this.phase !== 'mini' || !this.mini) return;
@@ -462,11 +494,15 @@ export class Room {
       if (playerId && this.players.has(playerId) && this.emotes.add(playerId, i)) this.changed();
     });
 
-    socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
+    // Eigene Frage/Aussage aus der Lobby. Socket.IO liefert den Ack-Callback immer als LETZTES Argument –
+    // deshalb (text, kind, ack); ein älteres Handy ohne `kind` schickt (text, ack) und bekommt trotzdem eine Antwort.
+    socket.on('question:add', (text: string, kindOrAck?: unknown, maybeAck?: unknown) => {
       if (!playerId) return;
+      const kind = typeof kindOrAck === 'string' ? kindOrAck : undefined;
+      const ack = typeof maybeAck === 'function' ? maybeAck : typeof kindOrAck === 'function' ? kindOrAck : null;
       const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : kind === 'werwars' ? this.werwarsQ : this.questions;
       const q = store.add(String(text ?? ''));
-      if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
+      if (ack) (ack as (r: { ok: boolean; question?: string }) => void)({ ok: !!q, question: q ?? undefined });
       this.changed();
     });
 
@@ -512,7 +548,7 @@ export class Room {
     this.board?.dispose();
     this.board = new Board(ids, rounds, {
       onChange: () => this.changed(),
-      startMini: (kind) => this.startMini(kind),
+      startMini: (kind, teams) => this.startMini(kind, teams ? { teams } : undefined),
       isConnected: (id) => this.inPlay(id),
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
@@ -575,7 +611,7 @@ export class Room {
 
   /** Ergebnis eines Einzelspiels (kein Spielbrett, keine Date Night, keine Trinkspiel-Runde)? */
   private singleResults() {
-    return this.phase === 'results' && this.singleActive && !this.board && !this.dateRun && !this.drinkRun && !!this.results && !this.results.final;
+    return this.phase === 'results' && this.singleActive && !this.board && !this.dateRun && !this.drinkRun && !this.turnier && !!this.results && !this.results.final;
   }
 
   /** „Nochmal“: dasselbe Spiel mit allen, die gerade da sind (Kart: nächste Strecke). Fehlermeldung oder null. */
@@ -607,6 +643,8 @@ export class Room {
 
   private resetSession() {
     this.session.reset();
+    this.fx.clear();
+    this.streaks.clear();
     if (this.results) delete this.results.points;
     this.changed();
   }
@@ -637,7 +675,7 @@ export class Room {
   // ---------------------------------------------------------------- Regelkarte (Phase `intro`)
 
   /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, Ende (Server-Zeit) */
-  private intro: { kind: MiniKind; opts?: { track?: number }; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
+  private intro: { kind: MiniKind; opts?: MiniOpts; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
   /** Spiele, die heute (seit Serverstart) schon liefen → Regelkarte nur kurz */
   private introSeen = new Set<MiniKind>();
   private static readonly INTRO_MS = 15_000;
@@ -647,7 +685,7 @@ export class Room {
    * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, Übungsfeld, „Bereit!“). Ohne Karte:
    * Date-Night-Kapitel, Trinkspiele und „Nochmal“ desselben Spiels.
    */
-  private startMini(kind: MiniKind, opts?: { track?: number }) {
+  private startMini(kind: MiniKind, opts?: MiniOpts) {
     const again = this.singleResults() && this.lastKind === kind;
     this.endIntro();
     if (this.dateRun || this.drinkRun || again) {
@@ -704,12 +742,13 @@ export class Room {
   private introState() {
     const it = this.intro;
     if (this.phase !== 'intro' || !it) return null;
-    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short };
+    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short, teams: it.opts?.teams ?? null };
   }
 
-  private launchMini(kind: MiniKind, opts?: { track?: number }) {
+  private launchMini(kind: MiniKind, opts?: MiniOpts) {
     this.mini?.dispose();
     this.showBoard = false;
+    this.miniTeams = opts?.teams ?? null;
     // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
     this.arcadeVotes?.clear();
     this.lastKind = kind;
@@ -728,6 +767,8 @@ export class Room {
       lookOf: (id) => this.players.get(id)?.look,
       colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
+      teams: this.miniTeams,
+      log: (type, data) => this.fx.push(type, data, kind),
     };
     switch (kind) {
       case 'flunky':
@@ -915,6 +956,13 @@ export class Room {
         coins: r.coins ? r.coins[Math.min(gi, r.coins.length - 1)] : placeCoins(ranks[gi], ranked),
       })),
     );
+    // Team-Spiel vom Brett mit ungleichen Teams (1 gegen 3): gewinnt das kleinere Team, bekommt es doppelte Münzen
+    const teams = this.miniTeams;
+    this.miniTeams = null;
+    if (teams && this.board && teams.A.length !== teams.B.length && r.groups.length > 1) {
+      const small = teams.A.length < teams.B.length ? teams.A : teams.B;
+      if (r.groups[0].every((id) => small.includes(id))) for (const row of rows) if (row.place === 1) row.coins *= 2;
+    }
     // Party-Finale (Mord/Verräter): Sieger bekommen zusätzlich Cocktails – das Brett bucht sie in afterMini
     const finaleCocktails = this.board?.finaleCocktails(kind) ?? 0;
     if (finaleCocktails) for (const row of rows) if (row.place === 1) row.detail = [row.detail, `+${finaleCocktails} Cocktails`].filter(Boolean).join(' · ');
@@ -926,6 +974,7 @@ export class Room {
     }
     this.results = { title: MINI_INFO[kind].title, subtitle: r.subtitle, rows, final: false, ...hearts };
     if (this.singleActive && !this.board && !this.dateRun && !this.drinkRun) this.scoreSingle(kind, r);
+    this.logMiniEnd(kind, r, snap);
     this.phase = 'results';
     this.changed();
   }
@@ -973,6 +1022,7 @@ export class Room {
 
   private continueAfterResults(end = false) {
     const res = this.results;
+    if (this.turnier) return this.turnierContinue();
     if (this.drinkRun && res) {
       if (res.final) return this.backToLobby();
       if (!end) return this.nextDrinkRound();
@@ -1024,6 +1074,7 @@ export class Room {
     this.board = null;
     this.dateRun = null;
     this.drinkRun = null;
+    this.turnier = null;
     this.singleActive = false;
     this.arcadeActive = false;
     this.results = null;
@@ -1127,6 +1178,10 @@ export class Room {
       this.markSingle();
       this.startRandom();
       return { ok: true, msg: 'Zufallsspiel!' };
+    }
+    if (what.startsWith('turnier:')) {
+      const err = this.startTurnier({ playlist: what.slice(8) });
+      return err ? { ok: false, msg: err } : { ok: true, msg: `Turnier „${this.turnier?.name}“ startet!` };
     }
     const kind = what === 'top' ? this.votedKind('top') : MINI_KINDS.includes(what as MiniKind) ? (what as MiniKind) : null;
     if (!kind) return { ok: false, msg: what === 'top' ? 'Noch keine (passenden) Stimmen.' : 'Unbekanntes Spiel.' };
@@ -1373,6 +1428,141 @@ export class Room {
     if (oldest) this.players.delete(oldest.id);
   }
 
+  // ================================================================ Turnier (Playlist mit Gesamtwertung)
+  // Spiele laufen nacheinander wie Einzelspiele (Regelkarte, Ergebnis, Leaderboard des Abends + ewige Tabelle),
+  // dazu ein eigener Zwischenstand (`turnierBoard`) und am Ende die Siegerehrung mit Podest + Titeln des Abends.
+
+  /** Turnier aus der Lobby starten (VIP-Handy oder Laptop). Liefert eine Fehlermeldung oder null. */
+  private startTurnier(req: { playlist?: unknown; kinds?: unknown }): string | null {
+    if (this.phase !== 'lobby') return 'Gerade läuft schon ein Spiel.';
+    if (!this.connectedIds().length) return 'Noch keine Spieler da.';
+    const id = String(req.playlist ?? '');
+    let name: string;
+    let icon: string;
+    let kinds: MiniKind[];
+    if (id === 'custom') {
+      const raw = Array.isArray(req.kinds) ? req.kinds.map(String) : [];
+      kinds = [...new Set(raw.filter((k): k is MiniKind => TURNIER_KINDS.includes(k as MiniKind)))];
+      if (kinds.length < TURNIER_CUSTOM.MIN || kinds.length > TURNIER_CUSTOM.MAX) return `Eigenes Turnier: ${TURNIER_CUSTOM.MIN}–${TURNIER_CUSTOM.MAX} Spiele wählen.`;
+      name = 'Eigenes Turnier';
+      icon = '🏆';
+    } else {
+      const pl = TURNIER_PLAYLISTS.find((p) => p.id === id);
+      if (!pl) return 'Unbekannte Playlist.';
+      ({ name, icon, kinds } = pl);
+    }
+    for (const k of kinds) {
+      const err = this.fitError(k);
+      if (err) return err;
+    }
+    this.session.endSeries();
+    this.turnierBoard.reset();
+    this.turnier = { playlist: id, name, icon, kinds, index: 0, played: 0 };
+    // Punkte wie bei Einzelspielen (Leaderboard des Abends + ewige Tabelle), aber ohne „Nochmal“ (siehe singleResults)
+    this.singleActive = true;
+    this.arcadeActive = false;
+    this.startMini(kinds[0]);
+    return null;
+  }
+
+  /** „Weiter“ im Turnier-Ergebnis: nächstes Spiel der Playlist (passt es nicht mehr zur Spielerzahl: überspringen) oder Siegerehrung */
+  private turnierContinue() {
+    const t = this.turnier;
+    if (!t || this.results?.final) return this.backToLobby();
+    let i = t.index + 1;
+    while (i < t.kinds.length) {
+      const err = this.fitError(t.kinds[i]);
+      if (!err) break;
+      this.io.to('players').emit('toast', `Übersprungen – ${err}`);
+      i += 1;
+    }
+    if (i < t.kinds.length) {
+      t.index = i;
+      return this.startMini(t.kinds[i]);
+    }
+    this.results = this.turnierFinal();
+    this.phase = 'results';
+    this.changed();
+  }
+
+  /** Siegerehrung: Endstand des Turniers (Podest in ResultsScene) */
+  private turnierFinal(): ResultsState {
+    const t = this.turnier!;
+    const rows = this.turnierBoard.rows(this.present()).filter((r) => r.status !== 'removed');
+    const winners = rows.filter((r) => r.rank === 1).map((r) => r.name);
+    const subtitle = !winners.length
+      ? 'Niemand mehr da – trotzdem danke fürs Mitspielen!'
+      : winners.length === 1
+        ? `${winners[0]} gewinnt das Turnier!`
+        : `${winners.slice(0, -1).join(', ')} und ${winners.at(-1)} teilen sich den Sieg!`;
+    return {
+      title: `${t.icon} ${t.name}`,
+      subtitle: `${subtitle} (${t.played} ${t.played === 1 ? 'Spiel' : 'Spiele'})`,
+      rows: rows.map((r) => ({ playerId: r.id, place: r.rank, detail: `${r.points} Pkt · ${r.wins} ${r.wins === 1 ? 'Sieg' : 'Siege'}`, coins: 0 })),
+      final: true,
+    };
+  }
+
+  private turnierState(): TurnierState | null {
+    const t = this.turnier;
+    if (!t) return null;
+    return { playlist: t.playlist, name: t.name, icon: t.icon, kinds: t.kinds, index: t.index, played: t.played, table: this.turnierBoard.state(this.present()), final: !!this.results?.final };
+  }
+
+  // ================================================================ Protokoll des Abends (FxLog → „Titel des Abends“)
+
+  /**
+   * Nach jedem Minispiel: Siege, Serien, letzte Plätze und gewonnene Wetten protokollieren;
+   * im Turnier die Punkte dieses Spiels (aus `results.points`) in den Zwischenstand buchen.
+   */
+  private logMiniEnd(kind: MiniKind, r: MiniResult, snap: ReturnType<MiniGame['snapshot']> | undefined) {
+    this.fx.push('play', {}, kind);
+    const groups = r.groups.filter((g) => g.length);
+    // Gewinner nur bei Wettbewerben (nicht Koop/Herzen, nicht Trinkspiel-Schlücke)
+    if (groups.length > 1 && r.hearts === undefined && !r.sips) {
+      const winners = new Set(groups[0]);
+      for (const id of groups.flat()) {
+        if (!this.players.has(id)) continue;
+        if (winners.has(id)) {
+          const streak = (this.streaks.get(id) ?? 0) + 1;
+          this.streaks.set(id, streak);
+          this.fx.push('win', { p: id }, kind);
+          this.fx.push('streak', { p: id, n: streak }, kind);
+        } else this.streaks.set(id, 0);
+      }
+      for (const id of groups[groups.length - 1]) if (this.players.has(id)) this.fx.push('last', { p: id }, kind);
+    }
+    // Wetten der Zuschauer: Bonus aus dem Snapshot der Elimination-Spiele (BetBook, server/spectator.ts)
+    const bonus = (snap?.state as { spectator?: { bonus?: Record<string, number> } } | undefined)?.spectator?.bonus;
+    if (bonus) for (const [id, n] of Object.entries(bonus)) if (n > 0 && this.players.has(id)) this.fx.push('bet', { p: id, n }, kind);
+    if (this.turnier && this.results?.points) {
+      const winners = new Set(r.sips ? (groups[groups.length - 1] ?? []) : groups.length > 1 ? groups[0] : []);
+      this.turnierBoard.score(kind, this.results.points, winners, this.present());
+      this.turnier.played += 1;
+    }
+  }
+
+  /** Brett: Münzen gewonnen/verloren (ohne Cocktail-Käufe) aus dem Unterschied zum letzten Flush */
+  private trackBoardCoins() {
+    const b = this.board?.state;
+    if (!b) {
+      this.boardCoins = null;
+      return;
+    }
+    const prev = this.boardCoins;
+    if (prev) {
+      for (const id of b.order) {
+        const bought = Math.max(0, (b.cocktails[id] ?? 0) - (prev.cocktails[id] ?? 0)) * COCKTAIL_PRICE;
+        const d = (b.coins[id] ?? 0) - (prev.coins[id] ?? 0) + bought;
+        if (d < 0) this.fx.push('coinloss', { p: id, n: -d });
+        else if (d > 0) this.fx.push('coingain', { p: id, n: d });
+      }
+    }
+    if (!prev || b.order.some((id) => b.coins[id] !== prev.coins[id] || b.cocktails[id] !== prev.cocktails[id])) {
+      this.boardCoins = { coins: { ...b.coins }, cocktails: { ...b.cocktails } };
+    }
+  }
+
   // ---------------------------------------------------------------- Helfer
 
   private connectedIds() {
@@ -1490,6 +1680,7 @@ export class Room {
       customQuipCount: this.quips.all.length,
       customWerwarsCount: this.werwarsQ.all.length,
       session: this.session.state(this.present()),
+      evening: this.fx.stats([...this.players.keys()]),
     };
   }
 
@@ -1513,6 +1704,7 @@ export class Room {
       showBoard: this.phase === 'lobby' && this.showBoard,
       partyResume: this.phase === 'lobby' ? partyResumeInfo() : null,
       emotes: this.emotes.state(),
+      turnier: this.turnierState(),
     };
   }
 
@@ -1527,6 +1719,7 @@ export class Room {
     this.flushTimer = null;
     const now = Date.now();
     this.lastFlush = now;
+    this.trackBoardCoins();
     // meta nur bei Änderung – „offline seit …“ zählt minutengenau (die Clients rechnen dazwischen selbst weiter)
     const meta = this.meta(now);
     const key = JSON.stringify(meta, (k, v) => (k === 'offlineMs' ? Math.floor(v / 60_000) : v));
@@ -1540,7 +1733,8 @@ export class Room {
     for (const p of this.players.values()) {
       if (!p.socketId) continue;
       seen.add(p.socketId);
-      const priv = this.mini?.privateFor?.(p.id) ?? null;
+      const boardPriv = this.phase === 'board' ? this.board?.privateFor(p.id) : null;
+      const priv: PrivateState = boardPriv ? { kind: 'board', state: boardPriv } : (this.mini?.privateFor?.(p.id) ?? null);
       const json = JSON.stringify(priv);
       if (this.privKeys.get(p.socketId) === json) continue;
       this.privKeys.set(p.socketId, json);

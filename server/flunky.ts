@@ -10,7 +10,7 @@ import {
   computeLanding,
   otherTeam,
 } from '../shared/flunky';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, splitTeams } from './minigame';
 
 /** Mindestabstand zwischen zwei Taps eines Spielers (gegen Auto-Clicker / Multi-Touch-Spam) */
 const MIN_TAP_GAP_MS = 55;
@@ -34,14 +34,11 @@ export class FlunkyGame implements MiniGame {
     playerIds: string[],
     private ctx: MiniCtx,
   ) {
-    const shuffled = shuffle(playerIds);
     const beer: Record<string, number> = {};
     for (const id of playerIds) beer[id] = 100;
     this.state = {
-      teams: {
-        A: shuffled.filter((_, i) => i % 2 === 0),
-        B: shuffled.filter((_, i) => i % 2 === 1),
-      },
+      // Vom Spielbrett vorgegebene Teams (2 gegen 2) oder zufällig geteilt
+      teams: splitTeams(playerIds, ctx.teams),
       beer,
       turnTeam: Math.random() < 0.5 ? 'A' : 'B',
       throwerId: '',

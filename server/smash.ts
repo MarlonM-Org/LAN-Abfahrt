@@ -670,8 +670,11 @@ export class SmashGame implements MiniGame {
     this.pushFx('ko', clamp(f.x, 0, 480), clamp(f.y - SMASH.H / 2, 0, 270), 1, f.id);
     if (f.lastHitBy && now - f.lastHitAt < 8000) {
       const k = this.fighters.get(f.lastHitBy);
-      if (k && k !== f) k.kos += 1;
-    }
+      if (k && k !== f) {
+        k.kos += 1;
+        this.ctx.log?.('ko', { p: k.id, o: f.id });
+      }
+    } else this.ctx.log?.('selfout', { p: f.id });
     f.lastHitBy = null;
     f.attack = null;
     f.matratze = null;
