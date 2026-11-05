@@ -66,7 +66,8 @@ export type MiniKind =
   | 'golf'
   | 'autoball'
   | 'werwolf'
-  | 'pixel';
+  | 'pixel'
+  | 'zauber';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1570,6 +1571,76 @@ export interface SumoState {
   roundWinner: string | null;
 }
 
+// ------------------------------------------------------------------ Zauber-Arena
+
+export interface ZauberPlayer {
+  /** Füße, Welt-Koordinaten */
+  x: number;
+  y: number;
+  /** Zielrichtung in Grad (0 = rechts, im Uhrzeigersinn) */
+  a: number;
+  hp: number;
+  alive: boolean;
+  /** Eilzauber aktiv */
+  sprint: boolean;
+  /** Gerade getroffen (fliegt, kann kurz nicht steuern) */
+  stun: boolean;
+  /** Steht in der Lava */
+  lava: boolean;
+  /** Restliche Abklingzeit ANGRIFF / EILE (ms) */
+  cdA: number;
+  cdB: number;
+  /** Zählt hoch bei jedem erlittenen Treffer (Handy vibriert) */
+  hits: number;
+  wins: number;
+  /** In die Lava befördert bzw. verpufft (alle Runden) */
+  kills: number;
+  /** Verursachter Feuerball-Schaden (alle Runden) */
+  dmg: number;
+}
+
+export interface ZauberBolt {
+  id: number;
+  x: number;
+  y: number;
+  /** Flugrichtung in Grad */
+  a: number;
+  /** Wer ihn geworfen hat (Farbe) */
+  o: string;
+}
+
+export interface ZauberFx {
+  seq: number;
+  type: 'hit' | 'puff' | 'clash' | 'fizzle';
+  x: number;
+  y: number;
+  /** Betroffener Spieler */
+  id?: string;
+  /** Verursacher */
+  by?: string;
+}
+
+export interface ZauberState {
+  sub: 'countdown' | 'play' | 'roundOver' | 'over';
+  endsIn: number;
+  round: number;
+  winRounds: number;
+  maxRounds: number;
+  /** Plattform: Form + Bröckel-Reihenfolge folgen aus seed + n (siehe shared/zauber.ts) */
+  seed: number;
+  n: number;
+  /** So viele Kacheln der Reihenfolge haben Risse … */
+  cracked: number;
+  /** … und so viele sind schon in der Lava versunken */
+  fallen: number;
+  /** Die letzte Insel zerfällt */
+  sudden: boolean;
+  players: Record<string, ZauberPlayer>;
+  bolts: ZauberBolt[];
+  fx: ZauberFx[];
+  roundWinner: string | null;
+}
+
 // ------------------------------------------------------------------ Bogen-Arena
 
 export interface BogenPlayer {
@@ -1766,7 +1837,8 @@ export type MiniSnapshot =
   | { kind: 'golf'; state: GolfState }
   | { kind: 'autoball'; state: AfbState }
   | { kind: 'werwolf'; state: WolfState }
-  | { kind: 'pixel'; state: PixelState };
+  | { kind: 'pixel'; state: PixelState }
+  | { kind: 'zauber'; state: ZauberState };
 
 export interface GameState {
   phase: Phase;
