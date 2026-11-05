@@ -18,6 +18,8 @@ export interface MiniCtx {
   onChange(): void;
   finish(result: MiniResult): void;
   isConnected(id: string): boolean;
+  /** Vom VIP/Laptop entfernt (kommt in diesem Spiel nicht mehr zurück) */
+  isGone?(id: string): boolean;
   nameOf(id: string): string;
   /** Testspieler? (z. B. für Hinweise, die Menschen per Zuruf bekommen) */
   isBot?(id: string): boolean;

@@ -152,7 +152,7 @@ export function slugId(title: string): string {
 /** Eingebaute Zuordnung Szene → eingebauter Song, wenn nichts anderes eingestellt ist */
 export function defaultSongForScene(scene: string): string {
   switch (scene) {
-    case 'lobby': case 'board': case 'results':
+    case 'lobby': case 'board': case 'results': case 'volley':
       return 'party';
     case 'story': case 'stars': case 'rhythm': case 'boule':
       return 'romantic';
@@ -160,7 +160,7 @@ export function defaultSongForScene(scene: string): string {
       return 'strandpromenade';
     case 'wrap': case 'descent':
       return 'action';
-    case 'murder': case 'ttt': case 'verstecken': case 'geist': case 'fangen':
+    case 'murder': case 'ttt': case 'verstecken': case 'geist': case 'fangen': case 'werwolf':
       return 'spooky';
     case 'stillepost': case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'tourist': case 'sprueche':
       return 'bar';
