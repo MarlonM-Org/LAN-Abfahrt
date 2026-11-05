@@ -168,7 +168,7 @@ Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), d
 - [ ] (L) Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche
 
 ### Phase 5 · Portfolio umsteuern (neue Spiele, je S–M)
-- [ ] Wer war's? (Who's Who, #71 ✓), Schätzkönig (Wits & Wagers), Mäxchen am Pool, Funkfrequenz (Wavelength) – je ein Abend auf dem Sprüche-/WWE-Fluss
+- [x] Wer war's? (#71), Schätzkönig (#75), Mäxchen am Pool (#74), Funkfrequenz (#76)
 - [ ] Dann: Spion unter Gästen (läuft), Montagsmaler live, Strand-Band, Sektkorken (fürs Brett), Lügen-Lexikon, Strandkorb-Scharade, Geheimcode am Pool, Kofferbombe entschärfen, Urlaubs-Wahnsinn (WarioWare)
 - [ ] Verräter-Redesign „Stromausfall“ (Sichtbeschränkung mit der Dunkelheits-Technik der Geisterjagd)
 - [ ] Gestrichen/zusammengelegt: Wackel-Prügelei, Umzugschaos; Kofferpacken als Wackelturm-Variante
