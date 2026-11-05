@@ -5,6 +5,7 @@ import type { GrillState } from './grill';
 import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
+import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
 
@@ -41,7 +42,7 @@ export interface Point {
 export type MiniKind =
   | 'flunky' | 'wwe' | 'sprint' | 'murder'
   | 'descent' | 'rhythm' | 'wrap' | 'stars'
-  | 'nhie' | 'hilo' | 'bomb'
+  | 'nhie' | 'hilo' | 'bomb' | 'kingscup'
   | 'sup' | 'tidy'
   | 'flieger' | 'kurve' | 'arena'
   | 'bowling'
@@ -1825,6 +1826,7 @@ export type MiniSnapshot =
   | { kind: 'nhie'; state: NhieState }
   | { kind: 'hilo'; state: HiloState }
   | { kind: 'bomb'; state: BombState }
+  | { kind: 'kingscup'; state: KingsState }
   | { kind: 'sup'; state: SupState }
   | { kind: 'tidy'; state: TidyState }
   | { kind: 'flieger'; state: FliegerState }

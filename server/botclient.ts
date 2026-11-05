@@ -41,6 +41,7 @@ import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
+import type { KingsState } from '../shared/kingscup';
 import { WP, type WpistoleState, wpTargetAt } from '../shared/wpistole';
 import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
@@ -827,6 +828,8 @@ export class Bot {
         this.send('pass');
       });
     }
+
+    if (m.kind === 'kingscup') kingsBot(this, m.state);
 
     if (m.kind === 'sup' && m.state.sub === 'race') {
       const b = m.state.boards.find((bb) => bb.left === this.id || bb.right === this.id);
@@ -2945,6 +2948,54 @@ function afbBot(bot: Bot, st: AfbState) {
   } else mem.stuckSince = 0;
   mem.idle = false;
   bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
+}
+
+// ------------------------------------------------------------------ Kings Cup
+
+/** Kings Cup: ziehen, zufällig wählen, Knöpfe mit Reaktionszeit, „Haus“/„Tiere“, als Schiri meist „weiter“ */
+function kingsBot(bot: Bot, st: KingsState) {
+  const me = bot.id;
+  const cur = () => (bot.state?.mini?.kind === 'kingscup' ? bot.state.mini.state : null);
+  const others = st.order.filter((id) => id !== me);
+  if (st.sub === 'draw' && st.drawer === me) {
+    bot.once(`kc-draw-${st.drawSeq}`, async () => {
+      await sleep(rand(1200, 3000));
+      if (cur()?.sub === 'draw' && cur()?.drawer === me) bot.send('draw');
+    });
+  }
+  if (st.sub === 'draw' && st.qm && st.qm !== me && Math.random() < 0.002) bot.once(`kc-fool-${st.drawSeq}`, () => bot.send('fooled'));
+  if (st.sub === 'pick' && st.drawer === me) {
+    bot.once(`kc-pick-${st.drawSeq}`, async () => {
+      await sleep(rand(1000, 2500));
+      bot.send('pick', { target: others[Math.floor(Math.random() * others.length)] });
+    });
+  }
+  if (st.sub === 'race' && st.race?.phase === 'go' && st.race.players.includes(me) && !(me in st.race.times)) {
+    bot.once(`kc-race-${st.drawSeq}`, async () => {
+      await sleep(rand(250, 1100));
+      bot.send('tap');
+    });
+  }
+  if (st.sub === 'word' && st.drawer === me) {
+    bot.once(`kc-word-${st.drawSeq}`, async () => {
+      await sleep(rand(1500, 3500));
+      bot.send('word', { text: st.card?.rank === 9 ? 'Haus' : 'Tiere' });
+    });
+  }
+  if (st.sub === 'rule' && st.drawer === me) {
+    bot.once(`kc-rule-${st.drawSeq}`, async () => {
+      await sleep(rand(2000, 4000));
+      bot.send('rule', { text: ['Nur mit links trinken', 'Keine Vornamen sagen', 'Vor dem Trinken „Prost“ rufen', 'Wer flucht, trinkt'][Math.floor(Math.random() * 4)] });
+    });
+  }
+  if (st.sub === 'chain' && st.chain && st.drawer === me) {
+    const step = st.chain.step;
+    bot.once(`kc-chain-${st.drawSeq}-${step}`, async () => {
+      await sleep(rand(1200, 2600));
+      if (cur()?.chain?.step !== step) return;
+      bot.send(Math.random() < 0.22 ? 'fail' : 'next', { step });
+    });
+  }
 }
 
 // ------------------------------------------------------------------ Wasserpistolen-Duell
