@@ -4,8 +4,16 @@ import { partPix } from '../../art/parcours';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
 import { joystick } from './controller';
 
+/**
+ * Fallen-Parcours am Handy – durchgehend im Querformat (Wählen, Platzieren, Laufen, Warten, Wertung),
+ * damit niemand zwischen den Phasen das Handy drehen muss. Hochkant gibt es den Hinweis „quer halten“
+ * (wie beim Kart-Rennen); die Knöpfe funktionieren trotzdem.
+ * Alle Knöpfe reagieren auf pointerdown (tapButton) – Screens werden nur bei neuem Screen-Key neu gebaut.
+ */
+
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const pc = () => (store.state?.mini?.kind === 'parcours' ? store.state.mini.state : null);
+const secs = (ms: number) => Math.max(1, Math.ceil(ms / 1000));
 
 /** Teil-Bild, das in eine Box der Breite maxW passt (höchstens 3-fach) */
 function partIcon(type: PartType, maxW = 84) {
@@ -17,28 +25,68 @@ function partIcon(type: PartType, maxW = 84) {
   return c;
 }
 
-function header(s: ParcoursState, extra = '') {
+/** Querformat-Rahmen: Kopfzeile (Runde, Punkte), Inhalt, Dreh-Hinweis. Liefert Root + Updater für die Kopfzeile. */
+function frame(s: ParcoursState, mode: string, body: string) {
   const id = store.playerId!;
   const color = hex(P.COLORS[s.colors[id] ?? 0]);
-  return `<div class="top-row pc-top"><span><i class="pc-dot" style="background:${color}"></i>Runde ${Math.max(1, s.round)}/${s.rounds}</span><span class="pc-pts">${s.points[id] ?? 0}/${s.target} P</span></div>${extra}`;
+  const root = el(`
+    <div class="pcq pcq-${mode}">
+      <div class="pcq-top">
+        <span><i class="pc-dot" style="background:${color}"></i>Runde ${Math.max(1, s.round)}/${s.rounds}</span>
+        <span class="pc-pts">${s.points[id] ?? 0}/${s.target} P</span>
+      </div>
+      <div class="pcq-body">${body}</div>
+      <div class="pcq-portrait">Dreh dein Handy quer!</div>
+    </div>
+  `);
+  app.append(root);
+  const pts = q(root, '.pc-pts');
+  const head = () => {
+    const st = pc();
+    if (st) pts.textContent = `${st.points[store.playerId!] ?? 0}/${st.target} P`;
+    return st;
+  };
+  return { root, head };
 }
 
 export function pickParcours(s: ParcoursState): Screen {
   const id = store.playerId!;
   if (!(id in s.points)) return ['spectate', message('Du schaust zu')];
   if (s.sub === 'intro') {
-    return ['pc-intro', message('Fallen-Parcours', 'Jede Runde baut jeder ein Teil in die Strecke – dann rennen alle vom Handtuch zur Cocktailbar.\n\nPunkte gibt es nur, wenn manche ankommen – aber nicht alle!')];
+    return [
+      'pc-intro',
+      () =>
+        buildWait(
+          s,
+          'Fallen-Parcours',
+          'Jede Runde baut jeder ein Teil in die Strecke – dann rennen alle vom Handtuch zur Cocktailbar.\n\nPunkte gibt es nur, wenn manche ankommen – aber nicht alle! Halte das Handy quer.',
+        ),
+    ];
   }
   if (s.sub === 'build') {
     const b = s.builders[id];
-    if (!b || b.stage === 'done') return [`pc-done-${s.round}`, () => buildWait(s, 'Eingebaut!', 'Warte auf die anderen ...')];
+    if (!b) return [`pc-watch-${s.round}`, () => buildWait(s, 'Du schaust zu', 'Nächste Runde bist du wieder dabei.')];
+    if (b.stage === 'done') {
+      return b.skipped
+        ? [`pc-skip-${s.round}`, () => buildWait(s, 'Übersprungen', 'Du warst zu lange untätig – diese Runde ohne dein Teil.')]
+        : [`pc-done-${s.round}`, () => buildWait(s, 'Eingebaut!', 'Warte auf die anderen ...')];
+    }
     if (b.stage === 'pick') return [`pc-pick-${s.round}`, () => buildPick(s)];
     return [`pc-place-${s.round}-${b.pick}`, () => buildPlace(s, b.pick!)];
   }
   if (s.sub === 'countdown' || s.sub === 'run') {
     const r = s.runners[id];
-    if (!r) return [`pc-watch-${s.round}`, message('Du schaust zu', 'Nächste Runde bist du wieder dabei.')];
-    if (r.st === 'dead') return [`pc-dead-${s.round}`, () => buildWait(s, 'Erwischt!', r.by && r.by !== id ? `${nameOf(r.by)}s Falle hat dich erwischt.` : r.by === id ? 'Von deiner eigenen Falle ...' : 'Platsch – ab ins Wasser!')];
+    if (!r) return [`pc-watch-${s.round}`, () => buildWait(s, 'Du schaust zu', 'Nächste Runde bist du wieder dabei.')];
+    if (r.st === 'dead') {
+      const why = r.zzz
+        ? 'Eingeschlafen – du warst zu lange untätig.'
+        : r.by && r.by !== id
+          ? `${nameOf(r.by)}s Falle hat dich erwischt.`
+          : r.by === id
+            ? 'Von deiner eigenen Falle ...'
+            : 'Platsch – ab ins Wasser!';
+      return [`pc-dead-${s.round}`, () => buildWait(s, r.zzz ? 'Zzz ...' : 'Erwischt!', `${why}\nWarte, bis alle fertig sind.`)];
+    }
     if (r.st === 'goal') return [`pc-goal-${s.round}`, () => buildWait(s, r.place === 1 ? 'Erster an der Bar!' : 'An der Bar!', 'Prost! Schau, wer es noch schafft.')];
     return [`pc-run-${s.round}`, () => buildRun(s)];
   }
@@ -46,76 +94,99 @@ export function pickParcours(s: ParcoursState): Screen {
 }
 
 function buildWait(s: ParcoursState, title: string, sub: string) {
-  const root = el(`${header(s)}<div class="center"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(sub)}</p></div>`);
-  app.append(root);
-  return () => {
-    const st = pc();
-    if (st) q(root, '.pc-pts').textContent = `${st.points[store.playerId!] ?? 0}/${st.target} P`;
-  };
+  const { head } = frame(s, 'wait', `<div class="pcq-center"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(sub).replace(/\n/g, '<br>')}</p></div>`);
+  return () => void head();
+}
+
+function afkText(ms: number, what: 'build' | 'run') {
+  if (ms <= 0) return '';
+  return what === 'build' ? `Noch ${secs(ms)}s, dann wirst du übersprungen!` : `Beweg dich! In ${secs(ms)}s schläfst du ein.`;
 }
 
 function buildPick(s: ParcoursState) {
   const b = s.builders[store.playerId!];
-  const root = el(`${header(s)}<h2>Wähle ein Teil</h2><div class="pc-cards"></div><p class="hint pc-time"></p>`);
-  const cards = q(root, '.pc-cards');
+  const { root, head } = frame(s, 'pick', `<div class="pcq-cards"></div><p class="pcq-hint"></p>`);
+  const cards = q(root, '.pcq-cards');
   for (const type of b.choice) {
     const d = PART_DEFS[type];
-    const btn = el(`<button class="pc-card"><span class="pc-card-icon"></span><span class="pc-card-text"><b>${d.name}</b><small>${d.desc}</small></span></button>`).firstElementChild as HTMLButtonElement;
+    const btn = el(`<button class="pc-card"><span class="pc-card-icon"></span><span class="pc-card-text"><b>${d.name}</b><small>${d.desc}</small></span></button>`)
+      .firstElementChild as HTMLButtonElement;
     q(btn, '.pc-card-icon').append(partIcon(type));
-    btn.addEventListener('click', () => {
+    tapButton(btn, () => {
       send('pick', { type });
       navigator.vibrate?.(15);
     });
     cards.append(btn);
   }
-  app.append(root);
+  const hint = q(root, '.pcq-hint');
   return () => {
-    const st = pc();
-    if (st) q(root, '.pc-time').textContent = `Noch ${Math.ceil(st.endsIn / 1000)}s`;
+    const st = head();
+    const me = st?.builders[store.playerId!];
+    if (!st || !me) return;
+    const warn = afkText(me.afk, 'build');
+    hint.textContent = warn || 'Tippe auf ein Teil – dann platzierst du es mit dem Joystick.';
+    hint.classList.toggle('warn', !!warn);
   };
 }
 
 function buildPlace(s: ParcoursState, type: PartType) {
   const d = PART_DEFS[type];
-  const root = el(`
-    ${header(s)}
-    <div class="pc-picked"><span class="pc-card-icon"></span><span><b>${d.name}</b><small class="pc-status"></small></span></div>
+  const { root, head } = frame(
+    s,
+    'place',
+    `
     <div class="stick-area"></div>
-    <div class="pc-build-btns">
-      <button class="secondary pc-back">Zurück</button>
-      ${d.rots > 1 ? '<button class="secondary pc-rot">DREHEN</button>' : ''}
+    <div class="pcq-info">
+      <span class="pc-card-icon"></span>
+      <b>${d.name}</b>
+      <small class="pc-status"></small>
+      <small class="pcq-hint"></small>
     </div>
-    <button class="big-btn pc-place">PLATZIEREN</button>
-  `);
+    <div class="pcq-btns">
+      <div class="pcq-row">
+        <button class="secondary pc-back">Zurück</button>
+        ${d.rots > 1 ? '<button class="secondary pc-rot">Drehen</button>' : ''}
+      </div>
+      <button class="big-btn pc-place">PLATZIEREN</button>
+    </div>
+  `,
+  );
   q(root, '.pc-card-icon').append(partIcon(type, 64));
   joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
-  q(root, '.pc-back').addEventListener('click', () => send('unpick'));
+  tapButton(q(root, '.pc-back'), () => send('unpick'));
   const rot = root.querySelector<HTMLButtonElement>('.pc-rot');
   if (rot) tapButton(rot, () => send('rotate'));
   const place = q<HTMLButtonElement>(root, '.pc-place');
   tapButton(place, () => {
+    if (place.disabled) return;
     send('place');
     navigator.vibrate?.(25);
   });
-  app.append(root);
+  const status = q(root, '.pc-status');
+  const hint = q(root, '.pcq-hint');
   return () => {
-    const st = pc();
+    const st = head();
     const b = st?.builders[store.playerId!];
     if (!st || !b) return;
     place.disabled = !b.ok;
-    q(root, '.pc-status').textContent = b.ok ? `Passt! Noch ${Math.ceil(st.endsIn / 1000)}s` : `Hier nicht möglich · ${Math.ceil(st.endsIn / 1000)}s`;
+    status.textContent = b.ok ? 'Passt hier!' : 'Hier nicht möglich';
+    status.classList.toggle('bad', !b.ok);
+    const warn = afkText(b.afk, 'build');
+    hint.textContent = warn || 'Schieb den Geist auf dem Fernseher an die richtige Stelle.';
+    hint.classList.toggle('warn', !!warn);
   };
 }
 
 function buildRun(s: ParcoursState) {
-  const root = el(`
-    ${header(s)}
-    <p class="hint pc-run-hint"></p>
-    <div class="pc-run">
-      <div class="stick-area"></div>
-      <button class="big-btn jump pc-jump">SPRINGEN</button>
-    </div>
-  `);
+  const { root, head } = frame(
+    s,
+    'run',
+    `
+    <div class="stick-area"></div>
+    <p class="pcq-hint pc-run-hint"></p>
+    <button class="big-btn jump pc-jump">SPRINGEN</button>
+  `,
+  );
   joystick(q(root, '.stick-area'), (x) => send('stick', { x, y: 0 }));
   const jump = q<HTMLButtonElement>(root, '.pc-jump');
   let pointer: number | null = null;
@@ -136,12 +207,13 @@ function buildRun(s: ParcoursState) {
   jump.addEventListener('pointerup', up);
   jump.addEventListener('pointercancel', up);
   jump.addEventListener('contextmenu', (e) => e.preventDefault());
-  app.append(root);
+  const hint = q(root, '.pc-run-hint');
   return () => {
-    const st = pc();
+    const st = head();
     if (!st) return;
-    q(root, '.pc-run-hint').textContent =
-      st.sub === 'countdown' ? `Gleich geht’s los! ${Math.max(1, Math.ceil(st.endsIn / 1000))}` : `Ab zur Cocktailbar! ${Math.ceil(st.endsIn / 1000)}s · länger drücken = höher`;
+    const warn = st.sub === 'run' ? afkText(st.runners[store.playerId!]?.afk ?? 0, 'run') : '';
+    hint.textContent = st.sub === 'countdown' ? `Gleich geht’s los! ${secs(st.endsIn)}` : warn || 'Ab zur Cocktailbar! Länger drücken = höher springen';
+    hint.classList.toggle('warn', !!warn);
   };
 }
 
@@ -159,7 +231,10 @@ function buildScore(s: ParcoursState) {
     .sort((a, b) => s.points[b] - s.points[a])
     .map((pid) => `<li${pid === id ? ' class="me"' : ''}><i class="pc-dot" style="background:${hex(P.COLORS[s.colors[pid] ?? 0])}"></i>${escapeHtml(nameOf(pid))}<b>${s.points[pid]}</b></li>`)
     .join('');
-  const root = el(`${header(s)}<div class="center"><h2>${verdict}</h2><p>${escapeHtml(s.sub === 'over' ? 'Schau auf den Fernseher!' : lines)}</p><p class="pc-big">${s.points[id] ?? 0} Punkte</p><ol class="pc-rank">${ranking}</ol></div>`);
-  app.append(root);
+  frame(
+    s,
+    'score',
+    `<div class="pcq-center"><h2>${verdict}</h2><p>${escapeHtml(s.sub === 'over' ? 'Schau auf den Fernseher!' : lines)}</p><p class="pc-big">${s.points[id] ?? 0} Punkte</p></div><ol class="pc-rank">${ranking}</ol>`,
+  );
   return null;
 }
