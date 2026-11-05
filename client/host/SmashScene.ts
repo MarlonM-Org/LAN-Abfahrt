@@ -10,7 +10,7 @@ import { ensureTex, txt } from './ui';
 type C = Phaser.GameObjects.Container;
 
 /** Spielerfarben (nach Reihenfolge), damit man sich auch bei gleichem Shirt unterscheidet */
-const COLORS = [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8];
+const COLORS = [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8, 0x8d5629, 0x5f6bd6, 0xa8c43a, 0xf4efe2];
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const ATTACK_ANIMS = new Set(['jab', 'side', 'up', 'down', 'nair', 'dair']);
 const HUD_Y = 236;
@@ -198,9 +198,11 @@ export class SmashScene extends Phaser.Scene {
         root.add(txt(this, 22, 4, (pl?.name ?? '?').replace(/^Bot\s+/, '').slice(0, maxChars), { color: hex(color), origin: [0, 0] }));
       }
       const stocks = this.add.graphics().setData('pipY', narrow ? 6 : 13);
-      const pct = txt(this, cw - 10, 17, '0', { size: 16, origin: [1, 0] });
-      const pctSign = txt(this, cw - 2, 24, '%', { origin: [1, 0] });
-      const out = txt(this, narrow ? cw / 2 + 8 : cw / 2, narrow ? 21 : 19, 'RAUS', { color: '#a7a39a', origin: [0.5, 0] }).setVisible(false);
+      // Sehr schmale Karten (ab 11 Spielern): Prozente in kleiner Schrift, sonst ragen sie in die Nachbarkarte
+      const tiny = cw < 60;
+      const pct = tiny ? txt(this, cw - 9, 23, '0', { origin: [1, 0] }) : txt(this, cw - 10, 17, '0', { size: 16, origin: [1, 0] });
+      const pctSign = txt(this, cw - 2, tiny ? 23 : 24, '%', { origin: [1, 0] });
+      const out = txt(this, tiny ? cw / 2 : narrow ? cw / 2 + 8 : cw / 2, narrow ? 21 : 19, 'RAUS', { color: '#a7a39a', origin: [0.5, 0] }).setVisible(false);
       root.add([stocks, pct, pctSign, out]);
       this.hud.add(root);
       this.cards.set(id, { root, pct, pctSign, stocks, out, key: '' });

@@ -12,8 +12,11 @@ import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
 import { setState } from './store';
+import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
-import { setTrack, toggleMute, trackForScene, unlockMusic } from './music';
+import { connectMusic, setScene, unlockMusic } from './music';
+import { isMusicMenuOpen, musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
+import { watchServerVersion } from '../version';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -33,8 +36,11 @@ import { StillepostScene } from './StillepostScene';
 import { FangenScene } from './FangenScene';
 import { GeistScene } from './GeistScene';
 import { initPlayersPanel } from './playersPanel';
+import { SumoScene } from './SumoScene';
+import { TouristScene } from './TouristScene';
+import { SpruecheScene } from './SpruecheScene';
 
-const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist'];
+const SCENE_KEYS = ['lobby', 'board', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'sumo', 'tourist', 'sprueche'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -57,13 +63,16 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene],
+    scene: [LobbyScene, BoardScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, SumoScene, TouristScene, SpruecheScene],
   });
 
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
   initPlayersPanel(socket); // Panel „Spieler“ (Taste P)
+  connectMusic(socket);
+  setupMusicMenu();
+  watchServerVersion(socket);
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
   const overlay = document.getElementById('sound');
@@ -73,15 +82,31 @@ async function start() {
   };
   window.addEventListener('pointerdown', unlock);
   window.addEventListener('keydown', (e) => {
+    const tag = (e.target as HTMLElement | null)?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'm' || e.key === 'M') {
-      const muted = toggleMute();
-      const n = document.getElementById('mute');
-      if (n) n.textContent = muted ? 'Ton aus (M)' : '';
+      // M öffnet das Musik-Menü (Lautstärke, Stumm, Bibliothek, Zuordnung)
+      unlock();
+      toggleMusicMenu();
+      return;
+    }
+    if (e.key === 'Escape' && isMusicMenuOpen()) {
+      // Nur das Menü schließen – nicht zusätzlich „Spiel abbrechen“ (Laptop-Steuerung) auslösen
+      toggleMusicMenu(false);
+      e.stopImmediatePropagation();
       return;
     }
     unlock();
   });
   socket.on('connect', () => socket.emit('host:hello'));
+  // Steuer-Overlay nur, wenn die TV-Seite direkt am Laptop läuft (der Server prüft das)
+  let controls = false;
+  socket.on('host:info', (info: { local?: boolean }) => {
+    if (info?.local && !controls) {
+      controls = true;
+      installHostControls(socket);
+    }
+  });
   socket.on('state', (s: GameState) => {
     const key = sceneKey(s);
     setState(s);
@@ -89,7 +114,8 @@ async function start() {
       currentKey = key;
       for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
       game.scene.start(key);
-      setTrack(trackForScene(key));
+      setScene(key);
+      musicMenuScene(key);
     }
   });
 }

@@ -18,8 +18,6 @@ export const store = {
   editing: !localStorage.getItem(LS.name),
   /** Vom VIP/Laptop entfernt → „Du wurdest entfernt“-Screen */
   kicked: false,
-  /** Beitreten ging nicht, weil gerade ein Spiel läuft → automatisch beitreten, sobald die Lobby da ist */
-  waitForLobby: false,
   /** performance.now()-Zeitpunkt, an dem der aktuelle Countdown abläuft */
   endsAt: 0,
 };
@@ -104,10 +102,13 @@ export function message(title: string, sub = ''): Builder {
 export function playerButtons(players: PlayerPublic[], onPick: (id: string) => void) {
   const grid = el(`<div class="player-grid"></div>`);
   const inner = q(grid, '.player-grid');
+  // Ab 9 Spielern drei Spalten mit kleineren Avataren, damit alle ohne viel Scrollen passen
+  const many = players.length > 8;
+  if (many) inner.classList.add('many');
   for (const p of players) {
     const b = document.createElement('button');
     b.className = 'player-btn';
-    b.append(avatarCanvas(3, p.look));
+    b.append(avatarCanvas(many ? 2 : 3, p.look));
     const span = document.createElement('span');
     span.textContent = p.name;
     b.append(span);

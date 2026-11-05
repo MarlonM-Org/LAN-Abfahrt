@@ -8,6 +8,7 @@ import type { Socket } from 'socket.io-client';
 import type { GameState, KickResponse, PlayerPublic } from '../../shared/types';
 import { offlineLabel } from '../../shared/players';
 import { bus, getState } from './store';
+import { isMusicMenuOpen } from './musicMenu';
 
 const CSS = `
 #pl-toggle { position: fixed; left: 2vh; top: 2vh; z-index: 20; padding: 0.8vh 1.2vh; font: 1.2vh 'Press Start 2P', monospace; color: #3d2414; background: #f7e4b5; border: 0.4vh solid #8d5629; box-shadow: 0 0 0 0.25vh #2d1b12; cursor: pointer; opacity: 0.35; }
@@ -57,9 +58,8 @@ export function initPlayersPanel(socket: Socket) {
   let stateAt = performance.now();
   let key = '';
 
-  const ask = () => socket.emit('host:whoami', (r: { local: boolean }) => ((local = !!r?.local), (key = ''), render()));
-  socket.on('connect', ask);
-  if (socket.connected) ask();
+  // Der Server sagt nach 'host:hello', ob diese TV-Seite am Laptop selbst läuft (Loopback)
+  socket.on('host:info', (r: { local?: boolean }) => ((local = !!r?.local), (key = ''), render()));
 
   const say = (text: string) => (msg.textContent = text);
   const result = (ok: string) => (r: KickResponse) => say(r?.ok ? ok.replace('#', String(r.removed ?? 0)) : (r?.error ?? 'Hat nicht geklappt.'));
@@ -131,8 +131,9 @@ export function initPlayersPanel(socket: Socket) {
   };
   toggle.addEventListener('click', () => setOpen(panel.hidden));
   window.addEventListener('keydown', (e) => {
-    if ((e.key === 'p' || e.key === 'P') && !e.repeat && !(e.target instanceof HTMLInputElement)) setOpen(panel.hidden);
-    if (e.key === 'Escape' && !panel.hidden) setOpen(false);
+    if (e.key !== 'p' && e.key !== 'P') return;
+    if (e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || isMusicMenuOpen()) return;
+    setOpen(panel.hidden);
   });
   bus.on('state', () => ((stateAt = performance.now()), render()));
   setInterval(render, 1000);

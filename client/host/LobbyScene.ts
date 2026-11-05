@@ -9,7 +9,9 @@ import { bus, getState } from './store';
 import { ensurePortrait, figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 
+/** Bis 8 Spieler: 2 Reihen à 4; ab 9 Spielern: 2 Reihen à 6 im Zickzack (Platz für 12) */
 const SLOTS = 8;
+const SLOTS_MAX = 12;
 
 export class LobbyScene extends Phaser.Scene {
   private playerLayer!: Phaser.GameObjects.Container;
@@ -85,12 +87,15 @@ export class LobbyScene extends Phaser.Scene {
 
     this.playerLayer.removeAll(true);
     if (s.mode === 'arcade') return this.renderLeaderboard(s);
-    for (let i = 0; i < SLOTS; i++) {
+    const wide = s.players.length > SLOTS;
+    for (let i = 0; i < (wide ? SLOTS_MAX : SLOTS); i++) {
       const p = s.players[i];
-      const col = i % 4;
-      const row = Math.floor(i / 4);
-      const x = 196 + col * 74 + (row % 2) * 18;
-      const y = 120 + row * 88;
+      const cols = wide ? 6 : 4;
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      // Breit: Spalten abwechselnd versetzt, damit sich die Namensschilder nicht überlappen
+      const x = wide ? 178 + col * 52 : 196 + col * 74 + (row % 2) * 18;
+      const y = wide ? 112 + row * 84 + (col % 2) * 16 : 120 + row * 88;
       if (!p) {
         const ghost = this.add.ellipse(x, y - 2, 22, 7, 0x000000, 0.12);
         this.playerLayer.add(ghost);
@@ -110,14 +115,16 @@ export class LobbyScene extends Phaser.Scene {
 
   private renderLeaderboard(s: GameState) {
     const x = 160, y = 50, w = 306;
-    const rows = s.leaderboard.slice(0, 8);
-    this.playerLayer.add(panel(this, x, y, w, 30 + Math.max(1, rows.length) * 18));
+    // Bis zu 12 Einträge (Lobby-Maximum); ab 9 enger, damit die Tafel über der Adresse endet
+    const rows = s.leaderboard.slice(0, 12);
+    const rowH = rows.length > 8 ? 12 : 18;
+    this.playerLayer.add(panel(this, x, y, w, 30 + Math.max(1, rows.length) * rowH));
     this.playerLayer.add(ink(this, x + w / 2, y + 9, 'ARCADE-LEADERBOARD', { color: RED_INK }));
     this.playerLayer.add(ink(this, x + w - 70, y + 20, 'Pkt', { color: '#7a5a3a' }));
     this.playerLayer.add(ink(this, x + w - 30, y + 20, 'Siege', { color: '#7a5a3a' }));
     if (!rows.length) this.playerLayer.add(ink(this, x + w / 2, y + 32, 'Noch keine Punkte – los geht’s!'));
     rows.forEach((e, i) => {
-      const ry = y + 32 + i * 18;
+      const ry = y + 32 + i * rowH;
       const p = s.players.find((pl) => pl.name === e.name && pl.connected);
       this.playerLayer.add(ink(this, x + 14, ry, `${i + 1}.`, { origin: [0, 0], color: i === 0 ? '#c98a10' : INK }));
       if (p) this.playerLayer.add(this.add.image(x + 42, ry + 12, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
