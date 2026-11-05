@@ -54,6 +54,7 @@ import { VersteckGame } from './verstecken';
 import { StillepostGame } from './stillepost';
 import { isLoopback } from './net';
 import { TouristGame } from './tourist';
+import { WerwolfGame } from './werwolf';
 import { SpruecheGame } from './sprueche';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
@@ -364,6 +365,7 @@ export class Room {
       onChange: () => this.changed(),
       finish: (r) => this.finishMini(kind, r),
       isConnected: (id) => this.isOnline(id),
+      isGone: (id) => !!this.players.get(id)?.removed,
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
       lookOf: (id) => this.players.get(id)?.look,
@@ -471,6 +473,9 @@ export class Room {
         break;
       case 'sprueche':
         this.mini = new SpruecheGame(ids, ctx, this.quips.all);
+        break;
+      case 'werwolf':
+        this.mini = new WerwolfGame(ids, ctx);
         break;
     }
     this.results = null;
@@ -661,6 +666,7 @@ export class Room {
     }
     if (m?.kind === 'stillepost' && m.state.sub === 'vote') return { key: `sp-vote-${m.state.chain}`, ms: null };
     if (m?.kind === 'murder' && m.state.sub === 'meeting') return { key: `murder-${m.state.phaseNo}`, ms: null };
+    if (m?.kind === 'werwolf' && m.state.sub === 'day') return { key: `werwolf-${m.state.phaseNo}`, ms: null };
     return null;
   }
 
