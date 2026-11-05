@@ -8,6 +8,8 @@ import { paintSky, paintWater } from '../art/ground';
 import { gustStreak, summitCross, turmPiece } from '../art/turm';
 import { bus, getState, playerById } from './store';
 import { GOLD, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const B = TURM.BLOCK;
 const HUD = 22;
@@ -95,6 +97,10 @@ export class TurmScene extends Phaser.Scene {
   private latest: TurmState | null = null;
   private hudKey = '';
   private cell = 8;
+  private juice!: Juice;
+  /** Pro Bahn: letztes aktives Teil, Platz, Böe, eingefroren (für Effekte) */
+  private laneFx = new Map<string, { active: number | null; place: number; gust: number; frozen: boolean }>();
+  private lastSub = '';
 
   constructor() {
     super('turm');
@@ -105,6 +111,9 @@ export class TurmScene extends Phaser.Scene {
     this.geo = null;
     this.latest = null;
     this.hudKey = '';
+    this.laneFx.clear();
+    this.lastSub = '';
+    this.juice = new Juice(this, { depth: 900 });
     this.g = this.add.graphics().setDepth(5);
     this.fg = this.add.graphics().setDepth(12);
     this.hud = this.add.container(0, 0).setDepth(1000);
@@ -207,6 +216,25 @@ export class TurmScene extends Phaser.Scene {
         seen.add(p[k]);
       }
       const a = lane.active;
+      // Landung: das vorher steuerbare Teil liegt jetzt im Turm
+      const fx = this.laneFx.get(lane.id) ?? { active: null, place: lane.place, gust: lane.gust, frozen: lane.frozen };
+      if (fx.active !== null && fx.active !== (a?.id ?? null) && st.sub === 'play') {
+        const sp = view.sprites.get(fx.active);
+        if (sp && p.some((_, k) => k % 6 === 0 && p[k] === fx.active)) {
+          sfx('bonk', { x: sp.tx, pitch: 1.1 + Math.random() * 0.3, vol: 0.45 });
+          this.juice.burst(sp.tx, sp.ty + 4, 'wood', 4);
+        }
+      }
+      if (lane.place && !fx.place) {
+        // Gipfel erreicht
+        sfx('fanfare', { x: lay.cx });
+        sfx('cheer', { x: lay.cx, delay: 0.2 });
+        this.juice.burst(lay.cx, lay.baseY - 120, 'confetti', 36);
+        this.juice.flash(0xfff1b0, 120);
+      }
+      if (lane.gust && !fx.gust) sfx('whoosh', { x: lay.cx, pitch: 0.6, vol: 0.6 });
+      if (lane.frozen && !fx.frozen) sfx('lose', { x: lay.cx });
+      this.laneFx.set(lane.id, { active: a?.id ?? null, place: lane.place, gust: lane.gust, frozen: lane.frozen });
       if (a) {
         this.sprite(view, a.id, a.shape, a.v, a.x, a.y, (a.rot * Math.PI) / 2);
         seen.add(a.id);
@@ -223,7 +251,11 @@ export class TurmScene extends Phaser.Scene {
         this.tweens.add({ targets: splash, scale: 3, alpha: 0, duration: 500, onComplete: () => splash.destroy() });
         const minus = txt(this, lay.cx, lay.baseY - 30, '-1', { color: C.red }).setDepth(40);
         this.tweens.add({ targets: minus, y: minus.y - 18, alpha: 0, duration: 900, onComplete: () => minus.destroy() });
-        this.cameras.main.shake(120, 0.002);
+        // Einsturz: Krachen + Platsch
+        this.juice.shake(1);
+        this.juice.burst(lay.cx, lay.baseY + 6, 'splash', 10);
+        sfx('crack', { x: lay.cx, pitch: 0.8 });
+        sfx('splash', { x: lay.cx, delay: 0.15 });
       }
       this.updateLabel(lane, view, lay, geo.s);
     });
@@ -231,6 +263,9 @@ export class TurmScene extends Phaser.Scene {
     if (st.sub === 'countdown') this.banner.setText(String(Math.max(1, Math.ceil(st.endsIn / 1000))));
     else if (st.sub === 'play') this.banner.setText('');
     else this.banner.setText(st.lanes.some((l) => l.place) ? 'Gipfel!' : 'Zeit um!');
+    if (st.sub === 'over' && this.lastSub === 'play') sfx(st.lanes.some((l) => l.place) ? 'win' : 'whistle');
+    this.lastSub = st.sub;
+
 
     const key = `${Math.ceil(st.endsIn / 1000)}-${Math.ceil(st.gustIn / 1000)}-${st.sub}`;
     if (key !== this.hudKey) {
