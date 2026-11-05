@@ -722,6 +722,35 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .sm-btn.jump, .sm-btn.a { transform: none; }
   .sm-btn.jump.pressed, .sm-btn.a.pressed { transform: translateY(2px) scale(0.97); }
 }
+/* ---------------------------------------------------------------- Bogen-Arena */
+.bogen .bg-top { border-bottom: 3px solid var(--bg-color, var(--wood-dark)); padding-bottom: 4px; }
+.bg-quiver { flex: 1; display: flex; align-items: center; gap: 3px; min-height: 32px; }
+.bg-arrow {
+  display: block; width: 8px; height: 30px;
+  background: linear-gradient(to bottom, #e0503f 0 6px, #d39a5c 6px 23px, #f4efe2 23px 25px, #e0503f 25px);
+  border: 2px solid var(--outline); border-radius: 2px 2px 0 0;
+}
+.bg-arrow.bomb { background: linear-gradient(to bottom, #3f8fe0 0 8px, #d39a5c 8px 23px, #f4efe2 23px 25px, #e0503f 25px); border-radius: 5px 5px 0 0; }
+.bg-count { font-weight: normal; font-size: 14px; color: var(--ink); margin-right: 4px; }
+.bg-empty { color: var(--red); font-size: 10px; }
+.bg-wins { display: flex; align-items: center; gap: 4px; color: var(--ink-soft); font-size: 9px; }
+.bg-pip { display: inline-block; width: 10px; height: 10px; background: rgba(45, 27, 18, 0.25); border: 2px solid var(--wood-darker); }
+.bg-pip.on { background: var(--gold, #ffd25e); }
+.bg-aim { position: absolute; top: 6px; left: 0; right: 0; text-align: center; font-size: 22px; color: var(--bg-color, var(--wood-dark)); pointer-events: none; text-shadow: 2px 2px 0 var(--outline); }
+.bg-btns { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; align-content: end; gap: 10px 8px; padding-bottom: 6px; }
+.bg-btns .bg-dash { grid-column: 1; grid-row: 1; width: 78%; justify-self: center; font-size: 9px; background: #9b5fc0; box-shadow: inset 0 4px 0 #c495e0, inset 0 -6px 0 #6c3a8f, 0 3px 0 var(--outline); }
+.bg-btns .bg-dash.cooling { color: #d8c8e8; }
+.bg-btns .bg-shoot { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 10px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7e, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.bg-btns .bg-shoot.empty { filter: saturate(0.3) brightness(0.9); }
+.bg-btns .bg-jump { grid-column: 1; grid-row: 2; transform: none; }
+.bg-btns .bg-jump.pressed { transform: translateY(2px) scale(0.97); }
+@media (orientation: landscape) and (max-height: 520px) {
+  .bg-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+  .bg-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
+  .bg-btns .bg-shoot { max-height: 170px; }
+  .bg-arrow { height: 18px; }
+  .bogen .bg-wins { margin-right: 120px; }
+}
 .mode-tabs.four { grid-template-columns: 1fr 1fr; }
 table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
 table.lb td { padding: 4px 2px; border-bottom: 1px dashed var(--paper-dark); color: var(--ink); }

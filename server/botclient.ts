@@ -31,6 +31,8 @@ import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
+import type { BogenState } from '../shared/types';
+import { BOGEN, BOGEN_DIRS, BOGEN_STAGES, bogenDx, bogenDy, bogenLineFree, bogenRectSolid, bogenTile } from '../shared/bogen';
 
 export interface BotOptions {
   url: string;
@@ -1048,6 +1050,8 @@ export class Bot {
     }
 
     if (m.kind === 'sumo') sumoBot(this, m.state);
+
+    if (m.kind === 'bogen') bogenBot(this, m.state);
 
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
@@ -2174,4 +2178,217 @@ function shuffleQuip<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// ------------------------------------------------------------------ Bogen-Arena
+
+interface BogenBotMemory {
+  nextAt: number;
+  stick: string;
+  stickAt: number;
+  shootAt: number;
+  jumpAt: number;
+  dashAt: number;
+  /** Festhängen erkennen */
+  lastX: number;
+  lastY: number;
+  checkAt: number;
+  unstickUntil: number;
+  unstickDir: number;
+  /** Eigene Zielgenauigkeit (Toleranz in px) */
+  slop: number;
+  round: number;
+  /** Letzter Schuss (lange keiner → direkt hinterher) */
+  lastShot: number;
+  /** Seit wann der Bot gegen eine Wand drückt */
+  blockedSince: number;
+}
+
+const bogenBotMem = new WeakMap<Bot, BogenBotMemory>();
+
+/** Steht unter (x, y) innerhalb von `depth` px ein Boden oder eine Plattform? */
+function bogenBotFloor(tiles: string, x: number, y: number, depth: number) {
+  const c = Math.floor(x / BOGEN.TILE);
+  for (let r = Math.floor(y / BOGEN.TILE); r <= Math.floor((y + depth) / BOGEN.TILE); r++) {
+    if (bogenTile(tiles, c, r) !== '.') return true;
+  }
+  return false;
+}
+
+function bogenBotStick(bot: Bot, mem: BogenBotMemory, x: number, y: number) {
+  const key = `${x.toFixed(2)},${y.toFixed(2)}`;
+  const now = Date.now();
+  if (key === mem.stick && now - mem.stickAt < 300) return;
+  mem.stick = key;
+  mem.stickAt = now;
+  bot.send('stick', { x, y });
+}
+
+/**
+ * Bogen-Arena-Bot: schießt, wenn ein Gegner grob in einer der 8 Richtungen frei vor ihm steht,
+ * hält etwas Abstand, sammelt Pfeile auf, wenn der Köcher leer ist, springt über Lücken und
+ * an Wänden hoch und weicht anfliegenden Pfeilen manchmal aus (= fängt sie).
+ */
+function bogenBot(bot: Bot, st: BogenState) {
+  let mem = bogenBotMem.get(bot);
+  if (!mem) {
+    mem = { nextAt: 0, stick: '', stickAt: 0, shootAt: 0, jumpAt: 0, dashAt: 0, lastX: 0, lastY: 0, checkAt: 0, unstickUntil: 0, unstickDir: 1, slop: rand(5, 11), round: 0, lastShot: 0, blockedSince: 0 };
+    bogenBotMem.set(bot, mem);
+  }
+  const me = st.players[bot.id];
+  const now = Date.now();
+  if (st.round !== mem.round) {
+    mem.round = st.round;
+    // Nach dem Countdown nicht alle gleichzeitig schießen
+    mem.shootAt = now + BOGEN.COUNTDOWN_MS + rand(900, 2200);
+    mem.lastShot = now + BOGEN.COUNTDOWN_MS;
+  }
+  if (st.sub !== 'play' || !me?.alive) {
+    if (mem.stick !== '0.00,0.00') bogenBotStick(bot, mem, 0, 0);
+    return;
+  }
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(70, 110);
+
+  const tiles = BOGEN_STAGES[st.stage].tiles;
+  const H = BOGEN.H;
+  const cy = me.y - H / 2;
+  const foes = Object.entries(st.players)
+    .filter(([id, p]) => id !== bot.id && p.alive)
+    .map(([, p]) => ({ p, dx: bogenDx(me.x, p.x), dy: bogenDy(cy, p.y - H / 2) }))
+    .sort((a, b) => Math.hypot(a.dx, a.dy * 1.5) - Math.hypot(b.dx, b.dy * 1.5));
+
+  // --- Ausweichen: feindlicher Pfeil fliegt auf mich zu → manchmal fangen
+  if (me.cd <= 0 && now > mem.dashAt) {
+    for (const a of st.arrows) {
+      if (a.s !== 0) continue;
+      const dx = bogenDx(a.x, me.x);
+      const dy = bogenDy(a.y, cy);
+      const d = Math.hypot(dx, dy);
+      if (d > 55 || d < 6) continue;
+      const toward = (a.vx * dx + a.vy * dy) / (Math.hypot(a.vx, a.vy) * d || 1);
+      if (toward > 0.85) {
+        mem.dashAt = now + 600;
+        if (Math.random() < 0.45) {
+          bot.send('btn', { b: 'dash', down: true, x: 0, y: -1 });
+          return;
+        }
+        break;
+      }
+    }
+  }
+
+  // --- Schießen
+  if (me.arrows > 0 && now >= mem.shootAt) {
+    for (const f of foes.slice(0, 3)) {
+      // etwas vorhalten
+      const lead = Math.min(0.25, Math.hypot(f.dx, f.dy) / BOGEN.ARROW_V);
+      const dx = f.dx + f.p.vx * lead;
+      const dy = f.dy + f.p.vy * lead * 0.5;
+      let dir = -1;
+      if (Math.abs(dy) < mem.slop && Math.abs(dx) < 230) dir = dx > 0 ? 0 : 4;
+      else if (Math.abs(dx) < mem.slop * 0.8 && Math.abs(dy) < 160) dir = dy > 0 ? 2 : 6;
+      else if (Math.abs(Math.abs(dx) - Math.abs(dy)) < mem.slop * 1.4 && Math.abs(dx) < 150) dir = dx > 0 ? (dy > 0 ? 1 : 7) : dy > 0 ? 3 : 5;
+      if (dir < 0) continue;
+      const v = BOGEN_DIRS[dir];
+      const dist = Math.hypot(dx, dy);
+      if (!bogenLineFree(tiles, me.x + v.x * 7, cy + v.y * 7, v.x * dist, v.y * dist)) continue;
+      bot.send('btn', { b: 'shoot', down: true, x: v.x, y: v.y });
+      mem.stick = '';
+      mem.shootAt = now + rand(550, 1200);
+      mem.lastShot = now;
+      return;
+    }
+  }
+
+  // --- Ziel wählen
+  let goal: { x: number; y: number } | null = null;
+  let retreat = false;
+  const free = st.arrows.filter((a) => a.s === 1 || (a.s === 2 && !a.vx && !a.vy));
+  if (me.arrows < 2 && free.length) {
+    const near = free
+      .map((a) => ({ a, d: Math.hypot(bogenDx(me.x, a.x), bogenDy(me.y, a.y) * 2) }))
+      .sort((x, y) => x.d - y.d)[0];
+    if (me.arrows === 0 || near.d < 70) goal = { x: near.a.x, y: near.a.y + 4 };
+  }
+  if (!goal && st.chest && Math.hypot(bogenDx(me.x, st.chest.x), bogenDy(me.y, st.chest.y)) < 160) goal = st.chest;
+  const foe = foes[0];
+  if (!goal && foe) {
+    if (me.arrows > 0 && Math.abs(foe.dx) < 50 && Math.abs(foe.dy) < 22) {
+      // Zu nah: Abstand halten (und dabei schießen)
+      retreat = true;
+      goal = { x: me.x - Math.sign(foe.dx || 1) * 60, y: me.y };
+    } else if (me.arrows === 0) {
+      // Keine Pfeile in Sicht: Kopfsprung versuchen
+      goal = { x: foe.p.x, y: foe.p.y - H - 8 };
+    } else if (now - mem.lastShot > 3500 || !bogenLineFree(tiles, me.x, cy, foe.dx, foe.dy)) {
+      // Keine freie Schusslinie (oder lange nichts passiert): direkt hinterher
+      goal = { x: foe.p.x, y: foe.p.y };
+    } else {
+      // Auf gleiche Höhe oder Diagonale kommen
+      goal = { x: foe.p.x - Math.sign(foe.dx || 1) * 70, y: foe.p.y };
+    }
+  }
+  if (!goal) goal = { x: me.x, y: me.y };
+
+  const gdx = bogenDx(me.x, goal.x);
+  const gdy = bogenDy(me.y, goal.y);
+  let mx = Math.abs(gdx) > 6 ? Math.sign(gdx) : 0;
+  let my = 0;
+  let jump = false;
+
+  // Festhängen: kaum bewegt, obwohl wir wollten → kurz andersherum + springen
+  if (now > mem.checkAt) {
+    const moved = Math.hypot(bogenDx(mem.lastX, me.x), bogenDy(mem.lastY, me.y));
+    if (moved < 4 && (mx !== 0 || Math.abs(gdy) > 20) && !retreat) {
+      mem.unstickUntil = now + rand(500, 900);
+      mem.unstickDir = Math.random() < 0.5 ? -1 : 1;
+    }
+    mem.lastX = me.x;
+    mem.lastY = me.y;
+    mem.checkAt = now + 1200;
+  }
+  // Drückt schon länger gegen eine Wand (z. B. Gegner „hinter“ der Wand über den Rand) → andersherum
+  const pushing = mx !== 0 && bogenRectSolid(tiles, me.x + mx * 5, me.y - 18, me.x + mx * 8, me.y - 4);
+  if (!pushing) mem.blockedSince = 0;
+  else if (!mem.blockedSince) mem.blockedSince = now;
+  else if (now - mem.blockedSince > 900 && now >= mem.unstickUntil) {
+    mem.unstickUntil = now + rand(1300, 2200);
+    mem.unstickDir = -mx;
+    mem.blockedSince = 0;
+  }
+  if (now < mem.unstickUntil) {
+    mx = mem.unstickDir;
+    if (me.ground && Math.random() < 0.3) jump = true;
+  }
+
+  if (me.ground) {
+    // Wand voraus → hochspringen
+    if (mx && bogenRectSolid(tiles, me.x + mx * 6, me.y - 18, me.x + mx * 10, me.y - 2)) jump = true;
+    // Lücke voraus → drüberspringen (außer das Ziel liegt unten)
+    if (mx && !bogenBotFloor(tiles, me.x + mx * 9, me.y, 30) && gdy < 30) jump = true;
+    // Ziel liegt höher → ab und zu springen
+    if (gdy < -25 && Math.abs(gdx) < 90 && Math.random() < 0.35) jump = true;
+    // Ziel liegt tiefer und wir stehen auf einer Plattform → durchfallen
+    const under = bogenTile(tiles, Math.floor(me.x / BOGEN.TILE), Math.round(me.y / BOGEN.TILE));
+    if (gdy > 25 && under === '=' && Math.abs(gdx) < 70) {
+      my = 0.95;
+      mx = 0;
+    }
+  } else {
+    // Wandsprung, wenn das Ziel oben liegt
+    if (me.wall && gdy < -10 && Math.random() < 0.5) jump = true;
+    // Kopfsprung: über einem Gegner → draufhalten
+    for (const f of foes) {
+      if (f.dy > 0 && f.dy < 60 && Math.abs(f.dx) < 30 && me.vy > 0) mx = Math.abs(f.dx) > 2 ? Math.sign(f.dx) : 0;
+    }
+  }
+
+  bogenBotStick(bot, mem, mx, my);
+  if (jump && now > mem.jumpAt) {
+    mem.jumpAt = now + rand(250, 450);
+    bot.send('btn', { b: 'jump', down: true, x: mx, y: my });
+    const hold = rand(160, 320);
+    setTimeout(() => bot.send('btn', { b: 'jump', down: false }), hold);
+  }
 }
