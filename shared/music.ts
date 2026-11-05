@@ -156,6 +156,8 @@ export function defaultSongForScene(scene: string): string {
       return 'party';
     case 'story': case 'stars': case 'rhythm': case 'boule':
       return 'romantic';
+    case 'golf':
+      return 'strandpromenade';
     case 'wrap': case 'descent':
       return 'action';
     case 'murder': case 'ttt': case 'verstecken': case 'geist': case 'fangen': case 'werwolf':

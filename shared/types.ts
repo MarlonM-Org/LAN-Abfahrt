@@ -60,6 +60,7 @@ export type MiniKind =
   | 'volley'
   | 'tourist'
   | 'sprueche'
+  | 'golf'
   | 'autoball'
   | 'werwolf';
 
@@ -636,6 +637,54 @@ export interface BouleState {
   endResult: { side: string | null; points: number; counting: number[]; radius: number } | null;
   /** Punkte pro Aufnahme */
   history: { side: string | null; points: number }[];
+}
+
+// ------------------------------------------------------------------ Minigolf
+
+/** Ball eines Spielers (kompakt, wird bis zu ~25×/s gesendet) */
+export interface GolfBallPub {
+  x: number;
+  y: number;
+  /** Schläge auf diesem Loch (inkl. Strafschläge) */
+  s: number;
+  /** 0 = spielt, 1 = eingelocht, 2 = aufgegeben (Schlag-Limit/Zeit) */
+  d: 0 | 1 | 2;
+  /** rollt gerade (oder steckt in der Röhre / ist ins Wasser gefallen) */
+  m: boolean;
+  /** in der Looping-Röhre (unsichtbar) */
+  tube?: boolean;
+  /** Zielen: Winkel (rad) und Kraft 0 … 1 */
+  aim: [number, number] | null;
+}
+
+export type GolfFxKind = 'hole' | 'ace' | 'water' | 'bump' | 'tube' | 'lip' | 'cap' | 'out';
+
+export interface GolfFx {
+  seq: number;
+  id: string;
+  k: GolfFxKind;
+  x: number;
+  y: number;
+  /** z. B. Schläge beim Einlochen */
+  n?: number;
+}
+
+export interface GolfState {
+  sub: 'intro' | 'tee' | 'play' | 'card' | 'over';
+  endsIn: number;
+  /** aktuelles Loch (0-basiert) und Anzahl Löcher */
+  hole: number;
+  holes: number;
+  /** Lochzeit in s (bewegliche Hindernisse) */
+  t: number;
+  order: string[];
+  /** Ballfarbe pro Spieler (Hex-Zahl) */
+  colors: Record<string, number>;
+  balls: Record<string, GolfBallPub>;
+  /** Schläge pro Loch (null = noch nicht gespielt) */
+  scores: Record<string, (number | null)[]>;
+  par: number[];
+  fx: GolfFx[];
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Ententeich
@@ -1589,6 +1638,7 @@ export type MiniSnapshot =
   | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'golf'; state: GolfState }
   | { kind: 'autoball'; state: AfbState }
   | { kind: 'werwolf'; state: WolfState };
 

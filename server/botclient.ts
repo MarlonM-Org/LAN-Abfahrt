@@ -21,6 +21,7 @@ import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint a
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
+import { golfBot } from './golfbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -987,6 +988,8 @@ export class Bot {
         this.smashBrain(m.state, me2);
       });
     }
+
+    if (m.kind === 'golf') golfBot(this, m.state, () => (this.state?.mini?.kind === 'golf' ? this.state.mini.state : null));
 
     if (m.kind === 'grill') {
       const st = m.state;
