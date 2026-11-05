@@ -83,7 +83,8 @@ export type MiniKind =
   | 'koffer'
   | 'suess'
   | 'umzug'
-  | 'wackel';
+  | 'wackel'
+  | 'schaetz';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -2106,7 +2107,8 @@ export type MiniSnapshot =
   | { kind: 'suess'; state: SuessState }
   | { kind: 'spion'; state: SpionState }
   | { kind: 'umzug'; state: UmzugState }
-  | { kind: 'wackel'; state: WackelState };
+  | { kind: 'wackel'; state: WackelState }
+  | { kind: 'schaetz'; state: SchaetzState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -2257,6 +2259,7 @@ export type PrivateState =
   | { kind: 'werwolf'; state: WolfPrivate }
   | { kind: 'pixel'; state: PixelPrivate }
   | { kind: 'spion'; state: SpionPrivate }
+  | { kind: 'schaetz'; state: SchaetzPrivate }
   | null;
 
 export interface JoinRequest {
@@ -2299,4 +2302,57 @@ export interface StartRequest {
   /** Party-Modus: gespeicherten Brettstand (data/party.json) fortsetzen */
   resume?: boolean;
   version?: string;
+}
+
+// ------------------------------------------------------------------ Schätzkönig (à la Wits & Wagers)
+
+/** Eine Karte auf dem Zahlenstrahl: gleiche Antworten teilen sich eine Karte */
+export interface SchaetzCard {
+  value: number;
+  /** Wer diese Zahl geschätzt hat */
+  by: string[];
+  /** Quote pro Chip (Mitte ×2, außen ×3/×4) */
+  odds: number;
+}
+
+export interface SchaetzState {
+  /**
+   * guess = Zahl eintippen · line = Karten fliegen auf den Zahlenstrahl · bet = Chips setzen ·
+   * truth = Gruppenfrage: VIP tippt die richtige Zahl ein · drum = Trommelwirbel · reveal = Auflösung ·
+   * scores = Zwischenstand · over = Ende
+   */
+  sub: 'guess' | 'line' | 'bet' | 'truth' | 'drum' | 'reveal' | 'scores' | 'over';
+  round: number;
+  rounds: number;
+  endsIn: number;
+  question: string;
+  unit: string;
+  /** Gruppenfrage über diesen Spieler (sonst null) */
+  subject: string | null;
+  players: string[];
+  /** Wer schon geschätzt hat (Zahlen bleiben bis `line` geheim) */
+  guessed: string[];
+  /** Aufsteigend sortiert, ab `line` */
+  cards: SchaetzCard[] | null;
+  /** Quote des Felds „Alle zu hoch“ (Index −1, ganz links) */
+  lowOdds: number;
+  /** Gesetzte Chips pro Spieler: Kartenindizes (−1 = „Alle zu hoch“), höchstens `SCHAETZ.CHIPS` */
+  chips: Record<string, number[]>;
+  /** Wer alle Chips gesetzt hat */
+  betDone: string[];
+  /** Richtige Antwort – erst ab `reveal` */
+  answer: number | null;
+  /** Gruppenfrage ohne Eingabe des VIP: Median der Schätzungen zählt */
+  answerByMedian: boolean;
+  /** Gewinnerkarte (−1 = „Alle zu hoch“), ab `reveal` */
+  winner: number | null;
+  /** Punkte dieser Runde pro Spieler (ab `reveal`) */
+  gain: Record<string, number> | null;
+  points: Record<string, number>;
+}
+
+export interface SchaetzPrivate {
+  round: number;
+  /** Eigene Schätzung dieser Runde */
+  guess: number | null;
 }
