@@ -83,7 +83,8 @@ export type MiniKind =
   | 'koffer'
   | 'suess'
   | 'umzug'
-  | 'wackel';
+  | 'wackel'
+  | 'maexchen';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -2106,7 +2107,8 @@ export type MiniSnapshot =
   | { kind: 'suess'; state: SuessState }
   | { kind: 'spion'; state: SpionState }
   | { kind: 'umzug'; state: UmzugState }
-  | { kind: 'wackel'; state: WackelState };
+  | { kind: 'wackel'; state: WackelState }
+  | { kind: 'maexchen'; state: MaexState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -2257,6 +2259,7 @@ export type PrivateState =
   | { kind: 'werwolf'; state: WolfPrivate }
   | { kind: 'pixel'; state: PixelPrivate }
   | { kind: 'spion'; state: SpionPrivate }
+  | { kind: 'maexchen'; state: MaexPrivate }
   | null;
 
 export interface JoinRequest {
@@ -2299,4 +2302,76 @@ export interface StartRequest {
   /** Party-Modus: gespeicherten Brettstand (data/party.json) fortsetzen */
   resume?: boolean;
   version?: string;
+}
+
+// ------------------------------------------------------------------ Mäxchen am Pool (Würfel-Bluff)
+
+/** Eine Ansage: wer, welcher Wert (Rangfolge in `shared/maexchen.ts`) */
+export interface MaexClaim {
+  by: string;
+  value: number;
+}
+
+/** Auflösung einer Kette: Aufdecken (Phase `lift` → `reveal`) oder geglaubtes Mäxchen */
+export interface MaexReveal {
+  /** Wer angesagt hat */
+  by: string;
+  /** Wer aufdeckt bzw. das Mäxchen glaubt */
+  doubter: string;
+  claimed: number;
+  /** null = noch unter dem Becher (Phase `lift`) bzw. nie aufgedeckt (Mäxchen geglaubt) */
+  dice: [number, number] | null;
+  actual: number | null;
+  /** Ansage war höher als der echte Wurf (null = noch offen / nicht aufgedeckt) */
+  lied: boolean | null;
+  loser: string | null;
+  /** Leben bzw. Schlücke */
+  cost: number;
+  /** Mäxchen geglaubt, ohne aufzudecken */
+  accepted: boolean;
+  /** Verlierer ist dadurch ausgeschieden (Arcade) */
+  out: boolean;
+}
+
+export interface MaexState {
+  /** Sitzordnung im Uhrzeigersinn */
+  order: string[];
+  /** Wer gerade dran ist (würfelt/zweifelt bzw. sagt an) */
+  turn: string;
+  /**
+   * roll = glauben (schütteln) oder aufdecken, announce = Wert ansagen,
+   * lift = Becher wird gehoben (Trommelwirbel), reveal = Würfel offen
+   */
+  sub: 'roll' | 'announce' | 'lift' | 'reveal' | 'over';
+  /** Zählt jede Phase hoch (Screen-Keys, Countdown) */
+  phaseNo: number;
+  endsIn: number;
+  /** Runde um den Tisch (1-basiert) */
+  round: number;
+  rounds: number;
+  /** Letzte Ansage der laufenden Kette (null = neue Kette, jeder Wert erlaubt) */
+  claim: MaexClaim | null;
+  /** Alle Ansagen der laufenden Kette (für den TV-Verlauf) */
+  chain: MaexClaim[];
+  /** Becher geschüttelt (TV: Klackern) */
+  rollSeq: number;
+  reveal: MaexReveal | null;
+  /** Trinkspiel: Schlücke statt Leben */
+  drink: boolean;
+  /** Arcade: Leben pro Spieler (Trinkspiel: alle bleiben dabei, `lives` bleibt voll) */
+  lives: Record<string, number>;
+  sips: Record<string, number>;
+  /** Ausgeschiedene in Reihenfolge (Arcade) */
+  out: string[];
+  /** Erfolgreiche Bluffs (geglaubt, obwohl gelogen) – nur fürs Ergebnis */
+  bluffs: Record<string, number>;
+  /** Zuschauer-Ebene: Lebende, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+}
+
+/** Nur für den, der gerade unter seinen Becher schaut */
+export interface MaexPrivate {
+  phaseNo: number;
+  dice: [number, number];
+  value: number;
 }
