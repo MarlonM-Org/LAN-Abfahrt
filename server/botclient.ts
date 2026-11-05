@@ -31,6 +31,7 @@ import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
+import { DARTS, type DartsState, dartsTarget } from '../shared/darts';
 
 export interface BotOptions {
   url: string;
@@ -133,6 +134,28 @@ export class Bot {
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);
+    });
+  }
+
+  /** Darts: meist auf die Triple 20, ab und zu aufs Bull – mit menschlicher Streuung bei Kraft und Ruhe */
+  private dartsPlay(st: DartsState) {
+    const me = st.players.find((p) => p.id === this.id);
+    if (!me || me.thrown >= DARTS.DARTS_PER_ROUND) return;
+    const n = me.thrown;
+    this.once(`darts-${st.round}-${n}`, async () => {
+      await sleep(rand(1500, 4500));
+      const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
+      if (!cur || cur.sub !== 'throw' || cur.round !== st.round) return;
+      const target = Math.random() < 0.7 ? dartsTarget(20, 'triple') : { x: 0, y: 0 };
+      this.send('throw', {
+        n,
+        ax: target.x + rand(-4, 4),
+        ay: target.y + rand(-4, 4),
+        t: Math.round(rand(500, 6000)),
+        amp: rand(DARTS.AMP_MIN, DARTS.AMP_MIN + 16),
+        power: DARTS.POWER_IDEAL + rand(-0.2, 0.2),
+        side: rand(-0.15, 0.15),
+      });
     });
   }
 
@@ -903,6 +926,8 @@ export class Bot {
     }
 
     if (m.kind === 'boule' && m.state.sub === 'aim' && m.state.turn === this.id) this.boulePlay(m.state);
+
+    if (m.kind === 'darts' && m.state.sub === 'throw') this.dartsPlay(m.state);
 
     if (m.kind === 'enten' && (m.state.sub === 'play' || m.state.sub === 'banner')) {
       const en = m.state;

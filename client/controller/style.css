@@ -414,6 +414,24 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .bo-sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--outline); }
 .bo-dots { font-size: 10px; letter-spacing: 1px; text-shadow: 0 0 1px #2d1b12; }
 
+/* ---------------------------------------------------------------- Darts an der Strandbar */
+.da-board-wrap { display: flex; justify-content: center; }
+.da-board { border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); touch-action: none; }
+.da-quick { display: flex; gap: 6px; }
+.da-quick button { flex: 1; padding: 8px 4px; }
+.da-result { margin: 0; min-height: 1.7em; text-align: center; color: var(--ink-soft); font-size: 10px; }
+.da-result.big { color: var(--red); font-size: 13px; }
+.da-result.flash { animation: da-flash 0.5s ease-out; }
+@keyframes da-flash { from { transform: scale(1.6); } to { transform: scale(1); } }
+.da-area { gap: 6px; }
+.da-area .bw-pad.da-pad { min-height: 22vh; padding-top: 10px; background: repeating-linear-gradient(90deg, #c9a35a 0 12px, #b88f48 12px 14px); }
+.da-area .big-btn.bw-swing { min-height: 22vh; }
+.da-area .bw-ball { width: 30px; height: 30px; margin: -15px 0 0 -15px; background: radial-gradient(circle at 40% 40%, #ffffff 0 3px, #c9ced6 5px, #6c727b 13px); }
+.da-area .center { gap: 6px; }
+.da-area .center h2 { margin: 0; }
+.da-list { gap: 4px; padding: 8px; }
+.da-rd { color: var(--ink-soft); }
+
 /* ---------------------------------------------------------------- Ententeich */
 .en-status { display: flex; align-items: center; gap: 10px; min-height: 26px; }
 .en-swatch { width: 18px; height: 18px; border: 3px solid var(--outline); flex: none; }
