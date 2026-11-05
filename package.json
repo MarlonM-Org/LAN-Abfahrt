@@ -13,7 +13,8 @@
     "domain": "tsx scripts/domain.ts",
     "test:music": "tsx scripts/test-music.ts",
     "test:darts": "tsx scripts/test-darts.ts",
-    "test:golf": "tsx scripts/test-golf.ts"
+    "test:golf": "tsx scripts/test-golf.ts",
+    "test:turm": "tsx scripts/test-turm.ts"
   },
   "dependencies": {
     "@fontsource/press-start-2p": "^5.3.0",

@@ -1058,6 +1058,10 @@ export interface TurmActive {
   y: number;
   /** Anzahl 90°-Drehungen im Uhrzeigersinn */
   rot: number;
+  /** Landehöhe des Schwerpunkts (wie y), wenn es jetzt gerade nach unten fiele; null = fällt ins Meer */
+  gy: number | null;
+  /** Hat aufgesetzt, ist aber noch steuerbar (Lock-Delay) */
+  rest: boolean;
 }
 
 export interface TurmLane {
