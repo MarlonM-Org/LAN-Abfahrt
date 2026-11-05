@@ -7,9 +7,9 @@ import type { KickResponse, PlayerPublic } from '../../shared/types';
 import { offlineLabel } from '../../shared/players';
 import { avatarCanvas, el, escapeHtml, me, q, socket, store, toast } from './core';
 
-/** Wann der letzte Zustand ankam – damit „offline seit X min“ ohne neuen Zustand weiterzählt */
+/** Wann die letzte Spielerliste (`meta`) ankam – damit „offline seit X min“ ohne neue Liste weiterzählt */
 let stateAt = performance.now();
-socket.on('state', () => (stateAt = performance.now()));
+socket.on('meta', () => (stateAt = performance.now()));
 
 /** Sichtbare Spieler (ohne bereits entfernte) */
 const visiblePlayers = (): PlayerPublic[] => store.state?.players.filter((p) => !p.removed) ?? [];
@@ -134,6 +134,6 @@ export function initVipPlayersButton() {
     key = k;
     fillList(list, players, (p) => !p.connected && p.id !== store.playerId);
   };
-  socket.on('state', update);
+  socket.on('meta', update);
   setInterval(update, 1000);
 }

@@ -7,7 +7,7 @@
 import type { Socket } from 'socket.io-client';
 import type { GameState, KickResponse, PlayerPublic } from '../../shared/types';
 import { offlineLabel } from '../../shared/players';
-import { bus, getState } from './store';
+import { bus, getState, metaReceivedAt } from './store';
 import { isMusicMenuOpen } from './musicMenu';
 
 const CSS = `
@@ -55,7 +55,6 @@ export function initPlayersPanel(socket: Socket) {
   const allBtn = panel.querySelector('[data-act=all]') as HTMLButtonElement;
 
   let local = true;
-  let stateAt = performance.now();
   let key = '';
 
   // Der Server sagt nach 'host:hello', ob diese TV-Seite am Laptop selbst läuft (Loopback)
@@ -87,7 +86,7 @@ export function initPlayersPanel(socket: Socket) {
   confirmBtn(allBtn, 'Alle entfernen', () => socket.emit('host:kickAll', result('# Spieler entfernt.')));
 
   const visible = (s: GameState | null): PlayerPublic[] => s?.players.filter((p) => !p.removed) ?? [];
-  const offMs = (p: PlayerPublic) => (p.offlineMs ?? 0) + (performance.now() - stateAt);
+  const offMs = (p: PlayerPublic) => (p.offlineMs ?? 0) + (performance.now() - metaReceivedAt());
   const status = (p: PlayerPublic) => (p.connected ? 'online' : offlineLabel(offMs(p)));
 
   function render() {
@@ -135,7 +134,7 @@ export function initPlayersPanel(socket: Socket) {
     if (e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || isMusicMenuOpen()) return;
     setOpen(panel.hidden);
   });
-  bus.on('state', () => ((stateAt = performance.now()), render()));
+  bus.on('state', () => render());
   setInterval(render, 1000);
   render();
 }

@@ -1,8 +1,9 @@
 import type { Server, Socket } from 'socket.io';
 import { randomUUID } from 'node:crypto';
 import type {
+  GameLive,
+  GameMeta,
   GameMode,
-  GameState,
   JoinRequest,
   JoinResponse,
   KickResponse,
@@ -84,6 +85,32 @@ const VIP_GRACE_MS = Number(process.env.VIP_GRACE_MS ?? 60_000);
 const AUTO_RESULTS_MS = Number(process.env.AUTO_CONTINUE_MS ?? 12_000);
 const AUTO_STORY_MS = 10_000;
 const AUTO_MINI_MS = 5_000;
+/** Kurzer Wackler (WLAN-Loch, App kurz gewechselt): so lange merkt das laufende Spiel nichts davon */
+const DISCONNECT_GRACE_MS = 3_000;
+/** Gehaltene Eingaben (Stick & Co.) schickt das Handy alle 250–500 ms neu – bleiben sie so lange aus, gilt „losgelassen“ */
+const HOLD_TIMEOUT_MS = 700;
+/** Höchstens alle 40 ms ein Zustand (≈ 25/s) – sofort, wenn der letzte länger her ist */
+const FLUSH_MS = 40;
+
+/**
+ * Gehaltene Eingaben, die ohne Nachschub auf „neutral“ fallen (z. B. Handy gesperrt, während der Daumen
+ * auf dem Stick lag). Nur Aktionen, deren Handy-Screen regelmäßig wiederholt (Keepalive < 700 ms):
+ * Stick (Fix-Pad 300 ms, schwebender Stick 250 ms), Kart/Autoball-Lenkung (300 ms),
+ * Kurven-Duell `turn` (400 ms), Volleyball `move` (500 ms). Igel `move` wiederholt nicht → nicht dabei.
+ */
+function holdRelease(kind: MiniKind, action: string, payload: unknown): { active: boolean; neutral: unknown } | null {
+  const pl = asRecord(payload);
+  const num = (v: unknown) => Number(v) || 0;
+  if (action === 'stick') return { active: num(pl.x) !== 0 || num(pl.y) !== 0, neutral: { x: 0, y: 0 } };
+  if (action === 'steer' && (kind === 'kart' || kind === 'autoball')) {
+    return {
+      active: num(pl.x) !== 0 || pl.gas === true || pl.brake === true || pl.drift === true || pl.boost === true,
+      neutral: { x: 0, gas: false, brake: false, drift: false, boost: false },
+    };
+  }
+  if ((action === 'turn' && kind === 'kurve') || (action === 'move' && kind === 'volley')) return { active: num(pl.dir) !== 0, neutral: { dir: 0 } };
+  return null;
+}
 
 export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board';
 
@@ -115,6 +142,15 @@ export class Room {
   private posts = new QuestionStore('stillepost.json', 'post');
   private quips = new QuestionStore('sprueche.json', 'quip');
   private flushTimer: NodeJS.Timeout | null = null;
+  private lastFlush = 0;
+  /** Zuletzt gesendetes `meta` (als Vergleichs-Schlüssel) – neu senden nur bei Änderung */
+  private metaKey = '';
+  /** Socket-ID → zuletzt gesendetes `private` (JSON) – unverändert wird nicht nochmal geschickt */
+  private privKeys = new Map<string, string>();
+  /** Spieler-ID → Timer der Gnadenfrist (playerDisconnected erst nach DISCONNECT_GRACE_MS) */
+  private graceTimers = new Map<string, NodeJS.Timeout>();
+  /** Gehaltene Eingaben: `${Spieler}|${Aktion}` → wann zuletzt gekommen */
+  private holds = new Map<string, { id: string; action: string; at: number; neutral: unknown }>();
 
   private bots: Bot[] = [];
   /** Ewige Tabelle (data/arcade.json) */
@@ -149,6 +185,7 @@ export class Room {
     private localUrl: string,
   ) {
     setInterval(() => this.tick(), 1000).unref();
+    setInterval(() => this.releaseStaleHolds(), 100).unref();
   }
 
   handle(socket: Socket) {
@@ -158,13 +195,17 @@ export class Room {
     const inCouple = () => !!playerId && !!this.dateRun?.state.couple.includes(playerId);
 
     socket.emit('server:hello', { boot: BOOT_ID, kinds: MINI_KINDS } satisfies ServerHello);
+    // Einmal komplett: seltene Daten (meta) + laufender Zustand – danach kommen nur noch Änderungen
+    socket.emit('meta', this.meta());
+    socket.emit('state', this.live());
 
     // Steuerung am Laptop (TV-Seite): nur von Verbindungen, die vom Laptop selbst kommen
     const local = isLoopback(socket.handshake.address);
     socket.on('host:hello', () => {
       socket.join('hosts');
       socket.emit('host:info', { local });
-      socket.emit('state', this.snapshot());
+      socket.emit('meta', this.meta());
+      socket.emit('state', this.live());
     });
 
     // Laptop: Spiel aus der Arcade-Auswahl (Taste A) starten – gleiche Rechte wie die übrige Laptop-Steuerung
@@ -213,6 +254,7 @@ export class Room {
       if (!p.connected) p.connectedSince = now;
       p.connected = true;
       p.disconnectedAt = 0;
+      this.clearGrace(p.id);
       p.isBot = msg.bot === true;
       if (msg.kartView === 'phone' || msg.kartView === 'tv') p.kartView = msg.kartView;
       if (!p.isBot && !this.hostId) this.hostId = p.id;
@@ -358,7 +400,11 @@ export class Room {
     });
 
     socket.on('mini:input', (msg: { action: string; payload?: unknown }) => {
-      if (playerId && this.phase === 'mini') this.mini?.input(playerId, String(asRecord(msg).action), asRecord(msg).payload);
+      if (!playerId || this.phase !== 'mini' || !this.mini) return;
+      const action = String(asRecord(msg).action);
+      const payload = asRecord(msg).payload;
+      this.trackHold(playerId, this.mini.kind, action, payload);
+      this.mini.input(playerId, action, payload);
     });
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
@@ -393,10 +439,9 @@ export class Room {
         // Alle Handys endgültig weg → sonst hängt das Spiel fest und niemand kann neu beitreten.
         // (Sind Menschen nur kurz weg, z. B. App gewechselt, wartet der Raum – siehe tick().)
         return this.backToLobby();
-      } else if (this.phase === 'mini') {
-        this.mini?.playerDisconnected(playerId);
-      } else if (this.phase === 'board') {
-        this.board?.playerDisconnected(playerId);
+      } else if (this.phase === 'mini' || this.phase === 'board') {
+        // Gnadenfrist: Kommt das Handy innerhalb von 3 s zurück (WLAN-Wackler), merkt das Spiel nichts
+        this.startGrace(playerId);
       }
       this.ensureVip();
       this.changed();
@@ -413,7 +458,7 @@ export class Room {
     this.board = new Board(ids, rounds, {
       onChange: () => this.changed(),
       startMini: (kind) => this.startMini(kind),
-      isConnected: (id) => this.isOnline(id),
+      isConnected: (id) => this.inPlay(id),
       nameOf: (id) => this.nameOf(id),
       connectedCount: () => this.gameIds().length,
       isGone: (id) => !!this.players.get(id)?.removed,
@@ -539,7 +584,8 @@ export class Room {
     const ctx: MiniCtx = {
       onChange: () => this.changed(),
       finish: (r) => this.finishMini(kind, r),
-      isConnected: (id) => this.isOnline(id),
+      isConnected: (id) => this.inPlay(id),
+      offlineMs: (id) => this.offlineMs(id),
       isGone: (id) => !!this.players.get(id)?.removed,
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
@@ -1127,10 +1173,69 @@ export class Room {
     return this.connectedIds().some((id) => !this.players.get(id)!.isBot);
   }
 
-  /** Online und nicht entfernt – das sehen die Spiele als „verbunden“. */
+  /** Online und nicht entfernt. */
   private isOnline(id: string) {
     const p = this.players.get(id);
     return !!p && p.connected && !p.removed;
+  }
+
+  /** Das sehen Spiele und Brett als „verbunden“: online oder erst seit < 3 s weg (Gnadenfrist). */
+  private inPlay(id: string, now = Date.now()) {
+    const p = this.players.get(id);
+    if (!p || p.removed) return false;
+    return p.connected || (!!p.disconnectedAt && now - p.disconnectedAt < DISCONNECT_GRACE_MS);
+  }
+
+  /** Seit wann ohne Verbindung (ms, 0 = verbunden) – Spiele lassen eingefrorene Figuren nach 15 s ausscheiden. */
+  private offlineMs(id: string, now = Date.now()) {
+    const p = this.players.get(id);
+    if (!p) return Infinity;
+    return p.connected || !p.disconnectedAt ? 0 : now - p.disconnectedAt;
+  }
+
+  // ---------------------------------------------------------------- Gnadenfrist & gehaltene Eingaben
+
+  private startGrace(id: string) {
+    this.clearGrace(id);
+    this.graceTimers.set(
+      id,
+      setTimeout(() => {
+        this.graceTimers.delete(id);
+        const p = this.players.get(id);
+        if (!p || p.connected || p.removed) return;
+        // Erst jetzt erfährt das laufende Spiel bzw. Brett vom Verbindungsverlust
+        if (this.phase === 'mini') this.mini?.playerDisconnected(id);
+        else if (this.phase === 'board') this.board?.playerDisconnected(id);
+        this.changed();
+      }, DISCONNECT_GRACE_MS),
+    );
+  }
+
+  private clearGrace(id: string) {
+    const t = this.graceTimers.get(id);
+    if (t) clearTimeout(t);
+    this.graceTimers.delete(id);
+  }
+
+  /** Merkt sich gehaltene Eingaben (Stick, Lenkung …), damit sie ohne Nachschub nicht ewig weiterlaufen. */
+  private trackHold(id: string, kind: MiniKind, action: string, payload: unknown) {
+    if (this.players.get(id)?.isBot) return; // Bots laufen im selben Prozess bzw. Netz und wiederholen nicht im Takt
+    const h = holdRelease(kind, action, payload);
+    if (!h) return;
+    const key = `${id}|${action}`;
+    if (h.active) this.holds.set(key, { id, action, at: Date.now(), neutral: h.neutral });
+    else this.holds.delete(key);
+  }
+
+  /** 700 ms kein neuer Stick → (0,0) an das Spiel (z. B. Handy gesperrt, während der Daumen draufblieb). */
+  private releaseStaleHolds() {
+    if (!this.holds.size) return;
+    const now = Date.now();
+    for (const [key, h] of this.holds) {
+      if (now - h.at < HOLD_TIMEOUT_MS) continue;
+      this.holds.delete(key);
+      if (this.phase === 'mini') this.mini?.input(h.id, h.action, h.neutral);
+    }
   }
 
   /** Wer beim nächsten Minispiel mitspielt: Party → nur Spieler auf dem Brett, Date → das Paar, sonst alle Verbundenen. */
@@ -1149,9 +1254,9 @@ export class Room {
     return [...this.players.values()].map(({ id, name, look, connected, removed, isBot }) => ({ id, name, look, connected, removed, isBot }));
   }
 
-  snapshot(): GameState {
+  /** Selten wechselnde Daten – gehen als `meta` nur bei Änderung raus. */
+  private meta(now = Date.now()): GameMeta {
     return {
-      phase: this.phase,
       players: [...this.players.values()]
         .sort((a, b) => a.joinedAt - b.joinedAt)
         .map(({ id, name, look, connected, isVip, disconnectedAt, removed, isBot }) => ({
@@ -1160,44 +1265,70 @@ export class Room {
           look,
           connected,
           isVip,
-          ...(!connected && disconnectedAt ? { offlineMs: Date.now() - disconnectedAt } : {}),
+          ...(!connected && disconnectedAt ? { offlineMs: now - disconnectedAt } : {}),
           ...(removed ? { removed } : {}),
           ...(isBot ? { bot: true } : {}),
         })),
       joinUrl: this.joinUrl,
+      customNhieCount: this.nhie.all.length,
+      botCount: this.bots.length,
+      leaderboard: this.leaderboard.list,
+      customQuestionCount: this.questions.all.length,
+      customPostCount: this.posts.all.length,
+      customQuipCount: this.quips.all.length,
+      session: this.session.state(this.present()),
+    };
+  }
+
+  /** Laufender Zustand – geht bei jeder Änderung als `state` raus. */
+  private live(): GameLive {
+    return {
+      phase: this.phase,
       partyActive: !!this.board,
       mode: this.mode,
       date: this.dateRun?.state ?? null,
       drinkActive: !!this.drinkRun,
-      customNhieCount: this.nhie.all.length,
-      botCount: this.bots.length,
-      leaderboard: this.leaderboard.list,
       arcadeActive: this.arcadeActive,
       board: this.board?.state ?? null,
       mini: this.mini?.snapshot() ?? null,
       results: this.results,
-      customQuestionCount: this.questions.all.length,
-      customPostCount: this.posts.all.length,
       inGame: this.phase === 'mini' ? this.miniIds : null,
-      customQuipCount: this.quips.all.length,
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
-      session: this.session.state(this.present()),
       nochmal: this.nochmalState(),
       showBoard: this.phase === 'lobby' && this.showBoard,
     };
   }
 
-  /** Bündelt Zustandsänderungen (z. B. viele Taps) zu max. ~25 Updates pro Sekunde. */
+  /** Bündelt Zustandsänderungen: sofort senden, aber höchstens alle 40 ms (bei 20-Hz-Spielen also ohne Wartezeit). */
   private changed() {
     if (this.flushTimer) return;
-    this.flushTimer = setTimeout(() => {
-      this.flushTimer = null;
-      this.io.emit('state', this.snapshot());
-      // Geheime Infos (z. B. Rolle im Mörderspiel) nur an den jeweiligen Spieler
-      for (const p of this.players.values()) {
-        if (!p.socketId) continue;
-        this.io.to(p.socketId).emit('private', this.mini?.privateFor?.(p.id) ?? null);
-      }
-    }, 40);
+    const wait = Math.max(0, FLUSH_MS - (Date.now() - this.lastFlush));
+    this.flushTimer = setTimeout(() => this.flush(), wait);
+  }
+
+  private flush() {
+    this.flushTimer = null;
+    const now = Date.now();
+    this.lastFlush = now;
+    // meta nur bei Änderung – „offline seit …“ zählt minutengenau (die Clients rechnen dazwischen selbst weiter)
+    const meta = this.meta(now);
+    const key = JSON.stringify(meta, (k, v) => (k === 'offlineMs' ? Math.floor(v / 60_000) : v));
+    if (key !== this.metaKey) {
+      this.metaKey = key;
+      this.io.emit('meta', meta);
+    }
+    this.io.emit('state', this.live());
+    // Geheime Infos (z. B. Rolle im Mörderspiel) nur an den jeweiligen Spieler – und nur, wenn sie sich geändert haben
+    const seen = new Set<string>();
+    for (const p of this.players.values()) {
+      if (!p.socketId) continue;
+      seen.add(p.socketId);
+      const priv = this.mini?.privateFor?.(p.id) ?? null;
+      const json = JSON.stringify(priv);
+      if (this.privKeys.get(p.socketId) === json) continue;
+      this.privKeys.set(p.socketId, json);
+      this.io.to(p.socketId).emit('private', priv);
+    }
+    for (const sid of this.privKeys.keys()) if (!seen.has(sid)) this.privKeys.delete(sid);
   }
 }

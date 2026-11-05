@@ -1,5 +1,5 @@
 import '@fontsource/press-start-2p/400.css';
-import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
+import type { GameLive, GameMeta, GameState, JoinResponse, PrivateState } from '../../shared/types';
 import { type Screen, LS, app, el, kartViewPref, me, message, socket, store, toast } from './core';
 import { startTimeSync } from '../timesync';
 import { knownKind, watchServerVersion } from '../version';
@@ -146,7 +146,20 @@ socket.on('private', (p: PrivateState) => {
   store.priv = p;
   render();
 });
-socket.on('state', (s: GameState) => {
+// Der Server schickt seltene Daten (meta) und den laufenden Zustand (state) getrennt –
+// die Screens lesen weiter alles aus store.state.
+let meta: GameMeta | null = null;
+let live: GameLive | null = null;
+socket.on('meta', (m: GameMeta) => {
+  meta = m;
+  if (live) onState({ ...m, ...live });
+});
+socket.on('state', (l: GameLive) => {
+  live = l;
+  if (meta) onState({ ...meta, ...l });
+});
+
+function onState(s: GameState) {
   const prevKey = timerKey(store.state);
   store.state = s;
   const key = timerKey(s);
@@ -162,7 +175,7 @@ socket.on('state', (s: GameState) => {
     join();
   }
   render();
-});
+}
 
 /** Countdown nur neu setzen, wenn sich die Spielphase ändert */
 function timerKey(s: GameState | null) {
@@ -173,9 +186,19 @@ function timerKey(s: GameState | null) {
 
 // ---------------------------------------------------------------- Rendering
 
+/** Mehrere Zustände pro Frame (state, meta, private) → ein einziges Render im nächsten Frame. */
+let renderQueued = 0;
+function render() {
+  if (renderQueued) return;
+  renderQueued = requestAnimationFrame(() => {
+    renderQueued = 0;
+    renderNow();
+  });
+}
+
 /** Baut den Screen nur neu, wenn sich der Screen-Key ändert – sonst nur Werte aktualisieren.
  *  So gehen keine Taps oder Wischgesten verloren, während Updates reinkommen. */
-function render() {
+function renderNow() {
   let screen: Screen;
   try {
     screen = pickScreen();
@@ -362,13 +385,24 @@ function syncVipAbort() {
   app.append(b);
 }
 
+type WakeSentinel = { released: boolean };
+let wakeLock: WakeSentinel | null = null;
 async function requestWakeLock() {
+  if (wakeLock && !wakeLock.released) return;
   try {
-    await (navigator as Navigator & { wakeLock?: { request: (t: string) => Promise<unknown> } }).wakeLock?.request('screen');
+    const wl = (navigator as Navigator & { wakeLock?: { request: (t: string) => Promise<WakeSentinel> } }).wakeLock;
+    wakeLock = (await wl?.request('screen')) ?? null;
   } catch {
     /* nur über HTTPS verfügbar – egal */
   }
 }
+// Der Browser gibt die Sperre frei, sobald die Seite verborgen war bzw. beim Vollbildwechsel → neu anfordern
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && store.joined) void requestWakeLock();
+});
+document.addEventListener('fullscreenchange', () => {
+  if (store.joined) void requestWakeLock();
+});
 
 onKartRerender(() => render());
 initVipPlayersButton();
