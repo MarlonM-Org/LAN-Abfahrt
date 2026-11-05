@@ -433,6 +433,24 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .bo-sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--outline); }
 .bo-dots { font-size: 10px; letter-spacing: 1px; text-shadow: 0 0 1px #2d1b12; }
 
+/* ---------------------------------------------------------------- Darts an der Strandbar */
+.da-board-wrap { display: flex; justify-content: center; }
+.da-board { border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); touch-action: none; }
+.da-quick { display: flex; gap: 6px; }
+.da-quick button { flex: 1; padding: 8px 4px; }
+.da-result { margin: 0; min-height: 1.7em; text-align: center; color: var(--ink-soft); font-size: 10px; }
+.da-result.big { color: var(--red); font-size: 13px; }
+.da-result.flash { animation: da-flash 0.5s ease-out; }
+@keyframes da-flash { from { transform: scale(1.6); } to { transform: scale(1); } }
+.da-area { gap: 6px; }
+.da-area .bw-pad.da-pad { min-height: 22vh; padding-top: 10px; background: repeating-linear-gradient(90deg, #c9a35a 0 12px, #b88f48 12px 14px); }
+.da-area .big-btn.bw-swing { min-height: 22vh; }
+.da-area .bw-ball { width: 30px; height: 30px; margin: -15px 0 0 -15px; background: radial-gradient(circle at 40% 40%, #ffffff 0 3px, #c9ced6 5px, #6c727b 13px); }
+.da-area .center { gap: 6px; }
+.da-area .center h2 { margin: 0; }
+.da-list { gap: 4px; padding: 8px; }
+.da-rd { color: var(--ink-soft); }
+
 /* ---------------------------------------------------------------- Ententeich */
 .en-status { display: flex; align-items: center; gap: 10px; min-height: 26px; }
 .en-swatch { width: 18px; height: 18px; border: 3px solid var(--outline); flex: none; }
@@ -649,6 +667,36 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .k3-viewnote { top: calc(100px + var(--st)); }
 }
 
+/* ---------------------------------------------------------------- Auto-Fußball (gleiches Querformat wie das Kart-Rennen) */
+.afb { background: linear-gradient(180deg, var(--paper) 0%, #f1d49a 100%); }
+.afb-A { box-shadow: inset 0 6px 0 #f4c542; }
+.afb-B { box-shadow: inset 0 6px 0 #3fa7e0; }
+.afb .k3-hud { top: calc(30px + var(--st)); }
+.afb-score { font-size: 34px; line-height: 1; color: var(--ink); }
+.afb-score .sa { color: #c8961c; }
+.afb-score .sb { color: #2a86c0; }
+.afb-score i { font-style: normal; margin: 0 8px; color: var(--ink-soft); }
+.afb-clock { margin-top: 8px; font-size: 11px; color: var(--ink); }
+.afb-team { margin-top: 8px; font-size: 7px; color: var(--ink-soft); }
+.afb-A .afb-team b { color: #c8961c; }
+.afb-B .afb-team b { color: #2a86c0; }
+.afb .k3-center { top: auto; bottom: calc(30% + var(--sb)); }
+.afb .k3-center.count { color: #c8961c; }
+.afb .k3-center.go { color: var(--green-ink, #2f7d32); }
+.afb .k3-center.hit { color: var(--red); }
+.afb .k3-btn small { text-align: center; line-height: 1.5; }
+.afb-boost { background: #f0973a; box-shadow: inset 0 4px 0 #f7bd7a, inset 0 -6px 0 #b8661c, 0 3px 0 var(--outline); }
+.afb-boost.empty { filter: grayscale(0.8) brightness(0.9); }
+.afb-bar { width: 76%; height: 9px; border: 2px solid var(--outline); background: rgba(0,0,0,0.35); box-sizing: border-box; }
+.afb-bar i { display: block; height: 100%; width: 0; background: #ffd25e; transition: width 120ms linear; }
+.afb-hop { right: calc(12px + var(--sr) + var(--bw) + var(--gap)); bottom: calc(12px + var(--sb) + var(--bh) + var(--gap)); width: calc(var(--bw) * 0.72); height: calc(var(--bh) * 0.78);
+  background: #9b5fc0; box-shadow: inset 0 4px 0 #c08fe0, inset 0 -6px 0 #6e3f8f, 0 3px 0 var(--outline); font-size: 9px; }
+.afb-hop.cool { filter: grayscale(0.7) brightness(0.85); }
+.afb .k3-brake.afb-charged { box-shadow: inset 0 2px 0 rgba(0,0,0,0.25), 0 0 0 4px #ffd25e; }
+@media (orientation: portrait) {
+  .afb .k3-portrait { display: block; }
+}
+
 /* ---------------------------------------------------------------- Wackelturm */
 .turm-info { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .turm-lives { font-size: 22px; letter-spacing: 4px; font-family: system-ui, sans-serif; }
@@ -765,6 +813,35 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .sm-btn { width: auto; height: 100%; max-height: 150px; }
   .sm-btn.jump, .sm-btn.a { transform: none; }
   .sm-btn.jump.pressed, .sm-btn.a.pressed { transform: translateY(2px) scale(0.97); }
+}
+/* ---------------------------------------------------------------- Bogen-Arena */
+.bogen .bg-top { border-bottom: 3px solid var(--bg-color, var(--wood-dark)); padding-bottom: 4px; }
+.bg-quiver { flex: 1; display: flex; align-items: center; gap: 3px; min-height: 32px; }
+.bg-arrow {
+  display: block; width: 8px; height: 30px;
+  background: linear-gradient(to bottom, #e0503f 0 6px, #d39a5c 6px 23px, #f4efe2 23px 25px, #e0503f 25px);
+  border: 2px solid var(--outline); border-radius: 2px 2px 0 0;
+}
+.bg-arrow.bomb { background: linear-gradient(to bottom, #3f8fe0 0 8px, #d39a5c 8px 23px, #f4efe2 23px 25px, #e0503f 25px); border-radius: 5px 5px 0 0; }
+.bg-count { font-weight: normal; font-size: 14px; color: var(--ink); margin-right: 4px; }
+.bg-empty { color: var(--red); font-size: 10px; }
+.bg-wins { display: flex; align-items: center; gap: 4px; color: var(--ink-soft); font-size: 9px; }
+.bg-pip { display: inline-block; width: 10px; height: 10px; background: rgba(45, 27, 18, 0.25); border: 2px solid var(--wood-darker); }
+.bg-pip.on { background: var(--gold, #ffd25e); }
+.bg-aim { position: absolute; top: 6px; left: 0; right: 0; text-align: center; font-size: 22px; color: var(--bg-color, var(--wood-dark)); pointer-events: none; text-shadow: 2px 2px 0 var(--outline); }
+.bg-btns { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; align-content: end; gap: 10px 8px; padding-bottom: 6px; }
+.bg-btns .bg-dash { grid-column: 1; grid-row: 1; width: 78%; justify-self: center; font-size: 9px; background: #9b5fc0; box-shadow: inset 0 4px 0 #c495e0, inset 0 -6px 0 #6c3a8f, 0 3px 0 var(--outline); }
+.bg-btns .bg-dash.cooling { color: #d8c8e8; }
+.bg-btns .bg-shoot { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: 10px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7e, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.bg-btns .bg-shoot.empty { filter: saturate(0.3) brightness(0.9); }
+.bg-btns .bg-jump { grid-column: 1; grid-row: 2; transform: none; }
+.bg-btns .bg-jump.pressed { transform: translateY(2px) scale(0.97); }
+@media (orientation: landscape) and (max-height: 520px) {
+  .bg-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+  .bg-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
+  .bg-btns .bg-shoot { max-height: 170px; }
+  .bg-arrow { height: 18px; }
+  .bogen .bg-wins { margin-right: 120px; }
 }
 .mode-tabs.four { grid-template-columns: 1fr 1fr; }
 table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
@@ -975,6 +1052,35 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .sq-answer:disabled { opacity: 0.45; }
 .sq-answer.active:disabled { opacity: 1; }
 .sq-next { min-height: 26vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }
+
+/* ---------------------------------------------------------------- Urlaubs-Minigolf */
+.gf-status { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.gf-status .gf-msg { flex: 1; color: var(--red); font-size: 11px; }
+.gf-status b { font-weight: normal; font-size: 10px; color: var(--ink); }
+.gf-sw { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--outline); display: inline-block; }
+.gf-pad {
+  flex: 1; min-height: 46vh; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 3px 10px;
+  touch-action: none; position: relative;
+  background: repeating-linear-gradient(90deg, #4fa63c 0 14px, #58b043 14px 28px);
+  border: 4px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--wood-light), 0 3px 0 var(--outline);
+}
+.gf-pad.locked { filter: saturate(0.6); }
+.gf-pad.motion { min-height: 30vh; }
+.gf-map { display: block; image-rendering: auto; border: 2px solid var(--outline); background: #f1d49a; pointer-events: none; }
+.gf-power { width: 80%; height: 10px; border: 2px solid var(--outline); background: var(--paper-dark); pointer-events: none; }
+.gf-power > div { height: 100%; width: 0; background: linear-gradient(90deg, #46b04a, #f2c33a 60%, #e0503f); }
+.gf-hint { color: var(--paper-light); text-shadow: 1px 1px 0 var(--outline); font-size: 9px; pointer-events: none; padding: 0 6px; }
+.gf-note { font-size: 8px; }
+.big-btn.gf-swing { min-height: 22vh; font-size: 16px; flex: none; }
+.gf-card { gap: 4px; padding: 8px; }
+.gf-row { display: grid; grid-template-columns: 26px 18px 1fr 30px 36px; gap: 6px; align-items: center; font-size: 9px; padding: 3px 4px; }
+.gf-row.me { background: #fff0c4; }
+.gf-row b { text-align: right; color: var(--red); font-size: 11px; }
+.gf-row .gf-sw { width: 14px; height: 14px; border-width: 2px; }
+.gf-this { text-align: center; color: var(--ink-soft); }
+.gf-cardhead { flex: 0 0 auto; }
+.gf-row.gf-head { font-size: 8px; color: var(--ink-soft); }
+.gf-row.gf-head b { font-size: 8px; color: var(--ink-soft); }
 
 /* ---------------------------------------------------------------- Werwölfe im Ferienhaus */
 .ww-card {

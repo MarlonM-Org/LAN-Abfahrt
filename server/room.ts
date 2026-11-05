@@ -22,6 +22,7 @@ import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
 import { BouleGame } from './boule';
+import { GolfGame } from './golf';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
@@ -43,6 +44,9 @@ import { Board } from './board';
 import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
 import { SumoGame } from './sumo';
+import { BogenGame } from './bogen';
+import { DartsGame } from './darts';
+import { AutoballGame } from './autoball';
 import { VolleyGame } from './volley';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
 import { MurderGame } from './murder';
@@ -481,6 +485,12 @@ export class Room {
       case 'sumo':
         this.mini = new SumoGame(ids, ctx);
         break;
+      case 'bogen':
+        this.mini = new BogenGame(ids, ctx);
+        break;
+      case 'darts':
+        this.mini = new DartsGame(ids, ctx);
+        break;
       case 'volley':
         this.mini = new VolleyGame(ids, ctx);
         break;
@@ -489,6 +499,12 @@ export class Room {
         break;
       case 'sprueche':
         this.mini = new SpruecheGame(ids, ctx, this.quips.all);
+        break;
+      case 'golf':
+        this.mini = new GolfGame(ids, ctx);
+        break;
+      case 'autoball':
+        this.mini = new AutoballGame(ids, ctx);
         break;
       case 'werwolf':
         this.mini = new WerwolfGame(ids, ctx);

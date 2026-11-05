@@ -35,6 +35,10 @@ import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
 import { pickPixel } from './screens/pixel';
+import { pickBogen } from './screens/bogen';
+import { pickDarts } from './screens/darts';
+import { pickGolf } from './screens/golf';
+import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
 
@@ -296,6 +300,14 @@ function pickScreen(): Screen {
           return pickTourist(m.state);
         case 'sprueche':
           return pickSprueche(m.state, vip);
+        case 'bogen':
+          return pickBogen(m.state);
+        case 'darts':
+          return pickDarts(m.state);
+        case 'golf':
+          return pickGolf(m.state);
+        case 'autoball':
+          return pickAutoball(m.state);
         case 'werwolf':
           return pickWerwolf(m.state);
         case 'pixel':

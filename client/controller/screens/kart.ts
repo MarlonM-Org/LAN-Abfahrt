@@ -22,8 +22,8 @@ const OFFROAD = { beach: 'Sand bremst!', harbor: 'Pflaster bremst!', pool: 'Rase
 const ITEM_LABEL: Record<KartItem, string> = { coconut: 'Kokosnuss', banana: 'Banane', ice: 'Turbo-Eis', gull: 'Möwe' };
 const LS_TILT = 'lanabfahrt.kartTilt';
 
-/** Kipp-Lenkung bleibt über Bildschirmwechsel hinweg aktiv */
-const tilt = { on: false, center: 0, roll: 0, smooth: 0, lastSample: 0, unsub: null as (() => void) | null };
+/** Kipp-Lenkung bleibt über Bildschirmwechsel hinweg aktiv (auch für Auto-Fußball) */
+export const tilt = { on: false, center: 0, roll: 0, smooth: 0, lastSample: 0, unsub: null as (() => void) | null };
 
 /** „So fährst du“ nur einmal pro Rennen */
 let introFor = 0;
@@ -31,7 +31,7 @@ let introFor = 0;
 // iOS: Pinch-Zoom-Gesten im Spiel unterbinden
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
-const vibrate = (pattern: number | number[]) => {
+export const vibrate = (pattern: number | number[]) => {
   try {
     if ('vibrate' in navigator) navigator.vibrate(pattern);
   } catch {
@@ -44,7 +44,7 @@ function screenAngle(): number {
   return ((Number(a) % 360) + 360) % 360;
 }
 
-async function startTilt(): Promise<boolean> {
+export async function startTilt(): Promise<boolean> {
   if (!(await enableMotion())) {
     toast('Bewegungssensor nicht erlaubt – Stick-Lenkung');
     return false;
@@ -72,7 +72,7 @@ async function startTilt(): Promise<boolean> {
   return true;
 }
 
-function stopTilt() {
+export function stopTilt() {
   tilt.unsub?.();
   tilt.unsub = null;
   tilt.on = false;
@@ -98,7 +98,7 @@ export function pickKart(s: KartState): Screen {
 // ------------------------------------------------------------------ Vollbild / Querformat
 
 let fullscreenTried = false;
-async function tryFullscreen() {
+export async function tryFullscreen() {
   if (fullscreenTried) return;
   fullscreenTried = true;
   try {
@@ -115,7 +115,7 @@ async function tryFullscreen() {
   }
 }
 
-function leaveFullscreen() {
+export function leaveFullscreen() {
   fullscreenTried = false;
   try {
     if (document.fullscreenElement) void document.exitFullscreen?.();

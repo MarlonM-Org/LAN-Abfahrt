@@ -6,7 +6,7 @@ import { type Screen, app, avatarCanvas, el, escapeHtml, me, message, q, send, s
  * Schwebender Joystick: Wo der Daumen aufsetzt, ist die Mitte.
  * Schickt die Richtung gedrosselt (~20 Hz) und bei jeder deutlichen Änderung.
  */
-function floatingStick(zone: HTMLElement, onMove: (x: number, y: number) => void) {
+export function floatingStick(zone: HTMLElement, onMove: (x: number, y: number) => void) {
   const ring = q(zone, '.sm-ring');
   const knob = q(zone, '.sm-knob');
   const R = 46;
@@ -84,7 +84,7 @@ function floatingStick(zone: HTMLElement, onMove: (x: number, y: number) => void
 }
 
 /** Knopf mit Drücken/Loslassen (für SCHILD halten) – reagiert sofort beim Berühren */
-function holdButton(btn: HTMLElement, onDown: () => void, onUp?: () => void) {
+export function holdButton(btn: HTMLElement, onDown: () => void, onUp?: () => void) {
   let pid: number | null = null;
   btn.addEventListener('pointerdown', (e) => {
     e.preventDefault();

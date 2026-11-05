@@ -21,6 +21,7 @@ import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint a
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
+import { golfBot } from './golfbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -33,6 +34,10 @@ import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
+import type { BogenState } from '../shared/types';
+import { BOGEN, BOGEN_DIRS, BOGEN_STAGES, bogenDx, bogenDy, bogenLineFree, bogenRectSolid, bogenTile } from '../shared/bogen';
+import { DARTS, type DartsState, dartsTarget } from '../shared/darts';
+import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
@@ -138,6 +143,28 @@ export class Bot {
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);
+    });
+  }
+
+  /** Darts: meist auf die Triple 20, ab und zu aufs Bull – mit menschlicher Streuung bei Kraft und Ruhe */
+  private dartsPlay(st: DartsState) {
+    const me = st.players.find((p) => p.id === this.id);
+    if (!me || me.thrown >= DARTS.DARTS_PER_ROUND) return;
+    const n = me.thrown;
+    this.once(`darts-${st.round}-${n}`, async () => {
+      await sleep(rand(1500, 4500));
+      const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
+      if (!cur || cur.sub !== 'throw' || cur.round !== st.round) return;
+      const target = Math.random() < 0.7 ? dartsTarget(20, 'triple') : { x: 0, y: 0 };
+      this.send('throw', {
+        n,
+        ax: target.x + rand(-4, 4),
+        ay: target.y + rand(-4, 4),
+        t: Math.round(rand(500, 6000)),
+        amp: rand(DARTS.AMP_MIN, DARTS.AMP_MIN + 16),
+        power: DARTS.POWER_IDEAL + rand(-0.2, 0.2),
+        side: rand(-0.15, 0.15),
+      });
     });
   }
 
@@ -909,6 +936,8 @@ export class Bot {
 
     if (m.kind === 'boule' && m.state.sub === 'aim' && m.state.turn === this.id) this.boulePlay(m.state);
 
+    if (m.kind === 'darts' && m.state.sub === 'throw') this.dartsPlay(m.state);
+
     if (m.kind === 'enten' && (m.state.sub === 'play' || m.state.sub === 'banner')) {
       const en = m.state;
       const me2 = en.players[this.id];
@@ -989,6 +1018,8 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'golf') golfBot(this, m.state, () => (this.state?.mini?.kind === 'golf' ? this.state.mini.state : null));
+
     if (m.kind === 'grill') {
       const st = m.state;
       this.once('grill', async () => {
@@ -1053,6 +1084,10 @@ export class Bot {
     }
 
     if (m.kind === 'sumo') sumoBot(this, m.state);
+
+    if (m.kind === 'bogen') bogenBot(this, m.state);
+
+    if (m.kind === 'autoball') afbBot(this, m.state);
 
     if (m.kind === 'volley') vballBot(this, m.state);
 
@@ -2431,4 +2466,372 @@ function pixBotPicture(): number[] {
     set(cx + 1, cy - 1, 0);
   }
   return cells;
+}
+
+// ------------------------------------------------------------------ Bogen-Arena
+
+interface BogenBotMemory {
+  nextAt: number;
+  stick: string;
+  stickAt: number;
+  shootAt: number;
+  jumpAt: number;
+  dashAt: number;
+  /** Festhängen erkennen */
+  lastX: number;
+  lastY: number;
+  checkAt: number;
+  unstickUntil: number;
+  unstickDir: number;
+  /** Eigene Zielgenauigkeit (Toleranz in px) */
+  slop: number;
+  round: number;
+  /** Letzter Schuss (lange keiner → direkt hinterher) */
+  lastShot: number;
+  /** Seit wann der Bot gegen eine Wand drückt */
+  blockedSince: number;
+}
+
+const bogenBotMem = new WeakMap<Bot, BogenBotMemory>();
+
+/** Steht unter (x, y) innerhalb von `depth` px ein Boden oder eine Plattform? */
+function bogenBotFloor(tiles: string, x: number, y: number, depth: number) {
+  const c = Math.floor(x / BOGEN.TILE);
+  for (let r = Math.floor(y / BOGEN.TILE); r <= Math.floor((y + depth) / BOGEN.TILE); r++) {
+    if (bogenTile(tiles, c, r) !== '.') return true;
+  }
+  return false;
+}
+
+function bogenBotStick(bot: Bot, mem: BogenBotMemory, x: number, y: number) {
+  const key = `${x.toFixed(2)},${y.toFixed(2)}`;
+  const now = Date.now();
+  if (key === mem.stick && now - mem.stickAt < 300) return;
+  mem.stick = key;
+  mem.stickAt = now;
+  bot.send('stick', { x, y });
+}
+
+/**
+ * Bogen-Arena-Bot: schießt, wenn ein Gegner grob in einer der 8 Richtungen frei vor ihm steht,
+ * hält etwas Abstand, sammelt Pfeile auf, wenn der Köcher leer ist, springt über Lücken und
+ * an Wänden hoch und weicht anfliegenden Pfeilen manchmal aus (= fängt sie).
+ */
+function bogenBot(bot: Bot, st: BogenState) {
+  let mem = bogenBotMem.get(bot);
+  if (!mem) {
+    mem = { nextAt: 0, stick: '', stickAt: 0, shootAt: 0, jumpAt: 0, dashAt: 0, lastX: 0, lastY: 0, checkAt: 0, unstickUntil: 0, unstickDir: 1, slop: rand(5, 11), round: 0, lastShot: 0, blockedSince: 0 };
+    bogenBotMem.set(bot, mem);
+  }
+  const me = st.players[bot.id];
+  const now = Date.now();
+  if (st.round !== mem.round) {
+    mem.round = st.round;
+    // Nach dem Countdown nicht alle gleichzeitig schießen
+    mem.shootAt = now + BOGEN.COUNTDOWN_MS + rand(900, 2200);
+    mem.lastShot = now + BOGEN.COUNTDOWN_MS;
+  }
+  if (st.sub !== 'play' || !me?.alive) {
+    if (mem.stick !== '0.00,0.00') bogenBotStick(bot, mem, 0, 0);
+    return;
+  }
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(70, 110);
+
+  const tiles = BOGEN_STAGES[st.stage].tiles;
+  const H = BOGEN.H;
+  const cy = me.y - H / 2;
+  const foes = Object.entries(st.players)
+    .filter(([id, p]) => id !== bot.id && p.alive)
+    .map(([, p]) => ({ p, dx: bogenDx(me.x, p.x), dy: bogenDy(cy, p.y - H / 2) }))
+    .sort((a, b) => Math.hypot(a.dx, a.dy * 1.5) - Math.hypot(b.dx, b.dy * 1.5));
+
+  // --- Ausweichen: feindlicher Pfeil fliegt auf mich zu → manchmal fangen
+  if (me.cd <= 0 && now > mem.dashAt) {
+    for (const a of st.arrows) {
+      if (a.s !== 0) continue;
+      const dx = bogenDx(a.x, me.x);
+      const dy = bogenDy(a.y, cy);
+      const d = Math.hypot(dx, dy);
+      if (d > 55 || d < 6) continue;
+      const toward = (a.vx * dx + a.vy * dy) / (Math.hypot(a.vx, a.vy) * d || 1);
+      if (toward > 0.85) {
+        mem.dashAt = now + 600;
+        if (Math.random() < 0.45) {
+          bot.send('btn', { b: 'dash', down: true, x: 0, y: -1 });
+          return;
+        }
+        break;
+      }
+    }
+  }
+
+  // --- Schießen
+  if (me.arrows > 0 && now >= mem.shootAt) {
+    for (const f of foes.slice(0, 3)) {
+      // etwas vorhalten
+      const lead = Math.min(0.25, Math.hypot(f.dx, f.dy) / BOGEN.ARROW_V);
+      const dx = f.dx + f.p.vx * lead;
+      const dy = f.dy + f.p.vy * lead * 0.5;
+      let dir = -1;
+      if (Math.abs(dy) < mem.slop && Math.abs(dx) < 230) dir = dx > 0 ? 0 : 4;
+      else if (Math.abs(dx) < mem.slop * 0.8 && Math.abs(dy) < 160) dir = dy > 0 ? 2 : 6;
+      else if (Math.abs(Math.abs(dx) - Math.abs(dy)) < mem.slop * 1.4 && Math.abs(dx) < 150) dir = dx > 0 ? (dy > 0 ? 1 : 7) : dy > 0 ? 3 : 5;
+      if (dir < 0) continue;
+      const v = BOGEN_DIRS[dir];
+      const dist = Math.hypot(dx, dy);
+      if (!bogenLineFree(tiles, me.x + v.x * 7, cy + v.y * 7, v.x * dist, v.y * dist)) continue;
+      bot.send('btn', { b: 'shoot', down: true, x: v.x, y: v.y });
+      mem.stick = '';
+      mem.shootAt = now + rand(550, 1200);
+      mem.lastShot = now;
+      return;
+    }
+  }
+
+  // --- Ziel wählen
+  let goal: { x: number; y: number } | null = null;
+  let retreat = false;
+  const free = st.arrows.filter((a) => a.s === 1 || (a.s === 2 && !a.vx && !a.vy));
+  if (me.arrows < 2 && free.length) {
+    const near = free
+      .map((a) => ({ a, d: Math.hypot(bogenDx(me.x, a.x), bogenDy(me.y, a.y) * 2) }))
+      .sort((x, y) => x.d - y.d)[0];
+    if (me.arrows === 0 || near.d < 70) goal = { x: near.a.x, y: near.a.y + 4 };
+  }
+  if (!goal && st.chest && Math.hypot(bogenDx(me.x, st.chest.x), bogenDy(me.y, st.chest.y)) < 160) goal = st.chest;
+  const foe = foes[0];
+  if (!goal && foe) {
+    if (me.arrows > 0 && Math.abs(foe.dx) < 50 && Math.abs(foe.dy) < 22) {
+      // Zu nah: Abstand halten (und dabei schießen)
+      retreat = true;
+      goal = { x: me.x - Math.sign(foe.dx || 1) * 60, y: me.y };
+    } else if (me.arrows === 0) {
+      // Keine Pfeile in Sicht: Kopfsprung versuchen
+      goal = { x: foe.p.x, y: foe.p.y - H - 8 };
+    } else if (now - mem.lastShot > 3500 || !bogenLineFree(tiles, me.x, cy, foe.dx, foe.dy)) {
+      // Keine freie Schusslinie (oder lange nichts passiert): direkt hinterher
+      goal = { x: foe.p.x, y: foe.p.y };
+    } else {
+      // Auf gleiche Höhe oder Diagonale kommen
+      goal = { x: foe.p.x - Math.sign(foe.dx || 1) * 70, y: foe.p.y };
+    }
+  }
+  if (!goal) goal = { x: me.x, y: me.y };
+
+  const gdx = bogenDx(me.x, goal.x);
+  const gdy = bogenDy(me.y, goal.y);
+  let mx = Math.abs(gdx) > 6 ? Math.sign(gdx) : 0;
+  let my = 0;
+  let jump = false;
+
+  // Festhängen: kaum bewegt, obwohl wir wollten → kurz andersherum + springen
+  if (now > mem.checkAt) {
+    const moved = Math.hypot(bogenDx(mem.lastX, me.x), bogenDy(mem.lastY, me.y));
+    if (moved < 4 && (mx !== 0 || Math.abs(gdy) > 20) && !retreat) {
+      mem.unstickUntil = now + rand(500, 900);
+      mem.unstickDir = Math.random() < 0.5 ? -1 : 1;
+    }
+    mem.lastX = me.x;
+    mem.lastY = me.y;
+    mem.checkAt = now + 1200;
+  }
+  // Drückt schon länger gegen eine Wand (z. B. Gegner „hinter“ der Wand über den Rand) → andersherum
+  const pushing = mx !== 0 && bogenRectSolid(tiles, me.x + mx * 5, me.y - 18, me.x + mx * 8, me.y - 4);
+  if (!pushing) mem.blockedSince = 0;
+  else if (!mem.blockedSince) mem.blockedSince = now;
+  else if (now - mem.blockedSince > 900 && now >= mem.unstickUntil) {
+    mem.unstickUntil = now + rand(1300, 2200);
+    mem.unstickDir = -mx;
+    mem.blockedSince = 0;
+  }
+  if (now < mem.unstickUntil) {
+    mx = mem.unstickDir;
+    if (me.ground && Math.random() < 0.3) jump = true;
+  }
+
+  if (me.ground) {
+    // Wand voraus → hochspringen
+    if (mx && bogenRectSolid(tiles, me.x + mx * 6, me.y - 18, me.x + mx * 10, me.y - 2)) jump = true;
+    // Lücke voraus → drüberspringen (außer das Ziel liegt unten)
+    if (mx && !bogenBotFloor(tiles, me.x + mx * 9, me.y, 30) && gdy < 30) jump = true;
+    // Ziel liegt höher → ab und zu springen
+    if (gdy < -25 && Math.abs(gdx) < 90 && Math.random() < 0.35) jump = true;
+    // Ziel liegt tiefer und wir stehen auf einer Plattform → durchfallen
+    const under = bogenTile(tiles, Math.floor(me.x / BOGEN.TILE), Math.round(me.y / BOGEN.TILE));
+    if (gdy > 25 && under === '=' && Math.abs(gdx) < 70) {
+      my = 0.95;
+      mx = 0;
+    }
+  } else {
+    // Wandsprung, wenn das Ziel oben liegt
+    if (me.wall && gdy < -10 && Math.random() < 0.5) jump = true;
+    // Kopfsprung: über einem Gegner → draufhalten
+    for (const f of foes) {
+      if (f.dy > 0 && f.dy < 60 && Math.abs(f.dx) < 30 && me.vy > 0) mx = Math.abs(f.dx) > 2 ? Math.sign(f.dx) : 0;
+    }
+  }
+
+  bogenBotStick(bot, mem, mx, my);
+  if (jump && now > mem.jumpAt) {
+    mem.jumpAt = now + rand(250, 450);
+    bot.send('btn', { b: 'jump', down: true, x: mx, y: my });
+    const hold = rand(160, 320);
+    setTimeout(() => bot.send('btn', { b: 'jump', down: false }), hold);
+  }
+}
+
+// ------------------------------------------------------------------ Auto-Fußball
+
+interface AfbBotMemory {
+  nextAt: number;
+  /** Für die Geschwindigkeit (der Snapshot hat keine) */
+  px: number;
+  py: number;
+  pt: number;
+  speed: number;
+  stuckSince: number;
+  reverseUntil: number;
+  /** Eigene Ungenauigkeit beim Lenken */
+  slop: number;
+  idle: boolean;
+}
+
+const afbBotMem = new WeakMap<Bot, AfbBotMemory>();
+const afbClamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+const afbWrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Auto-Fußball-Bot: fährt zu einem Punkt hinter dem Ball (auf der Linie Ball → gegnerisches Tor)
+ * und schiebt dann durch. Steht er vor dem Ball, fährt er außen herum. Pro Team verteidigt ein Bot
+ * (der dem eigenen Tor am nächsten ist), sobald der Ball in der eigenen Hälfte ist; weitere Bots
+ * halten Abstand und warten auf Abpraller.
+ */
+function afbBot(bot: Bot, st: AfbState) {
+  let mem = afbBotMem.get(bot);
+  if (!mem) afbBotMem.set(bot, (mem = { nextAt: 0, px: 0, py: 0, pt: 0, speed: 0, stuckSince: 0, reverseUntil: 0, slop: rand(-0.12, 0.12), idle: true }));
+  const me = st.cars[bot.id];
+  if (!me) return;
+  if (st.sub === 'over') {
+    if (!mem.idle) {
+      mem.idle = true;
+      bot.send('steer', { x: 0, gas: false, brake: false, boost: false });
+    }
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 130);
+  if (mem.pt) mem.speed = (Math.hypot(me.x - mem.px, me.y - mem.py) / Math.max(1, now - mem.pt)) * 1000;
+  mem.px = me.x;
+  mem.py = me.y;
+  mem.pt = now;
+  if (st.sub === 'countdown') {
+    mem.idle = false;
+    mem.stuckSince = 0;
+    bot.send('steer', { x: 0, gas: true, brake: false, boost: false });
+    return;
+  }
+
+  const dir = me.t === 'A' ? 1 : -1;
+  const ownX = me.t === 'A' ? AFB.X0 : AFB.X1;
+  const goalX = me.t === 'A' ? AFB.X1 + 12 : AFB.X0 - 12;
+  // Ball etwas vorausberechnen
+  const bx = st.ball.x + st.ball.vx * 0.2;
+  const by = st.ball.y + st.ball.vy * 0.2;
+  const isBot = (id: string) => !!bot.state?.players.find((p) => p.id === id)?.bot;
+  const team = Object.entries(st.cars).filter(([, c]) => c.t === me.t);
+  const teamBots = team.filter(([id]) => isBot(id));
+
+  // Rolle: Verteidiger (Ball in der eigenen Hälfte, ab 2 Autos im Team), Stürmer (am nächsten am Ball) oder Unterstützer
+  const ballOwnHalf = (bx - AFB_CX) * dir < 0;
+  const defender = team.length >= 2 && ballOwnHalf ? teamBots.sort((a, b) => Math.abs(a[1].x - ownX) - Math.abs(b[1].x - ownX))[0]?.[0] : undefined;
+  const others = team.filter(([id]) => id !== defender);
+  const striker = others.sort((a, b) => Math.hypot(a[1].x - bx, a[1].y - by) - Math.hypot(b[1].x - bx, b[1].y - by))[0]?.[0];
+
+  let ux = goalX - bx;
+  let uy = AFB_CY - by;
+  const ul = Math.hypot(ux, uy) || 1;
+  ux /= ul;
+  uy /= ul;
+  const rx = me.x - bx;
+  const ry = me.y - by;
+  const along = rx * ux + ry * uy;
+  const side = -rx * uy + ry * ux;
+  const reach = AFB.BALL_R + AFB.CAR_R;
+
+  let tx: number;
+  let ty: number;
+  let pushing = false;
+  let park = false;
+  const goalSide = (me.x - bx) * dir < 0;
+  const ballNearOwnGoal = Math.abs(bx - ownX) < 80;
+  if (bot.id === defender && !(ballNearOwnGoal && goalSide)) {
+    // Vor dem eigenen Tor zwischen Ball und Tor stehen
+    tx = ownX + dir * 26;
+    ty = afbClamp(AFB_CY + (by - AFB_CY) * 0.5, AFB_CY - st.goalHalf, AFB_CY + st.goalHalf);
+    park = true;
+  } else if (bot.id !== defender && bot.id !== striker && others.length > 1) {
+    // Unterstützer: mit Abstand hinter dem Ball, seitlich versetzt
+    const idx = others.findIndex(([id]) => id === bot.id);
+    const off = (idx % 2 ? 1 : -1) * (36 + 10 * Math.floor(idx / 2));
+    tx = bx - ux * 64 - uy * off;
+    ty = by - uy * 64 + ux * off;
+    park = true;
+  } else if (along < -4 && Math.abs(side) < 8 + Math.abs(along) * 0.3) {
+    // Hinter dem Ball auf Linie → durchschieben
+    tx = bx + ux * 30;
+    ty = by + uy * 30;
+    pushing = true;
+  } else if (along < 0) {
+    tx = bx - ux * (reach + 12);
+    ty = by - uy * (reach + 12);
+  } else {
+    // Vor dem Ball → außen herum, nicht ins eigene Tor schieben
+    const sgn = Math.sign(side) || 1;
+    tx = bx - ux * (reach + 18) - uy * sgn * 28;
+    ty = by - uy * (reach + 18) + ux * sgn * 28;
+  }
+  tx = afbClamp(tx, AFB.X0 - (pushing ? 20 : -10), AFB.X1 + (pushing ? 20 : -10));
+  ty = afbClamp(ty, AFB.Y0 + 10, AFB.Y1 - 10);
+
+  const dx = tx - me.x;
+  const dy = ty - me.y;
+  const dist = Math.hypot(dx, dy);
+  const diff = afbWrap(Math.atan2(dy, dx) - me.a);
+  let steer = afbClamp(diff * 2.2 + mem.slop, -1, 1);
+  let gas = true;
+  let brake = false;
+  let boost = false;
+  if (now < mem.reverseUntil) {
+    gas = false;
+    brake = true;
+    steer = -Math.sign(diff) || 1;
+  } else if (park && dist < 12) {
+    gas = false;
+    steer = 0;
+  } else if (Math.abs(diff) > 2.1 && dist < 60) {
+    // Ziel liegt hinter uns und nah: rückwärts drehen
+    gas = false;
+    brake = true;
+    steer = -Math.sign(diff);
+  } else if (Math.abs(diff) > 1.3 && mem.speed > 55) {
+    // scharfe Kurve: Bremse in voller Fahrt = Drift
+    gas = false;
+    brake = true;
+  } else {
+    const ballDist = Math.hypot(bx - me.x, by - me.y);
+    boost = me.b > 8 && Math.abs(diff) < 0.3 && ((pushing && ballDist < 70) || (dist > 150 && me.b > 45));
+    if (pushing && ballDist < reach + 10 && Math.abs(diff) < 0.35 && me.hc === 0 && Math.random() < 0.3) bot.send('hop');
+  }
+  // Festgefahren? Kurz zurücksetzen
+  if (gas && mem.speed < 6) {
+    if (!mem.stuckSince) mem.stuckSince = now;
+    else if (now - mem.stuckSince > 1100) {
+      mem.reverseUntil = now + rand(450, 750);
+      mem.stuckSince = 0;
+    }
+  } else mem.stuckSince = 0;
+  mem.idle = false;
+  bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
 }
