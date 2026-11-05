@@ -2115,6 +2115,8 @@ export type MiniSnapshot =
 export interface GameMeta {
   players: PlayerPublic[];
   joinUrl: string;
+  /** Online-Adresse über den Cloudflare-Tunnel (`npm run online` bzw. ONLINE_URL), sonst null */
+  onlineUrl: string | null;
   customNhieCount: number;
   botCount: number;
   /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
@@ -2126,6 +2128,12 @@ export interface GameMeta {
   customQuipCount: number;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
+}
+
+/** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */
+export interface HostInfo {
+  local: boolean;
+  online: boolean;
 }
 
 /** Laufender Zustand (Phase, Minispiel, Brett, Ergebnis) – Event `state`, bis zu 25-mal pro Sekunde. */

@@ -1,7 +1,7 @@
 import '@fontsource/press-start-2p/400.css';
 import Phaser from 'phaser';
 import { io } from 'socket.io-client';
-import type { GameLive, GameMeta, GameState } from '../../shared/types';
+import type { GameLive, GameMeta, GameState, HostInfo } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { LobbyScene } from './LobbyScene';
 import { BoardScene } from './BoardScene';
@@ -11,7 +11,7 @@ import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
-import { mergeLive, mergeMeta, setState } from './store';
+import { mergeLive, mergeMeta, setState, setViaTunnel } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
@@ -125,7 +125,8 @@ async function start() {
   socket.on('connect', () => socket.emit('host:hello'));
   // Steuer-Overlay nur, wenn die TV-Seite direkt am Laptop läuft (der Server prüft das)
   let controls = false;
-  socket.on('host:info', (info: { local?: boolean }) => {
+  socket.on('host:info', (info: Partial<HostInfo>) => {
+    setViaTunnel(!!info?.online);
     if (info?.local && !controls) {
       controls = true;
       installHostControls(socket);

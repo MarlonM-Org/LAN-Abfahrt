@@ -30,6 +30,18 @@ export const mergeLive = (l: GameLive): GameState | null => {
   live = l;
   return meta ? { ...meta, ...l } : null;
 };
+/**
+ * Läuft diese TV-Seite über den Online-Tunnel (TV bei Freunden)? Dann zeigt der QR-Code die eigene Adresse –
+ * die Heimnetz-Adresse aus `joinUrl` erreicht von dort niemand.
+ */
+let viaTunnel = false;
+export const setViaTunnel = (v: boolean) => {
+  if (v === viaTunnel) return;
+  viaTunnel = v;
+  if (current) bus.emit('state', current, current);
+};
+export const joinUrlOf = (s: GameState) => (viaTunnel ? `${location.origin}/` : s.joinUrl);
+
 /** performance.now() beim letzten `meta` – „offline seit …“ (offlineMs) zählt ab da weiter */
 export const metaReceivedAt = () => metaAt;
 
