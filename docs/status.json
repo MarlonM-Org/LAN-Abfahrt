@@ -1,21 +1,18 @@
 {
-  "updated": "2026-11-05 21:10",
+  "updated": "2026-11-05 20:25",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Umzugschaos",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/umzugschaos",
-      "detail": "à la Moving Out: Ferienhaus ausräumen, schwere Möbel zu zweit, Fenster als Abkürzung"
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Umzugschaos (à la Moving Out)",
+      "pr": 56,
+      "date": "2026-11-05"
+    },
     {
       "title": "Review: Netz (sofort senden, meta-Event, WebSocket), Reconnect-Gnadenfrist, Stick-Timeout",
       "pr": 54,
