@@ -39,6 +39,8 @@ import { BOGEN, BOGEN_DIRS, BOGEN_STAGES, bogenDx, bogenDy, bogenLineFree, bogen
 import { DARTS, type DartsState, dartsTarget } from '../shared/darts';
 import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
+import type { PixelState } from '../shared/types';
+import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
 
 export interface BotOptions {
   url: string;
@@ -1102,6 +1104,8 @@ export class Bot {
     if (m.kind === 'tourist') tourBot(this, m.state);
 
     if (m.kind === 'werwolf') wolfBot(this, m.state);
+
+    if (m.kind === 'pixel') pixBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -2378,6 +2382,90 @@ function shuffleQuip<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// ------------------------------------------------------------------ Pixel-Galerie
+
+/**
+ * Bots malen ein einfaches Motiv (Farbverlauf-Himmel + Kreis/Kasten/Streifen), schicken es in
+ * zwei, drei Etappen als Entwurf und dann fertig; abgestimmt wird zufällig (nie fürs eigene Bild).
+ * Der Leader-Bot (VIP) blättert Intro, Auflösung und Zwischenstand etwas schneller weiter.
+ */
+const pixMem = new WeakMap<Bot, Set<string>>();
+
+function pixBot(bot: Bot, st: PixelState) {
+  if (!st.players.includes(bot.id)) return;
+  let mem = pixMem.get(bot);
+  if (!mem) pixMem.set(bot, (mem = new Set()));
+  const seen = mem;
+  // Neues Spiel (z. B. „Nochmal“ im Arcade-Modus) → Gedächtnis leeren
+  if (st.sub === 'intro' && st.round === 1 && seen.has('paint-1')) seen.clear();
+  /** Jeden Schritt nur einmal (bot.once verhindert nur gleichzeitiges Ausführen) */
+  const first = (key: string) => (seen.has(key) ? false : (seen.add(key), true));
+  const p = bot.priv?.kind === 'pixel' && bot.priv.state.round === st.round && bot.priv.state.sub === st.sub ? bot.priv.state : null;
+  const cur = () => (bot.state?.mini?.kind === 'pixel' ? bot.state.mini.state : null);
+  const still = () => cur()?.round === st.round && cur()?.sub === st.sub;
+
+  if (st.sub === 'paint' && first(`paint-${st.round}`)) {
+    bot.once(`pix-paint-${st.round}`, async () => {
+      const pic = pixBotPicture();
+      const steps = 3;
+      for (let k = 1; k <= steps; k++) {
+        await sleep(rand(2500, 7000));
+        if (!still()) return;
+        // Zeilenweise "malen": erst oben, dann mehr
+        const upto = Math.round((PIXEL.SIZE * k) / steps) * PIXEL.SIZE;
+        const partial = pic.map((c, i) => (i < upto ? c : -1));
+        bot.send('paint', { round: st.round, pic: cellsToPic(partial), done: k === steps });
+      }
+    });
+  }
+  if (st.sub === 'vote' && p?.canVote && p.myVote === null && first(`vote-${st.round}`)) {
+    bot.once(`pix-vote-${st.round}`, async () => {
+      await sleep(rand(1500, 5000));
+      const options = st.gallery.map((_, i) => i).filter((i) => i !== p.mine);
+      if (still() && options.length) bot.send('vote', { round: st.round, idx: options[Math.floor(Math.random() * options.length)] });
+    });
+  }
+  if (bot.leader && (st.sub === 'intro' || st.sub === 'reveal' || st.sub === 'scores') && first(`next-${st.sub}-${st.round}`)) {
+    bot.once(`pix-next-${st.sub}-${st.round}`, async () => {
+      await sleep(st.sub === 'intro' ? 2000 : 4000);
+      if (still()) bot.socket.emit('vip:mini', 'next');
+    });
+  }
+}
+
+/** Zufallsmotiv als Farbindizes (−1 = leer) */
+function pixBotPicture(): number[] {
+  const n = PIXEL.SIZE;
+  const pick = () => Math.floor(Math.random() * PIXEL_COLORS.length);
+  const cells: number[] = new Array(n * n).fill(-1);
+  const set = (x: number, y: number, c: number) => {
+    if (x >= 0 && y >= 0 && x < n && y < n) cells[y * n + x] = c;
+  };
+  // Hintergrund: Verlauf aus zwei Farben (oder leer lassen)
+  if (Math.random() < 0.75) {
+    const a = pick();
+    const b = pick();
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) set(x, y, y + ((x * 7 + y * 3) % 4) - 2 < n / 2 ? a : b);
+  }
+  const fg = pick();
+  const cx = 4 + Math.floor(Math.random() * 8);
+  const cy = 4 + Math.floor(Math.random() * 8);
+  const r = 2 + Math.floor(Math.random() * 4);
+  const shape = Math.floor(Math.random() * 3);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const inside = shape === 0 ? (x - cx) ** 2 + (y - cy) ** 2 <= r * r : shape === 1 ? Math.abs(x - cx) <= r && Math.abs(y - cy) <= r - 1 : (x + y) % 5 === 0;
+      if (inside) set(x, y, fg);
+    }
+  }
+  // Zwei "Augen" + Kontur-Punkte, damit es nach etwas aussieht
+  if (shape !== 2) {
+    set(cx - 1, cy - 1, 0);
+    set(cx + 1, cy - 1, 0);
+  }
+  return cells;
 }
 
 // ------------------------------------------------------------------ Bogen-Arena

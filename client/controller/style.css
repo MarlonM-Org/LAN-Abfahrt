@@ -1126,3 +1126,35 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .ww-names { color: var(--ink); line-height: 1.8; }
 .ww-allroles, .ww-rolerow { width: 100%; }
 .ww-rolerow { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; padding: 3px 0; border-bottom: 1px dashed var(--paper-dark); }
+
+/* ---------------------------------------------------------------- Pixel-Galerie */
+.px-theme { color: var(--red); }
+.px-canvas {
+  display: block; align-self: center; width: min(100%, 46vh); aspect-ratio: 1; touch-action: none;
+  image-rendering: pixelated; image-rendering: crisp-edges;
+  border: 4px solid #8a5e14; box-shadow: 0 0 0 2px #d9a93a, 0 0 0 4px var(--outline), 0 4px 0 3px rgba(0, 0, 0, 0.25);
+}
+.px-locked .px-canvas { opacity: 0.6; }
+.px-palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.px-swatch { padding: 0; height: 30px; border: 3px solid var(--wood-darker); box-shadow: 0 2px 0 var(--outline); font-size: 0; }
+.px-swatch.active { outline: 3px solid var(--red); outline-offset: 1px; transform: translateY(-2px); }
+.px-tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.px-tools button { padding: 6px 1px; font-size: 7px; min-height: 36px; }
+.px-tools button.active { background: var(--gold); }
+.px-locked .px-palette, .px-locked .px-tools { opacity: 0.45; pointer-events: none; }
+.px-votes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.px-votes.many { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.px-vote {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; font-size: 9px;
+  background: var(--paper-light); color: var(--ink); text-shadow: none;
+  border: 3px solid var(--wood-dark); box-shadow: 0 3px 0 var(--wood-darker);
+}
+.px-vote canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; border: 2px solid #d9a93a; }
+.px-vote small { color: var(--ink-soft); font-size: 8px; }
+.px-vote.active { background: var(--gold); border-color: var(--red); }
+.px-vote:disabled { opacity: 0.4; }
+.px-vote.active:disabled { opacity: 1; }
+.px-vote.mine { border-style: dashed; }
+.px-mine canvas { width: min(60%, 30vh); image-rendering: pixelated; border: 4px solid #d9a93a; box-shadow: 0 0 0 2px var(--outline); }
+.px-next { min-height: 26vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }
+.px-mine { display: flex; justify-content: center; }
