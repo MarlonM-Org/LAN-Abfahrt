@@ -1,6 +1,6 @@
 import { MINI_INFO, ORIENT_TEXT, type PhoneOrientation } from '../../shared/games';
 import type { MiniKind } from '../../shared/types';
-import { type Screen, escapeHtml, store } from './core';
+import { LS, type Screen, escapeHtml, store } from './core';
 
 /**
  * Handy-Ausrichtung – ein zentraler Baustein für alle Spiele (Haltung steht in `MINI_INFO[kind].orientation`,
@@ -10,6 +10,10 @@ import { type Screen, escapeHtml, store } from './core';
  *   - blockierendes Overlay `#orient` bei falscher Lage (Dreh-Animation, nach 3 s Hinweis auf die iPhone-Sperre),
  *     beim Einblenden `input-reset` → Sticks senden (0, 0), Halte-Knöpfe lassen los
  *   - Android: beim ersten Tipp in einem Spiel Vollbild + `screen.orientation.lock()`, Vollbild bleibt die Session über
+ *   - iPhone (kein Lock, Ausrichtungssperre oft an): „Trotzdem spielen“ im Overlay → Pseudo-Quer: `html.pseudo-land`
+ *     dreht `body` per CSS um 90° (Maße getauscht, Safe-Area des Hochformats auf die Seiten gemappt), die Wahl bleibt
+ *     in localStorage. Stick/Pads rechnen über `localPoint()` (stick.ts) um; liegt das Handy wirklich quer, gilt wieder
+ *     die echte Lage. Die Ansage-Karte bietet dann „Anzeige nicht mehr drehen“ an.
  *   - Laptop/Tablet (feiner Zeiger oder kurze Bildschirmseite > 600 px) werden nie gewarnt oder gesperrt
  *   - Kein Overlay, solange ein Textfeld fokussiert ist (Tastatur verkleinert den Viewport)
  */
@@ -53,6 +57,53 @@ let allowedFor: MiniKind | null = null;
 let overlayOn = false;
 let overlayTimer: number | undefined;
 let lastOrient = deviceOrient();
+/** Pseudo-Quer gewünscht (iPhone mit Ausrichtungssperre) – bleibt gespeichert */
+let pseudoWanted = (() => {
+  try {
+    return localStorage.getItem(LS.pseudoLand) === '1';
+  } catch {
+    return false;
+  }
+})();
+let pseudoOn = false;
+
+function setPseudoWanted(on: boolean) {
+  pseudoWanted = on;
+  try {
+    if (on) localStorage.setItem(LS.pseudoLand, '1');
+    else localStorage.removeItem(LS.pseudoLand);
+  } catch {
+    /* privater Modus */
+  }
+  update();
+}
+
+/** Pseudo-Quer greift nur, wenn ein Quer-Spiel aktiv ist und das Handy tatsächlich hochkant liegt */
+function wantPseudo() {
+  return pseudoWanted && nag && want === 'landscape' && deviceOrient() === 'portrait' && !orientExempt() && !inputFocused();
+}
+
+/**
+ * Ersatz für `@media (orientation: landscape)` im CSS: `html.land` = Viewport quer oder Pseudo-Quer,
+ * `html.land-short` = dazu höchstens 520 px hoch (bei Pseudo-Quer zählt die Breite als Höhe).
+ */
+function syncLandClasses() {
+  const land = pseudoOn || matchMedia('(orientation: landscape)').matches;
+  const h = pseudoOn ? window.innerWidth : window.innerHeight;
+  document.documentElement.classList.toggle('land', land);
+  document.documentElement.classList.toggle('land-short', land && h <= 520);
+}
+
+function applyPseudo(on: boolean) {
+  syncLandClasses();
+  if (on === pseudoOn) return;
+  pseudoOn = on;
+  document.documentElement.classList.toggle('pseudo-land', on);
+  syncLandClasses();
+  // Wie beim echten Drehen: gehaltene Eingaben loslassen, Screens mit festen Maßen neu rechnen
+  window.dispatchEvent(new Event('input-reset'));
+  for (const cb of [...onRotateCbs]) cb();
+}
 
 const PASSIVE = /(^|-)(over|spectate|watch|wait|out)(-|$)/;
 
@@ -95,8 +146,9 @@ function wrong() {
 function update() {
   const now = performance.now();
   const bad = wrong();
-  // Overlay
-  const showOverlay = nag && bad && !inputFocused() && allowedFor !== kind;
+  applyPseudo(wantPseudo());
+  // Overlay (bei Pseudo-Quer ist die Lage „falsch“, aber die Anzeige passt)
+  const showOverlay = nag && bad && !inputFocused() && allowedFor !== kind && !pseudoOn;
   if (overlay && showOverlay !== overlayOn) {
     overlayOn = showOverlay;
     clearTimeout(overlayTimer);
@@ -114,14 +166,21 @@ function update() {
     if (cardHolding && !hold) cardUntil = Math.max(cardUntil, now + 600);
     cardHolding = hold;
   }
+  // Pseudo-Quer: Karte 4 s zeigen und darin „Anzeige nicht mehr drehen“ anbieten (sonst kommt man nie wieder raus)
+  if (pseudoOn && cardKind && cardUntil < cardStart + 4000) cardUntil = cardStart + 4000;
   const showCard = !!cardKind && !overlayOn && (cardHolding || now < cardUntil);
   if (card) {
-    if (showCard && card.dataset.kind !== `${cardKind}-${want}`) {
+    const cardKey = `${cardKind}-${want}-${pseudoOn ? 'pseudo' : ''}`;
+    if (showCard && card.dataset.kind !== cardKey) {
       const info = MINI_INFO[cardKind!];
-      card.dataset.kind = `${cardKind}-${want}`;
-      card.innerHTML = `<span class="oc-icon">${info.icon}</span><div><b>${escapeHtml(info.title)}</b><small class="oc-${want}">${ORIENT_TEXT[want]}</small></div>`;
+      card.dataset.kind = cardKey;
+      card.innerHTML = `<span class="oc-icon">${info.icon}</span><div><b>${escapeHtml(info.title)}</b><small class="oc-${want}">${ORIENT_TEXT[want]}</small>${
+        pseudoOn ? '<button class="oc-unpseudo">Anzeige gedreht · nicht mehr drehen ✕</button>' : ''
+      }</div>`;
+      card.querySelector('.oc-unpseudo')?.addEventListener('click', () => setPseudoWanted(false));
     }
     card.classList.toggle('hidden', !showCard);
+    card.classList.toggle('oc-tap', pseudoOn);
   }
   clearTimeout(cardTimer);
   if (showCard) cardTimer = window.setTimeout(update, cardHolding ? Math.max(50, cardStart + 8000 - now + 20) : Math.max(50, cardUntil - now + 20));
@@ -131,6 +190,8 @@ function renderOverlay() {
   if (!overlay) return;
   const info = kind ? MINI_INFO[kind] : null;
   const canSkip = want === 'portrait' && !!kind && !STRICT.includes(kind);
+  // Quer-Spiel, Handy dreht nicht (iPhone-Sperre): Anzeige selbst drehen
+  const canPseudo = want === 'landscape';
   overlay.innerHTML = `
     <div class="or-box">
       <div class="or-phone or-${want}"><i></i></div>
@@ -138,11 +199,13 @@ function renderOverlay() {
       <h2>${ORIENT_TEXT[want]}</h2>
       <p class="or-lock">Dreht sich nicht? Ausrichtungssperre im Kontrollzentrum ausschalten 🔒</p>
       ${canSkip ? '<button class="secondary small or-skip">Trotzdem so</button>' : ''}
+      ${canPseudo ? '<button class="secondary small or-pseudo">Trotzdem spielen 🔄<small>Anzeige wird gedreht – Sperre kann anbleiben</small></button>' : ''}
     </div>`;
   overlay.querySelector('.or-skip')?.addEventListener('click', () => {
     allowedFor = kind;
     update();
   });
+  overlay.querySelector('.or-pseudo')?.addEventListener('click', () => setPseudoWanted(true));
 }
 
 // ---------------------------------------------------------------- Android: Vollbild + Lock
@@ -219,6 +282,7 @@ function rotated() {
   }
   update();
 }
+syncLandClasses();
 screen.orientation?.addEventListener?.('change', rotated);
 matchMedia('(orientation: landscape)').addEventListener?.('change', rotated);
 window.addEventListener('resize', rotated);

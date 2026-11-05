@@ -3,7 +3,7 @@ import { KART, KART_TRACKS, type KartInput, wrapAngle } from '../../../shared/ka
 import { itemIcon } from '../../art/kartsprites';
 import { Mode7Renderer } from '../../kart3d/render';
 import { KartWorld } from '../../kart3d/world';
-import { onInputReset } from '../stick';
+import { onInputReset, localPoint } from '../stick';
 import { type Screen, LS, app, colorOfId, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
 import { steerFromRoll, tiltLabel, tiltRoll } from '../tilt';
@@ -170,21 +170,22 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       e.preventDefault();
       left.setPointerCapture(e.pointerId);
       active = e.pointerId;
-      baseX = e.clientX;
-      const r = left.getBoundingClientRect();
-      stick.style.left = `${e.clientX - r.left}px`;
-      stick.style.top = `${e.clientY - r.top}px`;
+      const p = localPoint(left, e);
+      baseX = p.x;
+      stick.style.left = `${p.x}px`;
+      stick.style.top = `${p.y}px`;
       stick.classList.add('on');
       knob.style.transform = '';
     });
     left.addEventListener('pointermove', (e) => {
       if (e.pointerId !== active) return;
-      const d = e.clientX - baseX;
+      const px = localPoint(left, e).x;
+      const d = px - baseX;
       const mag = Math.max(0, Math.abs(d) - DEAD) / (FULL - DEAD);
       inp.steer = Math.round(Math.sign(d) * Math.min(1, mag) * 100) / 100;
       knob.style.transform = `translateX(${Math.max(-FULL, Math.min(FULL, d))}px)`;
       // Stick „wandert“ mit, wenn der Daumen weit über den Anschlag hinausgeht
-      if (Math.abs(d) > FULL + 24) baseX = e.clientX - Math.sign(d) * (FULL + 24);
+      if (Math.abs(d) > FULL + 24) baseX = px - Math.sign(d) * (FULL + 24);
       push();
     });
     const up = (e: PointerEvent) => {
