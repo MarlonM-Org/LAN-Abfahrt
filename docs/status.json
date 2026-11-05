@@ -1,14 +1,7 @@
 {
-  "updated": "2026-11-05 17:50",
+  "updated": "2026-11-05 18:15",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "inProgress": [
-    {
-      "title": "Kings Cup",
-      "kind": "kingscup",
-      "type": "Neues Trinkspiel",
-      "branch": "spiel/kingscup",
-      "detail": "Kartenkreis mit Königsbecher, deine Regeln 2–Ass, Reaktions-Rennen am Handy"
-    },
     {
       "title": "Zug überspringen + mehr Ruhe",
       "kind": "",
@@ -43,6 +36,11 @@
     "Wackel-Prügelei"
   ],
   "done": [
+    {
+      "title": "Kings Cup (Trinkspiel)",
+      "pr": 35,
+      "date": "2026-11-05"
+    },
     {
       "title": "Nochmal nach Einzelspielen + Leaderboard des Abends",
       "pr": 33,
