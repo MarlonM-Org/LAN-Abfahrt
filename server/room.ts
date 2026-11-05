@@ -62,6 +62,7 @@ import { TouristGame } from './tourist';
 import { WerwolfGame } from './werwolf';
 import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
+import { WpistoleGame } from './wpistole';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
 const MAX_PLAYERS = 12;
@@ -582,6 +583,9 @@ export class Room {
         break;
       case 'pixel':
         this.mini = new PixelGame(ids, ctx);
+        break;
+      case 'wpistole':
+        this.mini = new WpistoleGame(ids, ctx);
         break;
     }
     this.results = null;

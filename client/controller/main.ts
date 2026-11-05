@@ -35,6 +35,7 @@ import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
 import { pickPixel } from './screens/pixel';
+import { pickWpistole } from './screens/wpistole';
 import { pickBogen } from './screens/bogen';
 import { pickDarts } from './screens/darts';
 import { pickGolf } from './screens/golf';
@@ -312,6 +313,8 @@ function pickScreen(): Screen {
           return pickWerwolf(m.state);
         case 'pixel':
           return pickPixel(m.state, vip);
+        case 'wpistole':
+          return pickWpistole(m.state);
       }
       return outdatedScreen();
     }

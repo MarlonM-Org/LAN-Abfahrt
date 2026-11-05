@@ -70,7 +70,8 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 ### Zielen
 - [ ] ⭐ **Ententeich** *(Vorbild: Duck Hunt)* – Mit dem Handy zielen (Bewegungssensor, Fadenkreuz am TV), Enten/Möwen abschießen, Punkte für Trefferserien, keine Badegäste treffen.
   👥 1–8 · 📱 Handy als Zielgerät
-- [ ] **Wasserpistolen-Duell** – Gleiche Ziel-Mechanik, Spieler gegeneinander.
+- [x] **Wasserpistolen-Duell** – Western-Duell im Garten: auf „ZIEHT!“ warten, Handy hochreißen (oder Touch), zielen und spritzen; Frühstart = Eimer, Schweizer System + Finale
+  👥 2–12 · 📱 Bewegungssensor oder Touch
 
 ### Physik
 - [ ] ⭐ **Wackelturm** *(Vorbild: Tricky Towers)* – Jeder baut seinen eigenen Turm aus fallenden Blöcken (Koffer, Liegestühle, Surfbretter), wer zuerst die Ziellinie erreicht, gewinnt. Gemeine Zauber gegen andere.
