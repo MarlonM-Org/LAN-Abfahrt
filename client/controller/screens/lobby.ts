@@ -166,6 +166,15 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     singles(DRINK_KINDS);
   } else if (vip) {
     menu.append(el(`<h2>Party-Modus</h2><p>Spielbrett + Minispiele, Finale: Mord oder Verräter im Ferienhaus</p>`));
+    // Gespeicherter Brettstand (data/party.json, z. B. nach einem Server-Neustart) → fortsetzen
+    const saved = store.state?.partyResume;
+    if (saved) {
+      const names = saved.names.slice(0, 4).join(', ') + (saved.names.length > 4 ? ' …' : '');
+      const b = el(`<button class="drink-btn">Party fortsetzen? Runde ${saved.round}/${saved.maxRounds}</button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:start', { mode: 'party', resume: true }));
+      menu.append(b, el(`<p>Mit ${escapeHtml(names)}</p>`));
+      gated.push({ btn: b, min: 2 });
+    }
     const roundRow = el(`<div class="btn-row"></div>`);
     for (const r of PARTY_ROUND_OPTIONS) {
       const b = el(`<button>${r} Runden</button>`).firstElementChild as HTMLButtonElement;

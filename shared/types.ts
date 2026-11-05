@@ -1900,17 +1900,55 @@ export interface BoardRoll {
   path: number[];
 }
 
+/** Statistik pro Spieler über die ganze Party (für die Bonus-Cocktails am Ende) */
+export interface BoardStats {
+  /** Münzen aus Minispielen */
+  miniCoins: number;
+  /** Auf roten Feldern gelandet */
+  red: number;
+  /** Felder gelaufen */
+  steps: number;
+}
+
+/** Bonus-Cocktail am Ende („Minispiel-Star“, „Pechvogel“, „Wanderer“) */
+export interface BoardAward {
+  key: 'star' | 'pech' | 'wander';
+  title: string;
+  /** z. B. „Meiste Münzen aus Minispielen“ */
+  desc: string;
+  winners: string[];
+  /** Wert der Gewinner, z. B. 38 (Münzen) */
+  value: number;
+  /** Einheit zum Wert, z. B. „Münzen“ */
+  unit: string;
+}
+
 export interface BoardState {
   round: number;
   maxRounds: number;
   order: string[];
+  /** Im Schnelldurchlauf: wer gerade läuft (Index in `order`) */
   turnIdx: number;
-  sub: 'roll' | 'moving' | 'intro';
+  /** roll = Würfelfenster (alle gleichzeitig), moving = Züge nacheinander, intro = Minispiel-Ansage, bonus = Bonus-Cocktails am Ende */
+  sub: 'roll' | 'moving' | 'intro' | 'bonus';
   pos: Record<string, number>;
   coins: Record<string, number>;
   cocktails: Record<string, number>;
   barField: number;
   lastRoll: BoardRoll | null;
+  /** Würfelfenster: Augenzahl pro Spieler, der schon gewürfelt hat (selbst oder automatisch) */
+  rolls: Record<string, number>;
+  /** Restzeit des Würfelfensters in ms (Stand beim Senden, wird ~1×/s aktualisiert; 0 außerhalb) */
+  rollMs: number;
+  /** Endspurt: blaue/rote Felder zählen doppelt */
+  double: boolean;
+  /** Tageszeit für den TV: 0 = Morgen, ~0.8 = Sonnenuntergang (letzte Runde), 1 = Nacht (Finale, Bonus) */
+  timeOfDay: number;
+  stats: Record<string, BoardStats>;
+  /** Bonus-Cocktails am Ende: `shown` Karten aufgedeckt, `revealed` = Gewinner der aktuellen Karte steht fest */
+  bonus: { awards: BoardAward[]; shown: number; revealed: boolean } | null;
+  /** Nachzügler, die diese Runde eingestiegen sind */
+  joined: string[];
   /** Ereignistext für TV + Handys */
   message: string;
   messageSeq: number;
@@ -2054,8 +2092,18 @@ export interface GameLive {
   intro?: IntroState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
   showBoard: boolean;
+  /** Lobby: gespeicherte Party (data/party.json), die der VIP fortsetzen kann */
+  partyResume?: PartyResumeInfo | null;
   /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */
   emotes?: import('./spectator').EmoteEntry[];
+}
+
+/** Kurzinfo zur gespeicherten Party für den „Party fortsetzen?“-Knopf */
+export interface PartyResumeInfo {
+  round: number;
+  maxRounds: number;
+  names: string[];
+  savedAt: number;
 }
 
 /** Was TV, Handy und Bots lesen: `meta` + `state` zusammengeführt ({ ...meta, ...live }). */
@@ -2187,5 +2235,7 @@ export interface StartRequest {
   rounds?: number;
   /** Party-Modus: auch lange Minispiele (> 4 min) aufs Brett */
   longGames?: boolean;
+  /** Party-Modus: gespeicherten Brettstand (data/party.json) fortsetzen */
+  resume?: boolean;
   version?: string;
 }
