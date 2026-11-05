@@ -1,6 +1,6 @@
 import '@fontsource/press-start-2p/400.css';
 import type { GameState, JoinResponse, PrivateState } from '../../shared/types';
-import { type Screen, LS, app, el, me, message, socket, store, toast } from './core';
+import { type Screen, LS, app, el, kartViewPref, me, message, socket, store, toast } from './core';
 import { startTimeSync } from '../timesync';
 import { knownKind, watchServerVersion } from '../version';
 import { buildEdit, buildLobby } from './screens/lobby';
@@ -34,6 +34,7 @@ import { pickSumo } from './screens/sumo';
 import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
+import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
 
 let screenKey = '';
@@ -48,7 +49,7 @@ let retryInLobby = false;
 function join() {
   if (joinPending) return;
   joinPending = true;
-  socket.emit('player:join', { name: store.name, look: store.look, playerId: store.playerId }, (r: JoinResponse) => {
+  socket.emit('player:join', { name: store.name, look: store.look, playerId: store.playerId, kartView: kartViewPref() }, (r: JoinResponse) => {
     joinPending = false;
     if (r.ok && r.playerId) {
       store.playerId = r.playerId;
@@ -294,6 +295,8 @@ function pickScreen(): Screen {
           return pickTourist(m.state);
         case 'sprueche':
           return pickSprueche(m.state, vip);
+        case 'werwolf':
+          return pickWerwolf(m.state);
       }
       return outdatedScreen();
     }

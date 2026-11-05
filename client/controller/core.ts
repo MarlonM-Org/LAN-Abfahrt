@@ -3,7 +3,13 @@ import type { GameState, Look, PlayerPublic, PrivateState, Team } from '../../sh
 import { AV_H, AV_W, drawAvatar, randomLook, sanitizeLook } from '../../shared/avatar';
 import { TEAM_INFO } from '../../shared/flunky';
 
-export const LS = { id: 'lanabfahrt.playerId', name: 'lanabfahrt.name', look: 'lanabfahrt.look' };
+export const LS = { id: 'lanabfahrt.playerId', name: 'lanabfahrt.name', look: 'lanabfahrt.look', kartView: 'lanabfahrt.kartView' };
+
+/** Kart-Rennen: gespeicherte Ansichts-Wahl (eigene Verfolger-Ansicht am Handy oder TV-Splitscreen) */
+export function kartViewPref(): 'phone' | 'tv' | undefined {
+  const v = localStorage.getItem(LS.kartView);
+  return v === 'phone' || v === 'tv' ? v : undefined;
+}
 
 export const socket = io();
 

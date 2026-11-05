@@ -2,6 +2,7 @@ import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
+import type { WolfPrivate, WolfState } from './werwolf';
 
 export interface Look {
   skin: number;
@@ -57,7 +58,8 @@ export type MiniKind =
   | 'sumo'
   | 'volley'
   | 'tourist'
-  | 'sprueche';
+  | 'sprueche'
+  | 'werwolf';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -953,6 +955,8 @@ export interface KartCar {
   vy: number;
   dc: number;
   bm: number;
+  /** Dieser Spieler sieht seine Verfolger-Ansicht auf dem eigenen Handy (statt im TV-Splitscreen) */
+  phoneView: boolean;
 }
 
 export interface KartEvent {
@@ -971,11 +975,11 @@ export interface KartState {
   closing: boolean;
   track: number;
   laps: number;
-  /** split = Verfolger-Ansichten auf dem geteilten TV, phone = jedes Handy zeigt seine eigene (TV: Draufsicht) */
+  /** Was der TV zeigt: split = Verfolger-Ansichten (`panes`), phone = niemand fährt auf dem TV → Draufsicht */
   view: import('./kart').KartView;
-  /** Wer im Splitscreen eine Ansicht bekommt (max. 4, in dieser Reihenfolge) */
+  /** Wer im TV-Splitscreen eine Ansicht bekommt (max. 4, in dieser Reihenfolge) – ohne die, die aufs Handy umgeschaltet haben */
   panes: string[];
-  /** Darf der VIP auf Splitscreen umschalten? (≤ 4 Menschen) */
+  /** Gibt es überhaupt TV-Splitscreen? (≤ 4 Menschen) – sonst fahren alle auf dem Handy */
   splitOk: boolean;
   /** Serverzeit des Physik-Schritts zu diesem Stand (für Interpolation/Vorhersage) */
   t: number;
@@ -1582,7 +1586,8 @@ export type MiniSnapshot =
   | { kind: 'sumo'; state: SumoState }
   | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
-  | { kind: 'sprueche'; state: SpruecheState };
+  | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'werwolf'; state: WolfState };
 
 export interface GameState {
   phase: Phase;
@@ -1629,6 +1634,7 @@ export type PrivateState =
   | { kind: 'geist'; state: GeistPrivate }
   | { kind: 'tourist'; state: TourPrivate }
   | { kind: 'sprueche'; state: SpruechePrivate }
+  | { kind: 'werwolf'; state: WolfPrivate }
   | null;
 
 export interface JoinRequest {
@@ -1637,6 +1643,8 @@ export interface JoinRequest {
   playerId?: string;
   /** Testspieler (Bots) melden sich so an – manche Spiele geben ihnen Hinweise */
   bot?: boolean;
+  /** Kart-Rennen: gespeicherte Ansichts-Wahl des Handys (TV-Splitscreen oder eigene Ansicht am Handy) */
+  kartView?: 'phone' | 'tv';
 }
 
 export interface JoinResponse {

@@ -33,6 +33,7 @@ import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
+import type { WolfState } from '../shared/werwolf';
 
 export interface BotOptions {
   url: string;
@@ -1064,6 +1065,8 @@ export class Bot {
     }
 
     if (m.kind === 'tourist') tourBot(this, m.state);
+
+    if (m.kind === 'werwolf') wolfBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -2231,6 +2234,86 @@ function tourBot(bot: Bot, st: TourState) {
       if (cur()?.phaseNo === st.phaseNo) bot.send('vote', { yes: Math.random() < 0.6 });
     });
   }
+}
+
+// ------------------------------------------------------------------ Werwölfe im Ferienhaus
+
+/**
+ * Bots können nicht diskutieren: Wölfe wählen ein zufälliges Nicht-Wolf-Opfer (und schließen sich
+ * gern dem Rudel an), die Seherin schaut in Unbekannte, die Hexe heilt/vergiftet manchmal,
+ * am Tag stimmen alle zufällig ab. Der Leader-Bot (VIP) kürzt die Diskussion ab.
+ */
+function wolfBot(bot: Bot, st: WolfState) {
+  const p = bot.priv?.kind === 'werwolf' ? bot.priv.state : null;
+  if (!p || !(bot.id in st.alive)) return;
+  const pickOne = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
+  const cur = () => (bot.state?.mini?.kind === 'werwolf' ? bot.state.mini.state : null);
+  const still = () => cur()?.phaseNo === st.phaseNo;
+  const others = Object.keys(st.alive).filter((id) => st.alive[id] && id !== bot.id);
+
+  if (st.sub === 'day' && bot.leader) {
+    bot.once(`wolf-day-${st.phaseNo}`, async () => {
+      await sleep(4000);
+      if (still()) bot.socket.emit('vip:mini', 'skip');
+    });
+  }
+  // Der Jäger ist schon tot, wenn er schießt
+  if (st.sub === 'hunter' && st.hunter === bot.id && !st.shotDone) {
+    bot.once(`wolf-shoot-${st.phaseNo}`, async () => {
+      await sleep(rand(1500, 4000));
+      const alive = Object.keys(st.alive).filter((id) => st.alive[id] && id !== bot.id);
+      if (still() && alive.length) bot.send('shoot', { target: pickOne(alive) });
+    });
+  }
+  if (!p.alive) return;
+
+  if (st.sub === 'night') {
+    if (p.role === 'wolf') {
+      const prey = others.filter((id) => !p.partners.includes(id));
+      const packPicks = Object.entries(p.pack).filter(([w]) => w !== bot.id).map(([, t]) => t);
+      if (!p.nightPick) {
+        bot.once(`wolf-night-${st.phaseNo}`, async () => {
+          await sleep(rand(1500, 5000));
+          const latest = bot.priv?.kind === 'werwolf' ? bot.priv.state : p;
+          const join = Object.entries(latest.pack).filter(([w]) => w !== bot.id).map(([, t]) => t);
+          if (still() && prey.length) bot.send('night', { target: join.length && Math.random() < 0.8 ? pickOne(join) : pickOne(prey) });
+        });
+      } else if (packPicks.some((t) => t !== p.nightPick)) {
+        // Uneinig → nach kurzem Zögern oft dem Rudel anschließen
+        bot.once(`wolf-agree-${st.phaseNo}`, async () => {
+          await sleep(rand(2000, 4000));
+          if (still() && Math.random() < 0.6) bot.send('night', { target: pickOne(packPicks) });
+        });
+      }
+    } else if (!p.nightPick) {
+      bot.once(`wolf-night-${st.phaseNo}`, async () => {
+        await sleep(rand(1500, 6000));
+        const fresh = p.role === 'seherin' ? others.filter((id) => !p.seen.some((x) => x.id === id)) : others;
+        const pool = fresh.length ? fresh : others;
+        if (still() && pool.length) bot.send('night', { target: pickOne(pool) });
+      });
+    }
+  }
+
+  if (st.sub === 'witch' && p.role === 'hexe' && !p.witchDone) {
+    bot.once(`wolf-witch-${st.phaseNo}`, async () => {
+      await sleep(rand(1500, 4000));
+      if (!still()) return;
+      if (p.victim && p.heal && Math.random() < 0.5) bot.send('heal', { on: true });
+      if (p.poison && others.length && Math.random() < 0.2) bot.send('poison', { target: pickOne(others) });
+      await sleep(300);
+      bot.send('witchDone');
+    });
+  }
+
+  if (st.sub === 'vote' && !p.myVote) {
+    bot.once(`wolf-vote-${st.phaseNo}`, async () => {
+      await sleep(rand(800, 3500));
+      const pool = p.role === 'wolf' ? others.filter((id) => !p.partners.includes(id)) : others;
+      if (still()) bot.send('vote', { target: Math.random() < 0.12 || !pool.length ? 'none' : pickOne(pool) });
+    });
+  }
+
 }
 
 /** Sprüche-Duell: Antworten der Bots (passen zu fast jeder Frage) */
