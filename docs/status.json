@@ -1,42 +1,33 @@
 {
-  "updated": "2026-11-06 00:25",
+  "updated": "2026-11-06 00:50",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Review Nacharbeit: Handy-Farben, TV-Banner, Doku-Dubletten",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/nacharbeit",
-      "detail": "Abendfarbe auch auf den Handy-Screens (Kurve, Bogen, Igel, Sumo, Kart), Namensschilder in Abendfarbe, Quer-Banner nicht mehr übers HUD, README/MiniKind aufräumen"
-    },
-    {
-      "title": "Neues Spiel: Schätzkönig",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/schaetz",
-      "detail": "à la Wits & Wagers: schätzen, dann Chips auf die beste Antwort setzen; 90-s-Variante fürs Brett"
-    },
-    {
-      "title": "Neues Spiel: Mäxchen am Pool",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/maexchen",
-      "detail": "Würfel-Bluff mit geheimer Hand, Schütteln zum Würfeln, auch als Trinkspiel"
-    },
-    {
-      "title": "Neues Spiel: Funkfrequenz",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/funk",
-      "detail": "à la Wavelength: Funker sieht das Ziel auf der Skala, Team dreht den Zeiger, Gegner wetten"
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Review Nacharbeit: Abendfarbe am Handy, TV-Banner nur ohne Regelkarte, Doku/Typen aufgeräumt",
+      "pr": 73,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Mäxchen am Pool (Würfel-Bluff, auch Trinkspiel)",
+      "pr": 74,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Schätzkönig (à la Wits & Wagers, 1 Frage auf dem Brett)",
+      "pr": 75,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Funkfrequenz (à la Wavelength, Team-Redespiel)",
+      "pr": 76,
+      "date": "2026-11-06"
+    },
     {
       "title": "Wer war's? (à la Who's Who)",
       "pr": 71,
@@ -359,8 +350,8 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Spiel-Review Phase 0+1 (Fairness, Netz, Pacing, Ton/Juice, Ausrichtung, Igel S) umgesetzt – offen: Regelkarte, Zuschauer-Rollen, Look, Spielbrett 2.0, Igel M, neue Spiele",
-      "status": "in Arbeit"
+      "title": "Spiel-Review umgesetzt: Phase 0–4 komplett, Phase 5 erste vier Spiele – offen: Igel Stufe L, Render-Auflösung/SnapBuffer, Parallax, Party 2.0 Stufe M, weitere neue Spiele",
+      "status": "umgesetzt"
     },
     {
       "title": "Online mit Freunden spielen → npm run online (Cloudflare-Tunnel statt Port öffnen), „Link teilen“ in der Handy-Lobby",
