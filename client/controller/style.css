@@ -535,33 +535,85 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .vs-blind p { color: #a8b3d6; }
 .vs-count { font-size: 48px; color: #fff4d6; text-align: center; }
 
-/* ---------------------------------------------------------------- Fallen-Parcours */
-.pc-top { align-items: center; }
+/* ---------------------------------------------------------------- Fallen-Parcours (durchgehend quer: Wählen, Platzieren, Laufen) */
+#app:has(.pcq) { padding: 0; border: 0; box-shadow: none; min-height: 0; }
+#app:has(.pcq) .abort { position: fixed; top: calc(4px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 4px 8px; font-size: 7px; }
+.pcq {
+  position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; gap: 6px; overflow: hidden;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) calc(10px + env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) calc(10px + env(safe-area-inset-left, 0px));
+  background: var(--paper); background-image: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px); background-size: 9px 9px;
+  border: 4px solid var(--wood-dark); box-shadow: inset 0 0 0 3px var(--wood), inset 0 0 0 5px var(--wood-darker);
+}
+.pcq-top { display: flex; justify-content: space-between; align-items: center; color: var(--ink-soft); font-size: 9px; padding: 2px 4px 0; }
+.pcq-body { flex: 1; min-height: 0; display: grid; gap: 10px; }
+.pcq-hint { font-size: 8px; line-height: 1.6; color: var(--ink-soft); }
+.pcq-hint.warn { color: var(--red); animation: shake 0.25s infinite; }
+.pcq-center { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; text-align: center; }
+.pcq-portrait { display: none; position: absolute; left: 0; right: 0; bottom: 18%; z-index: 7; text-align: center; padding: 12px; background: rgba(0,0,0,0.75); color: var(--gold); font-size: 12px; pointer-events: none; }
 .pc-dot { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 2px solid var(--outline); vertical-align: -1px; }
 .pc-pts { color: var(--red); }
 .pc-icon { image-rendering: pixelated; display: block; }
-.pc-cards { display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.pc-card { display: flex; align-items: center; gap: 12px; text-align: left; padding: 12px; min-height: 76px; background: var(--paper-light); color: var(--ink); text-shadow: none; border-color: var(--wood-dark); box-shadow: inset 0 3px 0 #fffaf0, inset 0 -3px 0 var(--paper-dark), 0 3px 0 var(--wood-darker); }
+.pc-card { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px; min-height: 0; touch-action: none; background: var(--paper-light); color: var(--ink); text-shadow: none; border-color: var(--wood-dark); box-shadow: inset 0 3px 0 #fffaf0, inset 0 -3px 0 var(--paper-dark), 0 3px 0 var(--wood-darker); }
 .pc-card-icon { width: 96px; min-width: 96px; display: flex; justify-content: center; align-items: center; background: #bfe6ff; border: 2px solid var(--wood-dark); padding: 6px 0; min-height: 52px; }
 .pc-card-text { display: flex; flex-direction: column; gap: 6px; }
-.pc-card small, .pc-picked small { font-size: 8px; color: var(--ink-soft); line-height: 1.5; display: block; }
-.pc-picked { display: flex; align-items: center; gap: 10px; }
-.pc-picked .pc-card-icon { width: 76px; min-width: 76px; min-height: 40px; }
-.pc-build-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.pc-build-btns button { padding: 10px 6px; font-size: 10px; }
-.pc-build-btns button:only-child { grid-column: 1 / -1; }
-.big-btn.pc-place { min-height: 13vh; flex: none; font-size: 16px; background: var(--green); box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
-.pc-run { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; align-items: stretch; }
-.pc-run .stick-area { min-height: 0; }
-.pc-run .stick-pad { width: 150px; height: 150px; }
-.big-btn.pc-jump { min-height: 50vh; font-size: 13px; }
-.big-btn.pc-jump.down { transform: translateY(2px); filter: brightness(0.9); }
+.pc-card small, .pcq-info small { font-size: 8px; color: var(--ink-soft); line-height: 1.5; display: block; }
 .pc-big { font-size: 16px; color: var(--red); }
-.pc-run-hint { min-height: 2.4em; }
-.pc-rank { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 4px; }
-.pc-rank li { display: flex; align-items: center; padding: 6px 8px; background: var(--paper-light); border: 2px solid var(--paper-dark); }
+.pc-rank { list-style: none; margin: 0 auto; padding: 0; width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; touch-action: pan-y; }
+.pc-rank li { display: flex; align-items: center; padding: 5px 8px; background: var(--paper-light); border: 2px solid var(--paper-dark); font-size: 9px; }
 .pc-rank li.me { border-color: var(--wood-dark); }
 .pc-rank li b { margin-left: auto; color: var(--red); }
+.pcq .stick-area { min-height: 0; }
+.pcq .stick-pad { width: 150px; height: 150px; }
+.pcq .big-btn { min-height: 0; }
+
+/* Wählen: drei Karten nebeneinander */
+.pcq-pick .pcq-body { grid-template-rows: 1fr auto; }
+.pcq-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; min-height: 0; }
+.pcq-cards .pc-card { flex-direction: column; justify-content: center; text-align: center; gap: 8px; }
+.pcq-cards .pc-card-text { align-items: center; }
+.pcq-pick .pcq-hint { min-height: 1.6em; }
+
+/* Platzieren: Stick links, Infos Mitte, Knöpfe rechts (PLATZIEREN unter dem rechten Daumen) */
+.pcq-place .pcq-body { grid-template-columns: 1fr minmax(120px, 0.8fr) 1fr; align-items: stretch; }
+.pcq-info { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
+.pcq-info .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
+.pcq-info b { font-size: 10px; }
+.pcq-info .pc-status { color: #2f7d32; }
+.pcq-info .pc-status.bad { color: var(--red); }
+.pcq-btns { display: flex; flex-direction: column; gap: 10px; }
+.pcq-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pcq-row button { padding: 10px 6px; font-size: 9px; touch-action: none; }
+.pcq-row button:only-child { grid-column: 1 / -1; }
+.big-btn.pc-place { flex: 1; font-size: 14px; background: var(--green); box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+
+/* Laufen: Stick links, SPRINGEN rechts */
+.pcq-run .pcq-body { grid-template-columns: 1fr minmax(100px, 0.6fr) 1fr; align-items: stretch; }
+.pcq-run .pc-run-hint { align-self: center; }
+.big-btn.pc-jump { font-size: 13px; }
+.big-btn.pc-jump.down { transform: translateY(2px); filter: brightness(0.9); }
+
+/* Warten/Wertung */
+.pcq-wait .pcq-body { grid-template-columns: 1fr; }
+.pcq-wait .pcq-center p { max-width: 520px; }
+.pcq-score .pcq-body { grid-template-columns: 1fr 1fr; align-items: center; }
+.pcq-score .pc-rank { max-height: 100%; }
+
+@media (orientation: portrait) {
+  .pcq-portrait { display: block; }
+  .pcq-cards { grid-template-columns: 1fr; }
+  .pcq-cards .pc-card { flex-direction: row; text-align: left; }
+  .pcq-cards .pc-card-text { align-items: flex-start; }
+  .pcq-place .pcq-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .pcq-place .pcq-info { order: -1; }
+  .pcq-run .pcq-body { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; }
+  .pcq-run .pc-run-hint { grid-column: 1 / -1; grid-row: 1; }
+  .pcq-score .pcq-body { grid-template-columns: 1fr; }
+}
+@media (orientation: landscape) and (max-height: 360px) {
+  .pcq .stick-pad { width: 128px; height: 128px; }
+  .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
+}
 
 /* ---------------------------------------------------------------- Kart-Rennen (quer, Mode-7-Ansicht hinter den Knöpfen) */
 #app:has(.k3) { padding: 0; border: 0; box-shadow: none; background: #000; }

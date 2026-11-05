@@ -27,10 +27,15 @@ export const PARCOURS = {
   ROUNDS: 6,
   TARGET: 15,
   INTRO_MS: 4000,
-  BUILD_MS: 15000,
   COUNTDOWN_MS: 2500,
-  RUN_MS: 25000,
   SCORE_MS: 5500,
+  /** Bauen und Laufen haben KEIN Zeitlimit. Nur wer so lange gar nichts eingibt (AFK), wird übersprungen
+   *  bzw. scheidet aus – ab AFK_WARN_MS Restzeit sieht er am Handy (und am TV) einen Hinweis. */
+  AFK_MS: 60000,
+  AFK_WARN_MS: 20000,
+  /** Testspieler können sich festlaufen – damit eine reine Bot-Runde nicht ewig hängt */
+  BOT_BUILD_MS: 20000,
+  BOT_RUN_MS: 30000,
   /** Punkte */
   GOAL_PTS: 4,
   FIRST_PTS: 2,
