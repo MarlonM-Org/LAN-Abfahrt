@@ -1,20 +1,15 @@
 import type { GeistPrivate, GeistState } from '../../../shared/types';
 import { GEIST, conePolygon, drawGeistMap } from '../../../shared/geist';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 import { ghostSprite } from '../../art/geist';
 
 const geist = () => (store.state?.mini?.kind === 'geist' ? store.state.mini.state : null);
 const priv = (): GeistPrivate | null => (store.priv?.kind === 'geist' ? store.priv.state : null);
 
-/** Vibration gibt es nicht überall (z. B. iOS Safari) – dann nur optisch */
-const vibrate = (pattern: number | number[]) => {
-  try {
-    if (typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
-  } catch {
-    /* egal */
-  }
-};
+/** Android: Vibration, iPhone: Klick + Rand-Blitz (haptic.ts) */
+const vibrate = (pattern: number | number[]) => haptic(pattern);
 
 export function pickGeist(g: GeistState): Screen {
   const p = priv();
@@ -71,17 +66,22 @@ function buildIntro(g: GeistState, ghost: boolean) {
 // ------------------------------------------------------------------ Jäger
 
 function buildHunter() {
+  // Quer: links Stick, Mitte Gänsehaut-Meter, rechts LICHT (mit Akku)
   const root = el(`
-    <div class="top-row"><span class="timer"></span><span class="ghost-hp"></span></div>
-    <div class="fear-box">
-      <div class="fear-head"><span>GÄNSEHAUT</span><span class="fear-word"></span></div>
-      <div class="meter fear"><div></div></div>
+    <div class="lx gs-lx gs-hunt">
+      <div class="lx-head"><span class="lx-tag gs-tag">JÄGER</span><span class="timer"></span><span class="ghost-hp grow"></span></div>
+      <div class="lx-left gs-stick"><span class="st-label">LAUFEN · Lampe leuchtet in Laufrichtung</span></div>
+      <div class="lx-mid">
+        <div class="fear-box">
+          <div class="fear-head"><span>GÄNSEHAUT</span><span class="fear-word"></span></div>
+          <div class="meter fear"><div></div></div>
+        </div>
+        <div class="dead-banner hidden down-banner">BUH! Du liegst vor Schreck am Boden. Ein Mitspieler muss 2 s neben dir stehen!</div>
+      </div>
+      <div class="lx-right"><button class="big-btn light-btn"><span class="light-label">LICHT AN</span><div class="meter battery"><div></div></div></button></div>
     </div>
-    <div class="dead-banner hidden down-banner">BUH! Du liegst vor Schreck am Boden. Ein Mitspieler muss 2 s neben dir stehen!</div>
-    <div class="stick-area"></div>
-    <button class="big-btn light-btn"><span class="light-label">LICHT AN</span><div class="meter battery"><div></div></div></button>
   `);
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.gs-stick'), (x, y) => send('stick', { x, y }));
   const lightBtn = q<HTMLButtonElement>(root, '.light-btn');
   tapButton(lightBtn, () => {
     send('light');
@@ -122,15 +122,19 @@ function buildHunter() {
 // ------------------------------------------------------------------ Geist
 
 function buildGhost() {
+  // Quer: die private Karte groß in der Mitte, Stick links, Leben/Status rechts
   const root = el(`
-    <div class="top-row"><span class="timer"></span><span class="hp"></span></div>
-    <div class="meter ghost-life"><div></div></div>
-    <p class="ghost-status"></p>
-    <canvas class="geist-map" width="464" height="242"></canvas>
-    <p class="map-legend">Du = weißer Kreis · Gelb = Jäger · Kegel = Licht</p>
-    <div class="stick-area small"></div>
+    <div class="lx gs-lx gs-ghost">
+      <div class="lx-head"><span class="lx-tag gs-tag ghost">GEIST</span><span class="timer"></span><span class="hp"></span><span class="meter ghost-life grow"><div></div></span></div>
+      <div class="lx-left gs-stick"><span class="st-label">SCHWEBEN</span></div>
+      <div class="lx-mid"><canvas class="geist-map" width="464" height="242"></canvas></div>
+      <div class="lx-right gs-side">
+        <p class="ghost-status"></p>
+        <p class="map-legend">Du = weißer Kreis<br/>Gelb = Jäger<br/>Kegel = Licht</p>
+      </div>
+    </div>
   `);
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.gs-stick'), (x, y) => send('stick', { x, y }));
   app.append(root);
   const canvas = q<HTMLCanvasElement>(root, '.geist-map');
   const g = canvas.getContext('2d')!;

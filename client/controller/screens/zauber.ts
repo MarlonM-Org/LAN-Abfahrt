@@ -3,7 +3,6 @@ import { ZAUBER } from '../../../shared/zauber';
 import { SHIRTS } from '../../../shared/avatar';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store } from '../core';
 import { floatingStick, holdButton } from './smash';
-import { leaveFullscreen, tryFullscreen } from './kart';
 
 /**
  * Zauber-Arena am Handy (am besten quer): links schwebender Joystick zum Laufen, rechts
@@ -17,7 +16,6 @@ export function pickZauber(s: ZauberState): Screen {
   const mine = s.players[id];
   if (!mine) return ['spectate', message('Du schaust zu', 'Zauber-Arena läuft – schau auf den Fernseher!')];
   if (s.sub === 'over') {
-    leaveFullscreen();
     const best = Math.max(...Object.values(s.players).map((p) => p.wins));
     const won = mine.wins === best && Object.values(s.players).filter((p) => p.wins === best).length === 1;
     return [`zb-over-${won}`, message(won ? 'Erzmagier!' : 'Zauber-Arena vorbei!', won ? 'Du hast die Zauber-Arena gewonnen!' : 'Schau auf den Fernseher!')];
@@ -35,7 +33,6 @@ export function pickZauber(s: ZauberState): Screen {
     const color = look ? SHIRTS[look.shirt] : '#9b5fc0';
     const root = el(`
       <div class="smash zauber" style="--zb-color:${color}">
-        <div class="zb-rot">Dreh dein Handy quer!</div>
         <div class="sm-top zb-top">
           <span class="sm-av"></span>
           <span class="zb-hp"><i></i><b></b></span>
@@ -74,7 +71,6 @@ export function pickZauber(s: ZauberState): Screen {
     };
     holdButton(q(root, '.zb-cast'), press('cast'));
     holdButton(q(root, '.zb-sprint'), press('sprint'));
-    root.querySelector('.smash')!.addEventListener('pointerdown', () => void tryFullscreen(), { once: true });
     app.append(root);
 
     let hits = mine.hits;

@@ -46,6 +46,7 @@ import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
+import { onRotate, syncOrientation } from './orientation';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -197,6 +198,7 @@ function render() {
     }
   }
   syncVipAbort();
+  syncOrientation(screen);
   try {
     updater?.();
   } catch (e) {
@@ -371,6 +373,12 @@ async function requestWakeLock() {
 }
 
 onKartRerender(() => render());
+// Handy gedreht: Werte nachziehen; Darts/Golf berechnen ihre Größe einmalig → neu bauen (beim Drehen tippt niemand)
+onRotate(() => {
+  const k = store.state?.mini?.kind;
+  if (store.state?.phase === 'mini' && (k === 'darts' || k === 'golf')) screenKey = '';
+  render();
+});
 initVipPlayersButton();
 
 // Countdowns etc. regelmäßig aktualisieren
