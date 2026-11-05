@@ -25,6 +25,7 @@ const CSS = `
 #ap-panel .tile .ic { font-size: 3.4vh; line-height: 1.15; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
 #ap-panel .tile .insp { font-size: 0.85vh; color: #7a5a3a; }
 #ap-panel .tile .pl { font-size: 0.85vh; color: #7a5a3a; }
+#ap-panel .tile .or { position: absolute; top: 0.4vh; left: 0.5vh; padding: 0.15vh 0.4vh; font-size: 1.1vh; color: #2f7d32; background: #d9f2c8; border: 0.2vh solid #2f7d32; }
 #ap-panel .tile .vt { position: absolute; top: 0.4vh; right: 0.4vh; padding: 0.2vh 0.5vh; font-size: 1vh; color: #fff4d6; background: #a8342a; }
 #ap-panel .tile:hover:not(:disabled), #ap-panel .tile:focus { background: #f7c948; outline: 0.3vh solid #a8342a; outline-offset: -0.3vh; }
 #ap-panel button:disabled { opacity: 0.35; cursor: default; filter: grayscale(0.7); }
@@ -72,7 +73,7 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
       b.className = 'tile';
       b.dataset.kind = kind;
       const range = mi.maxPlayers ? `${mi.minPlayers}–${mi.maxPlayers} Spieler` : `ab ${mi.minPlayers} Spieler`;
-      b.innerHTML = `<span class="ic"></span><span class="t"></span><span class="insp"></span><span class="pl">${range}</span><span class="vt" hidden></span>`;
+      b.innerHTML = `<span class="ic"></span><span class="t"></span><span class="insp"></span><span class="pl">${range}</span><span class="vt" hidden></span>${mi.orientation === 'landscape' ? '<span class="or" title="Handy quer halten">↔</span>' : ''}`;
       (b.querySelector('.ic') as HTMLElement).textContent = mi.icon;
       (b.querySelector('.t') as HTMLElement).textContent = mi.title;
       (b.querySelector('.insp') as HTMLElement).textContent = miniInspired(kind);

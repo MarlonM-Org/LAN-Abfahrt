@@ -211,6 +211,10 @@ Alternativ mehrere Browser-Tabs mit `http://localhost:3000/` öffnen (verschiede
 
 Alle laufen auch im Party-Modus auf dem Spielbrett.
 
+### Handy-Ausrichtung
+
+Jedes Spiel legt fest, wie das Handy gehalten wird (`orientation` in `shared/games.ts`): **quer** für alles mit Stick + Knöpfen (zwei Daumen wie am Gamepad – Kart, Wasserbomben, Igel-Krieg, Grill-Chaos, Smash …), **hochkant** für Sensor-Würfe, Listen, Text und Malen (Bowling, Darts, Golf, Stille Post …), **egal** für einen einzelnen Riesenknopf. Vor jedem Spiel zeigt das Handy eine kurze Ansage-Karte, der TV blendet „📱↔ Handys QUER halten“ bzw. hochkant ein, das Brett-Intro nennt es auch, und in den Spiellisten steht ↔ hinter Quer-Spielen. Hält jemand das Handy falsch, legt sich ein Hinweis mit Dreh-Animation über das Spiel (Eingaben werden dabei losgelassen); dreht es sich nicht, ist meist die Ausrichtungssperre im Kontrollzentrum an (iPhone). Auf Android geht das Handy beim ersten Tipp in einem Spiel ins Vollbild und wird in die richtige Lage gesperrt – das bleibt für die ganze Session. Laptops und Tablets bekommen nie einen Hinweis. Alle Quer-Spiele nutzen dasselbe Layout (Kopfzeile, links ein schwebender Stick – Daumen irgendwo aufsetzen –, rechts die Knöpfe), ausgelegt auf 300 px Höhe. Zum Testen am Laptop: `/?orient` erzwingt Hinweis und Ansage auch mit Maus.
+
 ## Trinkspiel
 
 Partyklassiker reihum, ohne Punkte – gezählt werden nur Schlücke (Wasser zählt auch!):
