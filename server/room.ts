@@ -76,6 +76,7 @@ import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
+import { WerwarsGame } from './werwars';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 import { EmoteFeed } from './spectator';
 
@@ -150,6 +151,7 @@ export class Room {
   private questions = new QuestionStore();
   private posts = new QuestionStore('stillepost.json', 'post');
   private quips = new QuestionStore('sprueche.json', 'quip');
+  private werwarsQ = new QuestionStore('werwars.json', 'werwars');
   private flushTimer: NodeJS.Timeout | null = null;
   private lastFlush = 0;
   /** Zuletzt gesendetes `meta` (als Vergleichs-Schlüssel) – neu senden nur bei Änderung */
@@ -448,7 +450,7 @@ export class Room {
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
       if (!playerId) return;
-      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : this.questions;
+      const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : kind === 'werwars' ? this.werwarsQ : this.questions;
       const q = store.add(String(text ?? ''));
       if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
       this.changed();
@@ -863,6 +865,9 @@ export class Room {
         break;
       case 'umzug':
         this.mini = new UmzugGame(ids, ctx);
+        break;
+      case 'werwars':
+        this.mini = new WerwarsGame(ids, ctx, this.werwarsQ.all);
         break;
     }
     this.results = null;
@@ -1459,6 +1464,7 @@ export class Room {
       customQuestionCount: this.questions.all.length,
       customPostCount: this.posts.all.length,
       customQuipCount: this.quips.all.length,
+      customWerwarsCount: this.werwarsQ.all.length,
       session: this.session.state(this.present()),
     };
   }
