@@ -65,6 +65,7 @@ import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
+import { SuessGame } from './suess';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
 const MAX_PLAYERS = 12;
@@ -594,6 +595,9 @@ export class Room {
         break;
       case 'angeln':
         this.mini = new AngelnGame(ids, ctx);
+        break;
+      case 'suess':
+        this.mini = new SuessGame(ids, ctx);
         break;
     }
     this.results = null;

@@ -7,6 +7,7 @@ import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
+import type { SuessState } from './suess';
 
 export interface Look {
   skin: number;
@@ -71,7 +72,8 @@ export type MiniKind =
   | 'pixel'
   | 'wpistole'
   | 'zauber'
-  | 'angeln';
+  | 'angeln'
+  | 'suess';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1857,7 +1859,8 @@ export type MiniSnapshot =
   | { kind: 'pixel'; state: PixelState }
   | { kind: 'wpistole'; state: WpistoleState }
   | { kind: 'zauber'; state: ZauberState }
-  | { kind: 'angeln'; state: AngelnState };
+  | { kind: 'angeln'; state: AngelnState }
+  | { kind: 'suess'; state: SuessState };
 
 export interface GameState {
   phase: Phase;

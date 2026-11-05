@@ -37,6 +37,7 @@ import { pickSprueche } from './screens/sprueche';
 import { pickPixel } from './screens/pixel';
 import { pickWpistole } from './screens/wpistole';
 import { pickAngeln } from './screens/angeln';
+import { pickSuess } from './screens/suess';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
 import { pickDarts } from './screens/darts';
@@ -321,6 +322,8 @@ function pickScreen(): Screen {
           return pickZauber(m.state);
         case 'angeln':
           return pickAngeln(m.state);
+        case 'suess':
+          return pickSuess(m.state);
       }
       return outdatedScreen();
     }
