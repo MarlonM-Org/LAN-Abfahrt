@@ -2,6 +2,7 @@ import type { PropType } from './verstecken';
 
 import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
+import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
 
@@ -60,6 +61,7 @@ export type MiniKind =
   | 'volley'
   | 'tourist'
   | 'sprueche'
+  | 'darts'
   | 'golf'
   | 'autoball'
   | 'werwolf';
@@ -1638,6 +1640,7 @@ export type MiniSnapshot =
   | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
+  | { kind: 'darts'; state: DartsState }
   | { kind: 'golf'; state: GolfState }
   | { kind: 'autoball'; state: AfbState }
   | { kind: 'werwolf'; state: WolfState };
