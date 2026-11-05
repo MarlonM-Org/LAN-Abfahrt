@@ -9,8 +9,9 @@
  *   this.juice.sfx('splash', { x });
  *
  * Hit-Stop und Zeitlupe wirken nur auf die Darstellung (Tweens, Timer, Partikel) – die
- * Positionen kommen ja vom Server. Szenen, die selbst interpolieren, können `frozen`
- * abfragen und in der Zeit die Figuren stehen lassen.
+ * Positionen kommen ja vom Server. Szenen mit `SnapBuffer` (interp.ts) übergeben ihn als
+ * `clock`: dann bleiben auch die Figuren stehen bzw. laufen in Zeitlupe (die Wiedergabe-Uhr
+ * holt danach mit 1,25× auf). Andere Szenen können `frozen` abfragen.
  */
 import Phaser from 'phaser';
 import { ensureTex, txt } from './ui';
@@ -28,6 +29,11 @@ export interface JuiceOpts {
   depth?: number;
   /** Die Szene setzt den Kamera-Zoom selbst (Smash) – dann `zoom` mit einrechnen statt die Kamera zu tweenen */
   manualZoom?: boolean;
+  /**
+   * Wiedergabe-Uhr der Szene (`SnapBuffer` aus `interp.ts`): Hit-Stop und Zeitlupe halten dann auch
+   * die Figuren an bzw. verlangsamen sie – der Server läuft normal weiter, der Puffer holt danach auf.
+   */
+  clock?: { rate: number };
 }
 
 const FLOAT_COLORS: Record<FloatStyle, string> = { dmg: '#ff8a7a', heal: '#9ad65a', gold: '#ffd25e', info: '#fff4d6', water: '#93d3f3' };
@@ -181,6 +187,7 @@ export class Juice {
     this.scene.tweens.timeScale = s;
     this.scene.time.timeScale = s;
     for (const e of this.emitters.values()) e.timeScale = s;
+    if (this.opts.clock) this.opts.clock.rate = s;
   }
 
   // ---------------------------------------------------------------- Partikel & Texte

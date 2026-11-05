@@ -7,7 +7,22 @@
  * - gedrosselt: große Richtungswechsel sofort, kleine höchstens alle 50 ms, beim Halten alle 250 ms erneut
  * - hört auf `input-reset` (Handy gedreht, Overlay eingeblendet) → (0, 0)
  * - Randabstand: die Zone selbst liegt im `.lx`-Layout ≥ 24 px vom Bildschirmrand (Zurück-Wischgeste)
+ * - Pseudo-Quer (orientation.ts dreht die Seite per CSS um 90°): Pointer-Koordinaten über `localPoint()` ins
+ *   gedrehte Element umrechnen – Knöpfe treffen von selbst, nur Deltas/Positionen müssen gedreht werden
  */
+
+/** Seite ist per CSS um 90° gedreht (`html.pseudo-land`, siehe orientation.ts) */
+export const pseudoLandscape = () => document.documentElement.classList.contains('pseudo-land');
+
+/**
+ * Pointer-Position in den Koordinaten des Elements selbst (0/0 = seine linke obere Ecke, Achsen wie im Layout).
+ * Ohne Drehung einfach clientX/Y minus Rechteck; bei Pseudo-Quer (rotate(90deg) translateY(-100%), Ursprung oben links)
+ * zeigt die lokale x-Achse auf dem Bildschirm nach unten und die lokale y-Achse nach links.
+ */
+export function localPoint(el: HTMLElement, e: { clientX: number; clientY: number }, r: DOMRect = el.getBoundingClientRect()) {
+  if (pseudoLandscape()) return { x: e.clientY - r.top, y: r.right - e.clientX };
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
 export interface StickOpts {
   /** 'x' = nur links/rechts (y bleibt 0) */
   axis?: 'x' | 'xy';
@@ -35,8 +50,10 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
   zone.append(ring);
 
   let active: number | null = null;
+  /** Mitte des Sticks in Zonen-Koordinaten (localPoint) */
   let cx = 0;
   let cy = 0;
+  let rect: DOMRect | null = null;
   let cur = { x: 0, y: 0 };
   let sent = { x: 0, y: 0, t: 0 };
   const emit = (force = false) => {
@@ -48,13 +65,13 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
     onMove(cur.x, cur.y);
   };
   const place = () => {
-    const r = zone.getBoundingClientRect();
-    ring.style.left = `${cx - r.left}px`;
-    ring.style.top = `${cy - r.top}px`;
+    ring.style.left = `${cx}px`;
+    ring.style.top = `${cy}px`;
   };
   const move = (e: PointerEvent) => {
-    let dx = e.clientX - cx;
-    let dy = axis === 'x' ? 0 : e.clientY - cy;
+    const p = localPoint(zone, e, rect ?? undefined);
+    let dx = p.x - cx;
+    let dy = axis === 'x' ? 0 : p.y - cy;
     const d = Math.hypot(dx, dy);
     if (d > R) {
       if (trailing) {
@@ -96,8 +113,10 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
       /* egal */
     }
     active = e.pointerId;
-    cx = e.clientX;
-    cy = e.clientY;
+    rect = zone.getBoundingClientRect();
+    const p = localPoint(zone, e, rect);
+    cx = p.x;
+    cy = p.y;
     place();
     ring.classList.add('on');
     zone.classList.add('st-active');

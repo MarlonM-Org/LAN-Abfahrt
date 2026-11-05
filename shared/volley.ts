@@ -5,7 +5,7 @@
 import type { Team } from './types';
 
 export const VOLLEY = {
-  TICK_MS: 50,
+  TICK_MS: 33,
   /** Physik-Unterschritte pro Tick (≈ 120 Hz) */
   SUBSTEPS: 6,
   INTRO_MS: 4000,

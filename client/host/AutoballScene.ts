@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import type { GameState, Team } from '../../shared/types';
 import { WORLD, TEAM_INFO } from '../../shared/flunky';
 import { AFB, AFB_CY, type AfbState } from '../../shared/autoball';
-import { wrapAngle } from '../../shared/kart';
 import { ballShine, beachBall, paintAutoballPitch } from '../art/autoball';
 import { kartSprite } from '../art/kartsprites';
 import { bus, getState, playerById } from './store';
@@ -10,6 +9,7 @@ import { ensurePortrait } from './textures';
 import { pcol } from './playerColor';
 import { Countdown, GOLD, LIGHT, background, ensureTex, panel, txt } from './ui';
 import { Juice } from './juice';
+import { SnapBuffer, lerpAngle, lerpJump } from './interp';
 import { sfx } from './sfx';
 
 interface CarView {
@@ -26,6 +26,10 @@ interface CarView {
 }
 
 const hexNum = (h: string) => parseInt(h.slice(1), 16);
+/** Tor-Wiederholung: so viel echte Zeit vor/nach dem Tor, abgespielt in so vielen ms (≈ 0,3×) */
+const REPLAY_BACK_MS = 550;
+const REPLAY_AHEAD_MS = 50;
+const REPLAY_MS = 2000;
 const fmtClock = (ms: number) => {
   const s = Math.ceil(ms / 1000);
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -38,7 +42,8 @@ const fmtClock = (ms: number) => {
 export class AutoballScene extends Phaser.Scene {
   private cars = new Map<string, CarView>();
   private ball!: { root: Phaser.GameObjects.Container; spin: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; x: number; y: number; rot: number };
-  private ballSnap = { x: 0, y: 0, vx: 0, vy: 0, at: 0 };
+  /** Wiedergabe-Uhr (60 ms hinter dem Server) mit 8 s Puffer – daraus kommt die Tor-Wiederholung */
+  private buf = new SnapBuffer<AfbState>();
   private builtHalf = -1;
   private bg: Phaser.GameObjects.Image | null = null;
   private goalLabels: Phaser.GameObjects.Text[] = [];
@@ -59,8 +64,6 @@ export class AutoballScene extends Phaser.Scene {
   private juice!: Juice;
   /** Anstoß-Countdown ohne Tafel (die Tafel lag sonst über dem Feld) */
   private kick!: Phaser.GameObjects.Text;
-  /** Tor-Wiederholung light: bis dahin Zeitlupe + Zoom */
-  private replayUntil = 0;
   private carFx = new Map<string, { bo: boolean; hop: boolean }>();
   private cd = new Countdown();
   private clockCd = new Countdown();
@@ -80,10 +83,9 @@ export class AutoballScene extends Phaser.Scene {
     this.lastRound = -1;
     this.scoreKey = '';
     this.bannerUntil = 0;
-    this.replayUntil = 0;
     this.carFx.clear();
-    this.ballSnap = { x: 0, y: 0, vx: 0, vy: 0, at: 0 };
-    this.juice = new Juice(this, { depth: 1500 });
+    this.buf = new SnapBuffer();
+    this.juice = new Juice(this, { depth: 1500, clock: this.buf });
 
     // Ball
     const shadow = this.add.ellipse(2, 7, 20, 8, 0x000000, 0.22);
@@ -103,10 +105,11 @@ export class AutoballScene extends Phaser.Scene {
     this.sub = txt(this, WORLD.W / 2, 136, '', { size: 8, wrap: 320 }).setDepth(2001);
     this.kick = txt(this, WORLD.W / 2, AFB_CY - 44, '', { size: 24, color: GOLD }).setDepth(2001).setAlpha(0.9);
     this.intro = this.add.container(0, 0).setDepth(2002).setVisible(false);
+    // Bildfest (scrollFactor 0): bleibt bei Kamera-Schwenk/Zoom der Tor-Wiederholung oben in der Mitte
     this.small = {
-      bg: panel(this, 140, 46, 200, 46, 'dark').setDepth(2000).setVisible(false),
-      title: txt(this, WORLD.W / 2, 50, '', { size: 24, color: GOLD }).setDepth(2001),
-      sub: txt(this, WORLD.W / 2, 78, '', { size: 8 }).setDepth(2001),
+      bg: panel(this, 140, 46, 200, 46, 'dark').setDepth(2000).setVisible(false).setScrollFactor(0),
+      title: txt(this, WORLD.W / 2, 50, '', { size: 24, color: GOLD }).setDepth(2001).setScrollFactor(0),
+      sub: txt(this, WORLD.W / 2, 78, '', { size: 8 }).setDepth(2001).setScrollFactor(0),
     };
 
     const fn = (s: GameState) => this.onState(s);
@@ -151,18 +154,19 @@ export class AutoballScene extends Phaser.Scene {
 
   update(_t: number, dms: number) {
     const st = this.latest;
-    if (!st) return;
+    const s = this.buf.sample();
+    if (!st || !s) return;
     const now = this.time.now;
-    const live = st.sub === 'play' || st.sub === 'goal';
-    for (const [id, car] of Object.entries(st.cars)) {
+    const { a, b, f } = s;
+    const live = b.sub === 'play' || b.sub === 'goal';
+    for (const [id, car] of Object.entries(b.cars)) {
       const v = this.carView(id, st);
       if (!v) continue;
-      // Tor-Wiederholung: Figuren laufen in Zeitlupe nach
-      const slow = now < this.replayUntil ? 0.3 : 1;
-      const k = st.sub === 'countdown' ? 1 : 0.45 * slow;
-      v.x += (car.x - v.x) * k;
-      v.y += (car.y - v.y) * k;
-      v.a += wrapAngle(car.a - v.a) * k;
+      // Zwischen den zwei Ständen um die Wiedergabe-Uhr; beim Anstoß (Sprung) sofort an die Aufstellung
+      const ca = a.cars[id] ?? car;
+      v.x = lerpJump(ca.x, car.x, f, 60);
+      v.y = lerpJump(ca.y, car.y, f, 60);
+      v.a = lerpAngle(ca.a, car.a, f);
       v.body.setRotation(v.a + (car.d ? car.d * 0.35 : 0));
       // Hüpfer: lokal animiert (Start aus dem Rest-Wert)
       if (car.hop > 0 && !v.hopStart) v.hopStart = now - (AFB.HOP_MS - car.hop);
@@ -174,7 +178,7 @@ export class AutoballScene extends Phaser.Scene {
       }
       v.lift.setY(-lift).setScale(1 + lift * 0.035);
       v.shadow.setScale(1 - lift * 0.05);
-      v.root.setPosition(Math.round(v.x), Math.round(v.y)).setDepth(10 + v.y + (lift ? 40 : 0));
+      v.root.setPosition(v.x, v.y).setDepth(10 + v.y + (lift ? 40 : 0));
       if (live && now - v.lastPuff > 70) {
         v.lastPuff = now;
         const bx = v.x - Math.cos(v.a) * 8;
@@ -186,21 +190,17 @@ export class AutoballScene extends Phaser.Scene {
         }
       }
     }
-    // Ball: letzten Stand mit seiner Geschwindigkeit fortschreiben, weich nachziehen
-    const b = this.ball;
-    const el = Math.min(0.08, (performance.now() - this.ballSnap.at) / 1000);
-    const tx = this.ballSnap.x + this.ballSnap.vx * el;
-    const ty = this.ballSnap.y + this.ballSnap.vy * el;
-    const k = st.sub === 'countdown' ? 1 : now < this.replayUntil ? 0.12 : 0.5;
-    const ox = b.x;
-    const oy = b.y;
-    b.x += (tx - b.x) * k;
-    b.y += (ty - b.y) * k;
-    const moved = Math.hypot(b.x - ox, b.y - oy);
-    b.rot += (moved / AFB.BALL_R) * (b.x >= ox ? 1 : -1);
-    b.spin.setRotation(b.rot);
-    b.root.setPosition(Math.round(b.x), Math.round(b.y)).setDepth(10 + b.y);
-    if (st.sub === 'play' && moved * (1000 / Math.max(1, dms)) > 150 && Math.random() < 0.35) this.puff(b.x, b.y + 5, 0xe8d3a8, 2, 260);
+    // Ball ebenfalls zwischen den Ständen (rollt mit dem zurückgelegten Weg)
+    const bl = this.ball;
+    const ox = bl.x;
+    const oy = bl.y;
+    bl.x = lerpJump(a.ball.x, b.ball.x, f, 80);
+    bl.y = lerpJump(a.ball.y, b.ball.y, f, 80);
+    const moved = Math.hypot(bl.x - ox, bl.y - oy);
+    bl.rot += (moved / AFB.BALL_R) * (bl.x >= ox ? 1 : -1);
+    bl.spin.setRotation(bl.rot);
+    bl.root.setPosition(bl.x, bl.y).setDepth(10 + bl.y);
+    if (b.sub === 'play' && moved * (1000 / Math.max(1, dms)) > 150 && Math.random() < 0.35) this.puff(bl.x, bl.y + 5, 0xe8d3a8, 2, 260);
 
     // Uhr
     if (st.sub === 'play') this.clock.setText(`${st.overtime ? 'GOLDEN GOAL ' : ''}${fmtClock(this.clockCd.remaining)}`);
@@ -301,19 +301,13 @@ export class AutoballScene extends Phaser.Scene {
     this.latest = st;
     this.build(st);
     this.buildIntro();
-    this.ballSnap = { ...st.ball, at: performance.now() };
-
-    // Neuer Anstoß: alles sofort an die Startpositionen
+    this.buf.push(st.t, st);
     if (st.round !== this.lastRound) {
       this.lastRound = st.round;
-      this.ball.x = st.ball.x;
-      this.ball.y = st.ball.y;
-      for (const [id, car] of Object.entries(st.cars)) {
-        const v = this.carView(id, st);
-        if (v) Object.assign(v, { x: car.x, y: car.y, a: car.a });
-      }
+      // Neuer Anstoß: eine laufende Wiederholung abbrechen
+      if (this.buf.replaying) this.buf.live();
     }
-    // Ballkontakt: kleiner Staub-Ring am Ball + Plopp; Boost und Hüpfer mit Ton
+    // Ballkontakt: kleiner Staub-Ring am Ball + Plopp; Boost und Hüpfer mit Ton – erst, wenn die Wiedergabe-Uhr den Stand zeigt
     for (const [id, car] of Object.entries(st.cars)) {
       const v = this.cars.get(id);
       const fx = this.carFx.get(id) ?? { bo: false, hop: false };
@@ -324,14 +318,18 @@ export class AutoballScene extends Phaser.Scene {
       this.carFx.set(id, { bo: !!car.bo, hop: car.hop > 0 });
       if (v && car.k !== v.touches) {
         v.touches = car.k;
-        if (st.sub === 'play') {
-          const sp = Math.hypot(st.ball.vx, st.ball.vy);
-          sfx(sp > 200 ? 'hitHard' : 'bonk', { x: st.ball.x, vol: 0.6, pitch: 0.9 + Math.min(0.5, sp / 600) });
-          this.juice.burst(st.ball.x, st.ball.y + 4, 'sand', sp > 200 ? 10 : 5);
-          if (sp > 260) this.juice.shake(1);
-        }
-        const ring = this.add.circle(st.ball.x, st.ball.y, AFB.BALL_R + 2).setStrokeStyle(1, 0xfdf7ea, 0.9).setDepth(1400);
-        this.tweens.add({ targets: ring, scale: 1.8, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
+        const ball = { ...st.ball };
+        const play = st.sub === 'play';
+        this.buf.after(st.t, () => {
+          if (play) {
+            const sp = Math.hypot(ball.vx, ball.vy);
+            sfx(sp > 200 ? 'hitHard' : 'bonk', { x: ball.x, vol: 0.6, pitch: 0.9 + Math.min(0.5, sp / 600) });
+            this.juice.burst(ball.x, ball.y + 4, 'sand', sp > 200 ? 10 : 5);
+            if (sp > 260) this.juice.shake(1);
+          }
+          const ring = this.add.circle(ball.x, ball.y, AFB.BALL_R + 2).setStrokeStyle(1, 0xfdf7ea, 0.9).setDepth(1400);
+          this.tweens.add({ targets: ring, scale: 1.8, alpha: 0, duration: 260, onComplete: () => ring.destroy() });
+        });
       }
     }
 
@@ -352,24 +350,29 @@ export class AutoballScene extends Phaser.Scene {
       const name = g.scorer ? (playerById(g.scorer)?.name ?? '?') : '';
       const sub = g.own ? `Eigentor von ${name} – Punkt für ${TEAM_INFO[g.team].name}` : name ? `${name} trifft für ${TEAM_INFO[g.team].name}!` : `Punkt für ${TEAM_INFO[g.team].name}!`;
       const gx = g.team === 'A' ? AFB.X1 + 6 : AFB.X0 - 6;
-      this.confetti(gx, AFB_CY, g.team);
-      sfx('goal', { x: gx });
-      sfx(g.own ? 'lose' : 'cheer', { x: gx, delay: 0.25 });
-      this.juice.flash(0xffffff, 140);
-      this.juice.shake(2);
-      // Tor-Wiederholung light: 1 s Zeitlupe + Zoom aufs Tor, danach das große Banner
-      this.replayUntil = this.time.now + 1000;
-      this.juice.slowMo(0.3, 1000);
-      const cam = this.cameras.main;
-      cam.pan(Phaser.Math.Linear(WORLD.W / 2, gx, 0.6), AFB_CY, 250, 'Quad.easeOut');
-      cam.zoomTo(1.35, 250, 'Quad.easeOut');
-      window.setTimeout(() => {
-        if (!this.sys.isActive()) return;
-        cam.pan(WORLD.W / 2, WORLD.H / 2, 300, 'Quad.easeInOut');
-        cam.zoomTo(1, 300, 'Quad.easeInOut');
-        this.showBanner(g.own ? 'EIGENTOR!' : 'TOR!', sub, g.own ? '#ff8a7a' : GOLD);
-        this.confetti(WORLD.W / 2, 110, g.team);
-      }, 1000);
+      const goalT = st.t;
+      // Sobald die Wiedergabe-Uhr den Torschuss zeigt: Blitz, dann 2 s Wiederholung des letzten Moments in
+      // Zeitlupe (aus dem 8-s-Puffer, der Server pausiert dafür nicht), danach das große Banner mit dem Schützen
+      this.buf.after(goalT, () => {
+        this.confetti(gx, AFB_CY, g.team);
+        sfx('goal', { x: gx });
+        sfx(g.own ? 'lose' : 'cheer', { x: gx, delay: 0.25 });
+        this.juice.flash(0xffffff, 140);
+        this.juice.shake(2);
+        this.showSmall(g.own ? 'EIGENTOR!' : 'TOR!', '◀◀ Wiederholung', g.own ? '#ff8a7a' : GOLD, 16);
+        this.juice.slowMo(0.3, REPLAY_MS);
+        this.buf.replay(goalT - REPLAY_BACK_MS, goalT + REPLAY_AHEAD_MS, (REPLAY_BACK_MS + REPLAY_AHEAD_MS) / REPLAY_MS);
+        const cam = this.cameras.main;
+        cam.pan(Phaser.Math.Linear(WORLD.W / 2, gx, 0.6), AFB_CY, 250, 'Quad.easeOut');
+        cam.zoomTo(1.35, 250, 'Quad.easeOut');
+        window.setTimeout(() => {
+          if (!this.sys.isActive() || this.lastGoal !== g.seq) return;
+          cam.pan(WORLD.W / 2, WORLD.H / 2, 300, 'Quad.easeInOut');
+          cam.zoomTo(1, 300, 'Quad.easeInOut');
+          this.showBanner(g.own ? 'EIGENTOR!' : 'TOR!', sub, g.own ? '#ff8a7a' : GOLD);
+          this.confetti(WORLD.W / 2, 110, g.team);
+        }, REPLAY_MS);
+      });
     }
 
     if (st.sub === 'countdown') {

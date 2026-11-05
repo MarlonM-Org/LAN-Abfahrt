@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { GameState, Team, VolleyState } from '../../shared/types';
 import { WORLD, TEAM_INFO } from '../../shared/flunky';
-import { VOLLEY as V, type VollBall, vollStepBall, vollWon } from '../../shared/volley';
+import { VOLLEY as V, type VollBall, vollWon } from '../../shared/volley';
 import { paintVolleyBeach, volleyArrow, volleyBall, volleyNet } from '../art/volley';
 import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
@@ -9,6 +9,7 @@ import { avatarSprite, ensurePortrait, playAvatar } from './textures';
 import { pcol } from './playerColor';
 import { Countdown, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
+import { SnapBuffer, lerp, lerpJump } from './interp';
 import { sfx } from './sfx';
 import { Parallax } from './parallax';
 import { clouds, daylight, foam, gulls, waves } from './ambient';
@@ -35,8 +36,9 @@ export class VolleyScene extends Phaser.Scene {
   private juice!: Juice;
   private sub!: Phaser.GameObjects.Text;
   private latest: VolleyState | null = null;
-  /** Zeitpunkt (scene time), zu dem `latest` ankam */
-  private latestAt = 0;
+  /** Wiedergabe-Uhr (60 ms hinter dem Server): Ball und Spieler laufen interpoliert, Hit-Stop beim Schmettern */
+  private buf = new SnapBuffer<VolleyState>();
+  /** Ball, wie er gerade gezeichnet wird */
   private shown: VollBall = { x: V.NET_X, y: 110, vx: 0, vy: 0 };
   private hudKey = '';
   private phaseKey = '';
@@ -52,14 +54,14 @@ export class VolleyScene extends Phaser.Scene {
   create() {
     this.figs.clear();
     this.latest = null;
-    this.latestAt = 0;
+    this.buf = new SnapBuffer();
     this.shown = { x: V.NET_X, y: 110, vx: 0, vy: 0 };
     this.hudKey = '';
     this.phaseKey = '';
     this.hitSeq = 0;
     this.pointSeq = 0;
     this.trailAt = 0;
-    this.juice = new Juice(this, { depth: 1700 });
+    this.juice = new Juice(this, { depth: 1700, clock: this.buf });
 
     // Parallax: Abendhimmel (fern), Meer + ferne Palmen (mittel), Sand + Feld (nah) – die Kamera steht,
     // die fernen Ebenen wandern leicht mit dem Ball
@@ -95,70 +97,50 @@ export class VolleyScene extends Phaser.Scene {
 
   update() {
     const st = this.latest;
-    if (!st) return;
+    const s = this.buf.sample();
+    if (!st || !s) return;
     const now = this.time.now;
-    const age = Math.min(0.25, (now - this.latestAt) / 1000);
+    const { a, b, f } = s;
 
-    // Ball: vom letzten Server-Stand aus mit derselben Physik weiterrechnen, dann weich angleichen
-    const target = { ...st.ball };
-    if (st.sub === 'rally' || st.sub === 'point') {
-      const steps = Math.round(age * 120);
-      for (let i = 0; i < steps; i++) {
-        vollStepBall(target, 1 / 120);
-        if (target.y + V.BALL_R >= V.GROUND) {
-          target.y = V.GROUND - V.BALL_R;
-          if (st.sub === 'rally') break;
-          target.vy = -Math.abs(target.vy) * 0.35;
-        }
-      }
-    }
-    const jump = Math.hypot(target.x - this.shown.x, target.y - this.shown.y) > 40;
-    const k = jump ? 1 : 0.55;
-    this.shown.x += (target.x - this.shown.x) * k;
-    this.shown.y += (target.y - this.shown.y) * k;
-    const hover = st.sub === 'serve' ? Math.sin(now / 180) * 1.5 : 0;
+    // Ball: zwischen den zwei Ständen um die Wiedergabe-Uhr interpoliert (bei Aufschlag/Punkt steht er bzw. liegt er)
+    this.shown = { x: lerpJump(a.ball.x, b.ball.x, f, 60), y: lerpJump(a.ball.y, b.ball.y, f, 60), vx: b.ball.vx, vy: b.ball.vy };
+    const hover = b.sub === 'serve' ? Math.sin(now / 180) * 1.5 : 0;
     this.ball.setPosition(this.shown.x, this.shown.y + hover);
-    this.ball.rotation += (st.ball.vx / 600) * (this.game.loop.delta / 16);
+    this.ball.rotation += (b.ball.vx / 600) * (this.game.loop.delta / 16) * this.buf.rate;
     const hgt = V.GROUND - this.shown.y;
     const sh = Math.max(0.35, 1 - hgt / 220);
     this.ballShadow.setPosition(this.shown.x, V.GROUND + 1).setScale(sh).setAlpha(0.3 * sh + 0.05);
     this.arrow.setVisible(this.shown.y < 34).setX(Phaser.Math.Clamp(this.shown.x, 10, 470));
     // Schnelle Bälle ziehen eine Spur
-    const speed = Math.hypot(st.ball.vx, st.ball.vy);
-    if (st.sub === 'rally' && speed > 300 && now - this.trailAt > 30) {
+    const speed = Math.hypot(b.ball.vx, b.ball.vy);
+    if (b.sub === 'rally' && speed > 300 && now - this.trailAt > 30) {
       this.trailAt = now;
       const d = this.add.circle(this.shown.x, this.shown.y, 4, 0xfff4d6, 0.6).setDepth(290);
       this.tweens.add({ targets: d, scale: 0.2, alpha: 0, duration: 260, onComplete: () => d.destroy() });
     }
 
     // Spieler
-    for (const [id, p] of Object.entries(st.players)) {
-      const a = this.figs.get(id);
-      if (!a) continue;
-      a.img.setVisible(p.court);
-      a.shadow.setVisible(p.court);
+    for (const [id, p] of Object.entries(b.players)) {
+      const g = this.figs.get(id);
+      if (!g) continue;
+      g.img.setVisible(p.court);
+      g.shadow.setVisible(p.court);
       if (!p.court) continue;
-      let tx = p.x + p.vx * age;
-      let ty = p.y;
-      if (p.air) ty = Math.min(V.GROUND, p.y + p.vy * age + 0.5 * V.P_G * age * age);
-      if (Math.abs(tx - a.x) > 30 || !a.court) {
-        a.x = tx;
-        a.y = ty;
-      }
-      a.court = true;
-      a.x += (tx - a.x) * 0.6;
-      a.y += (ty - a.y) * 0.6;
+      const pa = a.players[id] ?? p;
+      g.x = g.court ? lerpJump(pa.x, p.x, f, 30) : p.x;
+      g.y = g.court ? lerp(pa.y, p.y, f) : p.y;
+      g.court = true;
       const running = p.vx !== 0 && !p.air;
-      a.img.setPosition(a.x, a.y).setFlipX(p.dir < 0);
-      playAvatar(a.img, p.air ? 'jump' : running ? 'walk' : 'idle');
-      if (p.spike) a.img.setAngle((p.team === 'A' ? 1 : -1) * 22).setScale(1.12, 0.95);
-      else if (p.air) a.img.setAngle(0).setScale(0.94, 1.08);
-      else a.img.setAngle(running ? Math.sin(now / 65) * 4 : 0).setScale(1);
-      const hgtP = V.GROUND - a.y;
-      a.shadow.setPosition(a.x, V.GROUND + 1).setScale(Math.max(0.5, 1 - hgtP / 90));
+      g.img.setPosition(g.x, g.y).setFlipX(p.dir < 0);
+      playAvatar(g.img, p.air ? 'jump' : running ? 'walk' : 'idle');
+      if (p.spike) g.img.setAngle((p.team === 'A' ? 1 : -1) * 22).setScale(1.12, 0.95);
+      else if (p.air) g.img.setAngle(0).setScale(0.94, 1.08);
+      else g.img.setAngle(running ? Math.sin(now / 65) * 4 : 0).setScale(1);
+      const hgtP = V.GROUND - g.y;
+      g.shadow.setPosition(g.x, V.GROUND + 1).setScale(Math.max(0.5, 1 - hgtP / 90));
       // Landung: kleine Sandwolke
-      if (a.air && !p.air) this.puff(a.x, V.GROUND, 3);
-      a.air = p.air;
+      if (g.air && !p.air) this.puff(g.x, V.GROUND, 3);
+      g.air = p.air;
     }
     if (st.sub === 'intro') this.banner.setText(String(Math.max(1, this.clock.seconds)));
   }
@@ -175,7 +157,7 @@ export class VolleyScene extends Phaser.Scene {
       this.shown = { ...st.ball };
     }
     this.latest = st;
-    this.latestAt = this.time.now;
+    this.buf.push(st.t, st);
 
     for (const [id, p] of Object.entries(st.players)) {
       if (this.figs.has(id)) continue;
@@ -196,11 +178,17 @@ export class VolleyScene extends Phaser.Scene {
     if (st.hitSeq !== this.hitSeq) {
       const fresh = st.hitSeq > this.hitSeq;
       this.hitSeq = st.hitSeq;
-      if (fresh && st.lastHit) this.onHit(st, st.lastHit.spike);
+      if (fresh && st.lastHit) {
+        const spike = st.lastHit.spike;
+        this.buf.after(st.t, () => this.onHit(st, spike));
+      }
     }
     if (st.pointSeq !== this.pointSeq) {
       this.pointSeq = st.pointSeq;
-      if (st.lastPoint) this.onPoint(st.lastPoint.team, st.lastPoint.x);
+      if (st.lastPoint) {
+        const { team, x } = st.lastPoint;
+        this.buf.after(st.t, () => this.onPoint(team, x));
+      }
     }
     this.drawHud(st);
   }

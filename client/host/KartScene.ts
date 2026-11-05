@@ -295,18 +295,21 @@ export class KartScene extends Phaser.Scene {
   }
 
   private updateTopdown(st: KartState, now: number, dms: number) {
+    // Draufsicht: dieselbe Interpolation wie der Splitscreen (KartWorld: ~100 ms hinter dem Server, bildratenunabhängig)
+    const poses = new Map(this.world?.poses().map((p) => [p.id, p]) ?? []);
     for (const [id, car] of Object.entries(st.karts)) {
       const v = this.kartView(id);
       if (!v) continue;
-      v.x += (car.x - v.x) * 0.4;
-      v.y += (car.y - v.y) * 0.4;
-      v.a += wrapAngle(car.angle - v.a) * 0.4;
+      const pose = poses.get(id);
+      v.x = pose?.x ?? car.x;
+      v.y = pose?.y ?? car.y;
+      v.a = pose?.angle ?? car.angle;
       if (car.spin > 0) v.spinA += dms * 0.018;
       else v.spinA = 0;
       const driftTilt = car.drift ? car.drift * 0.35 : 0;
       v.body.setRotation(v.a + v.spinA + driftTilt);
       v.head.setY(-3 + (car.offroad && !car.finished ? Math.sin(now / 40) * 0.8 : 0));
-      v.root.setPosition(Math.round(v.x), Math.round(v.y)).setDepth(10 + v.y).setAlpha(car.ghost ? 0.4 : car.finished ? 0.65 : 1); // ghost = Verbindung weg
+      v.root.setPosition(v.x, v.y).setDepth(10 + v.y).setAlpha(car.ghost ? 0.4 : car.finished ? 0.65 : 1); // ghost = Verbindung weg
       if (now - v.lastPuff > 70 && st.sub === 'race') {
         v.lastPuff = now;
         const bx = v.x - Math.cos(v.a) * 8;

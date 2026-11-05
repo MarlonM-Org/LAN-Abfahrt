@@ -8,6 +8,7 @@ import { avatarSprite, ensurePortrait, playAvatar } from './textures';
 import { pcol } from './playerColor';
 import { ensureTex, txt } from './ui';
 import { Juice } from './juice';
+import { SnapBuffer, lerp, lerpJump } from './interp';
 import { sfx } from './sfx';
 import { say, spokenName } from './speech';
 import { clouds, daylight, gulls } from './ambient';
@@ -49,7 +50,8 @@ interface Card {
 
 export class SmashScene extends Phaser.Scene {
   private latest: SmashState | null = null;
-  private recvAt = 0;
+  /** Wiedergabe-Uhr: 60 ms hinter dem Server, Hit-Stop/Zeitlupe über `juice` */
+  private buf = new SnapBuffer<SmashState>();
   private built = '';
   private bgL!: C;
   private actL!: C;
@@ -88,6 +90,7 @@ export class SmashScene extends Phaser.Scene {
     this.fxSeen = -1;
     this.lastSub = '';
     this.cam = { x: 240, y: 135, z: 1 };
+    this.buf = new SnapBuffer();
 
     this.bgL = this.add.container(0, 0).setDepth(0);
     this.actL = this.add.container(0, 0).setDepth(10);
@@ -95,7 +98,7 @@ export class SmashScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0).setDepth(100);
     this.beamG = this.add.graphics();
     this.fxL.add(this.beamG);
-    this.juice = new Juice(this, { layer: this.fxL, hud: this.hud, manualZoom: true });
+    this.juice = new Juice(this, { layer: this.fxL, hud: this.hud, manualZoom: true, clock: this.buf });
 
     const main = this.cameras.main;
     main.setBounds(0, 0, WORLD.W, WORLD.H).setZoom(1).centerOn(240, 135);
@@ -231,7 +234,7 @@ export class SmashScene extends Phaser.Scene {
     const st = s.mini.state;
     this.build(st);
     this.latest = st;
-    this.recvAt = performance.now();
+    this.buf.push(st.ts, st);
     const ids = Object.keys(st.fighters);
     ids.forEach((id, i) => this.ensureFig(id, i));
     this.buildCards(st);
@@ -258,7 +261,8 @@ export class SmashScene extends Phaser.Scene {
     // Effekte
     const maxSeq = st.fx.reduce((m, f) => Math.max(m, f.seq), 0);
     if (this.fxSeen < 0) this.fxSeen = maxSeq;
-    for (const fx of st.fx) if (fx.seq > this.fxSeen) this.playFx(fx, st);
+    // Effekte erst, wenn die Wiedergabe-Uhr den Stand erreicht – dann stehen die Figuren genau am Treffpunkt
+    for (const fx of st.fx) if (fx.seq > this.fxSeen) this.buf.after(st.ts, () => this.playFx(fx, st));
     this.fxSeen = Math.max(this.fxSeen, maxSeq);
 
     // Banner
@@ -448,32 +452,39 @@ export class SmashScene extends Phaser.Scene {
   // ---------------------------------------------------------------- Bild für Bild
 
   update(time: number, delta: number) {
-    const st = this.latest;
-    if (!st) return;
-    // Hit-Stop: Figuren, Plattformen und Kamera kurz stehen lassen (nur Darstellung)
-    if (this.juice.frozen) return;
-    const age = Math.min(0.08, (performance.now() - this.recvAt) / 1000);
-    const t = st.sub === 'fight' ? st.t + age * 1000 : st.t;
+    const s = this.buf.sample();
+    if (!s) return;
+    const { a, b, f } = s;
+    // Kampfzeit (bewegliche Plattformen) läuft mit der Wiedergabe-Uhr – steht also auch im Hit-Stop
+    const t = lerp(a.t, b.t, f);
     for (const pl of this.plats) {
       const pos = platformPos(pl.p, t);
-      pl.img.setPosition(Math.round(pos.x + pl.ox), Math.round(pos.y + pl.oy));
+      pl.img.setPosition(pos.x + pl.ox, pos.y + pl.oy);
     }
-    const ids = Object.keys(st.fighters);
-    for (const id of ids) this.updateFig(id, st.fighters[id], age, time, delta);
-    for (const p of st.projectiles) {
+    for (const id of Object.keys(b.fighters)) {
+      const fb = b.fighters[id];
+      const fa = a.fighters[id] ?? fb;
+      this.updateFig(id, fb, lerpJump(fa.x, fb.x, f, 70), lerpJump(fa.y, fb.y, f, 70), time, delta);
+    }
+    const spin = delta * this.buf.rate;
+    for (const p of b.projectiles) {
       const img = this.projs.get(p.id);
       if (!img) continue;
-      img.setPosition(p.x + p.vx * age, p.y + p.vy * age);
-      if (p.type === 'flipflop') img.rotation += delta * 0.025 * Math.sign(p.vx || 1);
-      else img.rotation += delta * 0.01;
+      const pa = a.projectiles.find((q) => q.id === p.id) ?? p;
+      img.setPosition(lerp(pa.x, p.x, f), lerp(pa.y, p.y, f));
+      if (p.type === 'flipflop') img.rotation += spin * 0.025 * Math.sign(p.vx || 1);
+      else img.rotation += spin * 0.01;
     }
-    for (const it of st.items) this.items.get(it.id)?.setPosition(it.x, it.y + Math.sin(time / 200 + it.id) * 0.8);
-    this.drawBeams(st);
-    this.updateCamera(st);
-    this.updateMarkers(st);
+    for (const it of b.items) {
+      const ia = a.items.find((q) => q.id === it.id) ?? it;
+      this.items.get(it.id)?.setPosition(lerp(ia.x, it.x, f), lerp(ia.y, it.y, f) + Math.sin(time / 200 + it.id) * 0.8);
+    }
+    this.drawBeams(b);
+    this.updateCamera(b);
+    this.updateMarkers(b);
   }
 
-  private updateFig(id: string, f: SmashFighter, age: number, time: number, delta: number) {
+  private updateFig(id: string, f: SmashFighter, x: number, y: number, time: number, delta: number) {
     const g = this.figs.get(id);
     if (!g) return;
     const show = f.state === 'fight';
@@ -482,16 +493,10 @@ export class SmashScene extends Phaser.Scene {
       g.visible = false;
       return;
     }
-    const tx = f.x + f.vx * age;
-    const ty = f.y + (f.ground ? 0 : f.vy * age);
-    if (!g.visible || Math.hypot(tx - g.x, ty - g.y) > 70) {
-      g.x = tx;
-      g.y = ty;
-    }
+    g.x = x;
+    g.y = y;
     g.visible = true;
-    g.x += (tx - g.x) * 0.5;
-    g.y += (ty - g.y) * 0.5;
-    g.root.setVisible(true).setPosition(Math.round(g.x), Math.round(g.y));
+    g.root.setVisible(true).setPosition(g.x, g.y);
 
     const S = SMASH.SCALE;
     const img = g.img;
@@ -525,7 +530,7 @@ export class SmashScene extends Phaser.Scene {
         g.shield.setRadius(7 + (15 * f.shield) / 100).setFillStyle(g.color, 0.35);
         break;
       case 'hurt': {
-        g.spin += delta * 0.7 * (f.vx >= 0 ? 1 : -1);
+        g.spin += delta * this.buf.rate * 0.7 * (f.vx >= 0 ? 1 : -1);
         img.setAngle(g.spin).setPosition(0, -SMASH.H / 2).setOrigin(0.5, 0.5);
         if (Math.floor(time / 60) % 2) img.setTintFill(0xffffff);
         const speed = Math.hypot(f.vx, f.vy);

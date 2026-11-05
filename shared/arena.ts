@@ -10,7 +10,7 @@ export const ARENA = {
   TILE: 18,
   OX: 15,
   OY: 35,
-  TICK_MS: 50,
+  TICK_MS: 33,
   COUNTDOWN_MS: 3000,
   /** Danach kommt die Flut (Sudden Death) */
   ROUND_MS: 60000,

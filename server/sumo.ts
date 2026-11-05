@@ -394,6 +394,7 @@ export class SumoGame implements MiniGame {
     if (p.lastHitBy && p.lastHitBy !== id && now - p.lastHitAt < SUMO.CREDIT_MS) {
       const k = this.players.get(p.lastHitBy);
       if (k) k.pushes += 1;
+      this.ctx.log?.('out', { p: p.lastHitBy, o: id });
     }
   }
 
@@ -504,6 +505,7 @@ export class SumoGame implements MiniGame {
       kind: 'sumo',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: Math.max(0, this.deadline - now),
         round: this.round,
         winRounds: SUMO.WIN_ROUNDS,

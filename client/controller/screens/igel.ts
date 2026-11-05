@@ -2,7 +2,7 @@ import type { IgelState, IgelWeapon } from '../../../shared/types';
 import { GRENADE, IGEL, IGEL_TAUNTS, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, squadOf, windArrows } from '../../../shared/igel';
 import { type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
 import { haptic } from '../haptic';
-import { onInputReset } from '../stick';
+import { onInputReset, localPoint } from '../stick';
 
 const igel = () => (store.state?.mini?.kind === 'igel' ? store.state.mini.state : null);
 /** Spielerfarbe des Abends – wie `colorOf` in der IgelScene */
@@ -229,16 +229,16 @@ function buildActive(turn: number) {
     e.preventDefault();
     if (!canAim() || drag || aimKind() === 'map' || aimKind() === 'none') return;
     pad.setPointerCapture(e.pointerId);
-    const r = pad.getBoundingClientRect();
-    drag = { id: e.pointerId, x0: e.clientX - r.left, y0: e.clientY - r.top, x: e.clientX - r.left, y: e.clientY - r.top };
+    const p = localPoint(pad, e);
+    drag = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y };
     ready = null;
     draw();
   });
   pad.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
-    const r = pad.getBoundingClientRect();
-    drag.x = e.clientX - r.left;
-    drag.y = e.clientY - r.top;
+    const p = localPoint(pad, e);
+    drag.x = p.x;
+    drag.y = p.y;
     draw();
     const v = vec()!;
     padText.textContent = aimKind() === 'dir' ? 'Richtung …' : `Kraft ${Math.round(v.power * 100)}%`;
@@ -274,11 +274,12 @@ function buildActive(turn: number) {
   mapCanvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     if (!canAim() || aimKind() !== 'map') return;
-    const r = mapCanvas.getBoundingClientRect();
-    // Karte ist per object-fit: contain eingepasst
-    const k = Math.min(r.width / IGEL.W, r.height / IGEL.H);
-    const ox = (r.width - IGEL.W * k) / 2;
-    const tx = Math.round(Math.max(6, Math.min(IGEL.W - 6, (e.clientX - r.left - ox) / k)));
+    // Karte ist per object-fit: contain eingepasst (clientWidth/Height: Layoutmaße, auch bei Pseudo-Quer)
+    const w = mapCanvas.clientWidth;
+    const h = mapCanvas.clientHeight;
+    const k = Math.min(w / IGEL.W, h / IGEL.H);
+    const ox = (w - IGEL.W * k) / 2;
+    const tx = Math.round(Math.max(6, Math.min(IGEL.W - 6, (localPoint(mapCanvas, e).x - ox) / k)));
     target = tx;
     send('aim', { tx });
     haptic(10);

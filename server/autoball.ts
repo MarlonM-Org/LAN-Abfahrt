@@ -2,7 +2,8 @@ import type { MiniSnapshot, Team } from '../shared/types';
 import { AFB, AFB_CX, AFB_CY, type AfbCar, type AfbGoal, type AfbState, afbCollideWalls, afbGoalHalf, afbKickoff } from '../shared/autoball';
 import { KART, type KartInput, type KartPhys, stepKart } from '../shared/kart';
 import { TEAM_INFO } from '../shared/flunky';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { teamHandicap } from '../shared/games';
+import { type MiniCtx, type MiniGame, Timers, asRecord, splitTeams } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -67,8 +68,13 @@ export class AutoballGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     const perTeam: Record<Team, number> = { A: 0, B: 0 };
-    shuffle(ids).forEach((id, i) => {
-      const team: Team = i % 2 === 0 ? 'A' : 'B';
+    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) oder zufällig geteilt
+    const split = splitTeams(ids, ctx.teams);
+    const teamOf = new Map<string, Team>([...split.A.map((id) => [id, 'A'] as const), ...split.B.map((id) => [id, 'B'] as const)]);
+    // Handicap bei ungleichen Brett-Teams: Vorsprung in Toren (dazu lädt der Boost des kleineren Teams schneller, s. u.)
+    if (ctx.teams) this.score = teamHandicap(split.A.length, split.B.length);
+    ids.forEach((id) => {
+      const team: Team = teamOf.get(id) ?? 'A';
       const slot = perTeam[team]++;
       const k = afbKickoff(team, slot);
       this.cars.set(id, {
@@ -178,6 +184,7 @@ export class AutoballGame implements MiniGame {
       }
     }
     if (scorer && !own) this.cars.get(scorer)!.goals++;
+    if (scorer) this.ctx.log?.(own ? 'owngoal' : 'goal', { p: scorer });
     this.lastGoal = { seq: ++this.seq, team, scorer, own };
     this.sub = 'goal';
     this.deadline = now + AFB.GOAL_MS;
@@ -389,6 +396,7 @@ export class AutoballGame implements MiniGame {
       kind: 'autoball',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: this.sub === 'play' ? Math.round(this.clock) : Math.max(0, this.deadline - now),
         round: this.round,
         clock: Math.round(this.clock),

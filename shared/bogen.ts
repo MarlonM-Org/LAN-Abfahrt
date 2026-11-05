@@ -10,7 +10,7 @@
  */
 
 export const BOGEN = {
-  TICK_MS: 50,
+  TICK_MS: 33,
   SUBSTEPS: 4,
   COLS: 48,
   ROWS: 25,

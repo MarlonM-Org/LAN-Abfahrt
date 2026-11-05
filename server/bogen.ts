@@ -655,6 +655,7 @@ export class BogenGame implements MiniGame {
       kind: 'bogen',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: Math.max(0, this.deadline - now),
         round: this.round,
         winRounds: BOGEN.WIN_ROUNDS,

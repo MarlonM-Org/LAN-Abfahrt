@@ -1,7 +1,8 @@
 import type { MiniSnapshot, Team, VolleyPlayer, VolleyState } from '../shared/types';
 import { TEAM_INFO, otherTeam } from '../shared/flunky';
+import { teamHandicap } from '../shared/games';
 import { VOLLEY as V, type VollBall, vollDir, vollSide, vollSpot, vollStepBall, vollWon } from '../shared/volley';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, splitTeams } from './minigame';
 
 interface P extends VolleyPlayer {
   /** Gehaltene Richtung vom Handy */
@@ -47,14 +48,19 @@ export class VolleyGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    shuffle(ids).forEach((id, i) => {
-      const team: Team = i % 2 === 0 ? 'A' : 'B';
-      this.queue[team].push(id);
-      this.players.set(id, {
-        team, court: false, x: vollSpot(team, 0), y: V.GROUND, vx: 0, vy: 0, air: false, spike: false, cd: 0, dir: 0, touches: 0, spikes: 0,
-        inDir: 0, jumpAt: 0, spikeUntil: 0, readyAt: 0, lastTouchAt: 0,
-      });
-    });
+    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) oder zufällig geteilt
+    const split = splitTeams(ids, ctx.teams);
+    for (const team of ['A', 'B'] as Team[]) {
+      for (const id of split[team]) {
+        this.queue[team].push(id);
+        this.players.set(id, {
+          team, court: false, x: vollSpot(team, 0), y: V.GROUND, vx: 0, vy: 0, air: false, spike: false, cd: 0, dir: 0, touches: 0, spikes: 0,
+          inDir: 0, jumpAt: 0, spikeUntil: 0, readyAt: 0, lastTouchAt: 0,
+        });
+      }
+    }
+    // Handicap bei ungleichen Brett-Teams: das kleinere startet mit Vorsprung (im Feld stehen ohnehin gleich viele)
+    if (ctx.teams) this.score = teamHandicap(split.A.length, split.B.length);
     this.placeTeams();
     this.ball = { x: V.NET_X, y: 110, vx: 0, vy: 0 };
     this.deadline = Date.now() + V.INTRO_MS;
@@ -359,6 +365,7 @@ export class VolleyGame implements MiniGame {
       kind: 'volley',
       state: {
         sub: this.sub,
+        t: now,
         endsIn: Math.max(0, this.deadline - now),
         clock: Math.round(this.clockLeft(now)),
         score: { ...this.score },

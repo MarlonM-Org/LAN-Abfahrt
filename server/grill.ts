@@ -34,7 +34,7 @@ import {
   tileCh,
   tileOfPos,
 } from '../shared/grill';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle, splitTeams } from './minigame';
 
 const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -114,7 +114,8 @@ export class GrillGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     const n = ids.length;
-    this.teams = n >= 7;
+    // Zwei Küchen ab 7 Spielern – oder wenn das Spielbrett Teams vorgibt (2 gegen 2)
+    this.teams = !!ctx.teams || n >= 7;
     this.goals = grillStarGoals(n);
     if (this.teams) {
       this.kitchens.push(this.makeKitchen('small', false, 6, 'A'));
@@ -124,9 +125,10 @@ export class GrillGame implements MiniGame {
     } else {
       this.kitchens.push(this.makeKitchen('wide', false, 6, null));
     }
-    const order = shuffle(ids);
+    const split = this.teams ? splitTeams(ids, ctx.teams) : null;
+    const order = split ? [...split.A, ...split.B] : shuffle(ids);
     order.forEach((id, i) => {
-      const k = this.teams ? i % 2 : 0;
+      const k = split ? (split.A.includes(id) ? 0 : 1) : 0;
       const kit = this.kitchens[k];
       kit.size++;
       this.players.set(id, {

@@ -10,7 +10,7 @@ export const SUMO = {
   TILE: 16,
   OX: 32,
   OY: 44,
-  TICK_MS: 50,
+  TICK_MS: 33,
   COUNTDOWN_MS: 3000,
   /** Kurz warten, bevor die Runde ausgewertet wird (gleichzeitiges Platschen = Unentschieden) */
   END_DELAY_MS: 800,

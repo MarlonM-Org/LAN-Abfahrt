@@ -63,6 +63,7 @@ import { IntroScene } from './IntroScene';
 import { SchaetzScene } from './SchaetzScene';
 import { WerwarsScene } from './WerwarsScene';
 import { MaexScene } from './MaexScene';
+import { hdFactor, installHd } from './hd';
 
 const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'funk'];
 
@@ -81,11 +82,14 @@ async function start() {
     new Promise((r) => setTimeout(r, 1500)),
   ]).catch(() => undefined);
 
+  // Render-Auflösung ×2 (960 × 540) bei unveränderter Welt 480 × 270 – siehe hd.ts (?hd=1|2, Laptop-Steuerung)
+  const hd = hdFactor();
+  installHd(hd);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game',
-    width: WORLD.W,
-    height: WORLD.H,
+    width: WORLD.W * hd,
+    height: WORLD.H * hd,
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
