@@ -3,7 +3,7 @@ import { ENTEN } from '../../../shared/games';
 import { WORLD } from '../../../shared/flunky';
 import { type Screen, app, el, message, q, send, store, tapButton, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
-import { type AimCalib, orientToAim, smoothAim, trackpadDelta } from '../aim';
+import { type AimCalib, orientToAim, smoothAim, trackpadDelta, wrapDeg } from '../aim';
 import { hat, kick, unlockAudio } from '../audio';
 
 type AimMode = 'ask' | 'motion' | 'touch';
@@ -76,7 +76,8 @@ function buildGun(mode: 'motion' | 'touch') {
     </div>
     ${
       mode === 'motion'
-        ? `<div class="en-tools"><button class="secondary small en-center">Zentrieren</button><button class="secondary small en-switch">Touchpad</button></div>
+        ? `<div class="en-mini"><div class="en-mini-field"><div class="en-pad-dot" style="background:${color}"></div></div><span class="en-mini-txt">Sensor …</span></div>
+           <div class="en-tools"><button class="secondary small en-center">Zentrieren</button><button class="secondary small en-switch">Touchpad</button></div>
            <p class="hint">Auf die TV-Mitte zielen, dann „Zentrieren“ tippen.</p>`
         : `<div class="en-pad"><div class="en-pad-dot" style="background:${color}"></div><span>Touchpad – wischen zum Zielen</span></div>`
     }
@@ -176,6 +177,9 @@ function buildGun(mode: 'motion' | 'touch') {
       navigator.vibrate?.(10);
     });
     let smoothed: { x: number; y: number } | null = null;
+    // Live-Anzeige: Drehung/Neigung gegenüber der Mitte
+    const miniTxt = q(root, '.en-mini-txt');
+    const angTxt = (d: number, neg: string, pos: string) => (Math.abs(d) < 1 ? '0°' : d < 0 ? `${neg} ${Math.round(-d)}°` : `${pos} ${Math.round(d)}°`);
     const off = onMotion((s) => {
       if (!root.isConnected) return off();
       // Manche Browser ohne echten Sensor liefern nur Nullen → ignorieren
@@ -186,6 +190,9 @@ function buildGun(mode: 'motion' | 'touch') {
         smoothed = null;
       }
       smoothed = smoothAim(smoothed, orientToAim(s, calib, FIELD), 0.35);
+      // alpha wächst beim Drehen nach links, beta beim Anheben
+      const t = `${angTxt(-wrapDeg(s.alpha - calib.alpha), '◀', '▶')} · ${angTxt(wrapDeg(s.beta - calib.beta), '▼', '▲')}`;
+      if (miniTxt.textContent !== t) miniTxt.textContent = t;
       setAim(smoothed.x, smoothed.y);
     });
     // Kein einziger Messwert (z. B. Laptop ohne Sensor) → Touchpad
