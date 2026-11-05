@@ -222,6 +222,8 @@ export class KartGame implements MiniGame {
         this.finishOrder.push(c.id);
         const place = this.finishOrder.length;
         this.event('finish', c.id, null, `${this.ctx.nameOf(c.id)} ist im Ziel – Platz ${place}!`);
+        this.ctx.log?.('place', { p: c.id, n: place });
+        if (place === 1) this.ctx.log?.('kartwin', { p: c.id });
         if (place === 1) {
           this.closing = true;
           this.deadline = Math.min(this.deadline, now + KART.AFTER_WINNER_MS);

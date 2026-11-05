@@ -178,6 +178,7 @@ export class AutoballGame implements MiniGame {
       }
     }
     if (scorer && !own) this.cars.get(scorer)!.goals++;
+    if (scorer) this.ctx.log?.(own ? 'owngoal' : 'goal', { p: scorer });
     this.lastGoal = { seq: ++this.seq, team, scorer, own };
     this.sub = 'goal';
     this.deadline = now + AFB.GOAL_MS;

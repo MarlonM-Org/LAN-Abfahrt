@@ -70,6 +70,8 @@ export interface BotOptions {
   rounds?: number;
   /** Party: gespeicherten Brettstand fortsetzen (data/party.json) statt neu zu starten */
   resume?: boolean;
+  /** Turnier: Playlist-ID (sport, arena, kopf) oder eigene Liste „sumo,sprint,maexchen“ */
+  turnier?: string;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
@@ -693,7 +695,18 @@ export class Bot {
     if (s.phase === 'lobby' && this.leader && me?.isVip && s.players.filter((p) => p.connected).length >= (this.opts.count ?? 1)) {
       this.once('start', async () => {
         await sleep(1500);
-        this.socket.emit('vip:start', this.opts.date ? { mode: 'date' } : this.opts.game ? { mode: this.opts.game } : { mode: 'party', rounds: this.opts.rounds ?? 3, resume: this.opts.resume && !!this.state?.partyResume });
+        this.socket.emit(
+          'vip:start',
+          this.opts.date
+            ? { mode: 'date' }
+            : this.opts.turnier
+              ? this.opts.turnier.includes(',')
+                ? { mode: 'turnier', playlist: 'custom', kinds: this.opts.turnier.split(',').map((k) => k.trim()) }
+                : { mode: 'turnier', playlist: this.opts.turnier }
+              : this.opts.game
+                ? { mode: this.opts.game }
+                : { mode: 'party', rounds: this.opts.rounds ?? 3, resume: this.opts.resume && !!this.state?.partyResume },
+        );
       });
     }
     if (s.phase === 'results' && this.leader && me?.isVip) {
@@ -706,6 +719,15 @@ export class Bot {
           const table = cur.session.rows.map((r) => `${r.rank}. ${r.name} ${r.points}${r.last !== null ? ` (+${r.last})` : ''}`).join(' | ');
           const ser = cur.session.series;
           this.opts.log?.(`Leaderboard nach ${cur.session.games} ${cur.session.games === 1 ? 'Spiel' : 'Spielen'}${ser ? ` [Serie ${ser.label}]` : ''}: ${table}`);
+        }
+        if (cur.turnier) {
+          const t = cur.turnier;
+          const table = t.table.rows.map((r) => `${r.rank}. ${r.name} ${r.points}`).join(' | ');
+          this.opts.log?.(`Turnier ${t.name} – Spiel ${t.index + 1}/${t.kinds.length} (${t.kinds[t.index]}), Zwischenstand nach ${t.played}: ${table}`);
+        }
+        if (s.results?.final && cur.evening?.titles.length) {
+          const names = cur.evening.titles.map((t) => `${t.icon} ${t.title}: ${t.playerId ? s.players.find((p) => p.id === t.playerId)?.name : t.kind} (${t.text})`).join(' | ');
+          this.opts.log?.(`Titel des Abends: ${names}`);
         }
         if (this.opts.game && !drink && this.nochmalCount < (this.opts.nochmal ?? 0)) {
           if (cur.nochmal && !cur.nochmal.disabled) {

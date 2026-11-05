@@ -50,7 +50,8 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   kart: { title: 'Kart-Rennen', icon: '🏎️', inspiredBy: 'Mario Kart', tagline: 'Verfolger-Kamera wie auf dem SNES – Gas, Drift, Items!', minPlayers: 2 , orientation: 'landscape' },
   turm: { title: 'Wackelturm', icon: '🗼', inspiredBy: 'Tricky Towers', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2 , orientation: 'landscape' },
   igel: { title: 'Igel-Krieg', icon: '🦔', inspiredBy: 'Worms', tagline: 'Kokosnüsse, Wasserbomben – wer bleibt auf der Insel?', minPlayers: 2 , orientation: 'landscape' },
-  smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2 , orientation: 'landscape' },
+  // max. 8: die Hauptplattform ist 280 px breit, bei 12 Kämpfern (16 px) blieben keine 8 px Abstand zum Nachbarn
+  smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
   wasser: { title: 'Wasserbomben-Schlacht', icon: '💦', tagline: 'Zielen, werfen, platsch – wer wird klatschnass?', minPlayers: 2 , orientation: 'landscape' },
   stillepost: { title: 'Stille Post mit Bildern', icon: '🖍️', inspiredBy: 'Gartic Phone', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3 , orientation: 'portrait' },
   fangen: { title: 'Urlaubs-Fangen', icon: '🕵️', inspiredBy: 'Mario Chase', tagline: 'Der Animateur ist unsichtbar – nur sein Handy kennt die Karte!', minPlayers: 3 , orientation: 'landscape' },
@@ -250,12 +251,14 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   // bis 5 Runden à 15–60 s (Flut beendet jede Runde)
   wackel: 'mittel',
   werwolf: 'lang',
-  // 6–8 Runden à ca. 40–90 s, endet früher bei 10 Punkten
-  funk: 'mittel',
+  // 8–12 Spieler: ab 9 Spielern 8 Runden (sonst 6) à Intro 5 s + Hinweis ≤ 30 s + Drehen ≤ 45 s + Wette ≤ 15 s + Auflösung 9 s
+  // = ≤ 104 s, realistisch ≈ 60 s → 6–8 min (max. 14 min); früher Schluss erst bei 10 Punkten
+  funk: 'lang',
   // Brett: 1 Frage ≈ 90 s (Arcade: 4 Fragen ≈ 4–5 min)
   schaetz: 'kurz',
-  // reihum, 3 Leben bzw. 6 Runden um den Tisch (Trinkspiel: 2) – 6 Spieler ≈ 4 min, 12 Spieler deutlich länger
-  maexchen: 'mittel',
+  // reihum, 3 Leben; Runden um den Tisch: 6 (≤ 6 Spieler), 4 (≤ 9), 3 (≥ 10), Trinkspiel 2. Pro Zug Würfeln ≤ 15 s + Ansage ≤ 15 s
+  // + Heben 2 s + Auflösung 4,6 s (+ Annahme 3,2 s), realistisch ≈ 15–20 s → 8 Spieler: 32 Züge ≈ 8–10 min, 12 Spieler: 36 Züge ≈ 9–12 min
+  maexchen: 'lang',
   // 1 min schreiben + 12 Antworten à ca. 25 s (ab 7 Spielern eine Antwort pro Spieler)
   werwars: 'mittel',
 };
@@ -840,3 +843,24 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'funk'] },
 ];
+
+/** Turnier: vorgefertigte Playlists (laufen nacheinander, Gesamtwertung mit `arcadePoints`) */
+export interface TurnierPlaylist {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+  kinds: MiniKind[];
+}
+
+export const TURNIER_PLAYLISTS: TurnierPlaylist[] = [
+  { id: 'sport', name: 'Sportabend', icon: '🏅', desc: 'Zielen, werfen, putten – vier Disziplinen am Strand', kinds: ['darts', 'golf', 'bowling', 'boule'] },
+  { id: 'arena', name: 'Arena-Cup', icon: '⚔️', desc: 'Vier Arenen, ein Champion', kinds: ['arena', 'sumo', 'bogen', 'smash'] },
+  { id: 'kopf', name: 'Kopf & Bauch', icon: '🧠', desc: 'Schätzen, abstimmen, bluffen, funken', kinds: ['schaetz', 'wwe', 'maexchen', 'funk'] },
+];
+
+/** Turnier „Eigene“: so viele Spiele darf der VIP wählen */
+export const TURNIER_CUSTOM = { MIN: 3, MAX: 6 };
+
+/** Spiele, die in ein eigenes Turnier dürfen (wie die Zufallsauswahl, ohne reine Trinkspiele und Date-Night-Kapitel) */
+export const TURNIER_KINDS: MiniKind[] = ARCADE_RANDOM;

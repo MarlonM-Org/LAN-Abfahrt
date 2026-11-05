@@ -266,6 +266,7 @@ export class ArenaGame implements MiniGame {
     if (by && by !== id) {
       const k = this.players.get(by);
       if (k) k.kills += 1;
+      this.ctx.log?.('hit', { p: by, o: id });
     }
   }
 

@@ -89,7 +89,7 @@ export type MiniKind =
   | 'maexchen'
   | 'werwars';
 
-export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
+export type GameMode = 'party' | 'date' | 'drink' | 'arcade' | 'turnier';
 
 // ------------------------------------------------------------------ Flunkyball
 
@@ -2195,6 +2195,8 @@ export interface GameMeta {
   customWerwarsCount: number;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
+  /** Abend-Statistik: „Titel des Abends“ aus dem Ereignisprotokoll (server/fx.ts) – ändert sich nur nach einem Spiel */
+  evening?: EveningStats;
 }
 
 /** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */
@@ -2232,6 +2234,8 @@ export interface GameLive {
   partyResume?: PartyResumeInfo | null;
   /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */
   emotes?: import('./spectator').EmoteEntry[];
+  /** Laufendes Turnier (Playlist mit Gesamtwertung) – null, wenn keins läuft */
+  turnier?: TurnierState | null;
 }
 
 /** Kurzinfo zur gespeicherten Party für den „Party fortsetzen?“-Knopf */
@@ -2371,8 +2375,12 @@ export interface ServerHello {
 }
 
 export interface StartRequest {
-  /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung) */
-  mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | MiniKind;
+  /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung), 'turnier' = Playlist mit Gesamtwertung */
+  mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | 'turnier' | MiniKind;
+  /** Turnier: ID der Playlist aus `TURNIER_PLAYLISTS` bzw. 'custom' */
+  playlist?: string;
+  /** Turnier „Eigene“: 3–6 Spiele in Reihenfolge */
+  kinds?: MiniKind[];
   rounds?: number;
   /** Party-Modus: auch lange Minispiele (> 4 min) aufs Brett */
   longGames?: boolean;
@@ -2617,4 +2625,64 @@ export interface WerwarsPrivate {
   /** Raten: Das ist meine eigene Antwort (dann ist der eigene Tipp nur Schein) */
   mine: boolean;
   myGuess: string | null;
+}
+
+// ------------------------------------------------------------------ Abend-Statistik („Titel des Abends“) & Turnier
+
+/**
+ * Ereignis im Protokoll des Abends (`FxLog`, server/fx.ts). Die Minispiele melden markante Momente über
+ * `ctx.log(type, { p, n })`, der Raum zählt Siege, Serien, Münzen und Wetten dazu.
+ *   ko · selfout (Smash) · hit (Arena) · goal · owngoal (Autoball) · igelhit · selfhit (Igel) · out (Sumo) ·
+ *   kartwin · place (Kart) · hidden (Versteckspiel, n = ms) · win · streak · last · coingain · coinloss · bet · play
+ */
+export interface FxEvent {
+  seq: number;
+  at: number;
+  type: string;
+  kind: MiniKind | null;
+  /** Spieler, um den es geht */
+  p?: string;
+  /** Menge (Standard 1) – bei `hidden` Millisekunden */
+  n?: number;
+  /** Zweiter Beteiligter (Opfer, Torschütze …) */
+  o?: string;
+}
+
+/** Ein „Titel des Abends“, z. B. „Meiste K.O.s – Ben (7)“ */
+export interface EveningTitle {
+  /** Schlüssel des Titels (kos, owngoals, kamikaze, hidden, pechvogel, streak, favorite, bets, …) */
+  id: string;
+  title: string;
+  icon: string;
+  /** Träger des Titels (bei „Lieblingsspiel“ leer) */
+  playerId: string | null;
+  /** Lieblingsspiel der Gruppe */
+  kind?: MiniKind;
+  value: number;
+  /** Fertiger Wert-Text, z. B. „7 K.O.s“ oder „2:35 min“ */
+  text: string;
+}
+
+export interface EveningStats {
+  /** Höchstens 5 Titel, nur zu denen es Daten gibt – in Reveal-Reihenfolge */
+  titles: EveningTitle[];
+  /** Gespielte Minispiele des Abends */
+  games: number;
+}
+
+/** Turnier: Playlist aus 3–6 Spielen, die nacheinander laufen – Gesamtwertung mit Arcade-Punkten */
+export interface TurnierState {
+  /** 'sport' | 'arena' | 'kopf' | 'custom' */
+  playlist: string;
+  name: string;
+  icon: string;
+  kinds: MiniKind[];
+  /** Index des laufenden bzw. zuletzt gespielten Spiels (0-basiert) */
+  index: number;
+  /** Schon gewertete Spiele */
+  played: number;
+  /** Zwischenstand (gleiche Tabelle wie das Leaderboard des Abends, nur für dieses Turnier) */
+  table: SessionState;
+  /** Siegerehrung läuft (Endstand in `results`) */
+  final: boolean;
 }
