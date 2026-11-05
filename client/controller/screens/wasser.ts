@@ -1,72 +1,10 @@
 import type { WasserState } from '../../../shared/wasser';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { type Screen, app, el, message, q, send, store } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
-
-/**
- * Ziel-Stick: Ziehen = Richtung + Weite (Vorschau auf dem TV), Loslassen = werfen.
- * Kurz antippen (fast keine Auslenkung) bricht ab.
- */
-function aimStick(container: HTMLElement, onAim: (x: number, y: number) => void, onRelease: (x: number, y: number) => void) {
-  const pad = el(`<div class="stick-pad aim"><div class="stick-knob"></div><div class="aim-ring"></div></div>`).firstElementChild as HTMLElement;
-  const knob = pad.querySelector('.stick-knob') as HTMLElement;
-  container.append(pad);
-  let active: number | null = null;
-  let cx = 0;
-  let cy = 0;
-  let R = 60;
-  let cur = { x: 0, y: 0 };
-  let last = { x: 0, y: 0, t: 0 };
-  const emit = (force = false) => {
-    const now = performance.now();
-    if (!force && now - last.t < 50 && Math.hypot(cur.x - last.x, cur.y - last.y) < 0.04) return;
-    last = { ...cur, t: now };
-    onAim(Math.round(cur.x * 100) / 100, Math.round(cur.y * 100) / 100);
-  };
-  const move = (e: PointerEvent) => {
-    let dx = e.clientX - cx;
-    let dy = e.clientY - cy;
-    const d = Math.hypot(dx, dy);
-    if (d > R) {
-      dx = (dx / d) * R;
-      dy = (dy / d) * R;
-    }
-    knob.style.transform = `translate(${dx}px, ${dy}px)`;
-    cur = { x: dx / R, y: dy / R };
-    emit();
-  };
-  pad.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    pad.setPointerCapture(e.pointerId);
-    active = e.pointerId;
-    const r = pad.getBoundingClientRect();
-    cx = r.left + r.width / 2;
-    cy = r.top + r.height / 2;
-    R = r.width * 0.36;
-    pad.classList.add('active');
-    move(e);
-  });
-  pad.addEventListener('pointermove', (e) => e.pointerId === active && move(e));
-  const up = (e: PointerEvent) => {
-    if (e.pointerId !== active) return;
-    active = null;
-    knob.style.transform = '';
-    pad.classList.remove('active');
-    const v = { x: Math.round(cur.x * 100) / 100, y: Math.round(cur.y * 100) / 100 };
-    cur = { x: 0, y: 0 };
-    if (e.type === 'pointerup' && Math.hypot(v.x, v.y) >= 0.2) onRelease(v.x, v.y);
-    else onAim(0, 0);
-  };
-  pad.addEventListener('pointerup', up);
-  pad.addEventListener('pointercancel', up);
-  const keepAlive = setInterval(() => {
-    if (!pad.isConnected) return clearInterval(keepAlive);
-    if (active !== null) emit(true);
-  }, 300);
-  return pad;
-}
 
 export function pickWasser(s: WasserState): Screen {
   const id = store.playerId!;
@@ -79,32 +17,34 @@ export function pickWasser(s: WasserState): Screen {
       const team = me.t ? TEAM_INFO[me.t] : null;
       const side = me.t === 'A' ? 'links' : 'rechts';
       const badge = team
-        ? `<div class="team-badge team-${me.t}">${team.name} – Lager ${side}</div>`
-        : `<div class="team-badge" style="background:${hex(me.c)};color:#fff4d6">Jeder gegen jeden!</div>`;
+        ? `<span class="lx-tag team-${me.t}">${team.name} · Lager ${side}</span>`
+        : `<span class="lx-tag" style="background:${hex(me.c)};color:#fff4d6">Jeder gegen jeden</span>`;
+      // Quer wie ein Twin-Stick-Gamepad: linke Hälfte laufen, rechte Hälfte zielen (Loslassen = Wurf)
       const root = el(`
-        <div class="ws">
-          ${badge}
-          <div class="top-row"><span class="timer"></span><span class="score"></span></div>
-          <div class="ws-status">
-            <div class="ws-wet"><span>NÄSSE</span><div class="ws-meter"><div></div></div></div>
-            <div class="ws-ammo"><i></i><i></i><i></i></div>
+        <div class="lx ws ws-lx">
+          <div class="lx-head">
+            ${badge}<span class="timer"></span>
+            <span class="ws-wet">NÄSSE <span class="ws-meter"><div></div></span></span>
+            <span class="ws-ammo"><i></i><i></i><i></i></span>
+            <span class="score grow"></span>
           </div>
-          <p class="ws-hint"></p>
-          <div class="ws-sticks">
-            <div class="ws-col"><div class="ws-move"></div><small>LAUFEN</small></div>
-            <div class="ws-col"><div class="ws-aim"></div><small class="ws-aim-label">ZIELEN · LOSLASSEN</small></div>
-          </div>
+          <div class="lx-left ws-move"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+          <div class="lx-mid"><p class="ws-hint"></p></div>
+          <div class="lx-right ws-aim"><span class="st-label ws-aim-label">ZIELEN · LOSLASSEN = WURF</span></div>
         </div>
       `);
-      joystick(q(root, '.ws-move'), (x, y) => send('stick', { x, y }));
-      aimStick(
-        q(root, '.ws-aim'),
-        (x, y) => send('aim', { x, y }),
-        (x, y) => {
-          send('throw', { x, y });
-          navigator.vibrate?.(15);
+      stickZone(q(root, '.ws-move'), (x, y) => send('stick', { x, y }));
+      // Ziel-Stick: Ziehen = Richtung + Weite (Vorschau auf dem TV), Loslassen = werfen, kurz antippen bricht ab
+      stickZone(q(root, '.ws-aim'), (x, y) => send('aim', { x, y }), {
+        radius: 56,
+        trailing: false,
+        onRelease: (x, y, ok) => {
+          if (ok && Math.hypot(x, y) >= 0.2) {
+            send('throw', { x, y });
+            haptic(15);
+          } else send('aim', { x: 0, y: 0 });
         },
-      );
+      });
       app.append(root);
       const wrap = q(root, '.ws');
       const fill = q(root, '.ws-meter > div');
@@ -133,11 +73,11 @@ export function pickWasser(s: WasserState): Screen {
         else if (p.a === 0) hint = `Leer! Nachfüllen am ${bucket} oder am Schlauch (Mitte, schneller).`;
         else if (p.w > 70) hint = 'Fast klatschnass – ab in Deckung!';
         q(root, '.ws-hint').textContent = hint;
-        q(root, '.ws-aim-label').textContent = p.pi > 0 ? 'SPRITZEN!' : 'ZIELEN · LOSLASSEN';
+        q(root, '.ws-aim-label').textContent = p.pi > 0 ? 'SPRITZEN! Ziehen = Richtung' : 'ZIELEN · LOSLASSEN = WURF';
         wrap.classList.toggle('soaked', p.s !== 'ok');
         wrap.classList.toggle('pistol', p.pi > 0);
-        if (p.n > prevSoaked) navigator.vibrate?.([80, 60, 160]);
-        else if (p.w > prevWet + 5) navigator.vibrate?.(40);
+        if (p.n > prevSoaked) haptic([80, 60, 160]);
+        else if (p.w > prevWet + 5) haptic(40);
         prevWet = p.w;
         prevSoaked = p.n;
       };

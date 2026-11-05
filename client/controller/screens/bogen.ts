@@ -1,5 +1,6 @@
 import type { BogenState } from '../../../shared/types';
 import { BOGEN, BOGEN_COLORS, BOGEN_POWERS, bogenSnap } from '../../../shared/bogen';
+import { haptic } from '../haptic';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, send, store } from '../core';
 import { floatingStick, holdButton } from './smash';
 
@@ -27,7 +28,7 @@ export function pickBogen(s: BogenState): Screen {
   if (!mine.alive && s.sub === 'play') {
     const msg = message('Getroffen!', 'Puff – du bist für diese Runde raus. Feuer die anderen an!');
     return [`bg-dead-${s.round}`, () => {
-      navigator.vibrate?.([60, 40, 120]);
+      haptic([60, 40, 120]);
       return msg();
     }];
   }
@@ -105,7 +106,7 @@ export function pickBogen(s: BogenState): Screen {
       (q(root, '.bg-dash .cd') as HTMLElement).style.height = `${Math.min(1, p.cd / BOGEN.DASH_CD_MS) * 100}%`;
       dash.classList.toggle('cooling', p.cd > 0);
       q(root, '.bg-shoot').classList.toggle('empty', p.arrows === 0);
-      if (lastArrows >= 0 && p.arrows > lastArrows) navigator.vibrate?.(15);
+      if (lastArrows >= 0 && p.arrows > lastArrows) haptic(15);
       lastArrows = p.arrows;
     };
   }];

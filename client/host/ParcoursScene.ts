@@ -252,9 +252,11 @@ export class ParcoursScene extends Phaser.Scene {
       if (!pl) continue;
       if (!v) {
         const color = P.COLORS[st.colors[id] ?? 0];
-        const img = this.add.image(0, 0, ensureAvatar(this, pl.look)).setOrigin(0.5, 1).setScale(0.5);
-        const mark = this.add.triangle(0, -18, 0, 0, 6, 0, 3, 4, color).setStrokeStyle(1, 0x2d1b12);
-        const root = this.add.container(r.x, r.y, [img, mark]).setDepth(500);
+        const img = this.add.image(0, 0, ensureAvatar(this, pl.look)).setOrigin(0.5, 1).setScale(0.75);
+        const mark = this.add.triangle(0, -25, 0, 0, 6, 0, 3, 4, color).setStrokeStyle(1, 0x2d1b12);
+        // Kürzel über dem Kopf, abwechselnd versetzt, damit sie sich am Start nicht überdecken
+        const tag = txt(this, 0, -36 - ((st.colors[id] ?? 0) % 2) * 9, short(id).slice(0, 3).toUpperCase(), { color: hex(color) });
+        const root = this.add.container(r.x, r.y, [img, mark, tag]).setDepth(500);
         v = { root, img, x: r.x, y: r.y, st: r.st };
         this.runners.set(id, v);
       }
@@ -265,7 +267,7 @@ export class ParcoursScene extends Phaser.Scene {
       if (r.st !== v.st) {
         v.st = r.st;
         if (r.st === 'dead') this.tweens.add({ targets: v.root, alpha: 0, angle: 180, duration: 500 });
-        if (r.st === 'goal') this.tweens.add({ targets: v.img, scale: 0.6, yoyo: true, duration: 180, repeat: 2 });
+        if (r.st === 'goal') this.tweens.add({ targets: v.img, scale: 0.9, yoyo: true, duration: 180, repeat: 2 });
       }
       if (r.st === 'run') v.root.setAlpha(1).setAngle(0);
     }

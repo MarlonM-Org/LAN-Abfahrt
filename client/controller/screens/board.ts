@@ -1,5 +1,5 @@
 import type { BoardState } from '../../../shared/types';
-import { MINI_INFO, miniInspired } from '../../../shared/games';
+import { MINI_INFO, ORIENT_TEXT, miniInspired } from '../../../shared/games';
 import { type Screen, app, el, escapeHtml, nameOf, q, socket, store, tapButton } from '../core';
 
 function stats(b: BoardState) {
@@ -14,7 +14,7 @@ export function pickBoard(b: BoardState): Screen {
     const info = MINI_INFO[b.nextMini];
     return [`board-intro-${b.round}`, () => {
       const insp = miniInspired(b.nextMini!);
-      app.append(el(`<div class="center"><p>Gleich geht's los:</p><div class="intro-icon">${info.icon}</div><h1>${escapeHtml(info.title)}</h1>${insp ? `<p class="insp">${escapeHtml(insp)}</p>` : ''}<p>${escapeHtml(info.tagline)}</p></div>`));
+      app.append(el(`<div class="center"><p>Gleich geht's los:</p><div class="intro-icon">${info.icon}</div><h1>${escapeHtml(info.title)}</h1>${insp ? `<p class="insp">${escapeHtml(insp)}</p>` : ''}<p>${escapeHtml(info.tagline)}</p><p class="orient-line orient-${info.orientation}">${ORIENT_TEXT[info.orientation]}</p></div>`));
       return null;
     }];
   }
