@@ -109,8 +109,30 @@ export const FIELD_TYPES: FieldType[] = Array.from({ length: BOARD_SIZE }, (_, i
 
 export const FIELD_COINS = { blue: 3, red: -3 };
 
-/** Münzen nach Platzierung im Minispiel */
-export const PLACE_COINS = [10, 6, 3, 1];
+/**
+ * Punkte-Staffel nach Spielerzahl: Platz 1 bekommt 10, der Letzte 1 (Trost), dazwischen linear
+ * `round(10 · (n − Platz) / (n − 1))`. Bei 2 Spielern 10/5, allein 10.
+ * `place` ist der Wettkampfrang (1 + Spieler in besseren Gruppen), `n` die Zahl der gewerteten Spieler.
+ */
+function placeScale(place: number, n: number) {
+  if (n <= 1) return 10;
+  if (n === 2) return place <= 1 ? 10 : 5;
+  const p = Math.min(Math.max(1, place), n);
+  return Math.max(1, Math.round((10 * (n - p)) / (n - 1)));
+}
+
+/** Münzen nach Platzierung im Minispiel (Party-Modus) */
+export const placeCoins = (place: number, n: number) => placeScale(place, n);
+
+/** Rang (1-basiert, bei Gleichstand gleicher Rang) jeder Gruppe: [[a, b], [c]] → [1, 3] */
+export const groupPlaces = (groups: string[][]) => {
+  let seen = 0;
+  return groups.map((g) => {
+    const place = seen + 1;
+    seen += g.length;
+    return place;
+  });
+};
 
 // ------------------------------------------------------------------ Mord im Ferienhaus
 
@@ -528,10 +550,12 @@ export function turmSnapX(shape: number, rot: number, x: number): number {
 // ------------------------------------------------------------------ Arcade
 
 /**
- * Leaderboard-Punkte nach Platzierungsgruppe (1. 10, 2. 7, 3. 5, 4. 4, 5. 3, 6. 2, Rest 1).
+ * Leaderboard-Punkte nach Platz und Spielerzahl (gleiche Staffel wie `placeCoins`: 1. 10 … Letzter 1).
  * Teamsiege: alle Sieger stehen in Gruppe 1 und bekommen die vollen Punkte.
  */
-export const ARCADE_POINTS = [10, 7, 5, 4, 3, 2, 1];
+export const arcadePoints = (place: number, n: number) => placeScale(place, n);
+/** Feste Punkte für gemeinsame Spiele ohne Herzen (alle in einer Gruppe) */
+export const ARCADE_COOP_POINTS = 7;
 
 /** Wort für ein Spiel einer Serie („Kart-Rennen · Rennen 3“) */
 const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'Rennen', sprint: 'Lauf', parcours: 'Lauf', golf: 'Turnier', bowling: 'Spiel', darts: 'Spiel' };

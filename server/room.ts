@@ -15,7 +15,7 @@ import type {
   StartRequest,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
-import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, PLACE_COINS } from '../shared/games';
+import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, placeCoins } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
 import { Bot } from './botclient';
@@ -33,7 +33,7 @@ import { IgelGame } from './igel';
 import { SmashGame } from './smash';
 import { Leaderboard } from './leaderboard';
 import { SessionBoard } from './session';
-import { ARCADE_POINTS, ARCADE_RANDOM, fitsPlayers, seriesLabel } from '../shared/games';
+import { ARCADE_COOP_POINTS, ARCADE_RANDOM, arcadePoints, fitsPlayers, seriesLabel } from '../shared/games';
 import { KART_TRACKS } from '../shared/kart';
 import { WasserGame } from './wasser';
 import { GrillGame } from './grill';
@@ -697,13 +697,15 @@ export class Room {
     this.mini?.dispose();
     this.mini = null;
     this.miniIds = null;
-    const coinsPerGroup = r.coins ?? PLACE_COINS;
+    // Münzen: eigene Staffel des Spiels (pro Gruppe) oder Standard-Staffel nach Rang und Spielerzahl
+    const ranks = groupPlaces(r.groups);
+    const ranked = r.groups.reduce((sum, g) => sum + g.length, 0);
     const rows = r.groups.flatMap((group, gi) =>
       group.map((id) => ({
         playerId: id,
         place: gi + 1,
         detail: r.details[id] ?? '',
-        coins: coinsPerGroup[Math.min(gi, coinsPerGroup.length - 1)],
+        coins: r.coins ? r.coins[Math.min(gi, r.coins.length - 1)] : placeCoins(ranks[gi], ranked),
       })),
     );
     const hearts = r.hearts !== undefined ? { hearts: r.hearts, maxHearts: HEARTS_PER_CHAPTER } : {};
@@ -728,9 +730,12 @@ export class Room {
     // Gemeinsame Spiele (nur eine Gruppe): Herzen bzw. feste Punkte für alle
     const coop = groups.length === 1;
     const points: Record<string, number> = {};
+    // Punkte nach Rang und Spielerzahl (1. 10 … Letzter 1)
+    const ranks = groupPlaces(groups);
+    const ranked = groups.reduce((sum, g) => sum + g.length, 0);
     groups.forEach((g, gi) => {
       // Entfernte Spieler bekommen für dieses Spiel nichts mehr (ihre bisherigen Punkte bleiben)
-      for (const id of g) if (this.players.has(id) && !this.players.get(id)!.removed) points[id] = coop ? (r.hearts ?? ARCADE_POINTS[1]) : ARCADE_POINTS[Math.min(gi, ARCADE_POINTS.length - 1)];
+      for (const id of g) if (this.players.has(id) && !this.players.get(id)!.removed) points[id] = coop ? (r.hearts ?? ARCADE_COOP_POINTS) : arcadePoints(ranks[gi], ranked);
     });
     const winners = new Set(coop ? [] : (groups[0] ?? []));
     for (const [id, pts] of Object.entries(points)) this.leaderboard.add(this.nameOf(id), kind, pts, winners.has(id));

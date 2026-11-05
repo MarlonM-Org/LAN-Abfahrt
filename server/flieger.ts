@@ -272,12 +272,25 @@ export class FliegerGame implements MiniGame {
         : s.stage === 0
           ? `Absturz kurz nach dem Start in ${R[0]}!`
           : `Absturz zwischen ${R[s.stage]} und ${R[s.stage + 1]} – Etappe ${s.stage + 1}/${this.stages}.`;
+    // Koop-Münzen: alle bekommen dasselbe nach Ergebnis (Bali 8, je fehlender Etappe weniger, Absturz am Start 1),
+    // wer die meisten Anweisungen ausgeführt hat (MVP), +2.
+    const base = how === 'arrived' ? 8 : Math.max(1, Math.round(1 + (6 * s.stage) / Math.max(1, this.stages - 1)));
+    const best = Math.max(0, ...this.ids.map((id) => s.done[id] ?? 0));
+    const mvp = best > 0 ? this.ids.filter((id) => (s.done[id] ?? 0) === best) : [];
+    const rest = this.ids.filter((id) => !mvp.includes(id));
+    // MVP-Gruppe vorne; haben alle gleich viel (oder niemand etwas), gibt es eine gemeinsame Gruppe ohne Bonus
+    const split = mvp.length > 0 && rest.length > 0;
+    const groups = split ? [mvp, ...groupByScore(rest, score)] : [this.ids];
+    const coins = split ? [base + 2, base] : [base];
     this.timers.clear();
     this.timers.later(FLIEGER.END_MS, () =>
       this.ctx.finish({
-        groups: groupByScore(this.ids, score),
-        details: Object.fromEntries(this.ids.map((id) => [id, `${s.done[id] ?? 0}× ausgeführt · ${this.gotDone.get(id) ?? 0} eigene erledigt`])),
+        groups,
+        details: Object.fromEntries(
+          this.ids.map((id) => [id, `${s.done[id] ?? 0}× ausgeführt · ${this.gotDone.get(id) ?? 0} eigene erledigt${split && mvp.includes(id) ? ' · MVP' : ''}`]),
+        ),
         subtitle,
+        coins,
       }),
     );
   }
