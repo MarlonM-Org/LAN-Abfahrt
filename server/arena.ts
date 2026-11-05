@@ -1,6 +1,6 @@
 import type { ArenaPlayer, ArenaState, MiniSnapshot } from '../shared/types';
 import { ARENA, ARENA_SPAWNS, type ArenaCell, type ArenaItem, FLOOD_ORDER, blastCells, cellIdx, isSolidTile, spawnClearing } from '../shared/arena';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 type Axis = 'x' | 'y';
 
@@ -107,6 +107,7 @@ export class ArenaGame implements MiniGame {
     for (const [id, p] of this.players) {
       const i = active.indexOf(id);
       p.alive = i >= 0;
+      p.away = false;
       if (i >= 0) {
         p.x = spawns[i][0];
         p.y = spawns[i][1];
@@ -179,7 +180,12 @@ export class ArenaGame implements MiniGame {
       if (this.sub === 'countdown' || this.sub === 'roundOver') this.ctx.onChange();
       return;
     }
-    for (const p of this.players.values()) if (p.alive) this.move(p, dt);
+    // Verbindung weg (nach der 3-s-Gnadenfrist): Figur eingefroren + unverwundbar, nach 15 s raus
+    for (const [id, p] of this.players) {
+      p.away = p.alive && !this.ctx.isConnected(id);
+      if (p.away && (this.ctx.offlineMs?.(id) ?? 0) >= OFFLINE_OUT_MS) this.kill(id, null);
+    }
+    for (const p of this.players.values()) if (p.alive && !p.away) this.move(p, dt);
 
     // Power-ups einsammeln
     for (const p of this.players.values()) {
@@ -199,7 +205,7 @@ export class ArenaGame implements MiniGame {
 
     // Wer in einer Explosion steht, ist nass
     for (const [id, p] of this.players) {
-      if (!p.alive) continue;
+      if (!p.alive || p.away) continue;
       const f = this.flames.get(cellIdx(Math.round(p.x), Math.round(p.y)));
       if (f) this.kill(id, f.owner);
     }
@@ -231,6 +237,7 @@ export class ArenaGame implements MiniGame {
     if (!p || !p.alive) return;
     p.alive = false;
     p.moving = false;
+    p.away = false;
     this.deaths.push(id);
     if (by && by !== id) {
       const k = this.players.get(by);
@@ -374,7 +381,9 @@ export class ArenaGame implements MiniGame {
     const p = this.players.get(id);
     if (!p) return;
     p.sx = p.sy = 0;
-    if (this.sub === 'play') this.kill(id, null);
+    p.moving = false;
+    // Nur wer entfernt wurde, ist sofort raus – sonst eingefroren (siehe tick), bis er zurück ist oder 15 s um sind
+    if (this.sub === 'play' && this.ctx.isGone?.(id)) this.kill(id, null);
   }
 
   snapshot(): MiniSnapshot {
@@ -396,7 +405,7 @@ export class ArenaGame implements MiniGame {
         players: Object.fromEntries(
           [...this.players.entries()].map(([id, p]) => [
             id,
-            { x: r2(p.x), y: r2(p.y), alive: p.alive, dir: p.dir, moving: p.moving, bombs: p.bombs, range: p.range, speed: p.speed, wins: p.wins, kills: p.kills },
+            { x: r2(p.x), y: r2(p.y), alive: p.alive, dir: p.dir, moving: p.moving, bombs: p.bombs, range: p.range, speed: p.speed, wins: p.wins, kills: p.kills, ...(p.away ? { away: true } : {}) },
           ]),
         ),
         roundWinner: this.roundWinner,

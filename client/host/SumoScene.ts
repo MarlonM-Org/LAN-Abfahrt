@@ -121,7 +121,7 @@ export class SumoScene extends Phaser.Scene {
       } else {
         img.setAngle(0).setY(moving ? -Math.abs(Math.sin(now / 70)) * 2 : 0);
       }
-      a.f.setPosition(a.x, a.y + 3).setDepth(figDepth(a.y));
+      a.f.setPosition(a.x, a.y + 3).setDepth(figDepth(a.y)).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
       a.ring.setPosition(a.x, a.y + 2);
       if (p.dash && now - a.dustAt > 45) {
         a.dustAt = now;

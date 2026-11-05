@@ -158,8 +158,8 @@ export class KartGame implements MiniGame {
       c.charged = c.driftDir !== 0 && c.driftCharge >= KART.DRIFT_CHARGE_S;
     }
 
-    // Karts schubsen sich gegenseitig (Ehrenrunden-Karts sind "Geister")
-    const list = [...this.cars.values()].filter((c) => !c.finished);
+    // Karts schubsen sich gegenseitig (Ehrenrunden-Karts und Karts ohne Verbindung sind "Geister")
+    const list = [...this.cars.values()].filter((c) => !c.finished && this.ctx.isConnected(c.id));
     const R2 = KART.RADIUS * 2;
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
@@ -315,7 +315,7 @@ export class KartGame implements MiniGame {
         }
       }
       for (const c of this.cars.values()) {
-        if (c.finished || now < c.safeUntil) continue;
+        if (c.finished || now < c.safeUntil || !this.ctx.isConnected(c.id)) continue;
         if (h.owner === c.id && now - h.born < (h.kind === 'coconut' ? 400 : 700)) continue;
         if (Math.hypot(c.x - h.x, c.y - h.y) > KART.RADIUS + 4) continue;
         gone.add(h.id);
@@ -480,6 +480,7 @@ export class KartGame implements MiniGame {
         dc: Math.round(c.driftCharge * 100) / 100,
         bm: Math.round(c.boostMs),
         phoneView: this.isPhoneView(c.id),
+        ...(!c.finished && !this.ctx.isConnected(c.id) ? { ghost: true } : {}),
       };
     }
     const panes = this.panes();

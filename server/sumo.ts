@@ -1,6 +1,6 @@
 import type { MiniSnapshot, SumoPlayer, SumoState } from '../shared/types';
 import { SUMO, SUMO_CX, SUMO_CY, type SumoTile, sumoIdx, sumoRadii, sumoShape, sumoSolidAt, sumoSpawns } from '../shared/sumo';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 interface P extends SumoPlayer {
   vx: number;
@@ -86,6 +86,7 @@ export class SumoGame implements MiniGame {
     for (const [id, p] of this.players) {
       const i = active.indexOf(id);
       p.alive = i >= 0;
+      p.away = false;
       if (i >= 0) {
         p.x = spawns[i].x;
         p.y = spawns[i].y;
@@ -204,7 +205,12 @@ export class SumoGame implements MiniGame {
 
     this.shrink(now);
 
-    const live = [...this.players.entries()].filter(([, p]) => p.alive);
+    // Verbindung weg (nach der 3-s-Gnadenfrist): eingefroren, keine Rempler, fällt nicht – nach 15 s raus
+    for (const [id, p] of this.players) {
+      p.away = p.alive && !this.ctx.isConnected(id);
+      if (p.away && (this.ctx.offlineMs?.(id) ?? 0) >= OFFLINE_OUT_MS) this.fall(id, now);
+    }
+    const live = [...this.players.entries()].filter(([, p]) => p.alive && !p.away);
     for (const [, p] of live) this.move(p, now, dt);
     // Zusammenstöße (zweimal auflösen, damit Knäuel nicht ineinander stecken)
     for (let pass = 0; pass < 2; pass++) {
@@ -351,6 +357,7 @@ export class SumoGame implements MiniGame {
     const p = this.players.get(id);
     if (!p || !p.alive) return;
     p.alive = false;
+    p.away = false;
     p.vx = p.vy = 0;
     p.sx = p.sy = 0;
     p.dashUntil = 0;
@@ -398,7 +405,9 @@ export class SumoGame implements MiniGame {
     const p = this.players.get(id);
     if (!p) return;
     p.sx = p.sy = 0;
-    if (this.sub === 'play') this.fall(id, Date.now());
+    p.vx = p.vy = 0;
+    // Nur wer entfernt wurde, fällt sofort – sonst eingefroren (siehe tick), bis er zurück ist oder 15 s um sind
+    if (this.sub === 'play' && this.ctx.isGone?.(id)) this.fall(id, Date.now());
   }
 
   snapshot(): MiniSnapshot {
@@ -416,7 +425,7 @@ export class SumoGame implements MiniGame {
         players: Object.fromEntries(
           [...this.players.entries()].map(([id, p]) => [
             id,
-            { x: r1(p.x), y: r1(p.y), f: p.f, alive: p.alive, dash: p.dash, cd: Math.round(p.cd), stun: p.stun, hits: p.hits, wins: p.wins, pushes: p.pushes },
+            { x: r1(p.x), y: r1(p.y), f: p.f, alive: p.alive, dash: p.dash, cd: Math.round(p.cd), stun: p.stun, hits: p.hits, wins: p.wins, pushes: p.pushes, ...(p.away ? { away: true } : {}) },
           ]),
         ),
         roundWinner: this.roundWinner,

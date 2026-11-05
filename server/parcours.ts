@@ -20,7 +20,7 @@ import {
   snap,
   spawnX,
 } from '../shared/parcours';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 const TICK_MS = 50;
 const SUBSTEPS = 4;
@@ -293,9 +293,18 @@ export class ParcoursGame implements MiniGame {
   /** AFK beim Laufen: wer lange gar nichts eingibt, schläft ein und scheidet aus. Wer aktiv spielt,
    *  kann sich beliebig Zeit lassen – die Runde endet nie über die Uhr. */
   private tickRunAfk(now: number) {
-    for (const [id, r] of this.runners) {
+    for (const [id, r] of [...this.runners]) {
       if (r.st !== 'run') {
         r.afk = 0;
+        continue;
+      }
+      // Verbindung weg (nach der 3-s-Gnadenfrist): Läufer eingefroren, AFK-Uhr steht – nach 15 s fällt er raus
+      // (zählt dann wie früher nicht für „zu leicht/zu schwer“)
+      r.away = !this.ctx.isConnected(id);
+      if (r.away) {
+        r.afk = 0;
+        r.lastInput = now;
+        if ((this.ctx.offlineMs?.(id) ?? 0) >= OFFLINE_OUT_MS) this.runners.delete(id);
         continue;
       }
       if (r.sx !== 0 || r.held) r.lastInput = now; // Stick/Sprungknopf gehalten = aktiv
@@ -339,7 +348,7 @@ export class ParcoursGame implements MiniGame {
     const urchins = this.parts.filter((p) => p.type === 'urchin');
 
     for (const [id, r] of this.runners) {
-      if (r.st !== 'run') continue;
+      if (r.st !== 'run' || r.away) continue;
       // Auf der Schwebeplattform mitfahren
       if (r.ground && before.has(r.groundId)) {
         const a = before.get(r.groundId)!;
@@ -478,7 +487,7 @@ export class ParcoursGame implements MiniGame {
       if (n.x < -10 || n.x > COURSE.w + 10 || n.y < COURSE.y - 20 || n.y > WATER_Y + 4) return false;
       if (solids.some((s) => s.id !== n.from && !s.oneway && overlaps(nr, s.r))) return false;
       for (const [id, r] of this.runners) {
-        if (r.st !== 'run') continue;
+        if (r.st !== 'run' || r.away) continue; // eingefroren = unverwundbar
         if (overlaps(nr, runnerRect(r.x, r.y))) {
           this.knockOut(id, r, n.owner);
           return false;
@@ -587,7 +596,7 @@ export class ParcoursGame implements MiniGame {
         t: Math.round(this.t),
         nuts: this.nuts.map((n) => ({ id: n.id, x: rnd(n.x), y: rnd(n.y) })),
         runners: Object.fromEntries(
-          [...this.runners.entries()].map(([id, r]) => [id, { x: rnd(r.x), y: rnd(r.y), face: r.face, st: r.st, ground: r.ground, by: r.by, place: r.place, afk: r.afk, zzz: r.zzz }]),
+          [...this.runners.entries()].map(([id, r]) => [id, { x: rnd(r.x), y: rnd(r.y), face: r.face, st: r.st, ground: r.ground, by: r.by, place: r.place, afk: r.afk, zzz: r.zzz, ...(r.away ? { away: true } : {}) }]),
         ),
         builders: Object.fromEntries(
           [...this.builders.entries()].map(([id, b]) => [id, { stage: b.stage, choice: b.choice, pick: b.pick, gx: snap(b.gx), gy: snap(b.gy), rot: b.rot, ok: b.ok, afk: b.afk, skipped: b.skipped }]),
@@ -603,8 +612,12 @@ export class ParcoursGame implements MiniGame {
   playerDisconnected(id: string) {
     const b = this.builders.get(id);
     if (b) b.stage = 'done';
-    // Wer weg ist, läuft nicht mehr mit (zählt nicht für "zu leicht/zu schwer")
-    this.runners.delete(id);
+    const r = this.runners.get(id);
+    if (!r) return;
+    r.sx = 0;
+    r.held = false;
+    // Entfernt: läuft nicht mehr mit. Sonst bleibt der Läufer eingefroren stehen (siehe tickRunAfk), bis er zurück ist.
+    if (this.ctx.isGone?.(id)) this.runners.delete(id);
   }
 
   dispose() {

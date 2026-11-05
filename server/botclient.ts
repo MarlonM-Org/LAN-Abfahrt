@@ -3,7 +3,7 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { ArenaState, GameState, IgelState, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
+import type { ArenaState, GameLive, GameMeta, GameState, IgelState, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
 import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, PUNCH, type Mask, buildTerrain, carve, simulateBazooka, surfaceY } from '../shared/igel';
@@ -152,9 +152,20 @@ export class Bot {
       opts.log?.(`${name}: wurde entfernt`);
       this.stop();
     });
-    this.socket.on('state', (s: GameState) => {
+    // meta (Spieler, Leaderboards – nur bei Änderung) + state (laufendes Spiel) → ein GameState
+    let meta: GameMeta | null = null;
+    let live: GameLive | null = null;
+    const onState = (s: GameState) => {
       this.state = s;
       this.react(s);
+    };
+    this.socket.on('meta', (m: GameMeta) => {
+      meta = m;
+      if (live) onState({ ...m, ...live });
+    });
+    this.socket.on('state', (l: GameLive) => {
+      live = l;
+      if (meta) onState({ ...meta, ...l });
     });
   }
 

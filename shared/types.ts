@@ -523,6 +523,8 @@ export interface ArenaPlayer {
   speed: number;
   wins: number;
   kills: number;
+  /** Verbindung weg (Gnadenfrist): eingefroren + unverwundbar, TV zeigt die Figur halbtransparent */
+  away?: boolean;
 }
 
 export interface ArenaState {
@@ -958,6 +960,8 @@ export interface ParcoursRunner {
   afk: number;
   /** Wegen Untätigkeit ausgeschieden */
   zzz: boolean;
+  /** Verbindung weg (Gnadenfrist): eingefroren + unverwundbar, TV zeigt die Figur halbtransparent */
+  away?: boolean;
 }
 
 export interface ParcoursBuilder {
@@ -1034,6 +1038,8 @@ export interface KartCar {
   bm: number;
   /** Dieser Spieler sieht seine Verfolger-Ansicht auf dem eigenen Handy (statt im TV-Splitscreen) */
   phoneView: boolean;
+  /** Verbindung weg: Geist ohne Kollision (TV halbtransparent) */
+  ghost?: boolean;
 }
 
 export interface KartEvent {
@@ -1218,6 +1224,8 @@ export interface SmashFighter {
   kos: number;
   /** Endplatzierung (erst wenn ausgeschieden bzw. am Ende) */
   place: number | null;
+  /** Verbindung weg (Gnadenfrist): eingefroren + unverwundbar, TV zeigt die Figur halbtransparent */
+  away?: boolean;
 }
 
 export interface SmashProjectile {
@@ -1654,6 +1662,8 @@ export interface SumoPlayer {
   wins: number;
   /** Wie oft man jemanden ins Wasser geschubst hat (alle Runden) */
   pushes: number;
+  /** Verbindung weg (Gnadenfrist): eingefroren + unverwundbar, TV zeigt die Figur halbtransparent */
+  away?: boolean;
 }
 
 export interface SumoState {
@@ -1945,42 +1955,53 @@ export type MiniSnapshot =
   | { kind: 'spion'; state: SpionState }
   | { kind: 'wackel'; state: WackelState };
 
-export interface GameState {
-  phase: Phase;
+/**
+ * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
+ * Kommt als eigenes Event `meta` – nur bei Änderung, beim Verbinden einmal komplett.
+ */
+export interface GameMeta {
   players: PlayerPublic[];
   joinUrl: string;
+  customNhieCount: number;
+  botCount: number;
+  /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
+  leaderboard: LeaderEntry[];
+  customQuestionCount: number;
+  /** Eigene Startsätze für Stille Post */
+  customPostCount: number;
+  /** Eigene Fragen fürs Sprüche-Duell */
+  customQuipCount: number;
+  /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
+  session: SessionState;
+}
+
+/** Laufender Zustand (Phase, Minispiel, Brett, Ergebnis) – Event `state`, bis zu 25-mal pro Sekunde. */
+export interface GameLive {
+  phase: Phase;
   partyActive: boolean;
   /** Im Lobby-Menü gewählter Spielmodus */
   mode: GameMode;
   date: DateRunState | null;
   /** Trinkspiel läuft */
   drinkActive: boolean;
-  customNhieCount: number;
-  botCount: number;
-  /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
-  leaderboard: LeaderEntry[];
   arcadeActive: boolean;
   board: BoardState | null;
   mini: MiniSnapshot | null;
   results: ResultsState | null;
-  customQuestionCount: number;
-  /** Eigene Startsätze für Stille Post */
-  customPostCount: number;
   /** Wer im laufenden Minispiel mitspielt (wer später zurückkommt, schaut zu) */
   inGame?: string[] | null;
-  /** Eigene Fragen fürs Sprüche-Duell */
-  customQuipCount: number;
   /** Arcade: „Alle dürfen wählen“ – Stimmen der Spieler für das nächste Spiel (null = aus) */
   arcadeVote?: ArcadeVoteState | null;
   /** Kann der VIP (bzw. der Laptop) gerade etwas überspringen? (Zug, Phase, Info-Screen) – sonst null */
   skippable?: SkipInfo | null;
-  /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
-  session: SessionState;
   /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
   nochmal: NochmalState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
   showBoard: boolean;
 }
+
+/** Was TV, Handy und Bots lesen: `meta` + `state` zusammengeführt ({ ...meta, ...live }). */
+export interface GameState extends GameMeta, GameLive {}
 
 /** Eine Zeile im Leaderboard des Abends */
 export interface SessionRow {

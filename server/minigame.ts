@@ -18,7 +18,10 @@ export interface MiniResult {
 export interface MiniCtx {
   onChange(): void;
   finish(result: MiniResult): void;
+  /** Verbunden – oder erst seit < 3 s weg (Gnadenfrist des Raums: kurze Wackler merkt das Spiel nicht) */
   isConnected(id: string): boolean;
+  /** Seit wie vielen ms ohne Verbindung (0 = verbunden). Eingefrorene Figuren scheiden nach OFFLINE_OUT_MS aus. */
+  offlineMs?(id: string): number;
   /** Vom VIP/Laptop entfernt (kommt in diesem Spiel nicht mehr zurück) */
   isGone?(id: string): boolean;
   nameOf(id: string): string;
@@ -47,6 +50,9 @@ export interface MiniGame {
   skip?(): void;
   dispose(): void;
 }
+
+/** So lange bleibt eine Figur ohne Verbindung eingefroren + unverwundbar im Spiel, dann scheidet sie aus. */
+export const OFFLINE_OUT_MS = 15_000;
 
 /**
  * Optionaler Phasen-Timer: `ms === null` heißt „kein Zeitlimit“ (der VIP kann überspringen).
