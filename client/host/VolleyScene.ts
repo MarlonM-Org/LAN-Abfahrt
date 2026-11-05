@@ -6,6 +6,8 @@ import { paintVolleyBeach, volleyArrow, volleyBall, volleyNet } from '../art/vol
 import { bus, getState, playerById } from './store';
 import { ensureAvatar, ensurePortrait } from './textures';
 import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 interface Fig {
   img: Phaser.GameObjects.Image;
@@ -26,6 +28,7 @@ export class VolleyScene extends Phaser.Scene {
   private arrow!: Phaser.GameObjects.Image;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
+  private juice!: Juice;
   private sub!: Phaser.GameObjects.Text;
   private latest: VolleyState | null = null;
   /** Zeitpunkt (scene time), zu dem `latest` ankam */
@@ -52,6 +55,7 @@ export class VolleyScene extends Phaser.Scene {
     this.hitSeq = 0;
     this.pointSeq = 0;
     this.trailAt = 0;
+    this.juice = new Juice(this, { depth: 1700 });
 
     background(this, 'volley', WORLD.W, WORLD.H, (p) => paintVolleyBeach(p, WORLD.W, WORLD.H));
     // Wellen am Horizont glitzern
@@ -212,6 +216,8 @@ export class VolleyScene extends Phaser.Scene {
       const mb = this.matchball(st);
       const head = st.golden ? 'GOLDEN POINT!' : mb ? 'MATCHBALL!' : 'AUFSCHLAG';
       this.banner.setText(head).setColor(st.golden || mb ? '#ff9a6a' : '#ffd25e');
+      sfx('whistle', { vol: 0.6 });
+      if (st.golden || mb) sfx('drumroll', { vol: 0.6, delay: 0.3 });
       this.sub.setText(`${name} · ${TEAM_INFO[st.serving].name}`);
       this.tweens.add({ targets: [this.banner, this.sub], alpha: 0, delay: 1100, duration: 350 });
     } else if (st.sub === 'rally') {
@@ -222,6 +228,8 @@ export class VolleyScene extends Phaser.Scene {
       this.banner.setText(w ? `${TEAM_INFO[w].name.toUpperCase()} GEWINNT!` : 'UNENTSCHIEDEN').setColor(w ? TEAM_INFO[w].color : '#ffd25e');
       this.sub.setText(`${st.score.A} : ${st.score.B}`);
       if (w) this.confetti(w);
+      sfx('fanfare');
+      sfx('cheer', { delay: 0.3 });
     }
   }
 
@@ -242,7 +250,11 @@ export class VolleyScene extends Phaser.Scene {
         onComplete: () => d.destroy(),
       });
     }
-    this.cameras.main.shake(140, 0.005);
+    this.juice.shake(2);
+    this.juice.burst(x, V.GROUND - 2, 'sand', 16);
+    sfx('bonk', { x, pitch: 0.7 });
+    sfx('coin', { x, delay: 0.12 });
+    sfx('cheer', { x, vol: 0.6, delay: 0.15 });
     if (st.sub === 'over') return;
     this.tweens.killTweensOf([this.banner, this.sub]);
     this.banner.setAlpha(1).setText(`PUNKT ${info.name.toUpperCase()}!`).setColor(info.color);
@@ -256,14 +268,22 @@ export class VolleyScene extends Phaser.Scene {
     if (spike) {
       const t = txt(this, x, y - 26, 'ZACK!', { color: '#ff9a6a' }).setDepth(1700);
       this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 650, onComplete: () => t.destroy() });
-      this.cameras.main.shake(90, 0.006);
+      // Schmettern: kurzer Hit-Stop + Zoom-Stoß
+      this.juice.hitStop(70);
+      this.juice.shake(2);
+      this.juice.zoomPunch(0.04, 200);
+      this.juice.burst(x, y, 'spark', 10);
+      sfx('hitHard', { x });
+      sfx('whoosh', { x, pitch: 1.3, delay: 0.04 });
       for (let i = 0; i < 6; i++) {
         const ang = (i / 6) * Math.PI * 2;
         const l = this.add.rectangle(x, y, 6, 1, 0xffffff, 0.95).setRotation(ang).setDepth(320);
         this.tweens.add({ targets: l, x: x + Math.cos(ang) * 14, y: y + Math.sin(ang) * 14, alpha: 0, duration: 240, onComplete: () => l.destroy() });
       }
     } else {
+      sfx('hit', { x, vol: 0.7, pitch: st.sub === 'serve' ? 1.2 : 1 });
       const ring = this.add.circle(x, y, 5).setStrokeStyle(1, 0xffffff, 0.9).setDepth(320);
+
       this.tweens.add({ targets: ring, scale: 2.2, alpha: 0, duration: 220, onComplete: () => ring.destroy() });
     }
     void st;
