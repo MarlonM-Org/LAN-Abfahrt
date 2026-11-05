@@ -1,9 +1,12 @@
 /**
- * Tests ohne Browser für die Musik-Werkstatt: Tonhöhen-Pipeline (synthetischer Gesang) und
- * MIDI-Parser (erzeugte .mid). Aufruf: `npm run test:music`
+ * Tests ohne Browser für die Musik-Werkstatt: Tonhöhen-Pipeline (synthetischer Gesang),
+ * MIDI-Parser (erzeugte .mid) und alle eingebauten Songs (Gültigkeit, Zuordnung, Offline-Rendern).
+ * Aufruf: `npm run test:music`
  */
-import { emptySong, validateSong } from '../shared/music';
-import { BUILTIN_SONGS } from '../shared/musicBuiltin';
+import { ASSIGN_SCENES, MAX_BARS, STEPS_PER_BAR, STYLES, defaultSongForScene, emptySong, validateSong } from '../shared/music';
+import { BUILTIN_IDS, BUILTIN_SONGS } from '../shared/musicBuiltin';
+import { THEME_SONGS } from '../shared/musicThemen';
+import { db, longestSilence, peakOf, renderSong, rmsOf } from './musicRender';
 import { midiToSong, parseMidi, songToMidi } from '../client/music/midi';
 import { type PitchFrame, hzToMidi, quantize, rms, segment, yin } from '../client/music/pitch';
 
@@ -162,6 +165,64 @@ console.log('\nMIDI-Parser:');
   check(err.includes('MThd'), `Kaputte Datei abgelehnt: ${err}`);
   const s = emptySong();
   check(validateSong(s).ok, 'Leerer Song gültig');
+}
+
+// ------------------------------------------------------------------ Eingebaute Songs
+
+console.log('\nEingebaute Songs:');
+{
+  check(BUILTIN_IDS.size === BUILTIN_SONGS.length, `${BUILTIN_SONGS.length} Songs, IDs eindeutig`);
+  const titles = new Set(BUILTIN_SONGS.map((s) => s.title));
+  check(titles.size === BUILTIN_SONGS.length, 'Titel eindeutig');
+  const old = BUILTIN_SONGS.filter((s) => !THEME_SONGS.includes(s));
+  const oldRms = old.map((s) => db(rmsOf(renderSong(s).mix))).sort((a, b) => a - b);
+  const median = oldRms[Math.floor(oldRms.length / 2)];
+  for (const s of BUILTIN_SONGS) {
+    const v = validateSong(JSON.parse(JSON.stringify(s)));
+    const problems: string[] = [];
+    if (!v.ok) problems.push(v.error);
+    else if (JSON.stringify(v.song.lead.notes) !== JSON.stringify(s.lead.notes)) problems.push('Validierung verändert Noten');
+    if (!STYLES.some((x) => x.id === s.style)) problems.push(`Stil ${s.style}`);
+    if (s.bars > MAX_BARS) problems.push(`${s.bars} Takte`);
+    const total = s.bars * STEPS_PER_BAR;
+    for (const c of [s.lead, s.bass, s.harmony]) {
+      if (c.notes.some((n) => n.midi < 28 || n.midi > 96)) problems.push('Ton außerhalb 28–96');
+      // Was über das Loop-Ende hinausklingt, darf höchstens einen Takt lang sein
+      if (c.notes.some((n) => n.step + n.len > total + STEPS_PER_BAR)) problems.push('Note ragt weit über das Ende');
+    }
+    const r = renderSong(s);
+    const peak = peakOf(r.mix), rms = db(rmsOf(r.mix)), silent = longestSilence(r.mix, r.sr);
+    if (peak >= 0.95) problems.push(`übersteuert (Spitze ${peak.toFixed(2)})`);
+    for (const [k, a] of Object.entries(r.channels)) {
+      const used = k === 'drums' ? s.drums.kick.length + s.drums.snare.length + s.drums.hat.length > 0 : s[k as 'lead'].notes.length > 0;
+      if (used && rmsOf(a) < 1e-4) problems.push(`Kanal ${k} stumm`);
+    }
+    if (silent > 1) problems.push(`${silent.toFixed(1)} s Stille`);
+    const theme = THEME_SONGS.includes(s);
+    if (theme) {
+      if (r.seconds < 45 || r.seconds > 90) problems.push(`Loop ${r.seconds.toFixed(1)} s (soll 45–90 s)`);
+      if ([s.lead, s.bass, s.harmony].some((c) => c.notes.length === 0) || !s.drums.kick.length) problems.push('nicht alle Kanäle belegt');
+      if (Math.abs(rms - median) > 6) problems.push(`Pegel ${rms.toFixed(1)} dB weicht > 6 dB von den alten Loops (${median.toFixed(1)} dB) ab`);
+    }
+    check(!problems.length, `${s.id} „${s.title}“ (${styleOf(s.style)}): ${s.bars} Takte, ${r.seconds.toFixed(1)} s, Spitze ${peak.toFixed(2)}, RMS ${rms.toFixed(1)} dBFS${problems.length ? ' – ' + problems.join('; ') : ''}`);
+  }
+  // Jede Szene (und angekündigte Spiele) bekommt einen vorhandenen Song; Themen-Songs sind zugeordnet
+  const scenes = [...ASSIGN_SCENES.map((x) => x.id).filter((x) => x !== 'standard'), 'zauber', 'wpistole', 'angeln'];
+  const missing = scenes.filter((x) => !BUILTIN_IDS.has(defaultSongForScene(x)));
+  check(!missing.length, `Standard-Song für alle ${scenes.length} Szenen vorhanden${missing.length ? ': fehlt für ' + missing.join(', ') : ''}`);
+  const used = new Set(scenes.map(defaultSongForScene));
+  const unused = THEME_SONGS.filter((s) => !used.has(s.id)).map((s) => s.id);
+  check(!unused.length, `Alle Themen-Songs einer Szene zugeordnet${unused.length ? ': ' + unused.join(', ') : ''}`);
+  const counts = new Map<string, number>();
+  for (const x of scenes) counts.set(defaultSongForScene(x), (counts.get(defaultSongForScene(x)) ?? 0) + 1);
+  check(Math.max(...counts.values()) <= 7, `Abwechslung: höchstens 7 Szenen pro Song (${[...counts].map(([k, n]) => `${k} ${n}`).join(', ')})`);
+  const want: Record<string, string> = { zauber: 'zauber', igel: 'igelkrieg', kart: 'rennen', autoball: 'rennen', smash: 'arena', wpistole: 'western', volley: 'sport', murder: 'krimi', wasser: 'wasser', angeln: 'wasser' };
+  const wrong = Object.entries(want).filter(([k, v]) => defaultSongForScene(k) !== v);
+  check(!wrong.length, `Themen-Zuordnung${wrong.length ? ' falsch: ' + wrong.map(([k]) => k).join(', ') : ''}`);
+}
+
+function styleOf(id: string) {
+  return STYLES.find((x) => x.id === id)?.name ?? id;
 }
 
 console.log(failed ? `\n${failed} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');

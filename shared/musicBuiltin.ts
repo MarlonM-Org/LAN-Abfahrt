@@ -4,9 +4,14 @@
  * Die fünf alten Loops (party/action/romantic/spooky/bar) liegen noch im alten Kurzformat
  * (Akkorde + Melodie als Akkordindex) und werden hier in Song-Format v2 übersetzt – exakt so,
  * wie der alte Sequencer sie gespielt hat (Bass, leises Arpeggio, Melodie, Schlagzeug).
- * Dazu kommen neue Beispiel-Loops in weiteren Stilen, direkt in v2 (freie Tonhöhen).
+ * Dazu kommen neue Beispiel-Loops in weiteren Stilen, direkt in v2 (freie Tonhöhen), und die
+ * längeren Themen-Songs für die Minispiele (`musicThemen.ts`).
  */
 import { type Song, type SongInfo, type StyleId, type Wave, emptySong, songInfo } from './music';
+import { hits, seq } from './musicCompose';
+import { THEME_SONGS } from './musicThemen';
+
+export { midiOf } from './musicCompose';
 
 // ------------------------------------------------------------------ Altes Format
 
@@ -134,48 +139,6 @@ export function fromLegacy(id: string, title: string, style: StyleId, key: { roo
 
 // ------------------------------------------------------------------ Neue Loops (v2)
 
-const NAMES: Record<string, number> = { C: 0, 'C#': 1, Db: 1, D: 2, 'D#': 3, Eb: 3, E: 4, F: 5, 'F#': 6, Gb: 6, G: 7, 'G#': 8, Ab: 8, A: 9, 'A#': 10, Bb: 10, B: 11, H: 11 };
-/** „A4“ → 69 */
-export function midiOf(name: string): number {
-  const m = /^([A-H][#b]?)(-?\d)$/.exec(name);
-  if (!m) throw new Error(`Unbekannter Ton: ${name}`);
-  return (Number(m[2]) + 1) * 12 + NAMES[m[1]];
-}
-
-/**
- * Takt aus 16 Zeichen-Gruppen: Tonname (z. B. „E5“) beginnt eine Note, „-“ verlängert sie
- * um einen Schritt, „.“ ist Pause. Mehrere Takte durch „|“ getrennt.
- */
-function seq(pattern: string): { step: number; midi: number; len: number }[] {
-  const out: { step: number; midi: number; len: number }[] = [];
-  const bars = pattern.split('|');
-  bars.forEach((bar, b) => {
-    const tokens = bar.trim().split(/\s+/);
-    if (tokens.length !== 16) throw new Error(`Takt ${b + 1} hat ${tokens.length} statt 16 Schritte: ${bar}`);
-    tokens.forEach((tok, i) => {
-      if (tok === '.') return;
-      if (tok === '-') {
-        const last = out[out.length - 1];
-        if (last) last.len += 1;
-        return;
-      }
-      out.push({ step: b * 16 + i, midi: midiOf(tok), len: 1 });
-    });
-  });
-  return out;
-}
-
-/** Schlagzeug-Takt: „x“ = Schlag, „.“ = nichts; Takte durch „|“ */
-function hits(pattern: string): number[] {
-  const out: number[] = [];
-  pattern.split('|').forEach((bar, b) => {
-    const t = bar.replace(/\s+/g, '');
-    if (t.length !== 16) throw new Error(`Schlagzeug-Takt ${b + 1} hat ${t.length} statt 16 Schritte`);
-    for (let i = 0; i < 16; i++) if (t[i] === 'x') out.push(b * 16 + i);
-  });
-  return out;
-}
-
 function song(o: {
   id: string; title: string; style: StyleId; bpm: number; swing?: number; key: { root: number; minor: boolean };
   lead: { wave: Wave; volume: number; env?: 'hold' | 'pluck'; notes: string };
@@ -265,6 +228,7 @@ const NEW_SONGS: Song[] = [
 export const BUILTIN_SONGS: Song[] = [
   ...Object.entries(LEGACY).map(([id, l]) => fromLegacy(id, l.title, l.style, l.key, l.track)),
   ...NEW_SONGS,
+  ...THEME_SONGS,
 ];
 
 export const BUILTIN_IDS = new Set(BUILTIN_SONGS.map((s) => s.id));

@@ -8,7 +8,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run typecheck` – TypeScript prüfen (vor jedem Commit)
 - `npm run build` / `npm start` – Produktiv-Build
 - `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
-- `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen) und MIDI-Parser
+- `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen), MIDI-Parser und alle eingebauten Songs (Offline-Rendern: Pegel, Länge, stumme Kanäle, Szenen-Zuordnung); `npm run render:music -- <ordner>` schreibt sie als WAV
 
 ## Architektur-Regeln
 
@@ -22,3 +22,11 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - Phaser-Szenen werden beim Neustart wiederverwendet: Instanzfelder in `create()` zurücksetzen.
 - UI-Texte auf Deutsch, Pixel-Look (Font „Press Start 2P“, Welt 480 × 270).
 - Musik: Song-Format v2 in `shared/music.ts`, eingebaute Loops in `shared/musicBuiltin.ts`, Synth/Sequencer in `client/music/player.ts` (TV **und** Werkstatt `/musik.html` nutzen denselben). Eigene Songs + Szenen-Zuordnung speichert `server/music.ts` unter `data/music/`; Änderungen gehen per `music:songs`/`music:assign` live an die TVs.
+
+## Status-Seite (Claude-Artefakt) – in JEDER Session pflegen
+
+Marlon verfolgt den Projektstand über ein Claude-Artefakt: **https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi** (slug `3cefa65c-7b4d-4434-a343-b15cb2c458b5`).
+
+- Quelle der Wahrheit ist `docs/status.json` (in Arbeit, Warteschlange, Abgeschlossen mit PR-Nummer, Feedback pro Spiel, allgemeines Feedback). Spieleliste, Icons und „à la …“ kommen automatisch aus `shared/games.ts`.
+- Bei jeder Änderung am Stand (Arbeit begonnen, PR gemergt, neues Feedback von Marlon): `docs/status.json` anpassen (`updated` = aktuelle Zeit), `node scripts/status-page.mjs` ausführen und `docs/status.html` als `index.html` per Artefakt-Tool (`publish_files` mit dem slug oben, `base_version` vorher per `get_artifact` holen) neu veröffentlichen. Änderungen an `docs/status.*` mit committen.
+- Feedback-Status pro Spiel: `positiv`, `offen`, `in Arbeit`, `umgesetzt` (ohne Eintrag = „noch kein Feedback“).

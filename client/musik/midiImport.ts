@@ -2,7 +2,7 @@
  * MIDI-Import-Dialog: Datei lesen, Stimmen anzeigen, je Kanal (Melodie/Bass/Begleitung/Schlagzeug)
  * eine Stimme wählen, dann in den aktuellen Song übernehmen (Tempo + Takte kommen aus der Datei).
  */
-import { type Song } from '../../shared/music';
+import { MAX_BARS, type Song } from '../../shared/music';
 import { type MidiFile, midiToSong, parseMidi } from '../music/midi';
 import { noteName } from '../../shared/music';
 
@@ -49,7 +49,7 @@ export function openMidiImport(file: File, base: Song, onDone: (song: Song, note
     const L = sel('Melodie', lead), B = sel('Bass', bass), H = sel('Begleitung', harmony), D = sel('Schlagzeug', drums, true);
     const info = document.createElement('p');
     info.className = 'hint';
-    info.textContent = `${file.name}: Format ${midi.format}, ${midi.parts.length} Stimme(n), ${midi.bpm} BPM, ${midi.ticksPerBeat} Ticks/Viertel, ${midi.timeSig.num}/${midi.timeSig.den}. Noten werden auf Sechzehntel gerundet, höchstens 16 Takte.`;
+    info.textContent = `${file.name}: Format ${midi.format}, ${midi.parts.length} Stimme(n), ${midi.bpm} BPM, ${midi.ticksPerBeat} Ticks/Viertel, ${midi.timeSig.num}/${midi.timeSig.den}. Noten werden auf Sechzehntel gerundet, höchstens ${MAX_BARS} Takte.`;
     const ok = document.createElement('button');
     ok.className = 'btn primary';
     ok.textContent = 'Importieren';
