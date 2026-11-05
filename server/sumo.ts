@@ -1,6 +1,21 @@
 import type { MiniSnapshot, SumoPlayer, SumoState } from '../shared/types';
 import { SUMO, SUMO_CX, SUMO_CY, type SumoTile, sumoIdx, sumoRadii, sumoShape, sumoSolidAt, sumoSpawns } from '../shared/sumo';
-import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, shuffle } from './minigame';
+import { SPECTATOR } from '../shared/spectator';
+import { BetBook } from './spectator';
+
+/** Geister-Welle: läuft vom Rand quer über den Steg und gibt jedem, den die Front erreicht, einen kleinen Stoß */
+interface Wave {
+  seq: number;
+  by: string;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+  d: number;
+  len: number;
+  hit: Set<string>;
+}
 
 interface P extends SumoPlayer {
   vx: number;
@@ -48,6 +63,11 @@ export class SumoGame implements MiniGame {
   private roundWinner: string | null = null;
   private deaths: string[] = [];
   private timers = new Timers();
+  /** Zuschauer: Wetten der Ausgeschiedenen + Geister-Wellen */
+  private bets = new BetBook();
+  private ghostReady = new Map<string, number>();
+  private waves: Wave[] = [];
+  private waveSeq = 0;
 
   constructor(
     private ids: string[],
@@ -78,6 +98,9 @@ export class SumoGame implements MiniGame {
     this.deaths = [];
     this.sudden = false;
     this.cracking.clear();
+    this.ghostReady.clear();
+    this.waves = [];
+    this.bets.newRound(this.round);
     const active = shuffle(this.ids.filter((id) => this.ctx.isConnected(id)));
     const n = Math.max(2, active.length);
     this.tiles = [...sumoShape(n)] as SumoTile[];
@@ -152,6 +175,8 @@ export class SumoGame implements MiniGame {
     this.deaths.forEach((id, i) => (this.players.get(id)!.survival += i));
     for (const id of alive) this.players.get(id)!.survival += n - 1;
     if (this.roundWinner) this.players.get(this.roundWinner)!.wins += 1;
+    this.bets.resolve(this.roundWinner);
+    this.waves = [];
     this.sub = 'roundOver';
     this.deadline = now + SUMO.ROUND_OVER_MS;
     this.ctx.onChange();
@@ -169,7 +194,7 @@ export class SumoGame implements MiniGame {
       const p = this.players.get(id)!;
       return p.wins * 1000 + p.survival;
     };
-    const groups = groupByScore(this.ids, score);
+    const groups = this.bets.rank(this.ids, score);
     const top = groups[0] ?? [];
     const champ = top.length === 1 ? this.ctx.nameOf(top[0]) : null;
     this.timers.later(1500, () =>
@@ -178,7 +203,7 @@ export class SumoGame implements MiniGame {
         details: Object.fromEntries(
           this.ids.map((id) => {
             const p = this.players.get(id)!;
-            return [id, `${p.wins} ${p.wins === 1 ? 'Sieg' : 'Siege'} · ${p.pushes}× geschubst`];
+            return [id, `${p.wins} ${p.wins === 1 ? 'Sieg' : 'Siege'} · ${p.pushes}× geschubst${this.bets.detail(id)}`];
           }),
         ),
         subtitle: champ ? `${champ} beherrscht den Steg!` : 'Alle baden gegangen – Unentschieden!',
@@ -212,6 +237,7 @@ export class SumoGame implements MiniGame {
     }
     const live = [...this.players.entries()].filter(([, p]) => p.alive && !p.away);
     for (const [, p] of live) this.move(p, now, dt);
+    this.moveWaves(live, now, dt);
     // Zusammenstöße (zweimal auflösen, damit Knäuel nicht ineinander stecken)
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < live.length; i++) {
@@ -363,10 +389,62 @@ export class SumoGame implements MiniGame {
     p.dashUntil = 0;
     p.diedAt = now;
     this.deaths.push(id);
+    // Ab jetzt Geist: nach kurzer Pause darf man alle 5 s eine Welle schicken
+    this.ghostReady.set(id, now + 2000);
     if (p.lastHitBy && p.lastHitBy !== id && now - p.lastHitAt < SUMO.CREDIT_MS) {
       const k = this.players.get(p.lastHitBy);
       if (k) k.pushes += 1;
     }
+  }
+
+  // ---------------------------------------------------------------- Geister-Wellen
+
+  /** Welle von der Stelle aus, an der der Geist ins Wasser fiel, quer über den Steg zur anderen Seite */
+  private sendWave(id: string, p: P, now: number) {
+    if (this.sub !== 'play' || now < (this.ghostReady.get(id) ?? Infinity)) return;
+    this.ghostReady.set(id, now + SPECTATOR.SUMO_WAVE_MS);
+    let ox = p.x - SUMO_CX;
+    let oy = p.y - SUMO_CY;
+    if (Math.hypot(ox, oy) < 1) {
+      const a = Math.random() * Math.PI * 2;
+      ox = Math.cos(a);
+      oy = Math.sin(a);
+    }
+    // Start außen auf der Ellipse um das Raster (die Welle kommt immer vom Wasser her)
+    const ex = (SUMO.COLS * SUMO.TILE) / 2 + 12;
+    const ey = (SUMO.ROWS * SUMO.TILE) / 2 + 12;
+    const k = 1 / Math.hypot(ox / ex, oy / ey);
+    const x = SUMO_CX + ox * k;
+    const y = SUMO_CY + oy * k;
+    const len = Math.hypot(ox * k, oy * k);
+    this.waves.push({ seq: ++this.waveSeq, by: id, x, y, dx: -ox * k / len, dy: -oy * k / len, d: 0, len: len * 2, hit: new Set() });
+    if (this.waves.length > 8) this.waves.shift();
+    this.ctx.onChange();
+  }
+
+  private moveWaves(live: [string, P][], now: number, dt: number) {
+    if (!this.waves.length) return;
+    const step = SPECTATOR.SUMO_WAVE_SPEED * dt;
+    for (const w of this.waves) {
+      const d0 = w.d;
+      w.d += step;
+      for (const [id, p] of live) {
+        if (w.hit.has(id)) continue;
+        const rx = p.x - w.x;
+        const ry = p.y - w.y;
+        const along = rx * w.dx + ry * w.dy;
+        const side = Math.abs(rx * -w.dy + ry * w.dx);
+        if (along < d0 - SUMO.RADIUS || along > w.d + SUMO.RADIUS || side > SPECTATOR.SUMO_WAVE_HALF) continue;
+        w.hit.add(id);
+        p.vx += w.dx * SPECTATOR.SUMO_WAVE_PUSH;
+        p.vy += w.dy * SPECTATOR.SUMO_WAVE_PUSH;
+        p.stunUntil = Math.max(p.stunUntil, now + 160);
+        p.hits += 1;
+        p.lastHitBy = w.by;
+        p.lastHitAt = now;
+      }
+    }
+    this.waves = this.waves.filter((w) => w.d < w.len);
   }
 
   // ---------------------------------------------------------------- Eingaben
@@ -374,6 +452,15 @@ export class SumoGame implements MiniGame {
   input(id: string, action: string, payload: unknown) {
     const p = this.players.get(id);
     if (!p) return;
+    if (action === 'bet') {
+      const open = this.sub === 'play' && !this.endAt;
+      if (this.bets.place(id, payload, this.ids, this.alive(), open)) this.ctx.onChange();
+      return;
+    }
+    if (action === 'wave' || (action === 'dash' && !p.alive)) {
+      if (!p.alive && this.ids.includes(id)) this.sendWave(id, p, Date.now());
+      return;
+    }
     if (action === 'stick') {
       const pl = asRecord(payload);
       let x = clamp(Number(pl.x) || 0, -1, 1);
@@ -429,6 +516,9 @@ export class SumoGame implements MiniGame {
           ]),
         ),
         roundWinner: this.roundWinner,
+        spectator: this.bets.info(this.alive(), this.round, this.sub === 'play' && !this.endAt, this.sub === 'play' || this.sub === 'countdown' ? undefined : this.roundWinner),
+        ghosts: Object.fromEntries([...this.ghostReady.entries()].map(([id, at]) => [id, { cd: Math.max(0, at - now) }])),
+        waves: this.waves.map((w) => ({ seq: w.seq, by: w.by, x: r1(w.x), y: r1(w.y), dx: Math.round(w.dx * 100) / 100, dy: Math.round(w.dy * 100) / 100, d: Math.round(w.d) })),
       },
     };
   }

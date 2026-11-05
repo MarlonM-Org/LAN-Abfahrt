@@ -8,7 +8,7 @@ import { paintGrass, paintTiles, paintWater, paintWoodFloor } from '../art/groun
 import { Pix } from '../art/pix';
 import { hideProp, hidePropKey } from '../art/hideprops';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { GREEN_INK, INK, RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
 import { sfx } from './sfx';
 
@@ -160,7 +160,7 @@ export class VersteckScene extends Phaser.Scene {
       a.y += (av.y - a.y) * 0.4;
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setFlipX(av.dir < 0);
-      img.setY(av.moving ? -Math.abs(Math.sin(this.time.now / 80)) * 2 : 0);
+      playAvatar(img, av.stunned ? 'hit' : av.moving ? 'walk' : 'idle');
       a.f.setPosition(Math.round(a.x), Math.round(a.y)).setDepth(a.y + 0.5);
       a.dizzy.setVisible(av.stunned).setAngle(Math.sin(this.time.now / 90) * 20);
     }

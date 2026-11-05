@@ -4,7 +4,7 @@ import { WORLD } from '../../shared/flunky';
 import { FANGEN, HEAT_LABELS } from '../../shared/fangen';
 import { animateurHat, footprints, paintResort } from '../art/resort';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { GOLD, ensureTex, txt } from './ui';
 
 const HEAT_COLORS = [0x5aa0e8, 0xf2e05a, 0xf0973a, 0xe0402f];
@@ -65,7 +65,7 @@ export class FangenScene extends Phaser.Scene {
       a.y += (h.y - a.y) * 0.35;
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setFlipX(h.dir < 0);
-      img.setY(h.moving ? -Math.abs(Math.sin(this.time.now / (h.sprinting ? 50 : 80))) * 2 : 0);
+      playAvatar(img, h.moving ? 'walk' : 'idle', h.sprinting ? 1.6 : 1);
       a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
       a.ring.setPosition(a.x, a.y + 5).setDepth(a.y - 1);
       const heat = st.sub === 'chase' ? h.heat : -1;

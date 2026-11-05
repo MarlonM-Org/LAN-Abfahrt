@@ -7,7 +7,7 @@ import * as O from '../art/objects';
 import { paintSand, paintShore, paintTiles, paintWater, paintWoodFloor } from '../art/ground';
 import { basket, buoy, clutter, jellyfish, seaRock, supBoard } from '../art/props2';
 import { bus, getState, playerById } from './store';
-import { figure } from './textures';
+import { figure, playAvatar } from './textures';
 import { BLUE_INK, RED_INK, background, ensureTex, ink, panel, prop, txt } from './ui';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -202,7 +202,7 @@ export class TidyScene extends Phaser.Scene {
       a.y += (p.y - a.y) * 0.35;
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setFlipX(p.dir < 0);
-      img.setY(p.moving ? -Math.abs(Math.sin(this.time.now / 80)) * 2 : 0);
+      playAvatar(img, p.moving ? 'walk' : 'idle');
       a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
     }
   }

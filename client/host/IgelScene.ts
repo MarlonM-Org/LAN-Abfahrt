@@ -1,16 +1,19 @@
 import Phaser from 'phaser';
 import type { GameState, IgelFx, IgelState, Look } from '../../shared/types';
-import { IGEL, IGEL_COLORS, WEAPONS, type Mask, carve, genTerrain, seeded, surfaceY } from '../../shared/igel';
+import { IGEL, WEAPONS, type Mask, carve, genTerrain, seeded, surfaceY } from '../../shared/igel';
 import { C } from '../art/palette';
 import { cloud } from '../art/flieger';
 import * as O from '../art/objects';
 import { coconut, hedgehog, paintCrater, paintIslandSky, paintTerrain, sandcastle, swimRing, waterBomb } from '../art/igel';
+import { playerColor } from '../../shared/players';
 import { bus, getState, playerById } from './store';
+import { pcol } from './playerColor';
 import { GOLD, background, ensureTex, ink, panel, txt } from './ui';
 
 const TERRAIN_KEY = 'igel_terrain';
 const lookKey = (l: Look) => `${l.hair}_${l.hairStyle}_${l.shirt}`;
-const colorOf = (st: IgelState, id: string) => IGEL_COLORS[Math.max(0, st.teams.indexOf(id)) % IGEL_COLORS.length];
+/** Spielerfarbe des Abends (Fallback: Reihenfolge im Spiel) */
+const colorOf = (st: IgelState, id: string) => pcol(id, Math.max(0, st.teams.indexOf(id))).hex;
 const colorNum = (s: string) => parseInt(s.slice(1), 16);
 /** Kamera: Zoom auf den aktiven Igel / das Geschoss, Überblick in der Settle-Phase */
 const ZOOM_NEAR = 1.5;
@@ -334,7 +337,7 @@ export class IgelScene extends Phaser.Scene {
     if (st.active) {
       const name = (playerById(st.active)?.name ?? '?').slice(0, 10);
       const who = st.sub === 'retreat' ? `${name}: weg da!` : `${name}${secs !== null ? ` ${secs}s` : ''}`;
-      this.hud.add(ink(this, 10, 8, who, { origin: [0, 0], color: colorOf(st, st.active) === '#fdf7ea' ? '#3d2414' : colorOf(st, st.active) }));
+      this.hud.add(ink(this, 10, 8, who, { origin: [0, 0], color: colorOf(st, st.active) === playerColor(7).hex ? '#3d2414' : colorOf(st, st.active) }));
       this.hud.add(ink(this, 240, 8, WEAPONS[st.weapon].short, { origin: [0.5, 0] }));
     } else {
       this.hud.add(ink(this, 10, 8, st.sub === 'countdown' ? 'Igel auf Position ...' : '...', { origin: [0, 0] }));

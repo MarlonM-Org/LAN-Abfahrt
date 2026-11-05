@@ -25,12 +25,13 @@ export function pickBogen(s: BogenState): Screen {
     const won = mine.wins === best && Object.values(s.players).filter((p) => p.wins === best).length === 1;
     return [`bg-over-${won}`, message(won ? 'Meisterschütze!' : 'Bogen-Arena vorbei!', won ? 'Du hast die Bogen-Arena gewonnen!' : 'Schau auf den Fernseher!')];
   }
-  if (!mine.alive && s.sub === 'play') {
-    const msg = message('Getroffen!', 'Puff – du bist für diese Runde raus. Feuer die anderen an!');
+  // Raus (bis die nächste Runde startet): Zuschauer-Leiste mit Wetten hängt main.ts an (Key mit „dead“)
+  if (!mine.alive && (s.sub === 'play' || s.sub === 'roundOver')) {
+    const msg = message('Getroffen!', 'Puff – du bist für diese Runde raus. Tipp auf den Sieger!');
     return [`bg-dead-${s.round}`, () => {
       haptic([60, 40, 120]);
       return msg();
-    }];
+    }, 'any'];
   }
 
   return ['bg-play', () => {

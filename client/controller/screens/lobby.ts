@@ -2,7 +2,7 @@ import type { Look, MiniKind } from '../../../shared/types';
 import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
 import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, fitsPlayers, miniInspired } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
-import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
+import { LS, app, avatarCanvas, el, escapeHtml, myColor, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
 import { sessionPanel } from './leaderboard';
 
@@ -278,7 +278,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     const st = store.state;
     const n = st?.players.filter((p) => p.connected && !p.removed).length ?? 0;
     const off = st?.players.filter((p) => !p.connected && !p.removed).length ?? 0;
-    q(root, '.hello').textContent = `Hi ${store.name}!`;
+    q(root, '.hello').innerHTML = `Hi ${escapeHtml(store.name)}!` + ((c) => (c ? ` Du bist <span class="me-color" style="background:${c.hex};color:${c.ink}">${c.name.toUpperCase()}</span>` : ''))(myColor());
     q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}${off ? ` · ${off} offline` : ''}`;
     plist.update();
     q(root, '.q-count').textContent =

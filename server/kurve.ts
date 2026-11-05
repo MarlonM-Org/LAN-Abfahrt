@@ -1,6 +1,7 @@
 import type { KurveHead, KurvePower, KurveState, MiniSnapshot } from '../shared/types';
 import { KURVE } from '../shared/games';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { BetBook } from './spectator';
 
 const TICK_MS = 50;
 /** Kollisionsraster: 1 Zelle = 1 Welt-Pixel (480 × 270) */
@@ -59,6 +60,8 @@ export class KurveGame implements MiniGame {
   private pickup: KurveState['pickup'] = null;
   private pickupSeq = 0;
   private roundWinner: string | null = null;
+  /** Zuschauer: Wetten der Ausgeschiedenen auf den Rundensieger */
+  private bets = new BetBook();
   private timers = new Timers();
   private last = Date.now();
   private rounds: number;
@@ -106,6 +109,7 @@ export class KurveGame implements MiniGame {
     this.deaths = [];
     this.pickup = null;
     this.roundWinner = null;
+    this.bets.newRound(this.round);
     this.storm = false;
     const spots = this.spawnSpots(this.racers.size);
     shuffle([...this.racers.values()]).forEach((r, i) => {
@@ -358,6 +362,7 @@ export class KurveGame implements MiniGame {
   private endRound(alive: Racer[]) {
     this.sub = 'roundEnd';
     this.roundWinner = alive.length === 1 ? alive[0].id : null;
+    this.bets.resolve(this.roundWinner);
     this.deadline = Date.now() + KURVE.ROUND_END_MS;
     this.timers.later(KURVE.ROUND_END_MS, () => (this.round >= this.rounds ? this.end() : this.startRound()));
   }
@@ -367,12 +372,12 @@ export class KurveGame implements MiniGame {
     this.deadline = Date.now();
     this.ctx.onChange();
     const score = (id: string) => this.racers.get(id)?.score ?? 0;
-    const groups = groupByScore(this.ids, score);
+    const groups = this.bets.rank(this.ids, score);
     const best = groups[0] ?? [];
     this.timers.later(2500, () =>
       this.ctx.finish({
         groups,
-        details: Object.fromEntries(this.ids.map((id) => [id, `${score(id)} Punkte`])),
+        details: Object.fromEntries(this.ids.map((id) => [id, `${score(id)} Punkte${this.bets.detail(id)}`])),
         subtitle:
           best.length === 1
             ? `${this.ctx.nameOf(best[0])} fährt die schärfsten Kurven!`
@@ -385,6 +390,11 @@ export class KurveGame implements MiniGame {
 
   input(id: string, action: string, payload: unknown) {
     const r = this.racers.get(id);
+    if (r && action === 'bet') {
+      const alive = [...this.racers.values()].filter((x) => x.alive).map((x) => x.id);
+      if (this.bets.place(id, payload, this.ids, alive, this.sub === 'play')) this.ctx.onChange();
+      return;
+    }
     if (!r || action !== 'turn') return;
     const d = Number(asRecord(payload).dir);
     r.turn = d < 0 ? -1 : d > 0 ? 1 : 0;
@@ -427,6 +437,12 @@ export class KurveGame implements MiniGame {
         deaths: this.deaths,
         pickup: this.pickup,
         roundWinner: this.roundWinner,
+        spectator: this.bets.info(
+          [...this.racers.values()].filter((x) => x.alive).map((x) => x.id),
+          this.round,
+          this.sub === 'play',
+          this.sub === 'play' || this.sub === 'countdown' ? undefined : this.roundWinner,
+        ),
       },
     };
   }

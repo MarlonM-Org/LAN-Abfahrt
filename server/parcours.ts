@@ -90,7 +90,7 @@ export class ParcoursGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     ids.forEach((id, i) => {
-      this.colors[id] = i % P.COLORS.length;
+      this.colors[id] = ctx.colorOf?.(id) ?? i % P.COLORS.length;
       this.points[id] = 0;
     });
     let last = Date.now();

@@ -5,7 +5,7 @@ import { PARCOURS as P, type ParcoursPart, fanZone, partRect, partSize } from '.
 import * as O from '../art/objects';
 import { coconutPix, paintParcours, partPix } from '../art/parcours';
 import { bus, getState, playerById } from './store';
-import { ensureAvatar } from './textures';
+import { avatarSprite, playAvatar } from './textures';
 import { GOLD, INK, background, ensureTex, ink, panel, prop, txt } from './ui';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -22,7 +22,7 @@ interface PartView {
 
 interface RunnerView {
   root: Phaser.GameObjects.Container;
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
   x: number;
   y: number;
   st: string;
@@ -119,7 +119,7 @@ export class ParcoursScene extends Phaser.Scene {
       v.root.setPosition(Math.round(v.x), Math.round(v.y));
       v.img.setFlipX(r.face < 0);
       const moving = r.st === 'run' && r.ground && Math.abs(r.x - v.x) > 0.3;
-      v.img.setY(moving ? -Math.abs(Math.sin(this.time.now / 70)) * 1.5 : 0);
+      playAvatar(v.img, r.st === 'dead' ? 'hit' : r.st === 'goal' ? 'cheer' : !r.ground ? 'jump' : moving ? 'walk' : 'idle');
     }
   }
 
@@ -252,7 +252,7 @@ export class ParcoursScene extends Phaser.Scene {
       if (!pl) continue;
       if (!v) {
         const color = P.COLORS[st.colors[id] ?? 0];
-        const img = this.add.image(0, 0, ensureAvatar(this, pl.look)).setOrigin(0.5, 1).setScale(0.75);
+        const img = avatarSprite(this, pl.look).setScale(0.75);
         const mark = this.add.triangle(0, -25, 0, 0, 6, 0, 3, 4, color).setStrokeStyle(1, 0x2d1b12);
         // Kürzel über dem Kopf, abwechselnd versetzt, damit sie sich am Start nicht überdecken
         const tag = txt(this, 0, -36 - ((st.colors[id] ?? 0) % 2) * 9, short(id).slice(0, 3).toUpperCase(), { color: hex(color) });

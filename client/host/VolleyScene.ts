@@ -4,11 +4,12 @@ import { WORLD, TEAM_INFO } from '../../shared/flunky';
 import { VOLLEY as V, type VollBall, vollStepBall, vollWon } from '../../shared/volley';
 import { paintVolleyBeach, volleyArrow, volleyBall, volleyNet } from '../art/volley';
 import { bus, getState, playerById } from './store';
-import { ensureAvatar, ensurePortrait } from './textures';
+import { avatarSprite, ensurePortrait, playAvatar } from './textures';
+import { pcol } from './playerColor';
 import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
 
 interface Fig {
-  img: Phaser.GameObjects.Image;
+  img: Phaser.GameObjects.Sprite;
   shadow: Phaser.GameObjects.Ellipse;
   x: number;
   y: number;
@@ -132,8 +133,8 @@ export class VolleyScene extends Phaser.Scene {
       a.x += (tx - a.x) * 0.6;
       a.y += (ty - a.y) * 0.6;
       const running = p.vx !== 0 && !p.air;
-      const bob = running ? -Math.abs(Math.sin(now / 65)) * 2 : 0;
-      a.img.setPosition(a.x, a.y + bob).setFlipX(p.dir < 0);
+      a.img.setPosition(a.x, a.y).setFlipX(p.dir < 0);
+      playAvatar(a.img, p.air ? 'jump' : running ? 'walk' : 'idle');
       if (p.spike) a.img.setAngle((p.team === 'A' ? 1 : -1) * 22).setScale(1.12, 0.95);
       else if (p.air) a.img.setAngle(0).setScale(0.94, 1.08);
       else a.img.setAngle(running ? Math.sin(now / 65) * 4 : 0).setScale(1);
@@ -165,8 +166,8 @@ export class VolleyScene extends Phaser.Scene {
       const pl = playerById(id);
       if (!pl) continue;
       const color = TEAM_INFO[p.team].colorNum;
-      const shadow = this.add.ellipse(p.x, V.GROUND + 1, 16, 5, color, 0.75).setStrokeStyle(1, 0x2d1b12, 0.6).setDepth(45);
-      const img = this.add.image(p.x, p.y, ensureAvatar(this, pl.look)).setOrigin(0.5, 1).setDepth(p.team === 'A' ? 120 : 110);
+      const shadow = this.add.ellipse(p.x, V.GROUND + 1, 16, 5, color, 0.75).setStrokeStyle(1, pcol(id).num, 1).setDepth(45);
+      const img = avatarSprite(this, pl.look, p.x, p.y).setDepth(p.team === 'A' ? 120 : 110);
       this.figs.set(id, { img, shadow, x: p.x, y: p.y, air: p.air, court: p.court });
     }
 
@@ -314,6 +315,7 @@ export class VolleyScene extends Phaser.Scene {
         if (!pl) return;
         const p = st.players[id];
         const cx = left ? 24 + i * slot : 456 - i * slot;
+        this.hud.add(this.add.rectangle(cx, 3, 17, 17, pcol(id).num).setOrigin(0.5, 0).setAlpha(p.court ? 1 : 0.35));
         this.hud.add(this.add.image(cx, 4, ensurePortrait(this, pl.look)).setOrigin(0.5, 0).setAlpha(p.court ? 1 : 0.35));
         if (id === st.server && st.serving === t && (st.sub === 'serve' || st.sub === 'rally')) {
           this.hud.add(this.add.image(cx + 6, 16, ensureTex(this, 'vb_ball', volleyBall)).setScale(0.5));
