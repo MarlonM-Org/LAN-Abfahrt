@@ -7,7 +7,7 @@ import type { Point } from './types';
 
 export const KART = {
   LAPS: 3,
-  /** Etwas länger als früher: Zeit für „So fährst du“ und die Ansichts-Wahl des VIP */
+  /** Etwas länger als früher: Zeit für „So fährst du“ und die Ansichts-Wahl (TV / Handy) */
   COUNTDOWN_MS: 8000,
   /** Nach dem Sieger haben alle anderen noch so lange Zeit */
   AFTER_WINNER_MS: 20000,
@@ -46,13 +46,13 @@ export const KART = {
   SAFE_MS: 900,
   GULL_SPEED: 230,
   MAX_HAZARDS: 16,
-  /** Bis zu so vielen (menschlichen) Spielern ist TV-Splitscreen Standard, darüber rendert jedes Handy selbst */
+  /** Bis zu so vielen (menschlichen) Spielern gibt es TV-Splitscreen (jeder kann aufs Handy wechseln), darüber rendert jedes Handy selbst */
   SPLIT_MAX: 4,
   /** Server-Takt der Physik (ms) – die Handys bekommen so oft einen Stand */
   TICK_MS: 50,
 };
 
-/** Wo die Verfolger-Ansicht läuft: geteilter TV-Bildschirm oder auf jedem Handy */
+/** Was der TV zeigt: Verfolger-Splitscreen oder (wenn keiner auf dem TV fährt) die Draufsicht */
 export type KartView = 'split' | 'phone';
 
 export interface TrackDef {

@@ -3,7 +3,7 @@ import { KART, KART_TRACKS, type KartInput, wrapAngle } from '../../../shared/ka
 import { itemIcon } from '../../art/kartsprites';
 import { Mode7Renderer } from '../../kart3d/render';
 import { KartWorld } from '../../kart3d/world';
-import { type Screen, app, el, me, message, q, secondsLeft, send, socket, store, toast } from '../core';
+import { type Screen, LS, app, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
 import { steerFromRoll, tiltRoll } from '../tilt';
 
@@ -14,6 +14,8 @@ import { steerFromRoll, tiltRoll } from '../tilt';
  *            (Daumen von GAS nach oben rutschen lassen; DRIFT gibt mit Gas), ITEM oben rechts
  * Ansicht „Handy“: das Handy rendert seine eigene Verfolger-Ansicht (Mode 7) hinter den Knöpfen.
  * Ansicht „TV“: der TV zeigt den Splitscreen, das Handy nur Platz/Runde/Item.
+ * Bis 4 Spieler wählt jeder selbst (Knopf oben in der Mitte, gespeichert für die nächsten Rennen) – das Umschalten
+ * baut den Screen nicht neu, damit gehaltene Finger (GAS, Stick) nicht verloren gehen. Ab 5 Spielern immer „Handy“.
  */
 
 const OFFROAD = { beach: 'Sand bremst!', harbor: 'Pflaster bremst!', pool: 'Rasen bremst!' };
@@ -89,7 +91,8 @@ export function pickKart(s: KartState): Screen {
     return [`kart-fin-${car.place}`, message(`Im Ziel – Platz ${car.place}!`, 'Ehrenrunde fährt von allein. Schau auf den Fernseher!')];
   }
   const mode = tilt.on ? 'tilt' : 'touch';
-  return [`kart3-${s.view}-${mode}`, () => buildDrive(s.view, mode, () => window.dispatchEvent(new Event('kart-rerender')))];
+  // Die Ansicht (TV/Handy) gehört absichtlich nicht in den Key – sie wird im laufenden Screen umgeschaltet
+  return [`kart3-${mode}`, () => buildDrive(mode, () => window.dispatchEvent(new Event('kart-rerender')))];
 }
 
 // ------------------------------------------------------------------ Vollbild / Querformat
@@ -126,25 +129,24 @@ function leaveFullscreen() {
 
 type Btn = 'gas' | 'brake' | 'drift';
 
-function buildDrive(view: KartState['view'], mode: 'tilt' | 'touch', rerender: () => void) {
+function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   const st0 = store.state?.mini?.kind === 'kart' ? store.state.mini.state : null;
   if (!st0) return null;
   const support = motionSupport();
   const canTilt = support === 'ok' || support === 'needs-permission';
-  const phoneView = view === 'phone';
-  const vip = !!me()?.isVip;
   const root = el(`
-    <div class="k3 k3-${view} k3-${mode}">
+    <div class="k3 k3-${mode}">
       <div class="k3-hud">
         <div class="k3-place">–</div>
         <div class="k3-lap"></div>
-        ${phoneView ? '' : '<p class="k3-tv">Dein Kart läuft auf dem TV</p>'}
+        <p class="k3-tv">Dein Kart läuft auf dem TV</p>
         <div class="k3-msg"></div>
       </div>
       <div class="k3-center"></div>
+      <button class="k3-viewsw" aria-label="Ansicht wechseln"><span class="k3-seg k3-seg-tv">📺 TV</span><span class="k3-seg k3-seg-phone">📱 Handy</span></button>
+      <div class="k3-viewnote">📱 Ab 5 Spielern fährt jeder am Handy</div>
       <div class="k3-top">
         ${canTilt ? `<button class="k3-small k3-tilt">${mode === 'tilt' ? 'STICK' : 'KIPPEN'}</button>` : '<span></span>'}
-        ${vip && st0.splitOk ? `<button class="k3-small k3-switch">Ansicht: ${phoneView ? 'Handy' : 'TV'} ⇄</button>` : '<span></span>'}
         <button class="k3-item" disabled><canvas width="16" height="16"></canvas><small>ITEM</small></button>
       </div>
       <div class="k3-left">
@@ -239,7 +241,21 @@ function buildDrive(view: KartState['view'], mode: 'tilt' | 'touch', rerender: (
       void tryFullscreen();
     });
   }
-  root.querySelector('.k3-tilt')?.addEventListener('click', async () => {
+  // `.k3` unterdrückt touchstart → Handys feuern kein `click`. `touchend` zählt auf iOS sicher
+  // als Nutzergeste (nötig für die Sensor-Erlaubnis in enableMotion); Maus über pointerup.
+  const tiltBtn = root.querySelector<HTMLElement>('.k3-tilt');
+  tiltBtn?.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    const r = tiltBtn.getBoundingClientRect();
+    if (t && (t.clientX < r.left || t.clientX > r.right || t.clientY < r.top || t.clientY > r.bottom)) return;
+    e.preventDefault();
+    void toggleTilt();
+  });
+  tiltBtn?.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    void toggleTilt();
+  });
+  async function toggleTilt() {
     if (mode === 'tilt') {
       stopTilt();
       rerender();
@@ -247,8 +263,7 @@ function buildDrive(view: KartState['view'], mode: 'tilt' | 'touch', rerender: (
       toast('Handy wie ein Lenkrad drehen!');
       rerender();
     }
-  });
-  root.querySelector('.k3-switch')?.addEventListener('click', () => socket.emit('vip:mini', 'view:toggle'));
+  }
 
   // Rechte Hälfte: GAS / BREMSE / DRIFT mit Rüberrutschen (jeder Finger aktiviert den Knopf, über dem er gerade ist)
   const right = q(root, '.k3-right');
@@ -341,27 +356,82 @@ function buildDrive(view: KartState['view'], mode: 'tilt' | 'touch', rerender: (
     setTimeout(hide, 3200);
   }
 
-  // ---- Ansicht am Handy: Mode-7-Renderer + Vorhersage
+  // ---- Ansicht am Handy: Mode-7-Renderer + Vorhersage (die Vorhersage läuft immer – auch für Haptik/Drift-Anzeige)
   const world = new KartWorld(st0.track, store.playerId!);
   world.onSnapshot(st0);
   let renderer: Mode7Renderer | null = null;
   let camA = st0.karts[store.playerId!]?.angle ?? 0;
   let lastFrame = performance.now();
   let frameMs = 0;
-  if (phoneView) {
-    renderer = new Mode7Renderer(st0.track, 320, 148);
-    renderer.canvas.className = 'k3-view';
-    rootEl.prepend(renderer.canvas);
-    const fit = () => {
-      const W = rootEl.clientWidth || 320;
-      const H = rootEl.clientHeight || 148;
-      const base = W >= H ? 320 : 224;
-      renderer!.resize(base, Math.round((base * H) / W));
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    cleanup.push(() => window.removeEventListener('resize', fit));
-  }
+  const fit = () => {
+    if (!renderer) return;
+    const W = rootEl.clientWidth || 320;
+    const H = rootEl.clientHeight || 148;
+    const base = W >= H ? 320 : 224;
+    renderer.resize(base, Math.round((base * H) / W));
+  };
+  window.addEventListener('resize', fit);
+  cleanup.push(() => window.removeEventListener('resize', fit));
+
+  /** Eigene Verfolger-Ansicht ein-/ausschalten – ohne den Screen neu zu bauen (gehaltene Finger bleiben gültig) */
+  let phoneOn: boolean | null = null;
+  const viewBtn = q<HTMLButtonElement>(root, '.k3-viewsw');
+  const setPhoneView = (on: boolean) => {
+    if (on === phoneOn) return;
+    phoneOn = on;
+    rootEl.classList.toggle('k3-phone', on);
+    rootEl.classList.toggle('k3-split', !on);
+    viewBtn.classList.toggle('on-phone', on);
+    if (on && !renderer) {
+      renderer = new Mode7Renderer(st0.track, 320, 148);
+      renderer.canvas.className = 'k3-view';
+      rootEl.prepend(renderer.canvas);
+      fit();
+      // Kamera direkt hinter das Kart setzen statt von der alten Richtung einzuschwenken
+      const mine = world.poses().find((p) => p.id === store.playerId);
+      if (mine) camA = mine.angle;
+    } else if (!on && renderer) {
+      renderer.canvas.remove();
+      renderer = null;
+    }
+  };
+  /** Gerade angetippt, Server hat's noch nicht bestätigt */
+  let pending: { on: boolean; until: number } | null = null;
+  const effectiveView = (st: KartState) => {
+    const server = !!st.karts[store.playerId!]?.phoneView;
+    if (pending && (server === pending.on || performance.now() > pending.until || !st.splitOk)) pending = null;
+    return pending ? pending.on : server;
+  };
+  setPhoneView(effectiveView(st0));
+  // Antippen = Finger auf der Pille aufsetzen UND dort loslassen (ein Daumen, der beim Lenken drüberrutscht, schaltet nicht um).
+  // Kein 'click': .k3 unterdrückt touchstart, dann feuern Handys keinen click.
+  let swPointer: number | null = null;
+  viewBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    swPointer = e.pointerId;
+    viewBtn.classList.add('down');
+  });
+  viewBtn.addEventListener('pointercancel', () => {
+    swPointer = null;
+    viewBtn.classList.remove('down');
+  });
+  viewBtn.addEventListener('pointerup', (e) => {
+    if (e.pointerId !== swPointer) return;
+    swPointer = null;
+    viewBtn.classList.remove('down');
+    const r = viewBtn.getBoundingClientRect();
+    if (e.clientX < r.left - 8 || e.clientX > r.right + 8 || e.clientY < r.top - 8 || e.clientY > r.bottom + 8) return;
+    const st = store.state?.mini?.kind === 'kart' ? store.state.mini.state : null;
+    if (!st?.splitOk || st.sub === 'over') return;
+    const want = !phoneOn;
+    localStorage.setItem(LS.kartView, want ? 'phone' : 'tv');
+    socket.emit('kart:view', want ? 'phone' : 'tv');
+    pending = { on: want, until: performance.now() + 2500 };
+    setPhoneView(want);
+    // Kein Toast: der würde mitten im Rennen über BREMSE/GAS liegen – die Pille zeigt den Zustand
+    vibrate(12);
+  });
   // Diagnose (Playwright): Renderzeit pro Frame und Korrekturen der Vorhersage
   (window as unknown as { __kartDebug?: () => unknown }).__kartDebug = () => ({ frameMs, corrections: [...world.corrections], diag: { ...world.diag } });
   const lookOf = (id: string) => store.state?.players.find((p) => p.id === id)?.look;
@@ -437,6 +507,10 @@ function buildDrive(view: KartState['view'], mode: 'tilt' | 'touch', rerender: (
     const c = st?.karts[store.playerId!];
     if (!st || !c) return;
     const n = Object.keys(st.karts).length;
+    setPhoneView(effectiveView(st));
+    // Umschalter nur, wenn es TV-Splitscreen gibt (≤ 4 Spieler); sonst einmal kurz der Hinweis im Countdown
+    rootEl.classList.toggle('k3-nosplit', !st.splitOk);
+    rootEl.classList.toggle('k3-racing', st.sub !== 'countdown');
     q(root, '.k3-place').innerHTML = `${c.place}.<small>/${n}</small>`;
     q(root, '.k3-lap').textContent = `Runde ${Math.max(1, c.lap)}/${st.laps}`;
     if (shownItem !== (c.item ?? '')) {
