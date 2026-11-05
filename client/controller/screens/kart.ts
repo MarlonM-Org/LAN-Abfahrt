@@ -241,7 +241,21 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       void tryFullscreen();
     });
   }
-  root.querySelector('.k3-tilt')?.addEventListener('click', async () => {
+  // `.k3` unterdrückt touchstart → Handys feuern kein `click`. `touchend` zählt auf iOS sicher
+  // als Nutzergeste (nötig für die Sensor-Erlaubnis in enableMotion); Maus über pointerup.
+  const tiltBtn = root.querySelector<HTMLElement>('.k3-tilt');
+  tiltBtn?.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    const r = tiltBtn.getBoundingClientRect();
+    if (t && (t.clientX < r.left || t.clientX > r.right || t.clientY < r.top || t.clientY > r.bottom)) return;
+    e.preventDefault();
+    void toggleTilt();
+  });
+  tiltBtn?.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    void toggleTilt();
+  });
+  async function toggleTilt() {
     if (mode === 'tilt') {
       stopTilt();
       rerender();
@@ -249,7 +263,7 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       toast('Handy wie ein Lenkrad drehen!');
       rerender();
     }
-  });
+  }
 
   // Rechte Hälfte: GAS / BREMSE / DRIFT mit Rüberrutschen (jeder Finger aktiviert den Knopf, über dem er gerade ist)
   const right = q(root, '.k3-right');
