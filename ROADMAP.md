@@ -86,13 +86,13 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
   👥 3–8 · 📱 privater Bildschirm + Vibration
 - [ ] **Urlaubs-Fangen** *(Vorbild: Mario Chase aus Nintendo Land)* – Einer flieht und sieht die ganze Karte auf dem Handy, die Jäger nur den TV.
   👥 3–12
-- [ ] **Süßigkeiten-Klau** *(Vorbild: Animal Crossing Sweet Day aus Nintendo Land)* – Gruppe sammelt Snacks aus der Minibar, zwei Wächter jagen sie.
+- [x] **Süßigkeiten-Klau** *(Vorbild: Animal Crossing Sweet Day aus Nintendo Land)* – Gruppe sammelt Snacks aus der Minibar, zwei Wächter jagen sie.
   👥 4–12
 - [ ] ⭐ **Versteckspiel mit Möbeln** *(Vorbild: Prop Hunt)* – Verstecker verwandeln sich in Gegenstände im Ferienhaus (Topfpflanze, Kühlbox, Flamingo-Schwimmring), Sucher haben begrenzte „Schüsse“. Verstecker sehen auf dem Handy, ob sie gerade angeschaut werden.
   👥 4–12 · 📱 Joystick + Verwandeln/Einrasten
 - [ ] ⭐ **Verräter im Ferienhaus** *(Vorbild: Trouble in Terrorist Town)* – Unschuldige, Verräter, Detektiv. Waffen im Haus verteilt, Verräter-Shop auf dem Handy, Detektiv kann Leichen untersuchen. **Als neuer Modus von „Mord im Ferienhaus“ bauen** (Räume, Rollen, Meetings existieren schon).
   👥 5–12 · 📱 geheime Rolle + Shop
-- [ ] **Spion unter Gästen** – Viele gleich aussehende NPC-Gäste am TV; jeder weiß nur auf seinem Handy, welche Figur er ist. Unauffällig bewegen, andere Spieler entlarven. Mit 12 Spielern großartig.
+- [x] **Spion unter Gästen** – Viele gleich aussehende NPC-Gäste am TV; jeder weiß nur auf seinem Handy, welche Figur er ist. Unauffällig bewegen, andere Spieler entlarven. Mit 12 Spielern großartig.
   👥 3–12 · 📱 privater Bildschirm
 - [ ] **Werwolf** – Komplett per Handy, kein Spielleiter nötig.
   👥 6–12
@@ -117,7 +117,7 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 - [ ] **Grill-Chaos** *(Vorbild: Overcooked)* – Gemeinsam Bestellungen der Urlaubs-Grillparty abarbeiten: schnippeln, grillen, Cocktails mixen, servieren.
   👥 2–8 · 📱 Joystick + Aktion
 - [ ] **Umzugschaos** *(Vorbild: Moving Out)* – Ferienhaus ausräumen, bevor der Vermieter kommt.
-- [ ] **Wackel-Prügelei** *(Vorbild: Gang Beasts)* – Labbrige Physik-Figuren, Ziel: andere vom Steg ins Meer schubsen.
+- [x] **Wackel-Prügelei** *(Vorbild: Gang Beasts)* – Labbrige Physik-Figuren, Ziel: andere vom Steg ins Meer schubsen.
 - [ ] **Auto-Fußball** *(Vorbild: Rocket League, von oben)* – Kann Fahrphysik mit dem Kart-Rennen teilen.
 
 ---

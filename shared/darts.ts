@@ -40,11 +40,17 @@ export const DARTS = {
   /** Standardabweichung der kleinen Zufallsstreuung (mm) */
   NOISE_MM: 5,
 
+  /** Erklär-Screen (VIP kann überspringen) */
   INTRO_MS: 8000,
-  ROUND_MS: 40000,
+  /**
+   * Runde: `null` = kein Zeitlimit (vorher 40 s) – sie endet, wenn alle ihre Darts geworfen haben.
+   * Der VIP kann im Menü abkürzen; fehlende Darts werden dann automatisch (ungenau) geworfen.
+   */
+  ROUND_MS: null as number | null,
   /** nach dem letzten Dart einer Runde (Flug + Anzeige) */
   LAST_MS: 1800,
-  TALLY_MS: 5000,
+  /** Zwischenstand nach jeder Runde (vorher 5 s, VIP kann überspringen) */
+  TALLY_MS: 10000,
   OVER_MS: 4500,
   /** Abwesende Spieler werfen automatisch (Abstand zwischen zwei Darts) */
   AUTO_MS: 1400,

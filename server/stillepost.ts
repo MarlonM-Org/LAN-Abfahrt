@@ -1,6 +1,6 @@
-import type { MiniSnapshot, PostDrawing, PostEntry, PrivateState, StillepostState } from '../shared/types';
+import type { MiniSnapshot, PostDrawing, PostEntry, PrivateState, SkipInfo, StillepostState } from '../shared/types';
 import { POST, POST_PROMPTS, POST_ERASER, POST_BRUSHES } from '../shared/stillepost';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle, waitLabel } from './minigame';
 
 type Task = 'write' | 'draw' | 'describe';
 
@@ -78,9 +78,8 @@ export class StillepostGame implements MiniGame {
     s.done = [];
     this.done.clear();
     this.drafts.clear();
-    this.deadline = Date.now() + ms;
     this.timers.clear();
-    this.timers.later(ms, () => this.endStep(step));
+    this.deadline = phaseTimer(this.timers, ms, () => this.endStep(step));
     this.ctx.onChange();
   }
 
@@ -152,9 +151,8 @@ export class StillepostGame implements MiniGame {
     s.sub = 'vote';
     s.voted = [];
     this.votes.clear();
-    this.deadline = Date.now() + POST.VOTE_MS;
     this.timers.clear();
-    this.timers.later(POST.VOTE_MS, () => this.endVote());
+    this.deadline = phaseTimer(this.timers, POST.VOTE_MS, () => this.endVote());
     this.ctx.onChange();
   }
 
@@ -199,6 +197,30 @@ export class StillepostGame implements MiniGame {
     else if (s.sub === 'tally') this.nextChain();
   }
 
+  /** VIP/Laptop: Schreib-/Mal-/Rate-Schritt oder Abstimmung beenden, Vorführung weiterschalten */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (this.playing) {
+      const missing = this.order.filter((id) => this.ctx.isConnected(id) && !this.done.has(id));
+      const what = s.sub === 'draw' ? 'Bild' : s.sub === 'write' ? 'Satz' : 'Beschreibung';
+      const general = s.sub === 'draw' ? 'Malen beenden' : s.sub === 'write' ? 'Schreiben beenden' : 'Raten beenden';
+      return { label: waitLabel(this.ctx, missing, what, general) };
+    }
+    if (s.sub === 'reveal') return { label: 'Weiter', info: true };
+    if (s.sub === 'vote') {
+      const missing = this.order.filter((id) => this.ctx.isConnected(id) && this.canVote(id) && !this.votes.has(id));
+      return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+    }
+    if (s.sub === 'tally') return { label: this.state.chain + 1 >= this.n ? 'Zum Ergebnis' : 'Nächste Kette', info: true };
+    return null;
+  }
+
+  /** Wer noch nicht fertig ist: Entwurf zählt (leer → Ersatztext bzw. leeres Bild) */
+  skip() {
+    if (this.playing) this.endStep(this.step);
+    else this.vipAction('next');
+  }
+
   private finish() {
     const s = this.state;
     s.sub = 'over';
@@ -229,7 +251,7 @@ export class StillepostGame implements MiniGame {
         ...s,
         done: [...this.done],
         voted: [...this.votes.keys()],
-        endsIn: this.deadline ? Math.max(0, this.deadline - Date.now()) : 0,
+        endsIn: endsIn(this.deadline),
         entries: s.sub === 'reveal' ? chain.slice(0, s.shown) : chain,
       },
     };
@@ -288,7 +310,7 @@ export class StillepostGame implements MiniGame {
     if (action === 'undone' && playing && this.done.delete(id)) {
       const step = this.step;
       this.timers.clear();
-      this.timers.later(Math.max(0, this.deadline - Date.now()), () => this.endStep(step));
+      if (this.deadline) this.timers.later(Math.max(0, this.deadline - Date.now()), () => this.endStep(step));
       return this.ctx.onChange();
     }
     if (action === 'vote' && s.sub === 'vote' && !this.votes.has(id)) {

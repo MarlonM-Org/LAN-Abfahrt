@@ -36,7 +36,6 @@ function frame(s: ParcoursState, mode: string, body: string) {
         <span class="pc-pts">${s.points[id] ?? 0}/${s.target} P</span>
       </div>
       <div class="pcq-body">${body}</div>
-      <div class="pcq-portrait">Dreh dein Handy quer!</div>
     </div>
   `);
   app.append(root);

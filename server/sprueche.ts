@@ -1,6 +1,6 @@
-import type { MiniSnapshot, PrivateState, SpruecheState } from '../shared/types';
+import type { MiniSnapshot, PrivateState, SkipInfo, SpruecheState } from '../shared/types';
 import { QUIP_NO_ANSWER, QUIP_PROMPTS, QUIP_SAFETY, SPRUECHE, quipMultiplier } from '../shared/sprueche';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, shuffle, waitLabel } from './minigame';
 
 /** Eine Frage der aktuellen Runde mit ihren Autoren */
 interface QuipPrompt {
@@ -48,7 +48,8 @@ export class SpruecheGame implements MiniGame {
     this.state = {
       sub: 'intro',
       round: 0,
-      rounds: SPRUECHE.ROUNDS,
+      // Ab 9 Spielern nur Runde 1 + Finale (sonst ca. 15 min)
+      rounds: ids.length >= 9 ? 2 : SPRUECHE.ROUNDS,
       final: false,
       multiplier: 1,
       endsIn: 0,
@@ -70,10 +71,10 @@ export class SpruecheGame implements MiniGame {
 
   // ---------------------------------------------------------------- Ablaufsteuerung
 
-  /** Nächsten Schritt nach `ms` ausführen – der VIP kann ihn mit "Weiter" vorziehen */
-  private schedule(ms: number, fn: () => void) {
+  /** Nächsten Schritt nach `ms` ausführen (null = erst, wenn alle fertig sind) – der VIP kann ihn vorziehen */
+  private schedule(ms: number | null, fn: () => void) {
     this.timers.clear();
-    this.deadline = Date.now() + ms;
+    this.deadline = ms === null ? 0 : Date.now() + ms;
     const token = ++this.seq;
     const run = () => {
       if (this.seq !== token) return;
@@ -83,7 +84,7 @@ export class SpruecheGame implements MiniGame {
       fn();
     };
     this.pending = run;
-    this.timers.later(ms, run);
+    if (ms !== null) this.timers.later(ms, run);
   }
 
   /** Alle fertig → kurz durchatmen, dann weiter */
@@ -108,7 +109,7 @@ export class SpruecheGame implements MiniGame {
     const s = this.state;
     s.round = round;
     s.final = round >= s.rounds;
-    s.multiplier = quipMultiplier(round);
+    s.multiplier = s.final ? quipMultiplier(SPRUECHE.ROUNDS) : quipMultiplier(round);
     s.sub = 'intro';
     s.duel = null;
     s.finalAnswers = null;
@@ -317,7 +318,7 @@ export class SpruecheGame implements MiniGame {
       state: {
         ...s,
         voted: s.final && s.sub === 'vote' ? s.voters.filter((id) => this.voteDone.has(id) || (this.votes.get(id)?.length ?? 0) >= Math.min(SPRUECHE.FINAL_PICKS, this.finalOptions(id))) : s.voted,
-        endsIn: this.deadline ? Math.max(0, this.deadline - Date.now()) : 0,
+        endsIn: endsIn(this.deadline),
       },
     };
   }
@@ -410,6 +411,27 @@ export class SpruecheGame implements MiniGame {
     const sub = this.state.sub;
     // Antwortphase nicht per Knopf abkürzen – da tippen noch alle
     if (sub === 'intro' || sub === 'vote' || sub === 'reveal' || sub === 'scores') this.pending();
+  }
+
+  /** VIP/Laptop: jeden Schritt vorziehen – beim Schreiben zählen Entwürfe, Leeres wird zum Sicherheits-Spruch */
+  skippable(): SkipInfo | null {
+    if (!this.pending) return null;
+    const s = this.state;
+    if (s.sub === 'intro') return { label: 'Los geht’s', info: true };
+    if (s.sub === 'answer') {
+      const missing = this.ids.filter((id) => this.connected(id) && this.todoOf(id).length > 0);
+      return { label: waitLabel(this.ctx, missing, 'Antworten', 'Schreiben beenden') };
+    }
+    if (s.sub === 'vote') {
+      const missing = s.voters.filter((id) => this.connected(id) && !s.voted.includes(id));
+      return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+    }
+    if (s.sub === 'reveal' || s.sub === 'scores') return { label: 'Weiter', info: true };
+    return null;
+  }
+
+  skip() {
+    this.pending?.();
   }
 
   playerDisconnected() {

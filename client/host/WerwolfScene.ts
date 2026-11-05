@@ -101,7 +101,7 @@ export class WerwolfScene extends Phaser.Scene {
     const w = s?.mini?.kind === 'werwolf' ? s.mini.state : null;
     this.timerBar.clear();
     if (!w) return;
-    const showClock = w.sub !== 'over' && w.sub !== 'roles';
+    const showClock = w.sub !== 'over' && w.sub !== 'roles' && !this.countdown.none;
     const label = showClock ? clock(this.countdown.remaining) : '';
     if (label !== this.clockShown) {
       this.clockShown = label;

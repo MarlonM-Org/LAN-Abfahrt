@@ -22,6 +22,8 @@ import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
 import { golfBot } from './golfbot';
+import { spionBot } from './spionbot';
+import { WACKEL, type WackelPlatform, type WackelState, wackelPlatformUnder, wackelStage, wackelSurfaceY } from '../shared/wackel';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -47,6 +49,7 @@ import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
 import type { AngelnState } from '../shared/angeln';
 import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
+import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt, isWalk as suessWalk, stepAlong as suessStep, suessBfs, tileCenter as suessCenter, tileOf as suessTile } from '../shared/suess';
 
 export interface BotOptions {
   url: string;
@@ -455,6 +458,14 @@ export class Bot {
   }
 
   /** Führt eine Aktion pro Schlüssel nur einmal gleichzeitig aus */
+  /** Grobe Kennung des aktuellen Schritts (wie Room.stepTag) – für das VIP-Weiterschalten */
+  private stepTag(s: GameState): string {
+    if (s.phase === 'board' && s.board) return `b-${s.board.round}-${s.board.turnIdx}-${s.board.sub}`;
+    const st = s.mini?.state as unknown as Record<string, unknown> | undefined;
+    if (!st) return s.phase;
+    return [s.mini!.kind, ...['sub', 'round', 'phaseNo', 'shown', 'chain', 'match', 'hole', 'turn', 'aimSeq'].map((k) => String(st[k] ?? ''))].join('-');
+  }
+
   once(key: string, fn: () => Promise<void> | void) {
     if (this.busy.has(key)) return;
     this.busy.add(key);
@@ -720,6 +731,18 @@ export class Bot {
         this.socket.emit('board:roll');
       });
     }
+    // Bot als VIP (nur, wenn kein Mensch da ist): Info-Screens (Auflösung, Intro, Zwischenstand) nach ~2 s weiterschalten –
+    // so wie ein Mensch „Weiter“ im VIP-Menü drücken würde. Züge/Abstimmungen überspringt er nicht (die Bots spielen sie).
+    if (me?.isVip && s.skippable?.info && (s.phase === 'mini' || s.phase === 'board')) {
+      const label = s.skippable.label;
+      const tag = this.stepTag(s);
+      this.once(`vip-skip-${tag}-${label}`, async () => {
+        await sleep(2000);
+        const now = this.state;
+        if (now?.skippable?.label === label && this.stepTag(now) === tag) this.socket.emit('vip:skip');
+      });
+    }
+
     if (s.phase !== 'mini' || !s.mini) return;
 
     const m = s.mini;
@@ -1153,9 +1176,15 @@ export class Bot {
 
     if (m.kind === 'sumo') sumoBot(this, m.state);
 
+    if (m.kind === 'wackel') wackelBot(this, m.state);
+
     if (m.kind === 'bogen') bogenBot(this, m.state);
 
     if (m.kind === 'angeln') angelBot(this, m.state);
+
+    if (m.kind === 'suess') suessBot(this, m.state);
+
+    if (m.kind === 'spion') spionBot(this, m.state);
 
     if (m.kind === 'autoball') afbBot(this, m.state);
 
@@ -1642,6 +1671,13 @@ function shuffleArr<T>(arr: T[]): T[] {
 
 /** Igel-Krieg: kurz laufen, dann per Simulation zielen und schießen */
 function igelBot(bot: Bot, st: IgelState) {
+  // Zuschauer-Sprüche ab und zu (Server: Abklingzeit 8 s)
+  if (st.active !== bot.id && st.sub !== 'over' && st.sub !== 'countdown') {
+    bot.once('igel-taunt', async () => {
+      await sleep(rand(4000, 14000));
+      if (Math.random() < 0.5) bot.send('taunt', { i: Math.floor(Math.random() * 4) });
+    });
+  }
   if (st.active !== bot.id || st.activeHog === null) return;
   const cur = () => (bot.state?.mini?.kind === 'igel' ? bot.state.mini.state : null);
   if (st.sub === 'aim') {
@@ -2283,6 +2319,175 @@ function sumoBot(bot: Bot, st: SumoState) {
   mem.moving = true;
   bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
+
+// ------------------------------------------------------------------ Wackel-Prügelei
+
+interface WackelBotMemory {
+  nextAt: number;
+  moving: boolean;
+  grabbing: boolean;
+  /** Seit wann hält der Bot einen Spieler fest */
+  holdSince: number;
+  /** Richtung, in die der Gehaltene geschleppt wird (−1/1) */
+  dragDir: number;
+  /** Eigene Ungenauigkeit/Aggressivität, damit nicht alle Bots gleich spielen */
+  slop: number;
+  aggro: number;
+  lastJump: number;
+  lastPunch: number;
+  hangSince: number;
+}
+
+const wackelBotMem = new WeakMap<Bot, WackelBotMemory>();
+
+/** Nächste Kante der Plattform (x) in Richtung dir */
+function wackelEdgeX(p: WackelPlatform, dir: number) {
+  return dir < 0 ? p.x : p.x + p.w;
+}
+
+/**
+ * Wackel-Bot: torkelt zum nächsten Gegner, haut zu, wenn er nah ist, packt ihn ab und zu und
+ * schleppt ihn zur nächsten Kante, wo er ihn ins Wasser wirft. Hängt er selbst an einer Kante,
+ * klettert er mit SPRINGEN hoch; am Rand ohne Beute dreht er um.
+ */
+function wackelBot(bot: Bot, st: WackelState) {
+  let mem = wackelBotMem.get(bot);
+  if (!mem) wackelBotMem.set(bot, (mem = { nextAt: 0, moving: false, grabbing: false, holdSince: 0, dragDir: 1, slop: rand(0.05, 0.3), aggro: rand(0.3, 0.8), lastJump: 0, lastPunch: 0, hangSince: 0 }));
+  const me = st.players[bot.id];
+  const stop = () => {
+    if (mem!.moving) {
+      mem!.moving = false;
+      bot.send('stick', { x: 0, y: 0 });
+    }
+    if (mem!.grabbing) {
+      mem!.grabbing = false;
+      bot.send('btn', { b: 'grab', down: false, x: 0, y: 0 });
+    }
+  };
+  if (st.sub !== 'play' || !me?.alive || me.parts.length < 3) return stop();
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(90, 150);
+  if (me.stun) return stop();
+
+  const stage = wackelStage(st.stage);
+  const tilt = (st.tilt * Math.PI) / 1800;
+  const mx = me.parts[0];
+  const my = me.parts[1];
+  const plat = wackelPlatformUnder(stage, mx, my + WACKEL.STAND_H - 6, tilt, 16);
+  const send = (x: number, y: number) => {
+    mem!.moving = true;
+    bot.send('stick', { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+  };
+  const grab = (on: boolean, x = 0, y = 0) => {
+    if (mem!.grabbing === on) return;
+    mem!.grabbing = on;
+    bot.send('btn', { b: 'grab', down: on, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+  };
+
+  // An einer Kante hängen → kurz zappeln, dann hochklettern
+  if (me.grab === 2) {
+    if (!mem.hangSince) mem.hangSince = now;
+    if (now - mem.hangSince > rand(300, 900) && now - mem.lastJump > 700) {
+      mem.lastJump = now;
+      bot.send('btn', { b: 'jump', down: true, x: 0, y: 0 });
+    }
+    return;
+  }
+  mem.hangSince = 0;
+
+  // Jemanden im Griff: zur nächsten Kante schleppen und dort rauswerfen
+  if (me.grab === 1) {
+    if (!mem.holdSince) {
+      mem.holdSince = now;
+      mem.dragDir = plat ? (mx - plat.x < plat.x + plat.w - mx ? -1 : 1) : me.f;
+    }
+    const edge = plat ? wackelEdgeX(plat, mem.dragDir) : mx + mem.dragDir * 40;
+    const dist = Math.abs(edge - mx);
+    if (dist < 14 || now - mem.holdSince > 3200) {
+      // Werfen: Stick nach außen, dann loslassen
+      send(mem.dragDir, -0.35);
+      mem.holdSince = 0;
+      mem.grabbing = false;
+      bot.send('btn', { b: 'grab', down: false, x: mem.dragDir, y: -0.35 });
+      mem.nextAt = now + 350;
+      return;
+    }
+    send(mem.dragDir * 0.9, 0);
+    return;
+  }
+  mem.holdSince = 0;
+
+  // Ziel: nächster Gegner (bevorzugt auf gleicher Höhe)
+  const foes = Object.entries(st.players).filter(([id, p]) => id !== bot.id && p.alive && p.parts.length >= 3);
+  const target = foes
+    .map(([id, p]) => ({ id, p, d: Math.hypot(p.parts[0] - mx, (p.parts[1] - my) * 1.6) }))
+    .sort((a, b) => a.d - b.d)[0];
+  if (!target) return stop();
+  const tx = target.p.parts[0];
+  const ty = target.p.parts[1];
+  const dx = tx - mx;
+  const dy = ty - my;
+  const dist = Math.hypot(dx, dy);
+  let wantX = Math.sign(dx) || me.f;
+  let wantY = 0;
+
+  // Wasser steigt: hoch hinaus
+  if (st.sudden && plat) {
+    const higher = stage.platforms.filter((p) => p.y < plat.y - 10).sort((a, b) => Math.abs(a.x + a.w / 2 - mx) - Math.abs(b.x + b.w / 2 - mx))[0];
+    if (higher) {
+      const cx = higher.x + higher.w / 2;
+      wantX = Math.sign(cx - mx) || 1;
+      if (Math.abs(cx - mx) < higher.w / 2 + 6 && now - mem.lastJump > 900) {
+        mem.lastJump = now;
+        bot.send('btn', { b: 'jump', down: true, x: wantX, y: -1 });
+      }
+    }
+  }
+
+  // Randvermeidung: vor der Kante umdrehen, außer der Gegner steht gleich dahinter (springen)
+  if (plat) {
+    const ahead = mx + wantX * 14;
+    const sy = wackelSurfaceY(plat, ahead, tilt);
+    if (sy === null) {
+      const landing = wackelPlatformUnder(stage, mx + wantX * 30, my + WACKEL.STAND_H, tilt, 60);
+      if (landing && Math.abs(dx) > 20 && now - mem.lastJump > 900 && Math.random() < 0.5) {
+        mem.lastJump = now;
+        bot.send('btn', { b: 'jump', down: true, x: wantX, y: -1 });
+      } else if (Math.abs(dx) > 16 || dist > 26) wantX = -wantX * 0.6;
+      else wantX *= 0.3;
+    }
+  }
+  // Gegner steht höher: hochspringen – auch von den tiefen Planken zurück aufs Deck
+  const higherAhead = stage.platforms.find((p) => p.y < my + WACKEL.STAND_H - 12 && p.y > my - 46 && mx + wantX * 28 > p.x - 4 && mx + wantX * 28 < p.x + p.w + 4);
+  if (((dy < -22 && Math.abs(dx) < 40) || (higherAhead && plat && higherAhead !== plat)) && now - mem.lastJump > 1000 && Math.random() < 0.45) {
+    mem.lastJump = now;
+    wantX = higherAhead ? Math.sign(higherAhead.x + higherAhead.w / 2 - mx) || wantX : wantX;
+    bot.send('btn', { b: 'jump', down: true, x: wantX, y: -1 });
+  }
+
+  const close = dist < 20;
+  if (close) {
+    const dirX = Math.sign(dx) || me.f;
+    const dirY = Math.max(-0.6, Math.min(0.4, dy / 20));
+    // Greifen oder hauen?
+    if (!mem.grabbing && Math.random() < 0.28 * mem.aggro) {
+      grab(true, dirX, dirY);
+      send(dirX * 0.5, dirY);
+      return;
+    }
+    if (mem.grabbing && Math.random() < 0.3) grab(false);
+    if (!mem.grabbing && me.cd <= 0 && now - mem.lastPunch > 650 && Math.random() < 0.45 + mem.aggro * 0.3) {
+      mem.lastPunch = now;
+      bot.send('btn', { b: 'punch', down: true, x: dirX, y: dirY });
+    }
+    wantX = dirX * 0.45;
+    wantY = dirY * 0.5;
+  } else if (mem.grabbing && Math.random() < 0.25) grab(false);
+
+  const wob = Math.sin(now / 600 + mem.slop * 20) * mem.slop;
+  send(Math.max(-1, Math.min(1, wantX + wob)), wantY);
 }
 
 // ------------------------------------------------------------------ Angeln
@@ -3301,4 +3506,152 @@ function zaubBot(bot: Bot, st: ZauberState) {
   if (w.l < 0.05) stick(0, 0);
   else stick(w.x, w.y);
   if (aheadBad && !me.stun && me.cdB <= 0 && far > 50 && Math.random() < 0.3) bot.send('sprint', { x: home.x, y: home.y });
+}
+
+// ---------------------------------------------------------------- Süßigkeiten-Klau
+
+interface SuessBotMem {
+  nextAt: number;
+  /** Ab so viel Beute geht der Bot heim */
+  greed: number;
+  stick: string;
+  stickAt: number;
+  round: number;
+  /** Ziel-Süßigkeit (Bot bleibt dabei, solange es sie gibt) */
+  goal: number | null;
+}
+const suessBotMem = new WeakMap<Bot, SuessBotMem>();
+const SUESS_STASH_DIST = suessBfs(STASH_TILES);
+
+function suessStick(bot: Bot, mem: SuessBotMem, me: { x: number; y: number }, to: { x: number; y: number } | null) {
+  let x = 0;
+  let y = 0;
+  if (to) {
+    const dx = to.x - me.x;
+    const dy = to.y - me.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 1.5) {
+      x = Math.round((dx / d) * 100) / 100;
+      y = Math.round((dy / d) * 100) / 100;
+    }
+  }
+  const key = `${x},${y}`;
+  const now = Date.now();
+  if (key === mem.stick && now - mem.stickAt < 500) return;
+  mem.stick = key;
+  mem.stickAt = now;
+  bot.send('stick', { x, y });
+}
+
+/** Weg zu einem Punkt: in derselben/nächsten Kachel direkt hin, sonst Kachel für Kachel (Breitensuche vom Ziel) */
+function suessRoute(me: { x: number; y: number }, to: { x: number; y: number }, guard: boolean) {
+  const a = suessTile(me.x, me.y);
+  const b = suessTile(to.x, to.y);
+  if (Math.abs(a.col - b.col) + Math.abs(a.row - b.row) <= 1) return to;
+  return suessStep(me, suessBfs([b], guard), guard);
+}
+
+/**
+ * Bots: Naschkatzen sammeln gierig die nächste lohnende Süßigkeit (weg von Wächtern) und gehen heim,
+ * wenn die Taschen voll genug sind oder ein Wächter naht; Wächter jagen die dickste erreichbare Beute.
+ */
+function suessBot(bot: Bot, st: SuessState) {
+  let mem = suessBotMem.get(bot);
+  if (!mem) {
+    mem = { nextAt: 0, greed: Math.round(rand(4, 8)), stick: '', stickAt: 0, round: 0, goal: null };
+    suessBotMem.set(bot, mem);
+  }
+  if (mem.round !== st.round) {
+    mem.round = st.round;
+    mem.goal = null;
+    mem.greed = Math.round(rand(4, 8));
+  }
+  if (st.sub !== 'play') return;
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(120, 200);
+
+  const thief = st.thieves[bot.id];
+  const guard = st.guards[bot.id];
+  if (thief) {
+    if (thief.state !== 'run') return;
+    const guardTiles = Object.values(st.guards).map((g) => suessTile(g.x, g.y));
+    const dG = suessBfs(guardTiles, false);
+    const me = suessTile(thief.x, thief.y);
+    const danger = suessDistAt(dG, me.col, me.row);
+    const home = suessDistAt(SUESS_STASH_DIST, me.col, me.row);
+    // Notbremse: Wächter direkt dran, viel Beute, weit weg vom Versteck → ablegen und flitzen
+    if (danger <= 1 && thief.carry >= 6 && home > 4 && Math.random() < 0.35) {
+      bot.send('drop');
+      mem.goal = null;
+      return;
+    }
+    const goHome = thief.carry >= mem.greed || (thief.carry >= 2 && danger <= 4 && home <= danger + 3) || thief.carry >= SUESS.CARRY_MAX - 1;
+    if (goHome) {
+      mem.goal = null;
+      return suessStick(bot, mem, thief, suessStep(thief, SUESS_STASH_DIST));
+    }
+    // Wächter ganz nah und kein Versteck in Reichweite → weg von ihm
+    if (danger <= 2 && !thief.safe) {
+      let best: { x: number; y: number } | null = null;
+      let bestD = danger;
+      for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (!suessWalk(me.col + dc, me.row + dr)) continue;
+        const d = suessDistAt(dG, me.col + dc, me.row + dr) - suessDistAt(SUESS_STASH_DIST, me.col + dc, me.row + dr) * 0.01;
+        if (d > bestD) {
+          bestD = d;
+          best = suessCenter(me.col + dc, me.row + dr);
+        }
+      }
+      if (best) return suessStick(bot, mem, thief, best);
+    }
+    const dMe = suessBfs([me]);
+    let target = st.candy.find((c) => c.id === mem!.goal) ?? null;
+    if (!target || Math.random() < 0.05) {
+      let bestScore = Infinity;
+      target = null;
+      for (const c of st.candy) {
+        const t = suessTile(c.x, c.y);
+        const v = CANDY_KINDS[c.t].v;
+        if (thief.carry + v > SUESS.CARRY_MAX) continue;
+        const dg = suessDistAt(dG, t.col, t.row);
+        const score = suessDistAt(dMe, t.col, t.row) - v * 2.2 + (dg < 3 ? 14 : dg < 6 ? 5 : 0) + Math.random() * 2;
+        if (score < bestScore) {
+          bestScore = score;
+          target = c;
+        }
+      }
+      mem.goal = target?.id ?? null;
+    }
+    if (!target) return suessStick(bot, mem, thief, thief.carry > 0 ? suessStep(thief, SUESS_STASH_DIST) : null);
+    return suessStick(bot, mem, thief, suessRoute(thief, target, false));
+  }
+
+  if (guard) {
+    const me = suessTile(guard.x, guard.y);
+    const dMe = suessBfs([me], true);
+    // Bei zwei Wächtern: der zweite bevorzugt eine andere Beute
+    const others = Object.entries(st.guards).filter(([id]) => id !== bot.id);
+    let best: { x: number; y: number } | null = null;
+    let bestScore = -Infinity;
+    for (const t of Object.values(st.thieves)) {
+      if (t.state !== 'run' || t.safe) continue;
+      const tt = suessTile(t.x, t.y);
+      const d = suessDistAt(dMe, tt.col, tt.row);
+      if (d === Infinity) continue;
+      const crowd = others.some(([, g]) => Math.hypot(g.x - t.x, g.y - t.y) < Math.hypot(guard.x - t.x, guard.y - t.y)) ? 0.5 : 1;
+      const score = ((t.carry + 1.5) / (d + 3)) * crowd * (t.shield ? 0.3 : 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = t;
+      }
+    }
+    if (!best) {
+      // niemand draußen: an der Minibar lauern
+      return suessStick(bot, mem, guard, suessRoute(guard, suessCenter(16, 11), true));
+    }
+    const px = Math.hypot(best.x - guard.x, best.y - guard.y);
+    if (px < 50 && guard.sprintLeft <= 0 && Math.random() < 0.5) bot.send('sprint');
+    return suessStick(bot, mem, guard, suessRoute(guard, best, true));
+  }
 }

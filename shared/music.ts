@@ -177,7 +177,7 @@ export function defaultSongForScene(scene: string): string {
       return 'bar';
     case 'geist': case 'fangen': case 'werwolf':
       return 'spooky';
-    case 'murder': case 'ttt': case 'tourist': case 'verstecken':
+    case 'murder': case 'ttt': case 'tourist': case 'verstecken': case 'suess': case 'spion':
       return 'krimi';
     case 'zauber':
       return 'zauber';
@@ -185,7 +185,7 @@ export function defaultSongForScene(scene: string): string {
       return 'igelkrieg';
     case 'kart': case 'autoball':
       return 'rennen';
-    case 'arena': case 'smash': case 'sumo': case 'bogen':
+    case 'arena': case 'smash': case 'sumo': case 'bogen': case 'wackel':
       return 'arena';
     case 'wpistole': case 'enten':
       return 'western';

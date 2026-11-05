@@ -8,3 +8,9 @@ export function offlineLabel(ms: number): string {
   if (m < 60) return `offline seit ${m} min`;
   return `offline seit ${Math.floor(m / 60)} h`;
 }
+
+/** „Bens“, „Max’“, „Bot Lenas“ – Genitiv für Knopftexte wie „Bens Zug überspringen“ */
+export function possessive(name: string): string {
+  const n = name.trim();
+  return /(?:[sßxz]|ce)$/i.test(n) ? `${n}’` : `${n}s`;
+}

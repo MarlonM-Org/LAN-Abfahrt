@@ -103,11 +103,17 @@ export const GOLF = {
   MAX_STROKES: 6,
   /** nicht eingelocht: höchstens so viele Schläge auf der Karte */
   MAX_SCORE: 7,
-  HOLE_S: 60,
-  INTRO_MS: 6500,
+  /**
+   * Zeit pro Loch: `null` = kein Limit (vorher 60 s). Ein Loch endet, wenn alle eingelocht oder
+   * MAX_STROKES erreicht haben – oder wenn der VIP im Menü „Loch beenden“ wählt (Rest bekommt +2).
+   */
+  HOLE_S: null as number | null,
+  /** Erklär-Screen (VIP kann überspringen; vorher 6,5 s) */
+  INTRO_MS: 10000,
   TEE_MS: 3200,
-  CARD_MS: 6500,
-  LAST_CARD_MS: 8000,
+  /** Scorekarte nach jedem Loch (VIP kann überspringen; vorher 6,5 s / 8 s) */
+  CARD_MS: 12000,
+  LAST_CARD_MS: 12000,
   DONE_PAUSE_MS: 1400,
   /** Physik-Takt: TICK_S pro Tick, in SUBSTEPS Teilschritten */
   TICK_S: 1 / 30,

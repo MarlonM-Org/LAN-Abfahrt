@@ -7,6 +7,11 @@ import * as O from '../art/objects';
 import { LAGOON, crab, crosshair, duck, feather, flamingo, floater, gull, paintLagoon, reeds } from '../art/lagoon';
 import { bus, getState, playerById } from './store';
 import { GOLD, LIGHT, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { Juice } from './juice';
+import { type SfxName, sfx } from './sfx';
+
+/** Treffer-Ton je Vogeltyp: [Effekt, Tonhöhe] */
+const BIRD_SFX: Record<Exclude<EntenKind, 'float'>, [SfxName, number]> = { duck: ['pop', 0.7], gull: ['jump', 1.5], flamingo: ['coin', 1] };
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const FEATHER_TINT: Record<EntenKind, number[]> = {
@@ -45,6 +50,7 @@ export class EntenScene extends Phaser.Scene {
   private hudKey = '';
   private boardKey = '';
   private bannerKey = '';
+  private juice!: Juice;
 
   constructor() {
     super('enten');
@@ -86,6 +92,7 @@ export class EntenScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.board = this.add.container(0, 0).setDepth(1000);
     this.banner = this.add.container(0, 0).setDepth(1100);
+    this.juice = new Juice(this, { depth: 945 });
 
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
@@ -102,6 +109,8 @@ export class EntenScene extends Phaser.Scene {
     this.latest = st;
     this.syncTargets(st);
     this.syncAims(st);
+    // Beim (Wieder-)Einstieg alte Schüsse nicht nachspielen (sonst knallt es zehnmal)
+    if (this.lastShot < 0 && st.sub !== 'intro') this.lastShot = Math.max(0, ...st.shots.map((x) => x.seq));
     for (const shot of st.shots) if (shot.seq > this.lastShot) this.shotFx(shot, st);
     this.lastShot = Math.max(this.lastShot, ...st.shots.map((x) => x.seq), 0);
     if (this.lastLaugh < 0) this.lastLaugh = st.laughSeq;
@@ -198,12 +207,15 @@ export class EntenScene extends Phaser.Scene {
     this.tweens.add({ targets: flash, scale: 1.6, alpha: 0, angle: 30, duration: 140, onComplete: () => flash.destroy() });
     const ring = this.add.circle(x, y, 3).setStrokeStyle(1, color).setDepth(949);
     this.tweens.add({ targets: ring, scale: 2.5, alpha: 0, duration: 200, onComplete: () => ring.destroy() });
+    sfx('shoot', { x, vol: 0.6 });
 
     if (!shot.kind) {
       // Daneben: Wölkchen bzw. Platscher im Wasser
       if (y > LAGOON.HORIZON + 8 && y < LAGOON.SHORE) {
         const sp = this.add.ellipse(x, y + 2, 6, 2).setStrokeStyle(1, 0xeaf8ff).setDepth(25);
         this.tweens.add({ targets: sp, scaleX: 3, scaleY: 2, alpha: 0, duration: 450, onComplete: () => sp.destroy() });
+        sfx('splash', { x, vol: 0.3, pitch: 1.6, delay: 0.03 });
+        this.juice.burst(x, y, 'splash', 4);
       } else {
         const puff = this.add.circle(x, y, 2, 0xffffff, 0.7).setDepth(940);
         this.tweens.add({ targets: puff, scale: 3, alpha: 0, duration: 320, onComplete: () => puff.destroy() });
@@ -220,6 +232,10 @@ export class EntenScene extends Phaser.Scene {
       const sp = this.add.ellipse(fx, fy + 4, 10, 3).setStrokeStyle(1, 0xeaf8ff).setDepth(25);
       this.tweens.add({ targets: sp, scaleX: 3, scaleY: 2, alpha: 0, duration: 500, onComplete: () => sp.destroy() });
       this.cameras.main.shake(120, 0.004);
+      // Fehlschuss auf den Badegast: Buzzer + Platsch
+      sfx('error', { x: fx });
+      sfx('bonk', { x: fx, delay: 0.03 });
+      this.juice.burst(fx, fy, 'splash', 10);
       return;
     }
     // Federn
@@ -239,6 +255,15 @@ export class EntenScene extends Phaser.Scene {
         onComplete: () => f.destroy(),
       });
     }
+    const [bird, bp] = BIRD_SFX[shot.kind];
+    sfx('hit', { x: fx, vol: 0.7 });
+    sfx(bird, { x: fx, pitch: bp, delay: 0.04 });
+    this.juice.burst(fx, fy, 'puff', 4);
+    if (shot.combo > 1) sfx('coin', { x: fx, pitch: 1 + Math.min(10, shot.combo) * 0.06, vol: 0.6, delay: 0.1 });
+    if (shot.combo > 0 && shot.combo % 5 === 0) {
+      this.juice.burst(fx, fy, 'spark', 14);
+      this.juice.float(fx, fy - 40, `COMBO x${shot.combo}!`, 'gold');
+    }
     const plus = txt(this, fx, fy - 16, `+${shot.pts}`, { color: hex(color) }).setDepth(960);
     this.tweens.add({ targets: plus, y: plus.y - 14, alpha: 0, delay: 250, duration: 550, onComplete: () => plus.destroy() });
     if (shot.combo > 1) {
@@ -256,6 +281,7 @@ export class EntenScene extends Phaser.Scene {
     const x = xs[Math.floor(Math.random() * xs.length)];
     this.crabImg.setX(x);
     this.crabBubble.setPosition(x, 222).setText(Math.random() < 0.5 ? 'HAHAHA!' : 'HIHIHI!');
+    for (let i = 0; i < 3; i++) sfx('bonk', { x, pitch: 1.7 - i * 0.12, vol: 0.45, delay: i * 0.13 });
   }
 
   // ---------------------------------------------------------------- HUD
@@ -278,6 +304,8 @@ export class EntenScene extends Phaser.Scene {
       sub = 'Die Vögel sind weg ...';
     }
     if (!title) return;
+    if (st.sub === 'banner') sfx('select');
+    else if (st.sub === 'over') sfx('win');
     const cx = ENTEN.FIELD_W / 2;
     this.banner.add(panel(this, cx - 150, 68, 300, 78, 'dark'));
     this.banner.add(txt(this, cx, 82, title, { size: 24, color: GOLD }));

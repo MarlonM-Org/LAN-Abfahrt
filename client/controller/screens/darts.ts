@@ -1,6 +1,6 @@
 import { DARTS, DART_SEGMENTS, type DartsState, POWER_TEXT, dartsCalm, dartsPhase, dartsPowerHint, dartsTarget, dartsWobble } from '../../../shared/darts';
 import type { Point } from '../../../shared/types';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store } from '../core';
+import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, timerText } from '../core';
 import type { BowlThrow } from '../bowlingThrow';
 import { FLICK_SCALE, flickToThrow } from '../dartsThrow';
 import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, rememberFeedback } from '../motionFeedback';
@@ -253,7 +253,7 @@ function buildRound(s0: DartsState) {
           g.stroke();
         }
       }
-      roundEl.textContent = `Runde ${round}/${st.rounds}${final ? ' · FINALE x2' : ''} · ${secondsLeft()} s`;
+      roundEl.textContent = `Runde ${round}/${st.rounds}${final ? ' · FINALE x2' : ''}${timerText((sec) => ` · ${sec} s`)}`;
     }
     // Fadenkreuz
     if (n < DARTS.DARTS_PER_ROUND || flying) {

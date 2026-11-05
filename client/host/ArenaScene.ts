@@ -10,6 +10,8 @@ import { flower, umbrella } from '../art/objects';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
 import { Countdown, background, ensureTex, ink, panel, prop, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const T = ARENA.TILE;
 const px = (x: number) => ARENA.OX + x * T + T / 2;
@@ -41,6 +43,8 @@ export class ArenaScene extends Phaser.Scene {
   private round = 0;
   private floodShown = false;
   private clock = new Countdown();
+  private juice!: Juice;
+  private cheerRound = 0;
 
   constructor() {
     super('arena');
@@ -58,6 +62,8 @@ export class ArenaScene extends Phaser.Scene {
     this.phaseKey = '';
     this.round = 0;
     this.floodShown = false;
+    this.cheerRound = 0;
+    this.juice = new Juice(this, { depth: 1650 });
 
     const aw = ARENA.COLS * T;
     const ah = ARENA.ROWS * T;
@@ -192,11 +198,14 @@ export class ArenaScene extends Phaser.Scene {
         this.boxes.delete(i);
         this.tweens.add({ targets: box, scaleX: 1.4, scaleY: 0.2, alpha: 0, duration: 260, onComplete: () => box.destroy() });
         this.puff(px(x), py(y), 0xf1d49a);
+        this.juice.burst(px(x), py(y), (x * 7 + y * 13) % 5 < 2 ? 'sand' : 'wood', 8);
       }
       if (c === '~' && !this.flooded.has(i)) {
         const img = this.add.image(px(x), py(y), ensureTex(this, `flood${(x + y) % 3}`, () => floodTile((x + y) % 3))).setDepth(py(y) - 9).setAlpha(0);
         this.tweens.add({ targets: img, alpha: 0.95, duration: 200 });
         this.flooded.set(i, img);
+        // Flut: leises Plätschern je Zelle (gedrosselt in sfx)
+        if (st.floodActive) sfx('splash', { x: px(x), vol: 0.25, pitch: 1.3 });
       }
     }
 
@@ -217,6 +226,12 @@ export class ArenaScene extends Phaser.Scene {
       const img = this.add.image(px(b.x), py(b.y) + 1, key).setDepth(py(b.y) + 1);
       img.setData('born', this.time.now - (ARENA.FUSE_MS - b.fuse));
       this.bombs.set(b.id, img);
+      // Bombe legen: kurzes „Plopp“ (nur frisch gelegte, nicht beim Aufbau)
+      if (b.fuse > ARENA.FUSE_MS - 400) {
+        sfx('pop', { x: px(b.x), pitch: balloon ? 0.9 : 0.6 });
+        img.setScale(0.4);
+        this.tweens.add({ targets: img, scale: 1, duration: 160, ease: 'Back.Out' });
+      }
     }
 
     // Explosionen
@@ -228,21 +243,39 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
     let boom = false;
+    let boomX = 0;
     for (const f of st.flames) {
       const k = `${cellIdx(f.x, f.y)}-${f.k}`;
       if (this.flames.has(k)) continue;
       boom = true;
+      if (f.k === 'c') {
+        boomX = px(f.x);
+        this.juice.burst(px(f.x), py(f.y), 'splash', 16);
+        sfx('boom', { x: boomX, vol: 0.7 });
+        sfx('splash', { x: boomX, delay: 0.04 });
+      } else if ((f.x + f.y) % 2 === 0) this.juice.burst(px(f.x), py(f.y), 'splash', 3);
       const img = this.add.image(px(f.x), py(f.y), ensureTex(this, `splash_${f.k}`, () => splash(f.k))).setDepth(1500).setAlpha(0.92);
       img.setScale(0.6);
       this.tweens.add({ targets: img, scale: 1, duration: 90 });
       this.flames.set(k, img);
     }
-    if (boom) this.cameras.main.shake(90, 0.004);
+    if (boom) this.juice.shake(1);
 
     // Power-ups
     const its = new Set(st.items.map((it) => `${cellIdx(it.x, it.y)}-${it.t}`));
     for (const [k, img] of this.items) {
       if (!its.has(k)) {
+        // Eingesammelt (ein Spieler steht drauf) oder von der Explosion weggespült?
+        const [ci] = k.split('-');
+        const cx = Number(ci) % ARENA.COLS;
+        const cy = Math.floor(Number(ci) / ARENA.COLS);
+        const taker = Object.values(st.players).find((p) => p.alive && Math.round(p.x) === cx && Math.round(p.y) === cy);
+        if (taker) {
+          sfx('powerup', { x: px(cx) });
+          this.juice.burst(px(cx), py(cy), 'spark', 8);
+          const label = k.endsWith('bomb') ? '+1 BOMBE' : k.endsWith('range') ? '+REICHWEITE' : '+TEMPO';
+          this.juice.float(px(cx), py(cy) - 24, label, 'gold');
+        }
         this.tweens.killTweensOf(img);
         this.tweens.add({ targets: img, scale: 0, duration: 150, onComplete: () => img.destroy() });
         this.items.delete(k);
@@ -269,6 +302,9 @@ export class ArenaScene extends Phaser.Scene {
     if (st.floodActive && !this.floodShown) {
       this.floodShown = true;
       this.flash('FLUT!', 'Das Meer holt sich die Arena …');
+      sfx('whoosh', { vol: 1.2, pitch: 0.6 });
+      sfx('splash', { vol: 0.9, pitch: 0.7, delay: 0.25 });
+      this.juice.shake(2);
     }
     this.drawHud(st);
   }
@@ -285,6 +321,12 @@ export class ArenaScene extends Phaser.Scene {
     } else if (st.sub === 'roundOver' || st.sub === 'over') {
       const w = st.roundWinner ? playerById(st.roundWinner)?.name ?? '?' : null;
       this.banner.setText(w ? `${w} gewinnt!` : 'Alle nass!');
+      if (this.cheerRound !== st.round) {
+        this.cheerRound = st.round;
+        sfx(w ? 'win' : 'lose');
+        const wf = st.roundWinner ? this.figs.get(st.roundWinner) : undefined;
+        if (wf) this.juice.burst(px(wf.x), py(wf.y) - 10, 'confetti', 30);
+      }
       this.sub.setText(st.sub === 'over' ? 'Arena vorbei!' : w ? 'Rundensieg – trocken geblieben!' : 'Unentschieden – diese Runde zählt nicht.');
     }
   }
@@ -316,6 +358,9 @@ export class ArenaScene extends Phaser.Scene {
     const x = px(a.x);
     const y = py(a.y);
     a.ring.setVisible(false);
+    this.juice.burst(x, y, 'splash', 14);
+    sfx('splash', { x, pitch: 0.9 });
+    this.juice.shake(1);
     this.tweens.add({ targets: a.f, angle: 90, alpha: 0, y: a.f.y + 4, duration: 600, onComplete: () => a.f.setVisible(false) });
     for (let i = 0; i < 8; i++) {
       const d = this.add.circle(x, y, 2, i % 2 ? 0xeaf8ff : 0x93d3f3).setDepth(1600);

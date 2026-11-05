@@ -7,6 +7,8 @@ import { sumoRing } from '../art/sumo';
 import { bus, getState, playerById } from './store';
 import { ensureAvatar, ensurePortrait } from './textures';
 import { Countdown, ensureTex, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 type C = Phaser.GameObjects.Container;
 const AY = BOGEN.AY;
@@ -56,6 +58,10 @@ export class BogenScene extends Phaser.Scene {
   private phaseKey = '';
   private hudKey = '';
   private clock = new Countdown();
+  private juice!: Juice;
+  /** Schusszähler pro Spieler (Ton beim Schuss) */
+  private shotSeen = new Map<string, number>();
+  private cheerRound = 0;
 
   constructor() {
     super('bogen');
@@ -71,12 +77,15 @@ export class BogenScene extends Phaser.Scene {
     this.fxSeen = -1;
     this.phaseKey = '';
     this.hudKey = '';
+    this.shotSeen.clear();
+    this.cheerRound = 0;
 
     this.bgL = this.add.container(0, 0).setDepth(0);
     this.itemL = this.add.container(0, 0).setDepth(5);
     this.actL = this.add.container(0, 0).setDepth(10);
     this.fxL = this.add.container(0, 0).setDepth(20);
     this.hud = this.add.container(0, 0).setDepth(100);
+    this.juice = new Juice(this, { layer: this.fxL, hud: this.hud });
     this.bg = this.add.image(0, 0, '__WHITE').setOrigin(0, 0);
     this.bgL.add(this.bg);
 
@@ -156,8 +165,27 @@ export class BogenScene extends Phaser.Scene {
     // Effekte
     const maxSeq = st.fx.reduce((m, f) => Math.max(m, f.seq), 0);
     if (this.fxSeen < 0) this.fxSeen = maxSeq;
-    for (const fx of st.fx) if (fx.seq > this.fxSeen) this.playFx(fx);
+    let hitNow = false;
+    for (const fx of st.fx) {
+      if (fx.seq <= this.fxSeen) continue;
+      this.playFx(fx);
+      if (fx.type === 'hit' || fx.type === 'stomp' || fx.type === 'boom') hitNow = true;
+    }
     this.fxSeen = Math.max(this.fxSeen, maxSeq);
+    // Letzter Treffer der Runde: Zeitlupe
+    const all = Object.values(st.players);
+    if (hitNow && st.sub !== 'countdown' && all.length > 1 && all.filter((p) => p.alive).length <= 1) {
+      this.juice.slowMo(0.35, 900);
+      this.juice.flash(0xffffff, 160);
+      sfx('ko', { pitch: 0.8 });
+    }
+
+    // Schüsse
+    for (const [id, p] of Object.entries(st.players)) {
+      const seen = this.shotSeen.get(id);
+      if (seen !== undefined && p.shots > seen && p.alive) sfx('throw', { x: p.x, pitch: 1.5, vol: 0.8 });
+      this.shotSeen.set(id, p.shots);
+    }
 
     // Figuren an/aus
     for (const [id, p] of Object.entries(st.players)) {
@@ -189,6 +217,12 @@ export class BogenScene extends Phaser.Scene {
       if (st.roundWinner) {
         const g = this.figs.get(st.roundWinner);
         if (g) this.sparkle(g.x, AY + g.y - 14, 0xffd25e);
+      }
+      if (this.cheerRound !== st.round) {
+        this.cheerRound = st.round;
+        sfx(w ? 'win' : 'lose');
+        const g = st.roundWinner ? this.figs.get(st.roundWinner) : undefined;
+        if (g) this.juice.burst(g.x, AY + g.y - 14, 'confetti', 30);
       }
     } else if (st.sub === 'over') {
       this.banner.setText('SPIEL!').setScale(1);
@@ -382,6 +416,9 @@ export class BogenScene extends Phaser.Scene {
         this.floatText(x, y - 22, label, '#ffd25e');
         if (name) this.floatText(x, y - 12, name.replace(/^Bot\s+/, 'Bot ').slice(0, 10), '#fff4d6');
         this.cameras.main.shake(120, 0.005);
+        this.juice.burst(x, y, 'puff', 6);
+        sfx(fx.type === 'stomp' ? 'bonk' : 'hitHard', { x });
+        if (fx.type === 'stomp') sfx('hit', { x, delay: 0.05 });
         break;
       }
       case 'boom': {
@@ -396,29 +433,37 @@ export class BogenScene extends Phaser.Scene {
         }
         this.floatText(x, y - 16, 'PLATSCH!', '#7fd4ff');
         this.cameras.main.shake(180, 0.008);
+        this.juice.burst(x, y, 'splash', 18);
+        sfx('boom', { x, vol: 0.7 });
+        sfx('splash', { x, delay: 0.04 });
         break;
       }
       case 'catch':
         this.floatText(x, y - 20, 'Gefangen!', '#9ad65a');
         this.sparkle(x, y, 0x9ad65a);
+        this.juice.burst(x, y, 'spark', 8);
+        sfx('catch', { x });
         break;
       case 'shield': {
         const r = this.add.circle(x, y, 10, 0xffffff, 0).setStrokeStyle(2, 0xe0503f, 1);
         this.fxL.add(r);
         this.tweens.add({ targets: r, scale: 2, alpha: 0, duration: 300, onComplete: () => r.destroy() });
         this.floatText(x, y - 20, 'Schild!', '#f08a7e');
+        sfx('pop', { x, pitch: 1.3 });
         break;
       }
       case 'chest': {
         const power = fx.power ? BOGEN_POWERS[fx.power].name : '';
         this.sparkle(x, y - 6, 0xffd25e);
         this.floatText(x, y - 26, power, '#ffd25e');
+        sfx('powerup', { x });
         break;
       }
       case 'pickup': {
         const t = txt(this, x, y - 10, '+1', { color: '#fff4d6' });
         this.fxL.add(t);
         this.tweens.add({ targets: t, y: y - 18, alpha: 0, duration: 500, onComplete: () => t.destroy() });
+        sfx('select', { x, vol: 0.5 });
         break;
       }
     }

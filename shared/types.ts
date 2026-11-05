@@ -9,6 +9,8 @@ import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
 import type { KofferState } from './koffer';
+import type { WackelState } from './wackel';
+import type { SuessState } from './suess';
 
 export interface Look {
   skin: number;
@@ -70,11 +72,14 @@ export type MiniKind =
   | 'golf'
   | 'autoball'
   | 'werwolf'
+  | 'spion'
   | 'pixel'
   | 'wpistole'
   | 'zauber'
   | 'angeln'
-  | 'koffer';
+  | 'koffer'
+  | 'suess'
+  | 'wackel';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1135,15 +1140,20 @@ export interface IgelHog {
   state: 'ok' | 'dead' | 'drowned';
   flying: boolean;
   walking: boolean;
+  /** Angezeigte HP: Schaden zählt erst in der Settle-Phase Punkt für Punkt herunter (wie bei Worms) */
+  shown: number;
 }
 
 export interface IgelFx {
   seq: number;
-  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water';
+  /** taunt = Zuschauer-Spruch als Sprechblase über dem Igel `hog` */
+  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt';
   x: number;
   y: number;
   r?: number;
   text?: string;
+  /** Igel, über dem die Sprechblase hängt (taunt) */
+  hog?: number;
 }
 
 export interface IgelState {
@@ -1173,6 +1183,10 @@ export interface IgelState {
   suddenDeath: boolean;
   /** ms bis Sudden Death (0 = läuft schon) */
   suddenIn: number;
+  /** Start-HP pro Igel (100, ab 8 Spielern 60) */
+  maxHp: number;
+  /** Zugzeit dieser Partie (nach Spielerzahl) */
+  turnMs: number;
   damage: Record<string, number>;
   /** Ausgeschiedene Spieler in Reihenfolge */
   out: string[];
@@ -1476,6 +1490,70 @@ export interface FangenPrivate {
   dir: 1 | -1;
   decoyLeft: number;
   decoyActive: boolean;
+}
+
+// ------------------------------------------------------------------ Spion unter Gästen
+
+/** Öffentlich pro Spieler – welcher Gast er ist, steht hier NIE */
+export interface SpionPlayer {
+  out: boolean;
+  outBy: string | null;
+  balloons: number;
+  /** Erledigte Aufträge – erscheint absichtlich verzögert */
+  tasks: number;
+  score: number;
+  unmasks: number;
+}
+
+/** Ein Wasserballon im Flug (hit = null) bzw. gelandet */
+export interface SpionThrow {
+  seq: number;
+  by: string;
+  /** Ziel-Gast (Index in `guests`) */
+  g: number;
+  hit: boolean | null;
+  /** Getroffener Spieler (nur bei Treffer) */
+  victim: string | null;
+}
+
+/** Gast mit Namensschild auf dem TV: enttarnt, Fehlwurf (kurz) oder Auflösung am Rundenende */
+export interface SpionTag {
+  g: number;
+  id: string;
+  why: 'out' | 'miss' | 'reveal';
+}
+
+export interface SpionState {
+  sub: 'intro' | 'play' | 'reveal' | 'over';
+  endsIn: number;
+  round: number;
+  rounds: number;
+  /** Alle Gäste: [x, y, Flags] – siehe `packGuest()` in shared/spion.ts */
+  guests: [number, number, number][];
+  players: Record<string, SpionPlayer>;
+  throws: SpionThrow[];
+  tags: SpionTag[];
+  /** Laufschrift oben auf dem TV */
+  news: { seq: number; text: string } | null;
+  /** Wer in dieser Runde alle Aufträge geschafft hat */
+  winner: string | null;
+}
+
+/** Geheim – nur für den jeweiligen Spieler */
+export interface SpionPrivate {
+  /** Eigener Gast (Index in `guests`) */
+  g: number;
+  done: boolean[];
+  /** ms, bis der nächste Auftrag zählt */
+  cooldown: number;
+  /** Auftragsort in Reichweite (-1 = keiner) */
+  near: number;
+  /** ms, bis das Erledigen fertig ist (0 = nicht dabei) */
+  using: number;
+  walking: boolean;
+  chatting: boolean;
+  out: boolean;
+  note: { text: string; seq: number } | null;
 }
 
 // ------------------------------------------------------------------ Geisterjagd
@@ -1872,7 +1950,10 @@ export type MiniSnapshot =
   | { kind: 'wpistole'; state: WpistoleState }
   | { kind: 'zauber'; state: ZauberState }
   | { kind: 'angeln'; state: AngelnState }
-  | { kind: 'koffer'; state: KofferState };
+  | { kind: 'koffer'; state: KofferState }
+  | { kind: 'suess'; state: SuessState }
+  | { kind: 'spion'; state: SpionState }
+  | { kind: 'wackel'; state: WackelState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -1911,6 +1992,8 @@ export interface GameLive {
   inGame?: string[] | null;
   /** Arcade: „Alle dürfen wählen“ – Stimmen der Spieler für das nächste Spiel (null = aus) */
   arcadeVote?: ArcadeVoteState | null;
+  /** Kann der VIP (bzw. der Laptop) gerade etwas überspringen? (Zug, Phase, Info-Screen) – sonst null */
+  skippable?: SkipInfo | null;
   /** Ergebnis eines Einzelspiels: „Nochmal“ möglich? (null = kein Einzelspiel bzw. nicht im Ergebnis) */
   nochmal: NochmalState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
@@ -1970,6 +2053,16 @@ export interface NochmalState {
   random: boolean;
 }
 
+/**
+ * Überspringen per VIP-Menü (Handy) bzw. Taste S am Laptop – nur in Zug-/Warte-Phasen, nie in Echtzeit-Spielen.
+ * `label` ist der fertige Knopftext („Bens Wurf überspringen“, „Abstimmung beenden“).
+ */
+export interface SkipInfo {
+  label: string;
+  /** Reiner Info-Screen (Auflösung, Intro, Zwischenstand) – niemand muss etwas tun */
+  info?: boolean;
+}
+
 /** Arcade-Abstimmung in der Lobby: jeder Spieler hat höchstens eine Stimme */
 export interface ArcadeVoteState {
   /** Spieler-ID → gewähltes Spiel (nur verbundene Spieler) */
@@ -1996,6 +2089,7 @@ export type PrivateState =
   | { kind: 'sprueche'; state: SpruechePrivate }
   | { kind: 'werwolf'; state: WolfPrivate }
   | { kind: 'pixel'; state: PixelPrivate }
+  | { kind: 'spion'; state: SpionPrivate }
   | null;
 
 export interface JoinRequest {
@@ -2033,5 +2127,7 @@ export interface StartRequest {
   /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung) */
   mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | MiniKind;
   rounds?: number;
+  /** Party-Modus: auch lange Minispiele (> 4 min) aufs Brett */
+  longGames?: boolean;
   version?: string;
 }

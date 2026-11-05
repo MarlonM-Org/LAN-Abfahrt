@@ -2,10 +2,12 @@ import type { ArenaState, SupState, TidyState } from '../../../shared/types';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { SHIRTS } from '../../../shared/avatar';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 // ------------------------------------------------------------------ Joystick
 
-/** Virtueller Joystick: schickt die Richtung (−1…1) gedrosselt an den Server */
+/** Fester Joystick (Mitte = Kreismitte) – nur noch für den Fallen-Parcours; alle anderen nutzen stickZone() aus stick.ts */
 export function joystick(container: HTMLElement, onMove: (x: number, y: number) => void) {
   const pad = el(`<div class="stick-pad"><div class="stick-knob"></div></div>`).firstElementChild as HTMLElement;
   const knob = pad.querySelector('.stick-knob') as HTMLElement;
@@ -82,7 +84,7 @@ export function pickSup(s: SupState): Screen {
       const btn = el(`<button class="big-btn paddle ${side}">${side === 'left' ? '◀ LINKS' : 'RECHTS ▶'}<br/><small>paddeln</small></button>`).firstElementChild as HTMLButtonElement;
       tapButton(btn, () => {
         send('paddle', { side });
-        navigator.vibrate?.(10);
+        haptic(10);
       });
       wrap.append(btn);
     }
@@ -108,18 +110,20 @@ export function pickTidy(s: TidyState): Screen {
   if (s.sub === 'over') return ['td-over', message('Aufgeräumt!', 'Schau auf den Fernseher!')];
   return [`td-${s.sub}`, () => {
     const team = TEAM_INFO[me.team];
+    // Quer: zwei Daumen – links Stick, rechts SPRINT (früher Stick und Knopf übereinander für einen Daumen)
     const root = el(`
-      <div class="team-badge team-${me.team}">${team.name} – euer Korb: ${me.team === 'A' ? 'links' : 'rechts'}</div>
-      <div class="top-row"><span class="timer"></span><span class="score"></span></div>
-      <p class="hint">${s.sub === 'countdown' ? 'Gleich geht’s los! Schiebt die Sachen in euren Korb.' : 'Lauf gegen die Sachen, um sie zu schieben!'}</p>
-      <div class="stick-area"></div>
-      <button class="big-btn dash">SPRINT</button>
+      <div class="lx td-lx">
+        <div class="lx-head"><span class="lx-tag team-${me.team}">${team.name} · Korb ${me.team === 'A' ? 'links' : 'rechts'}</span><span class="timer"></span><span class="score grow"></span></div>
+        <div class="lx-left td-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+        <div class="lx-mid"><p class="hint">${s.sub === 'countdown' ? 'Gleich geht’s los! Schiebt die Sachen in euren Korb.' : 'Lauf gegen die Sachen, um sie zu schieben!'}</p></div>
+        <div class="lx-right"><button class="big-btn dash">SPRINT</button></div>
+      </div>
     `);
-    joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+    stickZone(q(root, '.td-stick'), (x, y) => send('stick', { x, y }));
     const dash = q<HTMLButtonElement>(root, '.dash');
     tapButton(dash, () => {
       send('dash');
-      navigator.vibrate?.(20);
+      haptic(20);
     });
     app.append(root);
     return () => {
@@ -144,23 +148,21 @@ export function pickArena(s: ArenaState): Screen {
   return ['ar-ctl', () => {
     const look = me()?.look;
     const color = look ? SHIRTS[look.shirt] : '#f2c33a';
+    // Quer wie Bomberman am Gamepad: links Stick, rechts BOMBE
     const root = el(`
-      <div class="arena-head" style="border-color:${color}">
-        <span class="arena-av"></span>
-        <div><div class="arena-round"></div><div class="arena-stats"></div></div>
-      </div>
-      <p class="hint arena-hint"></p>
-      <div class="arena-controls">
-        <div class="stick-area"></div>
-        <button class="big-btn arena-bomb">BOMBE</button>
+      <div class="lx ar-lx" style="--ar-color:${color}">
+        <div class="lx-head"><span class="arena-av"></span><span class="arena-round"></span><span class="arena-stats grow"></span></div>
+        <div class="lx-left ar-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+        <div class="lx-mid"><p class="hint arena-hint"></p></div>
+        <div class="lx-right"><button class="big-btn arena-bomb">BOMBE</button></div>
       </div>
     `);
-    if (look) q(root, '.arena-av').append(avatarCanvas(3, look));
-    joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+    if (look) q(root, '.arena-av').append(avatarCanvas(1, look));
+    stickZone(q(root, '.ar-stick'), (x, y) => send('stick', { x, y }));
     const bomb = q<HTMLButtonElement>(root, '.arena-bomb');
     tapButton(bomb, () => {
       send('bomb');
-      navigator.vibrate?.(25);
+      haptic(25);
     });
     app.append(root);
     return () => {

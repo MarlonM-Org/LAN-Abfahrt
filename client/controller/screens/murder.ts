@@ -1,6 +1,6 @@
 import type { MurderPrivate, MurderState } from '../../../shared/types';
 import { MURDER, ROOMS } from '../../../shared/games';
-import { type Screen, app, el, escapeHtml, message, nameOf, playerButtons, q, secondsLeft, send, socket, store, tapButton } from '../core';
+import { type Screen, app, el, escapeHtml, message, nameOf, playerButtons, q, send, socket, store, tapButton, timerText } from '../core';
 
 const murder = () => (store.state?.mini?.kind === 'murder' ? store.state.mini.state : null);
 const priv = (): MurderPrivate | null => (store.priv?.kind === 'murder' ? store.priv.state : null);
@@ -108,7 +108,7 @@ function buildTasks() {
     const p = priv();
     const m = murder();
     if (!p || !m) return;
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     q(root, '.status').textContent = `Aufgaben ${Math.round((m.taskProgress / Math.max(1, m.taskTarget)) * 100)}%`;
     q(root, '.dead-banner').classList.toggle('hidden', p.alive);
     roomBtns.forEach((b, i) => {
@@ -155,7 +155,7 @@ function buildMeeting(vip: boolean) {
   }
   app.append(root);
   return () => {
-    q(root, '.timer').textContent = `Abstimmung in ${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText((sec) => `Abstimmung in ${sec}s`);
   };
 }
 
@@ -175,7 +175,7 @@ function buildVote() {
   root.append(skip);
   app.append(root);
   return () => {
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
   };
 }
 
