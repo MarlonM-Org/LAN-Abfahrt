@@ -16,6 +16,7 @@ for (const m of block.matchAll(/^\s+(\w+): \{ title: '([^']+)'(.*)$/gm)) {
     title: m[2],
     icon: /icon: '([^']+)'/.exec(rest)?.[1] ?? '🎮',
     inspired: /inspiredBy: '([^']+)'/.exec(rest)?.[1] ?? '',
+    orient: /orientation: '(\w+)'/.exec(rest)?.[1] ?? '',
   };
 }
 const groups = [];
@@ -39,7 +40,7 @@ const card = (t) => `<div class="card wip-card"><div class="row"><span class="ta
 
 const gameRow = (k) => {
   const g = info[k]; const fb = data.feedback[k];
-  return `<tr><td class="ic">${g.icon}</td><td><b>${esc(g.title)}</b>${g.inspired ? `<div class="sub">à la ${esc(g.inspired)}</div>` : ''}</td>
+  return `<tr><td class="ic">${g.icon}</td><td><b>${esc(g.title)}</b>${g.orient === 'landscape' ? ' <span title="Handy quer">↔</span>' : g.orient === 'portrait' ? ' <span title="Handy hochkant">↕</span>' : ''}${g.inspired ? `<div class="sub">à la ${esc(g.inspired)}</div>` : ''}</td>
 <td><span class="pill ${fb ? fbClass[fb.status] ?? 'open' : 'none'}">${fb ? esc(fb.status) : 'noch kein Feedback'}</span></td><td class="notes">${fb ? esc(fb.notes) : ''}</td></tr>`;
 };
 

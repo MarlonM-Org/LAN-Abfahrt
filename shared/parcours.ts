@@ -71,7 +71,7 @@ export const PARCOURS = {
   BOMB_R: 24,
   /** Spielerfarben (bis 12) */
   COLORS: [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8, 0x8d5629, 0xfdf7ea, 0x5a6f8a, 0xb7d94a],
-  MAX_RUNNERS: 8,
+  MAX_RUNNERS: 12,
 };
 
 /** Spielfläche (unterhalb der HUD-Leiste) */
@@ -96,7 +96,8 @@ export const NO_BUILD: Rect[] = [
   { x: 384, y: 110, w: 96, h: 86 },
 ];
 
-export const spawnX = (i: number) => 12 + (i % 8) * 7;
+/** Startplätze auf dem Strand (x 0–76): bis 12 Läufer nebeneinander, 5 px Abstand */
+export const spawnX = (i: number) => 10 + (i % 12) * 5;
 export const SPAWN_Y = 200;
 
 export interface PartDef {

@@ -124,6 +124,9 @@ export class Board {
     for (const [id, c] of Object.entries(coins)) if (id in this.state.coins) this.addCoins(id, c);
     const s = this.state;
     s.round += 1;
+    // Startspieler rotiert: wer diese Runde als Erster dran war, ist nächste Runde Letzter.
+    // So kommt nicht immer dieselbe Person zuerst an die Bar (Clients lesen order[turnIdx]).
+    if (s.order.length > 1) s.order = [...s.order.slice(1), s.order[0]];
     s.turnIdx = 0;
     s.nextMini = null;
     if (this.finished) return;

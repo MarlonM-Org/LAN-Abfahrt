@@ -1,5 +1,7 @@
 import { KOFFER_ITEMS, type KofferState } from '../../../shared/koffer';
 import { kofferPiece } from '../../art/koffer';
+import { haptic } from '../haptic';
+import { onInputReset } from '../stick';
 import { type Screen, app, el, message, q, send, store } from '../core';
 
 const ICON = {
@@ -31,6 +33,7 @@ function repeatButton(btn: HTMLElement, fire: () => void) {
   });
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) btn.addEventListener(ev, stop);
   btn.addEventListener('contextmenu', (e) => e.preventDefault());
+  onInputReset(btn, stop);
 }
 
 function paintNext(c: HTMLCanvasElement, item: number, v: number) {
@@ -60,33 +63,37 @@ export function pickKoffer(s: KofferState): Screen {
 
   return ['koffer-play', () => {
     const partner = me.owners.find((o) => o !== store.playerId);
+    // Quer wie der Wackelturm: links ◀ ▶, rechts DREHEN über REIN DAMIT, Mitte Füllstand/Nächstes/Meldung
     const root = el(`
-      <div class="top-row"><span class="timer"></span><span class="ltr"></span></div>
-      <div class="turm-info koffer-info">
-        <div class="koffer-fill"><div class="koffer-bar"><i></i></div><small class="pct"></small></div>
-        <div class="turm-next"><small>Nächstes:</small><canvas width="54" height="36"></canvas><small class="next-name"></small></div>
-      </div>
-      ${partner ? `<p class="koffer-team">Team mit ${nameOf(partner)} – ihr packt abwechselnd</p>` : ''}
-      <p class="turm-msg"></p>
-      <div class="turm-pad koffer-pad">
-        <button class="big-btn turm-btn shift" data-dir="-1">${ICON.left}</button>
-        <button class="big-btn turm-btn rot">${ICON.rot}</button>
-        <button class="big-btn turm-btn shift" data-dir="1">${ICON.right}</button>
-        <button class="big-btn turm-btn drop">${ICON.drop}<span>REIN DAMIT</span></button>
+      <div class="lx turm-lx koffer-lx">
+        <div class="lx-head"><span class="timer"></span><span class="ltr"></span>${partner ? `<span class="koffer-team grow">Team mit ${nameOf(partner)} – ihr packt abwechselnd</span>` : '<span class="grow"></span>'}</div>
+        <div class="lx-left turm-move koffer-pad">
+          <button class="big-btn turm-btn shift" data-dir="-1">${ICON.left}</button>
+          <button class="big-btn turm-btn shift" data-dir="1">${ICON.right}</button>
+        </div>
+        <div class="lx-mid turm-info koffer-info">
+          <div class="koffer-fill"><div class="koffer-bar"><i></i></div><small class="pct"></small></div>
+          <div class="turm-next"><small>Nächstes:</small><canvas width="54" height="36"></canvas><small class="next-name"></small></div>
+          <p class="turm-msg"></p>
+        </div>
+        <div class="lx-right turm-act koffer-pad">
+          <button class="big-btn turm-btn rot">${ICON.rot}<span>DREHEN</span></button>
+          <button class="big-btn turm-btn drop">${ICON.drop}<span>REIN DAMIT</span></button>
+        </div>
       </div>
     `);
     for (const b of root.querySelectorAll<HTMLButtonElement>('.shift')) {
       const dir = Number(b.dataset.dir);
       repeatButton(b, () => {
         send('shift', { dir });
-        navigator.vibrate?.(5);
+        haptic(5);
       });
     }
     const rot = q<HTMLButtonElement>(root, '.rot');
     rot.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       send('rotate');
-      navigator.vibrate?.(8);
+      haptic(8);
     });
     rot.addEventListener('contextmenu', (e) => e.preventDefault());
     const drop = q<HTMLButtonElement>(root, '.drop');
@@ -104,10 +111,15 @@ export function pickKoffer(s: KofferState): Screen {
       });
     }
     drop.addEventListener('contextmenu', (e) => e.preventDefault());
+    onInputReset(drop, () => {
+      if (!drop.classList.contains('held')) return;
+      drop.classList.remove('held');
+      send('drop', { on: false });
+    });
     app.append(root);
 
     const canvas = q<HTMLCanvasElement>(root, 'canvas');
-    const pad = q(root, '.koffer-pad');
+    const pads = [...root.querySelectorAll<HTMLElement>('.koffer-pad')];
     let nextKey = '';
     let lostSeq = me.lostSeq;
     let lostAt = 0;
@@ -131,12 +143,12 @@ export function pickKoffer(s: KofferState): Screen {
       if (car.lostSeq !== lostSeq) {
         lostSeq = car.lostSeq;
         lostAt = performance.now();
-        navigator.vibrate?.([60, 40, 60]);
+        haptic([60, 40, 60]);
       }
       const mine = !!car.active && car.active.owner === store.playerId;
-      if (mine && !wasMine && partner) navigator.vibrate?.(30);
+      if (mine && !wasMine && partner) haptic(30);
       wasMine = mine;
-      pad.classList.toggle('waiting', !!partner && !mine);
+      for (const pad of pads) pad.classList.toggle('waiting', !!partner && !mine);
       const msg = q(root, '.turm-msg');
       const text =
         st.sub === 'countdown'

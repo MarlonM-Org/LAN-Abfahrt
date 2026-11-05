@@ -115,7 +115,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     const row = el(`<div class="btn-grid"></div>`);
     for (const kind of kinds) {
       const info = MINI_INFO[kind];
-      const b = el(`<button class="secondary small">${info.title}</button>`).firstElementChild as HTMLButtonElement;
+      const b = el(`<button class="secondary small">${info.title}${info.orientation === 'landscape' ? ' <b class="or-mark">↔</b>' : ''}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:start', { mode: kind }));
       q(row, '.btn-grid').append(b);
       gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
@@ -315,7 +315,7 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
       const info = MINI_INFO[kind];
       const insp = miniInspired(kind);
       const b = el(
-        `<button class="secondary arcade-tile"><span class="ic">${info.icon}</span><span class="t">${escapeHtml(info.title)}</span>${insp ? `<small class="insp">${escapeHtml(insp)}</small>` : ''}<span class="votes"></span></button>`,
+        `<button class="secondary arcade-tile"><span class="ic">${info.icon}</span><span class="t">${escapeHtml(info.title)}${info.orientation === 'landscape' ? ' <b class="or-mark" title="Handy quer halten">↔</b>' : ''}</span>${insp ? `<small class="insp">${escapeHtml(insp)}</small>` : ''}<span class="votes"></span></button>`,
       ).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => (vip ? socket.emit('vip:start', { mode: kind }) : socket.emit('arcade:vote', kind)));
       q(grid, '.arcade-grid').append(b);

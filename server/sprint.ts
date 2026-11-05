@@ -4,13 +4,19 @@ import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore } from './m
 
 /**
  * Liegestuhl-Sprint: Warten, bis die Sonne aufgeht – dann so schnell wie möglich tippen.
- * Wer vorher tippt, hat einen Fehlstart. Die Reaktionszeit misst das Handy selbst
- * (fair, weil Netzwerk-Laufzeiten nicht mitzählen).
+ * Wer vorher tippt, hat einen Fehlstart. Die Reaktionszeit misst der Server selbst
+ * (Zeit zwischen „LOS“ und Eingang des Taps, abzüglich der vom Handy per Uhrabgleich
+ * gemessenen Laufzeit). Die Zeit, die das Handy meldet, dient nur als Plausibilitätsgrenze.
  */
+/** Höchstens so viel Netzwerk-Laufzeit wird abgezogen (schützt vor geschönten Angaben) */
+const MAX_RTT_MS = 250;
+
 export class SprintGame implements MiniGame {
   readonly kind = 'sprint' as const;
   private state: SprintState;
   private timers = new Timers();
+  /** Serverzeit, zu der „LOS“ verschickt wurde */
+  private goAt = 0;
 
   constructor(
     private ids: string[],
@@ -37,8 +43,7 @@ export class SprintGame implements MiniGame {
       if (Number(p.seq) !== s.goSeq) {
         s.times[playerId] = 'early';
       } else {
-        const ms = Number(p.ms);
-        s.times[playerId] = Number.isFinite(ms) ? Math.round(Math.max(0, Math.min(SPRINT.GO_MS, ms))) : SPRINT.GO_MS;
+        s.times[playerId] = this.reactionMs(p);
       }
     } else {
       return;
@@ -58,6 +63,22 @@ export class SprintGame implements MiniGame {
     }
   }
 
+  /**
+   * Reaktionszeit aus Server-Sicht: Rohzeit seit „LOS“ minus Laufzeit hin (LOS ans Handy) und zurück (Tap zum
+   * Server), also eine volle Round-Trip-Zeit – geschätzt per Uhrabgleich am Handy (`rtt`), gedeckelt.
+   * Die Handy-Zeit (`ms`) hebt das Ergebnis höchstens an (wer behauptet, langsamer gewesen zu sein, bekommt das),
+   * kann es aber nie unter die Server-Schätzung drücken.
+   */
+  private reactionMs(p: Record<string, unknown>) {
+    const raw = Math.min(SPRINT.GO_MS, Math.max(0, Date.now() - this.goAt));
+    const rtt = Number(p.rtt);
+    const net = Number.isFinite(rtt) ? Math.min(MAX_RTT_MS, Math.max(0, rtt)) : 0;
+    const est = Math.max(0, raw - net);
+    const phone = Number(p.ms);
+    const t = Number.isFinite(phone) ? Math.max(est, Math.min(raw, phone)) : est;
+    return Math.round(t);
+  }
+
   dispose() {
     this.timers.clear();
   }
@@ -73,6 +94,7 @@ export class SprintGame implements MiniGame {
     this.timers.later(wait, () => {
       s.sub = 'go';
       s.goSeq += 1;
+      this.goAt = Date.now();
       this.ctx.onChange();
       this.timers.later(SPRINT.GO_MS, () => this.reveal());
     });
