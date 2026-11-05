@@ -57,6 +57,7 @@ import { isLoopback } from './net';
 import { TouristGame } from './tourist';
 import { WerwolfGame } from './werwolf';
 import { SpruecheGame } from './sprueche';
+import { PixelGame } from './pixel';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
 const MAX_PLAYERS = 12;
@@ -492,6 +493,9 @@ export class Room {
       case 'werwolf':
         this.mini = new WerwolfGame(ids, ctx);
         break;
+      case 'pixel':
+        this.mini = new PixelGame(ids, ctx);
+        break;
     }
     this.results = null;
     this.phase = 'mini';
@@ -682,6 +686,7 @@ export class Room {
     if (m?.kind === 'stillepost' && m.state.sub === 'vote') return { key: `sp-vote-${m.state.chain}`, ms: null };
     if (m?.kind === 'murder' && m.state.sub === 'meeting') return { key: `murder-${m.state.phaseNo}`, ms: null };
     if (m?.kind === 'werwolf' && m.state.sub === 'day') return { key: `werwolf-${m.state.phaseNo}`, ms: null };
+    if (m?.kind === 'pixel' && (m.state.sub === 'vote' || m.state.sub === 'reveal' || m.state.sub === 'scores')) return { key: `pixel-${m.state.sub}-${m.state.round}`, ms: null };
     return null;
   }
 

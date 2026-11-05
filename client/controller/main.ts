@@ -34,6 +34,7 @@ import { pickSumo } from './screens/sumo';
 import { pickVolley } from './screens/volley';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
+import { pickPixel } from './screens/pixel';
 import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
 
@@ -297,6 +298,8 @@ function pickScreen(): Screen {
           return pickSprueche(m.state, vip);
         case 'werwolf':
           return pickWerwolf(m.state);
+        case 'pixel':
+          return pickPixel(m.state, vip);
       }
       return outdatedScreen();
     }

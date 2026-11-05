@@ -59,7 +59,8 @@ export type MiniKind =
   | 'volley'
   | 'tourist'
   | 'sprueche'
-  | 'werwolf';
+  | 'werwolf'
+  | 'pixel';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1290,6 +1291,52 @@ export interface SpruechePrivate {
   voteDone: boolean;
 }
 
+// ------------------------------------------------------------------ Pixel-Galerie
+
+/** Ein Bild der Ausstellung (Bild-Kodierung siehe shared/pixel.ts) */
+export interface PixelEntry {
+  pic: string;
+  /** Künstler – erst in der Auflösung öffentlich */
+  by: string | null;
+  /** Stimmen – erst in der Auflösung */
+  votes: number | null;
+}
+
+export interface PixelState {
+  sub: 'intro' | 'paint' | 'vote' | 'reveal' | 'scores' | 'over';
+  round: number;
+  rounds: number;
+  /** Thema der Runde (alle malen dasselbe) */
+  prompt: string;
+  endsIn: number;
+  players: string[];
+  /** Malphase: bemalte Felder pro Spieler – die Bilder selbst bleiben bis zur Ausstellung geheim */
+  filled: Record<string, number>;
+  done: string[];
+  /** Ausstellung (ab "vote"), anonym gemischt */
+  gallery: PixelEntry[];
+  /** Wer abstimmen darf / schon abgestimmt hat */
+  voters: string[];
+  voted: string[];
+  /** Gesamtstimmen pro Spieler */
+  points: Record<string, number>;
+  /** Stimmen der letzten Runde */
+  roundGain: Record<string, number>;
+}
+
+/** Nur an den jeweiligen Spieler */
+export interface PixelPrivate {
+  round: number;
+  sub: PixelState['sub'];
+  /** Eigenes Bild der Runde (zum Wiederherstellen nach Neuladen) */
+  pic: string | null;
+  done: boolean;
+  /** Index des eigenen Bildes in der Ausstellung (dafür darf man nicht stimmen) */
+  mine: number | null;
+  canVote: boolean;
+  myVote: number | null;
+}
+
 // ------------------------------------------------------------------ Controller-Spiele: Urlaubs-Fangen
 
 export interface FangenHunter {
@@ -1587,7 +1634,8 @@ export type MiniSnapshot =
   | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
-  | { kind: 'werwolf'; state: WolfState };
+  | { kind: 'werwolf'; state: WolfState }
+  | { kind: 'pixel'; state: PixelState };
 
 export interface GameState {
   phase: Phase;
@@ -1635,6 +1683,7 @@ export type PrivateState =
   | { kind: 'tourist'; state: TourPrivate }
   | { kind: 'sprueche'; state: SpruechePrivate }
   | { kind: 'werwolf'; state: WolfPrivate }
+  | { kind: 'pixel'; state: PixelPrivate }
   | null;
 
 export interface JoinRequest {
