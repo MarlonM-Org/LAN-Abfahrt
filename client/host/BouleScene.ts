@@ -6,7 +6,10 @@ import { bouleBall, cochonnet, paintBoulePitch } from '../art/boule';
 import { crown } from '../art/objects';
 import { bus, getState, playerById } from './store';
 import { ensureAvatar, ensurePortrait } from './textures';
-import { GOLD, LIGHT, RED_INK, background, ensureTex, ink, panel, txt } from './ui';
+import { GOLD, LIGHT, RED_INK, background, ensureTex, fitText, ink, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { cloudShadows, crowd, gulls } from './ambient';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const MAX_BALLS = 16;
@@ -38,6 +41,8 @@ export class BouleScene extends Phaser.Scene {
   private latest: GameState | null = null;
   private play: Playback | null = null;
   private lastSeq = 0;
+  private juice!: Juice;
+  private fans: ReturnType<typeof crowd> | null = null;
   private hudKey = '';
   private boardKey = '';
   private placeT0 = 0;
@@ -63,6 +68,11 @@ export class BouleScene extends Phaser.Scene {
     this.overShown = false;
 
     background(this, 'boule', WORLD.W, WORLD.H, (p) => paintBoulePitch(p, WORLD.W, WORLD.H));
+    this.juice = new Juice(this, { depth: 1450 });
+    // Leerer Sandplatz: Möwen, Wolkenschatten und Zuschauer am Rand
+    gulls(this, { n: 3, y: [30, 120], depth: 1700 });
+    cloudShadows(this, { n: 3, y: [40, 250], depth: 3, alpha: 0.06 });
+    this.fans = crowd(this, [[16, 268], [32, 266], [448, 268], [464, 266], [456, 60]], { depth: 5 });
     this.g = this.add.graphics().setDepth(1);
     this.thrower = this.add.image(BOULE.CIRCLE.x, BOULE.CIRCLE.y + 2, ensureTex(this, 'boule_dummy', () => document.createElement('canvas'))).setOrigin(0.5, 1).setDepth(BOULE.CIRCLE.y + 2);
     this.styleTxt = txt(this, BOULE.CIRCLE.x + 4, BOULE.CIRCLE.y + 12, '', { origin: [0, 0] }).setDepth(900);
@@ -95,6 +105,7 @@ export class BouleScene extends Phaser.Scene {
       this.lastSeq = st.last.seq;
       this.play = { seq: st.last.seq, track: st.last.track, t0: this.time.now, landed: false, hitIdx: 0 };
       this.hideBanner();
+      sfx(st.last.shoot ? 'throw' : 'whoosh', { x: st.last.track.from.x, pitch: st.last.shoot ? 0.9 : 0.6, vol: 0.6 });
       if (st.last.shoot) this.showBanner('SCHUSS!', playerById(st.last.playerId)?.name ?? '', '#ff9a7a', true);
     }
     if (st.sub === 'aim' || st.sub === 'place') this.play = null;
@@ -115,6 +126,9 @@ export class BouleScene extends Phaser.Scene {
       const best = [...st.sides].sort((a, b) => b.score - a.score);
       const tie = best.length > 1 && best[0].score === best[1].score;
       this.showBanner('ENDSTAND', tie ? 'Unentschieden!' : `${best[0].name} gewinnt!`, GOLD);
+      sfx('fanfare');
+      this.fans?.cheer();
+      this.juice.burst(240, 110, 'confetti', 50);
     }
     this.renderIntro(st);
     this.renderHud(st);
@@ -176,6 +190,8 @@ export class BouleScene extends Phaser.Scene {
         if (!pb.landed) {
           pb.landed = true;
           this.puff(tr.land.x, tr.land.y, st.last?.shoot ? 10 : 7);
+          this.juice.burst(tr.land.x, tr.land.y, 'sand', st.last?.shoot ? 12 : 6);
+          sfx('bonk', { x: tr.land.x, pitch: 0.55, vol: 0.6 });
         }
         const f = Math.min(tr.frames - 1, (t - tr.flightMs) / 1000 / tr.dt);
         jackPos = at(0, f);
@@ -183,6 +199,11 @@ export class BouleScene extends Phaser.Scene {
         while (pb.hitIdx < tr.hits.length && tr.hits[pb.hitIdx] <= f) {
           const p = ballPos[ballPos.length - 1]!;
           this.spark(p.x, p.y);
+          // Kugel trifft Kugel: metallisches Klacken + kurzer Stopp
+          sfx('crack', { x: p.x, pitch: 1.6, vol: 0.7 });
+          this.juice.burst(p.x, p.y, 'spark', 8);
+          this.juice.hitStop(50);
+          if (st.last?.shoot) this.juice.shake(1);
           pb.hitIdx++;
         }
       }
@@ -240,6 +261,7 @@ export class BouleScene extends Phaser.Scene {
       if (this.measureShown === 0 && t > 500) {
         this.measureShown = 1;
         this.showBanner('GLEICHSTAND', 'Keiner punktet in dieser Aufnahme', LIGHT);
+        sfx('lose', { vol: 0.5 });
       }
       return;
     }
@@ -258,6 +280,13 @@ export class BouleScene extends Phaser.Scene {
       this.measureShown = shown;
       const last = shown === r.counting.length;
       this.showBanner(`${shown} ${shown === 1 ? 'PUNKT' : 'PUNKTE'}!`, last ? `für ${side.name}` : '', hex(side.color));
+      // Messung: Tick pro gezählter Kugel, am Ende Münze + Jubel
+      sfx('tick', { pitch: 1 + shown * 0.12 });
+      if (last) {
+        sfx('coin', { delay: 0.1 });
+        this.fans?.cheer();
+      }
+
     }
   }
 
@@ -353,7 +382,7 @@ export class BouleScene extends Phaser.Scene {
       this.hud.add(this.add.image(17, 27, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
       const side = st.sides.find((s) => s.members.includes(who));
       if (side) this.hud.add(this.add.circle(27, 12, 3, side.color).setStrokeStyle(1, 0x2d1b12));
-      this.hud.add(ink(this, 33, 9, p.name.slice(0, 13), { origin: [0, 0], color: RED_INK }));
+      this.hud.add(fitText(ink(this, 33, 9, tagName(p.name), { origin: [0, 0], color: RED_INK }), 13 * 8));
       const n = st.left[who] ?? 0;
       const status = st.sub === 'aim' ? `Aufn. ${st.end}/${st.maxEnds} · noch ${n} Kug.` : st.last?.shoot ? 'schießt …' : 'legt …';
       this.hud.add(ink(this, 33, 21, status, { origin: [0, 0] }));

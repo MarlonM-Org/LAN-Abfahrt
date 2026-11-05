@@ -8,6 +8,9 @@ import { ghostSprite } from '../../art/geist';
 const geist = () => (store.state?.mini?.kind === 'geist' ? store.state.mini.state : null);
 const priv = (): GeistPrivate | null => (store.priv?.kind === 'geist' ? store.priv.state : null);
 
+const ghostIds = (g: GeistState) => (g.ghostIds?.length ? g.ghostIds : [g.ghostId]);
+const mates = (g: GeistState) => ghostIds(g).filter((id) => id !== store.playerId);
+
 /** Android: Vibration, iPhone: Klick + Rand-Blitz (haptic.ts) */
 const vibrate = (pattern: number | number[]) => haptic(pattern);
 
@@ -38,11 +41,12 @@ function buildIntro(g: GeistState, ghost: boolean) {
         <p class="label-left">Auf dem Fernseher bist du unsichtbar – nur dein Handy zeigt dir, wo du bist.</p>
         <p class="label-left">Schleich dich an die Jäger an und berühre sie: BUH! Aber nicht im Lichtkegel – Licht tut weh.</p>
         <p class="label-left">Bei Blitzen sieht dich kurz jeder!</p>
+        ${mates(g).length ? `<p class="label-left">Mitgeist: <b>${escapeHtml(mates(g).map(nameOf).join(', '))}</b> – ihr spukt zu zweit (grauer Kreis auf der Karte).</p>` : ''}
       </div>
       <p class="timer"></p>`)
     : el(`
       <h1>GEISTERJÄGER</h1>
-      <h2>${escapeHtml(nameOf(g.ghostId))} ist der Geist!</h2>
+      <h2>${escapeHtml(ghostIds(g).map(nameOf).join(' und '))} ${ghostIds(g).length > 1 ? 'sind die Geister!' : 'ist der Geist!'}</h2>
       <div class="panel">
         <p class="label-left">Joystick = laufen. Die Taschenlampe leuchtet in Laufrichtung.</p>
         <p class="label-left">Licht an leert den Akku. Leer? Dann kurz stehen bleiben und laden.</p>
@@ -97,7 +101,7 @@ function buildHunter() {
     if (!st || !p || p.role !== 'hunter') return;
     const me = st.hunters[store.playerId!];
     q(root, '.timer').textContent = `${Math.ceil(st.endsIn / 1000)}s`;
-    q(root, '.ghost-hp').textContent = `Geist ${Math.round((st.health / st.maxHealth) * 100)}%`;
+    q(root, '.ghost-hp').textContent = `${ghostIds(st).length > 1 ? 'Geister' : 'Geist'} ${Math.round((st.health / st.maxHealth) * 100)}%`;
     const fear = me?.down ? 0 : p.fear;
     (q(root, '.fear > div') as HTMLElement).style.width = `${Math.round(fear * 100)}%`;
     q(root, '.fear-word').textContent = fear > 0.7 ? 'GANZ NAH!' : fear > 0.4 ? 'kalt ...' : fear > 0.1 ? 'hm?' : 'ruhig';
@@ -151,11 +155,11 @@ function buildGhost() {
     const p = priv();
     if (!st || !p || p.role !== 'ghost') return;
     q(root, '.timer').textContent = `${Math.ceil(st.endsIn / 1000)}s`;
-    const frac = st.health / st.maxHealth;
+    const frac = p.hp ?? st.health / st.maxHealth;
     q(root, '.hp').textContent = `Leben ${Math.round(frac * 100)}%`;
     (q(root, '.ghost-life > div') as HTMLElement).style.width = `${Math.round(frac * 100)}%`;
     const status = q(root, '.ghost-status');
-    status.textContent = p.lit ? 'IM LICHT! WEG HIER!' : st.ghost?.why === 'flash' ? 'Blitz! Alle sehen dich!' : p.cooldown > 0 ? 'Buh ... gleich wieder bereit' : 'Unsichtbar – schleich dich an!';
+    status.textContent = p.out ? 'GEBANNT! Dein Mitgeist spukt weiter.' : p.lit ? 'IM LICHT! WEG HIER!' : st.ghost?.why === 'flash' ? 'Blitz! Alle sehen dich!' : p.cooldown > 0 ? 'Buh ... gleich wieder bereit' : 'Unsichtbar – schleich dich an!';
     status.classList.toggle('danger-text', p.lit);
     if (p.lit && !wasLit) vibrate([60, 40, 60]);
     wasLit = p.lit;
@@ -198,6 +202,16 @@ function buildGhost() {
       const label = nameOf(id).replace(/^Bot\s+/, '').slice(0, 4);
       g.strokeText(label, h.x, h.y - 11);
       g.fillText(label, h.x, h.y - 11);
+    }
+    // Mitgeist (ab 7 Spielern)
+    for (const m of p.mates ?? []) {
+      g.fillStyle = m.out ? 'rgba(125,120,150,0.5)' : 'rgba(244,241,255,0.55)';
+      g.strokeStyle = '#6b4fa8';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.arc(m.x, m.y, GEIST.R + 2, 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
     }
     // Ich
     const pulse = 2 + Math.sin(performance.now() / 150) * 1.5;

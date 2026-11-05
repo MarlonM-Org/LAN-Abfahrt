@@ -6,7 +6,10 @@ import { flagPix, flamingoBumperPix, golfBallPix, lighthouseTopPix, paintGolfHol
 import { crown } from '../art/objects';
 import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
-import { Countdown, GOLD, INK, LIGHT, RED_INK, ensureTex, ink, panel, txt } from './ui';
+import { Countdown, GOLD, INK, LIGHT, RED_INK, ensureTex, ink, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
+import { cloudShadows, crowd, foam, gulls } from './ambient';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const MAX_P = 12;
@@ -40,6 +43,10 @@ export class GolfScene extends Phaser.Scene {
   private hudKey = '';
   private chipKey = '';
   private cardKey = '';
+  private juice!: Juice;
+  private fans: ReturnType<typeof crowd> | null = null;
+  /** Für Schlag- und Bandengeräusche: letzter Server-Stand pro Ball */
+  private prevBall = new Map<string, { x: number; y: number; dx: number; dy: number; m: boolean }>();
 
   constructor() {
     super('golf');
@@ -58,8 +65,15 @@ export class GolfScene extends Phaser.Scene {
     this.hudKey = '';
     this.chipKey = '';
     this.cardKey = '';
+    this.prevBall.clear();
+    this.juice = new Juice(this, { depth: 1750 });
 
     this.bg = this.add.image(0, 0, this.holeTex(0)).setOrigin(0, 0).setDepth(-1000);
+    // Leere Arena beleben: Möwen, Wolkenschatten, Wellenschaum, ein paar Zuschauer in den Ecken
+    gulls(this, { n: 2, y: [8, 60], depth: 1600 });
+    cloudShadows(this, { n: 3, y: [40, 230], depth: 350, alpha: 0.06 });
+    foam(this, { y: 29, n: 14, depth: -900 });
+    this.fans = crowd(this, [[14, 64], [30, 66], [450, 64], [466, 66]], { depth: 5 });
     this.g = this.add.graphics().setDepth(300);
     this.flag = this.add.image(0, 0, ensureTex(this, 'golf_flag0', () => flagPix(0))).setOrigin(0.2, 1).setDepth(450);
     ensureTex(this, 'golf_flag1', () => flagPix(1));
@@ -110,6 +124,7 @@ export class GolfScene extends Phaser.Scene {
       const h = GOLF_HOLES[st.hole];
       this.showBanner(`LOCH ${st.hole + 1}`, `${h.name} · Par ${h.par}`, GOLD, 2600);
     }
+    this.ballSounds(st);
     for (const f of st.fx) {
       if (f.seq <= this.lastFx) continue;
       this.lastFx = f.seq;
@@ -232,25 +247,68 @@ export class GolfScene extends Phaser.Scene {
 
   // ---------------------------------------------------------------- Effekte
 
+  /** Schlag (Ball rollt los) und Bande (Richtung kippt) aus den Ball-Positionen ablesen */
+  private ballSounds(st: GolfState) {
+    if (st.sub !== 'play') {
+      this.prevBall.clear();
+      return;
+    }
+    for (const id of st.order) {
+      const b = st.balls[id];
+      if (!b) continue;
+      const p = this.prevBall.get(id);
+      const dx = p ? b.x - p.x : 0;
+      const dy = p ? b.y - p.y : 0;
+      if (p) {
+        if (b.m && !p.m && !b.tube) sfx('hit', { x: b.x, pitch: 1.7, vol: 0.55 });
+        const sp = Math.hypot(dx, dy);
+        const ps = Math.hypot(p.dx, p.dy);
+        if (b.m && p.m && !b.tube && sp > 1.2 && ps > 1.2 && dx * p.dx + dy * p.dy < -0.2 * sp * ps) {
+          sfx('bonk', { x: b.x, pitch: 1.9, vol: Math.min(0.6, 0.2 + sp / 12) });
+          this.juice.burst(b.x, b.y, 'wood', 3);
+        }
+      }
+      this.prevBall.set(id, { x: b.x, y: b.y, dx, dy, m: b.m });
+    }
+  }
+
   private playFx(st: GolfState, f: GolfState['fx'][number]) {
-    const name = playerById(f.id)?.name ?? '';
+    const name = tagName(playerById(f.id)?.name ?? '');
     const col = hex(st.colors[f.id] ?? 0xffffff);
     if (f.k === 'ace') {
       this.showBanner('HOLE-IN-ONE!', name, GOLD, 2600);
       this.sparkle(f.x, f.y, 18);
+      this.juice.burst(f.x, f.y, 'confetti', 50);
+      this.juice.flash(0xfff1b0, 160);
+      this.juice.zoomPunch(0.06, 300);
+      sfx('fanfare');
+      sfx('cheer', { delay: 0.3 });
+      this.fans?.cheer();
     } else if (f.k === 'hole') {
-      this.floatText(f.x, f.y - 14, `${name.replace(/^Bot\s+/, '').slice(0, 8)}: ${f.n}`, col);
+      this.floatText(f.x, f.y - 14, `${name}: ${f.n}`, col);
       this.sparkle(f.x, f.y, 8);
+      this.juice.burst(f.x, f.y, 'spark', 8);
+      sfx('coin', { x: f.x });
+      sfx('pop', { x: f.x, pitch: 0.7, delay: 0.05 });
+      if ((f.n ?? 9) <= GOLF_HOLES[st.hole].par) this.fans?.cheer();
     } else if (f.k === 'water') {
       this.splash(f.x, f.y);
+      this.juice.burst(f.x, f.y, 'splash', 10);
+      sfx('splash', { x: f.x });
       this.floatText(f.x, f.y - 12, 'PLATSCH! +1', '#8fd8ff');
     } else if (f.k === 'tube') {
       this.floatText(f.x, f.y - 14, 'WUSCH!', '#ffd25e');
+      sfx('whoosh', { x: f.x });
     } else if (f.k === 'lip') {
       this.floatText(f.x, f.y - 12, 'Lippe!', LIGHT);
+      sfx('tick', { x: f.x, pitch: 0.8 });
+      sfx('lose', { x: f.x, vol: 0.3, pitch: 1.4, delay: 0.08 });
     } else if (f.k === 'cap') {
       this.floatText(f.x, f.y - 12, `MAX ${f.n ?? GOLF.MAX_SCORE}`, '#ff9a7a');
+      sfx('error', { x: f.x, vol: 0.6 });
     } else if (f.k === 'bump') {
+      sfx('bonk', { x: f.x, pitch: 1.3 });
+
       const h = GOLF_HOLES[st.hole];
       let best = -1;
       let bd = Infinity;

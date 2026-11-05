@@ -573,8 +573,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pc-rank li { display: flex; align-items: center; padding: 5px 8px; background: var(--paper-light); border: 2px solid var(--paper-dark); font-size: 9px; }
 .pc-rank li.me { border-color: var(--wood-dark); }
 .pc-rank li b { margin-left: auto; color: var(--red); }
-.pcq .stick-area { min-height: 0; }
-.pcq .stick-pad { width: 150px; height: 150px; }
 .pcq .big-btn { min-height: 0; }
 
 /* Wählen: drei Karten nebeneinander */
@@ -584,8 +582,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pcq-cards .pc-card-text { align-items: center; }
 .pcq-pick .pcq-hint { min-height: 1.6em; }
 
-/* Platzieren: Stick links, Infos Mitte, Knöpfe rechts (PLATZIEREN unter dem rechten Daumen) */
-.pcq-place .pcq-body { grid-template-columns: 1fr minmax(120px, 0.8fr) 1fr; align-items: stretch; }
+/* Platzieren: Infos + Knöpfe (PLATZIEREN unter dem rechten Daumen) */
 .pcq-info { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; }
 .pcq-info .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
 .pcq-info b { font-size: 10px; }
@@ -597,11 +594,15 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pcq-row button:only-child { grid-column: 1 / -1; }
 .big-btn.pc-place { flex: 1; font-size: 14px; background: var(--green); box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
 
-/* Laufen: Stick links, SPRINGEN rechts */
-.pcq-run .pcq-body { grid-template-columns: 1fr minmax(100px, 0.6fr) 1fr; align-items: stretch; }
-.pcq-run .pc-run-hint { align-self: center; }
 .big-btn.pc-jump { font-size: 13px; }
 .big-btn.pc-jump.down { transform: translateY(2px); filter: brightness(0.9); }
+
+/* Platzieren + Laufen im gemeinsamen Querlayout .lx (Stick links per stickZone, Knöpfe rechts) */
+.lx.pc-lx { --lx-l: 40%; --lx-r: 32%; }
+.lx.pc-place .lx-right { grid-template-rows: auto minmax(0, 1fr); grid-auto-rows: auto; }
+.lx.pc-lx .pc-pts { color: var(--red); }
+.lx.pc-lx .pc-dot { width: 8px; height: 8px; margin-right: 4px; }
+.lx.pc-run .pc-run-hint { align-self: center; }
 
 /* Warten/Wertung */
 .pcq-wait .pcq-body { grid-template-columns: 1fr; }
@@ -613,14 +614,9 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .pcq-cards { grid-template-columns: 1fr; }
   .pcq-cards .pc-card { flex-direction: row; text-align: left; }
   .pcq-cards .pc-card-text { align-items: flex-start; }
-  .pcq-place .pcq-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
-  .pcq-place .pcq-info { order: -1; }
-  .pcq-run .pcq-body { grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; }
-  .pcq-run .pc-run-hint { grid-column: 1 / -1; grid-row: 1; }
   .pcq-score .pcq-body { grid-template-columns: 1fr; }
 }
 @media (orientation: landscape) and (max-height: 360px) {
-  .pcq .stick-pad { width: 128px; height: 128px; }
   .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
 }
 

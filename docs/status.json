@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 21:40",
+  "updated": "2026-11-05 23:50",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -7,32 +7,63 @@
   },
   "inProgress": [
     {
-      "title": "Review Phase 4: Igel-Krieg Stufe M",
-      "kind": "igel",
-      "type": "Review-Umsetzung",
-      "branch": "review/igel-m",
-      "detail": "„Alle gleichzeitig“ ab 7, 10 Waffen, Kisten, Gasfässer, Spieler-Teams, Zielhilfe, Spruch-Knöpfe, Ton"
-    },
-    {
-      "title": "Review Reste: Juice in allen Szenen, Namensschilder, Parcours-Stick, zwei Rollenträger",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/juice-rest",
-      "detail": "Ton/Partikel in den übrigen Szenen, Namensschilder entzerren, Laptop-Knöpfe nicht übers HUD, leere Arenen beleben, Fangen/Geist mit zwei Rollenträgern"
-    },
-    {
       "title": "Online spielen über Cloudflare-Tunnel",
       "kind": "",
       "type": "Feature",
       "branch": "feature/online-tunnel",
       "detail": "npm run online startet Server + Tunnel und zeigt den Link; über den Tunnel keine Laptop-Rechte und Musik nur lesen; TV-Ansicht bei Freunden zeigt den Online-QR-Code"
+    },
+    {
+      "title": "Review Nacharbeit: Handy-Farben, TV-Banner, Doku-Dubletten",
+      "kind": "",
+      "type": "Review-Umsetzung",
+      "branch": "review/nacharbeit",
+      "detail": "Abendfarbe auch auf den Handy-Screens (Kurve, Bogen, Igel, Sumo, Kart), Namensschilder in Abendfarbe, Quer-Banner nicht mehr übers HUD, README/MiniKind aufräumen"
+    },
+    {
+      "title": "Neues Spiel: Wer war's?",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/werwars",
+      "detail": "à la Who's Who: anonyme Antworten auf persönliche Fragen, alle raten den Autor"
+    },
+    {
+      "title": "Neues Spiel: Schätzkönig",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/schaetz",
+      "detail": "à la Wits & Wagers: schätzen, dann Chips auf die beste Antwort setzen; 90-s-Variante fürs Brett"
+    },
+    {
+      "title": "Neues Spiel: Mäxchen am Pool",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/maexchen",
+      "detail": "Würfel-Bluff mit geheimer Hand, Schütteln zum Würfeln, auch als Trinkspiel"
+    },
+    {
+      "title": "Neues Spiel: Funkfrequenz",
+      "kind": "",
+      "type": "Neues Spiel",
+      "branch": "spiel/funk",
+      "detail": "à la Wavelength: Funker sieht das Ziel auf der Skala, Team dreht den Zeiger, Gegner wetten"
     }
   ],
   "queue": [],
   "done": [
     {
-      "title": "Review: Party-Modus 2.0 (alle würfeln gleichzeitig, Bonus-Cocktails, Endspurt, Finale, Party fortsetzen)",
+      "title": "Review: Party-Modus 2.0 (gleichzeitig würfeln, Bonus-Cocktails, Endspurt, Fortsetzen, Nachzügler, Tageszeit)",
       "pr": 66,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review Reste: Juice in allen Szenen, Namensschilder, Laptop-Knöpfe, belebte Arenen, Parcours-Stick, zwei Rollenträger",
+      "pr": 67,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Igel-Krieg Stufe M („Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Fässer, Teams, Zielhilfe)",
+      "pr": 68,
       "date": "2026-11-05"
     },
     {
@@ -263,11 +294,19 @@
     },
     "igel": {
       "status": "umgesetzt",
-      "notes": "Review Stufe S: Wind driftet, Zugzeit/HP nach Spielerzahl, Flut pro Runde, Kamera, HP-Countdown, FEUER-Knopf, quer (#45, #46)"
+      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68)"
     },
     "ttt": {
       "status": "umgesetzt",
       "notes": "Runden auf 100 s / 2 Runden gekürzt, quer (#45, #46)"
+    },
+    "fangen": {
+      "status": "umgesetzt",
+      "notes": "Ab 7 Spielern zwei Animateure, faire Rollenwertung (#67)"
+    },
+    "geist": {
+      "status": "umgesetzt",
+      "notes": "Ab 7 Spielern zwei Geister, faire Rollenwertung (#67)"
     }
   },
   "general": [
