@@ -56,7 +56,17 @@ app.use('/api/music', musicRouter(music, io));
 if (PROD) {
   app.use(express.static(path.resolve(dir, '../dist')));
 } else {
-  const { createServer } = await import('vite');
+  const { createServer, searchForWorkspaceRoot } = await import('vite');
+  // In Worktrees ist node_modules oft ein Symlink auf den Haupt-Checkout. Vite erlaubt
+  // /@fs/-Zugriffe nur innerhalb von fs.allow (Standard: Workspace-Root), sonst 403 –
+  // z. B. für die Font-Dateien von „Press Start 2P“. Deshalb den echten Pfad freigeben.
+  const nodeModules = path.join(root, 'node_modules');
+  let realNodeModules = nodeModules;
+  try {
+    realNodeModules = fs.realpathSync(nodeModules);
+  } catch {
+    /* kein node_modules – Vite meldet fehlende Pakete selbst */
+  }
   const vite = await createServer({
     configFile: path.resolve(dir, '../vite.config.ts'),
     server: {
@@ -64,6 +74,7 @@ if (PROD) {
       hmr: { server: httpServer },
       // Vite blockt fremde Hostnamen – die eigene Domain freigeben
       allowedHosts: PUBLIC_DOMAIN ? [PUBLIC_DOMAIN] : undefined,
+      fs: { allow: [...new Set([searchForWorkspaceRoot(process.cwd()), root, nodeModules, realNodeModules])] },
     },
     appType: 'mpa',
   });
