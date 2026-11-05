@@ -11,6 +11,9 @@
  *   npm run bots -- 4 --game=kart --nochmal=2 → danach zweimal „Nochmal“ (Leaderboard des Abends zählt weiter)
  *   npm run bots -- 2 --date        → zwei Bots spielen die komplette Date Night
  *   npm run bots -- 4 --drink       → Bots spielen ein paar Runden Trinkspiel
+ *   npm run bots -- 6 --turnier             → Bots spielen das Turnier „Arena-Cup“ komplett durch (Siegerehrung + Titel des Abends)
+ *   npm run bots -- 6 --turnier=sport       → Playlist nach ID (sport, arena, kopf – siehe TURNIER_PLAYLISTS in shared/games.ts)
+ *   npm run bots -- 6 --turnier=sumo,sprint,maexchen → eigene Playlist (3–6 Spiele)
  */
 import { Bot } from '../server/botclient';
 
@@ -22,7 +25,10 @@ const DATE = args.includes('--date');
 const ROUNDS = Number(args.find((a) => a.startsWith('--rounds='))?.slice(9) ?? 3);
 const RESUME = args.includes('--resume');
 const DRINK = args.includes('--drink');
-const LEAD = args.includes('--party') || RESUME || !!GAME || DATE || DRINK;
+const TURNIER_ARG = args.find((a) => a === '--turnier' || a.startsWith('--turnier='));
+/** Playlist-ID oder Liste von Spielen (Komma) – ohne Angabe „arena“ */
+const TURNIER = TURNIER_ARG ? TURNIER_ARG.slice('--turnier='.length) || 'arena' : undefined;
+const LEAD = args.includes('--party') || RESUME || !!GAME || DATE || DRINK || !!TURNIER;
 const URL = process.env.URL ?? 'http://localhost:3000';
 const NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -38,6 +44,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       nochmal: NOCHMAL,
       rounds: ROUNDS,
       resume: RESUME,
+      turnier: TURNIER,
       log: (m) => console.log(m),
       onDone: () => process.exit(0),
     });

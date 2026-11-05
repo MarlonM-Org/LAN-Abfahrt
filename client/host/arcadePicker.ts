@@ -6,7 +6,7 @@
  */
 import type { Socket } from 'socket.io-client';
 import type { GameState, MiniKind } from '../../shared/types';
-import { ARCADE_GROUPS, MINI_INFO, fitsPlayers, miniInspired } from '../../shared/games';
+import { ARCADE_GROUPS, MINI_INFO, TURNIER_PLAYLISTS, fitsPlayers, miniInspired } from '../../shared/games';
 import { bus, getState } from './store';
 import { isMusicMenuOpen } from './musicMenu';
 
@@ -29,6 +29,11 @@ const CSS = `
 #ap-panel .tile .vt { position: absolute; top: 0.4vh; right: 0.4vh; padding: 0.2vh 0.5vh; font-size: 1vh; color: #fff4d6; background: #a8342a; }
 #ap-panel .tile:hover:not(:disabled), #ap-panel .tile:focus { background: #f7c948; outline: 0.3vh solid #a8342a; outline-offset: -0.3vh; }
 #ap-panel button:disabled { opacity: 0.35; cursor: default; filter: grayscale(0.7); }
+#ap-panel .tour { display: flex; flex-wrap: wrap; gap: 1vh; }
+#ap-panel .tour button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4vh; padding: 1vh 1.2vh; font-size: 1.05vh; text-align: left; }
+#ap-panel .tour .tn { color: #a8342a; }
+#ap-panel .tour .tg { font-size: 0.9vh; color: #7a5a3a; }
+#ap-panel .tour button:hover:not(:disabled), #ap-panel .tour button:focus { background: #f7c948; outline: 0.3vh solid #a8342a; outline-offset: -0.3vh; }
 `;
 
 export interface ArcadePicker {
@@ -60,6 +65,23 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
   const msg = panel.querySelector('.msg') as HTMLElement;
   const rndBtn = panel.querySelector('[data-act=random]') as HTMLButtonElement;
   const topBtn = panel.querySelector('[data-act=top]') as HTMLButtonElement;
+
+  // Turnier: Playlists laufen nacheinander mit Gesamtwertung (Siegerehrung am Ende)
+  const tourHead = document.createElement('h4');
+  tourHead.textContent = 'Turnier (Playlist, Gesamtwertung, Siegerehrung)';
+  const tour = document.createElement('div');
+  tour.className = 'tour';
+  const tourBtns: { btn: HTMLButtonElement; kinds: MiniKind[] }[] = [];
+  for (const pl of TURNIER_PLAYLISTS) {
+    const b = document.createElement('button');
+    b.innerHTML = `<span class="tn"></span><span class="tg"></span>`;
+    (b.querySelector('.tn') as HTMLElement).textContent = `${pl.icon} ${pl.name}`;
+    (b.querySelector('.tg') as HTMLElement).textContent = pl.kinds.map((k) => `${MINI_INFO[k].icon} ${MINI_INFO[k].title}`).join(' → ');
+    b.addEventListener('click', () => start(`turnier:${pl.id}`));
+    tour.append(b);
+    tourBtns.push({ btn: b, kinds: pl.kinds });
+  }
+  groups.append(tourHead, tour);
 
   const tiles = new Map<MiniKind, { btn: HTMLButtonElement; vt: HTMLElement }>();
   for (const g of ARCADE_GROUPS) {
@@ -107,6 +129,7 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
       : 'Gerade läuft ein Spiel – erst abbrechen (Esc 2× bzw. „Spiel abbrechen“).';
     rndBtn.disabled = !lobby || n < 1;
     topBtn.disabled = !lobby || ![...counts.keys()].some((k) => fitsPlayers(k, n));
+    for (const t of tourBtns) t.btn.disabled = !lobby || !t.kinds.every((k) => fitsPlayers(k, n));
     for (const [kind, t] of tiles) {
       t.btn.disabled = !lobby || !fitsPlayers(kind, n);
       const c = counts.get(kind) ?? 0;
