@@ -1,53 +1,215 @@
 {
-  "updated": "2026-11-05 16:45",
+  "updated": "2026-11-05 16:55",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "inProgress": [
-    { "title": "Angeln", "kind": "angeln", "type": "Neues Spiel", "branch": "spiel/angeln", "detail": "Auswerfen per Schwung/Wischen, Anbiss, Schnurspannung beim Einholen" },
-    { "title": "Wasserpistolen-Duell", "kind": "wpistole", "type": "Neues Spiel", "branch": "spiel/wasserpistole", "detail": "Western-Duell: auf „ZIEHT!“ Handy hochreißen, Fehlstart wird bestraft" },
-    { "title": "Zauber-Arena", "kind": "zauber", "type": "Neues Spiel", "branch": "spiel/zauber", "detail": "à la Spellsworn: Zielsuch-Feuerball + Eilzauber, Lava-Arena schrumpft" },
-    { "title": "Kings Cup", "kind": "kingscup", "type": "Neues Trinkspiel", "branch": "spiel/kingscup", "detail": "Kartenkreis mit Königsbecher, deine Regeln 2–Ass, Reaktions-Rennen am Handy" },
-    { "title": "Fallen-Parcours: kein Zeitlimit + Querformat", "kind": "parcours", "type": "Feedback-Fix", "branch": "fix/parcours-quer", "detail": "Runden so lang wie nötig; Auswählen/Platzieren auch quer" },
-    { "title": "Wackelturm: Raster + Reinschieben", "kind": "turm", "type": "Feedback-Fix", "branch": "fix/turm-raster", "detail": "Teile bis ganz an den Nachbarn schieben, seitlich in Lücken stecken, Fall-Hilfslinie" },
-    { "title": "Sensor-Rückmeldung", "kind": "", "type": "Feature", "branch": "feature/sensor-feedback", "detail": "Handy zeigt nach jedem Wurf/Schwung, was erkannt wurde, + Tipp" },
-    { "title": "Musik pro Spiel", "kind": "", "type": "Feature", "branch": "feature/musik-themen", "detail": "Neue Chiptunes: Zauber, Igelkrieg, Rennen, Arena, Western, Sport, Krimi, Wasser" },
-    { "title": "Nochmal + Leaderboard", "kind": "", "type": "Feature", "branch": "feature/nochmal-leaderboard", "detail": "Nach Einzelspielen „Nochmal“ (Kart als Grand Prix), Punkte laufen über die Sitzung weiter" }
+    {
+      "title": "Angeln",
+      "kind": "angeln",
+      "type": "Neues Spiel",
+      "branch": "spiel/angeln",
+      "detail": "Auswerfen per Schwung/Wischen, Anbiss, Schnurspannung beim Einholen"
+    },
+    {
+      "title": "Wasserpistolen-Duell",
+      "kind": "wpistole",
+      "type": "Neues Spiel",
+      "branch": "spiel/wasserpistole",
+      "detail": "Western-Duell: auf „ZIEHT!“ Handy hochreißen, Fehlstart wird bestraft"
+    },
+    {
+      "title": "Zauber-Arena",
+      "kind": "zauber",
+      "type": "Neues Spiel",
+      "branch": "spiel/zauber",
+      "detail": "à la Spellsworn: Zielsuch-Feuerball + Eilzauber, Lava-Arena schrumpft"
+    },
+    {
+      "title": "Kings Cup",
+      "kind": "kingscup",
+      "type": "Neues Trinkspiel",
+      "branch": "spiel/kingscup",
+      "detail": "Kartenkreis mit Königsbecher, deine Regeln 2–Ass, Reaktions-Rennen am Handy"
+    },
+    {
+      "title": "Fallen-Parcours: kein Zeitlimit + Querformat",
+      "kind": "parcours",
+      "type": "Feedback-Fix",
+      "branch": "fix/parcours-quer",
+      "detail": "Runden so lang wie nötig; Auswählen/Platzieren auch quer"
+    },
+    {
+      "title": "Wackelturm: Raster + Reinschieben",
+      "kind": "turm",
+      "type": "Feedback-Fix",
+      "branch": "fix/turm-raster",
+      "detail": "Teile bis ganz an den Nachbarn schieben, seitlich in Lücken stecken, Fall-Hilfslinie"
+    },
+    {
+      "title": "Sensor-Rückmeldung",
+      "kind": "",
+      "type": "Feature",
+      "branch": "feature/sensor-feedback",
+      "detail": "Handy zeigt nach jedem Wurf/Schwung, was erkannt wurde, + Tipp"
+    },
+    {
+      "title": "Nochmal + Leaderboard",
+      "kind": "",
+      "type": "Feature",
+      "branch": "feature/nochmal-leaderboard",
+      "detail": "Nach Einzelspielen „Nochmal“ (Kart als Grand Prix), Punkte laufen über die Sitzung weiter"
+    }
   ],
   "queue": [
-    "Kofferpacken", "Süßigkeiten-Klau", "Spion unter Gästen", "Umzugschaos", "Wackel-Prügelei"
+    "Kofferpacken",
+    "Süßigkeiten-Klau",
+    "Spion unter Gästen",
+    "Umzugschaos",
+    "Wackel-Prügelei"
   ],
   "done": [
-    { "title": "Arcade für alle, Laptop-Auswahl, Icons, „à la …“", "pr": 22, "date": "2026-11-05" },
-    { "title": "Pixel-Galerie", "pr": 21, "date": "2026-11-05" },
-    { "title": "Bogen-Arena", "pr": 20, "date": "2026-11-05" },
-    { "title": "Darts an der Strandbar", "pr": 19, "date": "2026-11-05" },
-    { "title": "Urlaubs-Minigolf", "pr": 18, "date": "2026-11-05" },
-    { "title": "Auto-Fußball", "pr": 17, "date": "2026-11-05" },
-    { "title": "Strand-Volleyball", "pr": 16, "date": "2026-11-05" },
-    { "title": "Werwölfe im Ferienhaus", "pr": 15, "date": "2026-11-05" },
-    { "title": "Kart: TV/Handy-Ansicht pro Spieler + KIPPEN-Fix", "pr": 14, "date": "2026-11-05" },
-    { "title": "Spieler kicken / entfernen", "pr": 13, "date": "2026-11-04" },
-    { "title": "HTTPS mit eigener Domain (deSEC + Let's Encrypt)", "pr": null, "date": "2026-11-04" },
-    { "title": "Musik-Werkstatt + Musikmenü (Taste M)", "pr": null, "date": "2026-11-04" },
-    { "title": "Laptop-Hoststeuerung (Abbrechen, Weiter, Spieler-Panel P)", "pr": null, "date": "2026-11-04" },
-    { "title": "Kart 3D mit Handy-Ansicht, Joystick, Drift", "pr": null, "date": "2026-11-04" }
+    {
+      "title": "Musik passend zu den Spielen (8 neue Songs)",
+      "pr": 24,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Status-Seite (dieses Artefakt)",
+      "pr": 23,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Arcade für alle, Laptop-Auswahl, Icons, „à la …“",
+      "pr": 22,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Pixel-Galerie",
+      "pr": 21,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Bogen-Arena",
+      "pr": 20,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Darts an der Strandbar",
+      "pr": 19,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Urlaubs-Minigolf",
+      "pr": 18,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Auto-Fußball",
+      "pr": 17,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Strand-Volleyball",
+      "pr": 16,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Werwölfe im Ferienhaus",
+      "pr": 15,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Kart: TV/Handy-Ansicht pro Spieler + KIPPEN-Fix",
+      "pr": 14,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Spieler kicken / entfernen",
+      "pr": 13,
+      "date": "2026-11-04"
+    },
+    {
+      "title": "HTTPS mit eigener Domain (deSEC + Let's Encrypt)",
+      "pr": null,
+      "date": "2026-11-04"
+    },
+    {
+      "title": "Musik-Werkstatt + Musikmenü (Taste M)",
+      "pr": null,
+      "date": "2026-11-04"
+    },
+    {
+      "title": "Laptop-Hoststeuerung (Abbrechen, Weiter, Spieler-Panel P)",
+      "pr": null,
+      "date": "2026-11-04"
+    },
+    {
+      "title": "Kart 3D mit Handy-Ansicht, Joystick, Drift",
+      "pr": null,
+      "date": "2026-11-04"
+    }
   ],
   "feedback": {
-    "kart":     { "status": "umgesetzt", "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert" },
-    "enten":    { "status": "positiv",   "notes": "„Entenschießen mit Neigen – sehr cool“" },
-    "parcours": { "status": "in Arbeit", "notes": "Zeit lief am Ende aus → kein Zeitlimit; Item-Auswahl/Platzieren quer" },
-    "turm":     { "status": "in Arbeit", "notes": "Teile lassen sich nicht ganz heranschieben; seitlich in Lücken stecken wie bei Tricky Towers" },
-    "bowling":  { "status": "in Arbeit", "notes": "Sensor: Handy soll zeigen, welche Bewegung erkannt wurde" },
-    "boule":    { "status": "in Arbeit", "notes": "Sensor: Handy soll zeigen, welche Bewegung erkannt wurde" }
+    "kart": {
+      "status": "umgesetzt",
+      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert"
+    },
+    "enten": {
+      "status": "positiv",
+      "notes": "„Entenschießen mit Neigen – sehr cool“"
+    },
+    "parcours": {
+      "status": "in Arbeit",
+      "notes": "Zeit lief am Ende aus → kein Zeitlimit; Item-Auswahl/Platzieren quer"
+    },
+    "turm": {
+      "status": "in Arbeit",
+      "notes": "Teile lassen sich nicht ganz heranschieben; seitlich in Lücken stecken wie bei Tricky Towers"
+    },
+    "bowling": {
+      "status": "in Arbeit",
+      "notes": "Sensor: Handy soll zeigen, welche Bewegung erkannt wurde"
+    },
+    "boule": {
+      "status": "in Arbeit",
+      "notes": "Sensor: Handy soll zeigen, welche Bewegung erkannt wurde"
+    }
   },
   "general": [
-    { "title": "Lobby/Spielauswahl blieb hängen (alte Handy-Version)", "status": "umgesetzt" },
-    { "title": "VIP ging verloren nach kurzer Pause", "status": "umgesetzt" },
-    { "title": "Am Laptop Spiel abbrechen", "status": "umgesetzt" },
-    { "title": "Spieler kicken, Offline-Spieler entfernen", "status": "umgesetzt" },
-    { "title": "Musik: Lautstärke, Auswahl, Bibliothek, Link auf der Startseite", "status": "umgesetzt" },
-    { "title": "Arcade-Übersicht für alle + Auswahl am PC + Icons", "status": "umgesetzt" },
-    { "title": "Originalnamen: nur als „à la …“-Unterzeile", "status": "umgesetzt" },
-    { "title": "Leaderboard + Nochmal spielen", "status": "in Arbeit" },
-    { "title": "Musik passend zu den Spielen", "status": "in Arbeit" }
+    {
+      "title": "Lobby/Spielauswahl blieb hängen (alte Handy-Version)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "VIP ging verloren nach kurzer Pause",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Am Laptop Spiel abbrechen",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Spieler kicken, Offline-Spieler entfernen",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Musik: Lautstärke, Auswahl, Bibliothek, Link auf der Startseite",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Arcade-Übersicht für alle + Auswahl am PC + Icons",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Originalnamen: nur als „à la …“-Unterzeile",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Leaderboard + Nochmal spielen",
+      "status": "in Arbeit"
+    },
+    {
+      "title": "Musik passend zu den Spielen",
+      "status": "umgesetzt"
+    }
   ]
 }
