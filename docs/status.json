@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 18:50",
+  "updated": "2026-11-05 19:20",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -12,20 +12,6 @@
       "type": "Feature",
       "branch": "feature/skip-und-ruhe",
       "detail": "Kleines VIP-Menü + Laptop-Taste S zum Überspringen; Timer nur noch wo Zeit zum Spiel gehört"
-    },
-    {
-      "title": "Süßigkeiten-Klau",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/suessigkeiten",
-      "detail": "à la Sweet Day: Naschkatzen sammeln, Wächter jagen, schwer beladen = langsam"
-    },
-    {
-      "title": "Spion unter Gästen",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/spion",
-      "detail": "Spieler verstecken sich unter vielen gleichen NPC-Gästen, Aufgaben erfüllen, andere enttarnen"
     },
     {
       "title": "Umzugschaos",
@@ -79,6 +65,16 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Süßigkeiten-Klau",
+      "pr": 41,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Spion unter Gästen",
+      "pr": 40,
+      "date": "2026-11-05"
+    },
     {
       "title": "Kofferpacken",
       "pr": 37,
