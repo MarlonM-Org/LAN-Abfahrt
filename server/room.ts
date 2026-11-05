@@ -45,6 +45,7 @@ import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
 import { SumoGame } from './sumo';
 import { BogenGame } from './bogen';
+import { ZauberGame } from './zauber';
 import { DartsGame } from './darts';
 import { AutoballGame } from './autoball';
 import { VolleyGame } from './volley';
@@ -583,6 +584,9 @@ export class Room {
         break;
       case 'pixel':
         this.mini = new PixelGame(ids, ctx);
+        break;
+      case 'zauber':
+        this.mini = new ZauberGame(ids, ctx);
         break;
       case 'angeln':
         this.mini = new AngelnGame(ids, ctx);
