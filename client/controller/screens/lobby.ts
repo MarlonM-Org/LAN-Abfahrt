@@ -308,19 +308,15 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   q(root, '[data-act=addq]').addEventListener('click', () => {
     const text = qInput.value.trim();
     if (text.length < 4) return toast('Zu kurz.');
-    socket.emit(
-      'question:add',
-      text,
-      (r: { ok: boolean; question?: string }) => {
-        if (r.ok) {
-          qInput.value = '';
-          toast(`Gespeichert: ${qNames[qKind]} ${r.question}`);
-        } else {
-          toast('Hat nicht geklappt.');
-        }
-      },
-      qKind,
-    );
+    // Ack-Callback muss bei Socket.IO das letzte Argument sein (sonst wird er nie gerufen und die Eingabe bleibt stehen)
+    socket.emit('question:add', text, qKind, (r: { ok: boolean; question?: string }) => {
+      if (r.ok) {
+        qInput.value = '';
+        toast(`Gespeichert: ${qNames[qKind]} ${r.question}`);
+      } else {
+        toast('Hat nicht geklappt.');
+      }
+    });
   });
   q(root, '[data-act=edit]').addEventListener('click', onEdit);
   app.append(root);

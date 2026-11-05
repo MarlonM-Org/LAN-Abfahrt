@@ -462,11 +462,15 @@ export class Room {
       if (playerId && this.players.has(playerId) && this.emotes.add(playerId, i)) this.changed();
     });
 
-    socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
+    // Eigene Frage/Aussage aus der Lobby. Socket.IO liefert den Ack-Callback immer als LETZTES Argument –
+    // deshalb (text, kind, ack); ein älteres Handy ohne `kind` schickt (text, ack) und bekommt trotzdem eine Antwort.
+    socket.on('question:add', (text: string, kindOrAck?: unknown, maybeAck?: unknown) => {
       if (!playerId) return;
+      const kind = typeof kindOrAck === 'string' ? kindOrAck : undefined;
+      const ack = typeof maybeAck === 'function' ? maybeAck : typeof kindOrAck === 'function' ? kindOrAck : null;
       const store = kind === 'nhie' ? this.nhie : kind === 'post' ? this.posts : kind === 'quip' ? this.quips : kind === 'werwars' ? this.werwarsQ : this.questions;
       const q = store.add(String(text ?? ''));
-      if (typeof ack === 'function') ack({ ok: !!q, question: q ?? undefined });
+      if (ack) (ack as (r: { ok: boolean; question?: string }) => void)({ ok: !!q, question: q ?? undefined });
       this.changed();
     });
 
