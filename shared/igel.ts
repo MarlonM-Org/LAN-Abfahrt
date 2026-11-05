@@ -11,17 +11,17 @@ export const IGEL = {
   /** Anfangs-Wasserspiegel (y) */
   WATER_Y: 248,
   /** Zugzeit bis 4 Spieler – darüber siehe `igelTurnMs()` */
-  TURN_MS: 30000,
+  TURN_MS: 45000, // großzügiger (vorher 30 s), VIP kann im Menü überspringen
   /** Zugzeit, wenn der Spieler gerade offline ist (kurze Trennung, App gewechselt) */
   OFFLINE_TURN_MS: 5000,
   RETREAT_MS: 3000,
   COUNTDOWN_MS: 3500,
   SETTLE_MIN_MS: 700,
   /** Danach: Sudden Death (Wasser steigt nach jeder vollen Runde) – ab 7 Spielern `SUDDEN_MS_BIG` */
-  SUDDEN_MS: 5 * 60_000,
+  SUDDEN_MS: 6 * 60_000,
   SUDDEN_MS_BIG: 3 * 60_000,
   /** Absolute Obergrenze, falls sich niemand trifft */
-  HARD_CAP_MS: 8 * 60_000,
+  HARD_CAP_MS: 10 * 60_000,
   WATER_RISE: 20,
   GRAVITY: 260,
   /** Windbeschleunigung bei wind = ±1 (px/s²) */

@@ -94,7 +94,7 @@ export class GolfScene extends Phaser.Scene {
   private get holeT() {
     const st = this.latest;
     if (!st) return 0;
-    const extra = st.sub === 'play' ? Math.min(GOLF.HOLE_S, (performance.now() - this.recvAt) / 1000) : 0;
+    const extra = st.sub === 'play' ? Math.min(GOLF.HOLE_S ?? Infinity, (performance.now() - this.recvAt) / 1000) : 0;
     return st.t + extra;
   }
 
@@ -146,7 +146,7 @@ export class GolfScene extends Phaser.Scene {
     if (!st) return;
     const g = this.g;
     g.clear();
-    this.timerTxt.setText(st.sub === 'play' ? `0:${String(Math.min(59, this.clock.seconds)).padStart(2, '0')}` : '').setColor(this.clock.seconds <= 10 ? '#ff9a7a' : LIGHT);
+    this.timerTxt.setText(st.sub === 'play' && !this.clock.none ? `${Math.floor(this.clock.seconds / 60)}:${String(this.clock.seconds % 60).padStart(2, '0')}` : '').setColor(this.clock.seconds <= 10 ? '#ff9a7a' : LIGHT);
     if (st.sub === 'intro') {
       this.balls.forEach((b) => b.setVisible(false));
       return;

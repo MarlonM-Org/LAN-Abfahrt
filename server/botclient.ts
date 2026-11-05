@@ -446,6 +446,14 @@ export class Bot {
   }
 
   /** Führt eine Aktion pro Schlüssel nur einmal gleichzeitig aus */
+  /** Grobe Kennung des aktuellen Schritts (wie Room.stepTag) – für das VIP-Weiterschalten */
+  private stepTag(s: GameState): string {
+    if (s.phase === 'board' && s.board) return `b-${s.board.round}-${s.board.turnIdx}-${s.board.sub}`;
+    const st = s.mini?.state as unknown as Record<string, unknown> | undefined;
+    if (!st) return s.phase;
+    return [s.mini!.kind, ...['sub', 'round', 'phaseNo', 'shown', 'chain', 'match', 'hole', 'turn', 'aimSeq'].map((k) => String(st[k] ?? ''))].join('-');
+  }
+
   once(key: string, fn: () => Promise<void> | void) {
     if (this.busy.has(key)) return;
     this.busy.add(key);
@@ -711,6 +719,18 @@ export class Bot {
         this.socket.emit('board:roll');
       });
     }
+    // Bot als VIP (nur, wenn kein Mensch da ist): Info-Screens (Auflösung, Intro, Zwischenstand) nach ~2 s weiterschalten –
+    // so wie ein Mensch „Weiter“ im VIP-Menü drücken würde. Züge/Abstimmungen überspringt er nicht (die Bots spielen sie).
+    if (me?.isVip && s.skippable?.info && (s.phase === 'mini' || s.phase === 'board')) {
+      const label = s.skippable.label;
+      const tag = this.stepTag(s);
+      this.once(`vip-skip-${tag}-${label}`, async () => {
+        await sleep(2000);
+        const now = this.state;
+        if (now?.skippable?.label === label && this.stepTag(now) === tag) this.socket.emit('vip:skip');
+      });
+    }
+
     if (s.phase !== 'mini' || !s.mini) return;
 
     const m = s.mini;

@@ -48,6 +48,7 @@ import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
+import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
 
 let screenKey = '';
@@ -153,7 +154,11 @@ socket.on('state', (s: GameState) => {
   const prevKey = timerKey(store.state);
   store.state = s;
   const key = timerKey(s);
-  if (key !== prevKey && s.mini && 'endsIn' in s.mini.state) store.endsAt = performance.now() + s.mini.state.endsIn;
+  if (key !== prevKey && s.mini && 'endsIn' in s.mini.state) {
+    store.endsAt = performance.now() + s.mini.state.endsIn;
+    // endsIn 0 zu Beginn einer Phase = kein Zeitlimit
+    store.noTimer = s.mini.state.endsIn <= 0;
+  }
   // Server neu gestartet oder aus der Lobby geflogen → neu beitreten
   if (store.joined && !s.players.some((p) => p.id === store.playerId)) {
     store.joined = false;
@@ -386,6 +391,7 @@ onRotate(() => {
   render();
 });
 initVipPlayersButton();
+initVipMenu();
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

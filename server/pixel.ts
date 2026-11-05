@@ -1,6 +1,6 @@
-import type { MiniSnapshot, PixelState, PrivateState } from '../shared/types';
+import type { MiniSnapshot, PixelState, PrivateState, SkipInfo } from '../shared/types';
 import { PIXEL, PIXEL_PROMPTS, cleanPic, filledCount } from '../shared/pixel';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, shuffle, waitLabel } from './minigame';
 
 /**
  * Pixel-Galerie: Alle malen zum selben Thema ein 16 × 16-Pixelbild am Handy.
@@ -52,9 +52,9 @@ export class PixelGame implements MiniGame {
   // ---------------------------------------------------------------- Ablaufsteuerung (wie Sprüche-Duell)
 
   /** Nächsten Schritt nach `ms` ausführen – der VIP kann ihn mit "Weiter" vorziehen */
-  private schedule(ms: number, fn: () => void) {
+  private schedule(ms: number | null, fn: () => void) {
     this.timers.clear();
-    this.deadline = Date.now() + ms;
+    this.deadline = ms === null ? 0 : Date.now() + ms;
     const token = ++this.seq;
     const run = () => {
       if (this.seq !== token) return;
@@ -64,7 +64,7 @@ export class PixelGame implements MiniGame {
       fn();
     };
     this.pending = run;
-    this.timers.later(ms, run);
+    if (ms !== null) this.timers.later(ms, run);
   }
 
   /** Alle fertig → kurz durchatmen, dann weiter */
@@ -102,7 +102,7 @@ export class PixelGame implements MiniGame {
 
   private startPaint() {
     this.state.sub = 'paint';
-    this.paintEnds = Date.now() + PIXEL.PAINT_MS;
+    this.paintEnds = PIXEL.PAINT_MS === null ? 0 : Date.now() + PIXEL.PAINT_MS;
     this.schedule(PIXEL.PAINT_MS, () => this.startVote());
     this.ctx.onChange();
   }
@@ -187,7 +187,7 @@ export class PixelGame implements MiniGame {
 
   snapshot(): MiniSnapshot {
     const s = this.state;
-    return { kind: 'pixel', state: { ...s, endsIn: this.deadline ? Math.max(0, this.deadline - Date.now()) : 0 } };
+    return { kind: 'pixel', state: { ...s, endsIn: endsIn(this.deadline) } };
   }
 
   privateFor(id: string): PrivateState {
@@ -235,7 +235,8 @@ export class PixelGame implements MiniGame {
       s.done = s.done.filter((x) => x !== id);
       // Lief schon der "alle fertig"-Countdown → wieder bis zum regulären Ende (mind. 10 s) malen
       const left = this.paintEnds - Date.now();
-      if (this.pending && this.deadline < this.paintEnds) this.schedule(Math.max(10000, left), () => this.startVote());
+      if (this.pending && !this.paintEnds) this.schedule(null, () => this.startVote());
+      else if (this.pending && this.deadline < this.paintEnds) this.schedule(Math.max(10000, left), () => this.startVote());
       return this.ctx.onChange();
     }
     if (action === 'vote' && s.sub === 'vote' && s.voters.includes(id) && !this.votes.has(id)) {
@@ -253,6 +254,27 @@ export class PixelGame implements MiniGame {
     const sub = this.state.sub;
     // Malphase nicht per Knopf abkürzen – da malen noch alle
     if (sub === 'intro' || sub === 'vote' || sub === 'reveal' || sub === 'scores') this.pending();
+  }
+
+  /** VIP/Laptop: jeden Schritt vorziehen – beim Malen zählt, was bisher auf der Leinwand ist */
+  skippable(): SkipInfo | null {
+    if (!this.pending) return null;
+    const s = this.state;
+    if (s.sub === 'intro') return { label: 'Los geht’s', info: true };
+    if (s.sub === 'paint') {
+      const missing = this.ids.filter((id) => this.connected(id) && !s.done.includes(id));
+      return { label: waitLabel(this.ctx, missing, 'Bild', 'Malen beenden') };
+    }
+    if (s.sub === 'vote') {
+      const missing = s.voters.filter((id) => this.connected(id) && !this.votes.has(id));
+      return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+    }
+    if (s.sub === 'reveal' || s.sub === 'scores') return { label: 'Weiter', info: true };
+    return null;
+  }
+
+  skip() {
+    this.pending?.();
   }
 
   playerDisconnected() {

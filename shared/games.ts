@@ -161,6 +161,19 @@ export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 // ------------------------------------------------------------------ Spielbrett
 
 export const BOARD_SIZE = 24;
+
+/**
+ * Zeiten auf dem Spielbrett. `null` = kein Zeitlimit – der VIP kann im Menü „Für … würfeln“,
+ * offline gegangene Spieler würfeln nach OFFLINE_ROLL_MS automatisch.
+ */
+export const BOARD_TIMING = {
+  STEP_MS: 280,
+  /** Ansage des nächsten Minispiels (VIP kann sie überspringen) */
+  INTRO_MS: 6000,
+  /** vorher 45 s */
+  ROLL_IDLE_MS: null as number | null,
+  OFFLINE_ROLL_MS: 5000,
+};
 export const COCKTAIL_PRICE = 10;
 export const PARTY_ROUND_OPTIONS = [3, 5, 8];
 
@@ -222,19 +235,25 @@ export const ROOMS = [
   { name: 'Garten', task: 'Grill sauber machen' },
 ];
 
+/**
+ * Zeiten im Mörderspiel. Die Aufgaben-Phase ist Spielzeit (bleibt). Diskussion und Abstimmung haben kein
+ * Zeitlimit mehr (`null`; vorher 60 s / 30 s) – die Abstimmung endet, wenn alle gestimmt haben, der VIP kann
+ * beides im Menü beenden. Rollen-/Rauswurf-Screens sind länger (vorher 8 s / 6 s) und überspringbar.
+ */
 export const MURDER = {
-  ROLES_MS: 8000,
+  ROLES_MS: 12000,
   TASKS_MS: 60000,
-  MEETING_MS: 60000,
-  VOTE_MS: 30000,
-  EJECT_MS: 6000,
+  MEETING_MS: null as number | null,
+  VOTE_MS: null as number | null,
+  EJECT_MS: 10000,
   TASK_TAPS: 15,
   TASKS_PER_PLAYER: 9,
 };
 
 // ------------------------------------------------------------------ Wer würde eher …?
 
-export const WWE = { ROUNDS: 5, QUESTION_MS: 20000, REVEAL_MS: 7000 };
+/** `null` = kein Zeitlimit – aufgelöst wird, wenn alle abgestimmt haben (oder der VIP überspringt) */
+export const WWE = { ROUNDS: 5, QUESTION_MS: null as number | null, REVEAL_MS: 15000 };
 
 export const DEFAULT_QUESTIONS = [
   '... am Pool einschlafen und Sonnenbrand bekommen?',
@@ -266,9 +285,14 @@ export const SPRINT_POINTS = [3, 2, 1];
 
 // ------------------------------------------------------------------ Trinkspiel
 
-export const NHIE = { ROUNDS: 6, QUESTION_MS: 20000, REVEAL_MS: 6000 };
-export const HILO = { ROUNDS: 7, GUESS_MS: 12000, REVEAL_MS: 4000 };
-export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 4500, SIPS: 3, MIN_HOLD_MS: 900 };
+/**
+ * Zeiten der Trinkspiele. `null` = kein Zeitlimit: Die Runde wird aufgelöst, sobald alle (verbundenen)
+ * geantwortet haben – oder wenn der VIP im Menü überspringt. Auflösungen schalten großzügig von selbst weiter.
+ */
+export const NHIE = { ROUNDS: 6, QUESTION_MS: null as number | null, REVEAL_MS: 15000 };
+export const HILO = { ROUNDS: 7, GUESS_MS: null as number | null, REVEAL_MS: 12000 };
+/** Tick-Tack-Bumm: die Lunte ist Spielzeit (bleibt), nur die Pause nach dem Knall ist länger */
+export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 9000, SIPS: 3, MIN_HOLD_MS: 900 };
 
 export const DEFAULT_NHIE = [
   '... einen Flug oder Zug verpasst.',

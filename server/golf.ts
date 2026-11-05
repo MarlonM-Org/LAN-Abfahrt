@@ -1,7 +1,7 @@
-import type { GolfBallPub, GolfFx, GolfFxKind, GolfState, MiniSnapshot } from '../shared/types';
+import type { GolfBallPub, GolfFx, GolfFxKind, GolfState, MiniSnapshot, SkipInfo } from '../shared/types';
 import { GOLF, GOLF_HOLES, type GolfBody, golfIdealPutt, golfPowerToSpeed, golfStep, golfWalls } from '../shared/golf';
 import { SHIRTS } from '../shared/avatar';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, shuffle, waitLabel } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
@@ -104,7 +104,7 @@ export class GolfGame implements MiniGame {
       this.sub = 'play';
       this.playStart = Date.now();
       this.steps = 0;
-      this.deadline = Date.now() + GOLF.HOLE_S * 1000;
+      this.deadline = GOLF.HOLE_S === null ? 0 : Date.now() + GOLF.HOLE_S * 1000;
       this.doneAt = 0;
       for (const b of Object.values(this.balls)) b.restSince = Date.now();
       this.ctx.onChange();
@@ -129,19 +129,8 @@ export class GolfGame implements MiniGame {
       this.doneAt = now;
       this.timers.later(GOLF.DONE_PAUSE_MS, () => this.endHole());
     }
-    if (!this.doneAt && now >= this.deadline) {
-      // Zeit um: wer noch spielt, bekommt +2 (max. 7)
-      for (const id of this.order) {
-        const b = this.balls[id];
-        if (b.done) continue;
-        b.done = 2;
-        b.moving = false;
-        b.vx = b.vy = 0;
-        this.scores[id][this.hole] = Math.min(GOLF.MAX_SCORE, b.strokes + 2);
-        this.addFx(id, 'cap', b.x, b.y, this.scores[id][this.hole]!);
-      }
-      this.doneAt = now;
-      this.timers.later(600, () => this.endHole());
+    if (!this.doneAt && this.deadline && now >= this.deadline) {
+      this.capRest(now);
       changed = true;
     }
     // ab und zu auch ohne Bewegung senden, damit TV/Handys ihre Lochzeit nachstellen
@@ -243,6 +232,48 @@ export class GolfGame implements MiniGame {
     if (this.fx.length > 16) this.fx.splice(0, this.fx.length - 16);
   }
 
+  /** Zeit um bzw. VIP beendet das Loch: wer noch spielt, bekommt +2 (max. 7) */
+  private capRest(now = Date.now()) {
+    for (const id of this.order) {
+      const b = this.balls[id];
+      if (b.done) continue;
+      b.done = 2;
+      b.moving = false;
+      b.vx = b.vy = 0;
+      this.scores[id][this.hole] = Math.min(GOLF.MAX_SCORE, b.strokes + 2);
+      this.addFx(id, 'cap', b.x, b.y, this.scores[id][this.hole]!);
+    }
+    this.doneAt = now;
+    this.timers.later(600, () => this.endHole());
+  }
+
+  /** VIP/Laptop: Erklärung/Scorekarte überspringen oder das Loch beenden */
+  skippable(): SkipInfo | null {
+    if (this.sub === 'intro') return { label: 'Los geht’s', info: true };
+    if (this.sub === 'card') return { label: this.hole >= GOLF_HOLES.length - 1 ? 'Zum Ergebnis' : 'Nächstes Loch', info: true };
+    if (this.sub === 'play' && !this.doneAt) {
+      const missing = this.order.filter((id) => !this.balls[id]?.done && this.ctx.isConnected(id));
+      return { label: waitLabel(this.ctx, missing, 'Ball', 'Loch beenden') };
+    }
+    return null;
+  }
+
+  skip() {
+    if (this.sub === 'intro') {
+      this.timers.clear();
+      this.timers.every(Math.round(GOLF.TICK_S * 1000), () => this.tick());
+      this.startHole(0);
+    } else if (this.sub === 'card') {
+      this.timers.clear();
+      this.timers.every(Math.round(GOLF.TICK_S * 1000), () => this.tick());
+      if (this.hole >= GOLF_HOLES.length - 1) this.over();
+      else this.startHole(this.hole + 1);
+    } else if (this.sub === 'play' && !this.doneAt) {
+      this.capRest();
+      this.ctx.onChange();
+    }
+  }
+
   private endHole() {
     if (this.sub !== 'play') return;
     this.sub = 'card';
@@ -342,7 +373,7 @@ export class GolfGame implements MiniGame {
       kind: 'golf',
       state: {
         sub: this.sub,
-        endsIn: Math.max(0, this.deadline - Date.now()),
+        endsIn: endsIn(this.deadline),
         hole: this.hole,
         holes: this.holeCount,
         // Lochzeit nach der Uhr (nicht nur nach dem letzten Takt) – TV/Handys zählen ab Empfang weiter

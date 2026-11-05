@@ -218,7 +218,7 @@ export class DartsScene extends Phaser.Scene {
     }
     if (st.sub === 'throw' || st.sub === 'intro') {
       const sec = this.countdown.seconds;
-      this.timerTxt.setText(st.sub === 'throw' ? `${sec} s` : '');
+      this.timerTxt.setText(st.sub === 'throw' && !this.countdown.none ? `${sec} s` : '');
     } else this.timerTxt.setText('');
   }
 

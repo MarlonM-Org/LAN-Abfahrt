@@ -2,10 +2,15 @@ import type { PostDrawing } from './types';
 
 /** Stille Post mit Bildern – Zeiten, Pinsel, Farben, Startsätze */
 export const POST = {
-  WRITE_MS: 45000,
-  DRAW_MS: 70000,
-  DESCRIBE_MS: 45000,
-  VOTE_MS: 25000,
+  /**
+   * Schreiben/Malen/Raten/Abstimmen: `null` = kein Zeitlimit (vorher 45 s / 70 s / 45 s / 25 s).
+   * Ein Schritt endet, sobald alle fertig sind – oder wenn der VIP im Menü überspringt
+   * (dann zählt, was bis dahin geschrieben/gemalt wurde).
+   */
+  WRITE_MS: null as number | null,
+  DRAW_MS: null as number | null,
+  DESCRIBE_MS: null as number | null,
+  VOTE_MS: null as number | null,
   /** Mehr Schritte pro Kette werden zu lang (6 Schritte ≈ 5 Minuten Spielzeit) */
   MAX_STEPS: 6,
   MAX_TEXT: 90,

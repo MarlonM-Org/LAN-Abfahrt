@@ -13,11 +13,12 @@ import { installArcadePicker } from './arcadePicker';
  *   Enter / Leertaste  Weiter (wie „Weiter“ des VIP) – im Ergebnis eines Einzelspiels: Nochmal
  *   A               Arcade-Auswahl: beliebiges Spiel per Maus/Tastatur starten (im Ergebnis: anderes Spiel)
  *   L               Lobby: Leaderboard des Abends groß ein-/ausblenden
+ *   S               Zug/Phase überspringen (wie das VIP-Menü am Handy) – nur in Zug-/Warte-Phasen
  */
 const HIDE_MS = 3500;
 const ARM_MS = 3000;
 
-type Cmd = 'abort' | 'continue' | 'removeBots' | 'pick' | 'again' | 'menu' | 'board' | 'resetSession';
+type Cmd = 'abort' | 'continue' | 'removeBots' | 'pick' | 'again' | 'menu' | 'board' | 'resetSession' | 'skip';
 
 /** Eigenes Stylesheet, damit tv.html unangetastet bleibt */
 const CSS = `
@@ -49,6 +50,7 @@ export function installHostControls(socket: Socket) {
     <div class="hc-row">
       <button data-cmd="abort" tabindex="-1">Spiel abbrechen</button>
       <button data-cmd="continue" tabindex="-1">Weiter</button>
+      <button data-cmd="skip" tabindex="-1">Zug überspringen (S)</button>
       <button data-cmd="removeBots" tabindex="-1">Bots entfernen</button>
       <button data-cmd="pick" tabindex="-1">Spiel wählen (A)</button>
     </div>
@@ -58,7 +60,7 @@ export function installHostControls(socket: Socket) {
       <button data-cmd="board" tabindex="-1">Leaderboard (L)</button>
       <button data-cmd="resetSession" tabindex="-1">Leaderboard zurücksetzen</button>
     </div>
-    <div class="hc-keys">Esc 2× = abbrechen · Enter = weiter / nochmal · A = Spiel wählen · L = Leaderboard</div>
+    <div class="hc-keys">Esc 2× = abbrechen · Enter = weiter / nochmal · S = überspringen · A = Spiel wählen · L = Leaderboard</div>
     <div class="hc-msg"></div>
   `;
   document.body.append(root);
@@ -143,7 +145,13 @@ export function installHostControls(socket: Socket) {
     window.setTimeout(() => update(), ARM_MS + 50);
   };
 
+  const skip = () => {
+    if (btn('skip').disabled) return say('Gerade gibt es nichts zum Überspringen.');
+    send('skip');
+  };
+
   btn('abort').addEventListener('click', abort);
+  btn('skip').addEventListener('click', skip);
   btn('continue').addEventListener('click', cont);
   btn('removeBots').addEventListener('click', () => send('removeBots'));
   const picker = installArcadePicker(socket, say);
@@ -164,6 +172,12 @@ export function installHostControls(socket: Socket) {
       e.preventDefault();
       show();
       cont();
+    } else if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Nicht, während ein Eingabefeld (z. B. Arcade-Suche) den Fokus hat
+      if ((e.target as HTMLElement | null)?.closest?.('input, textarea, [contenteditable]')) return;
+      e.preventDefault();
+      show();
+      skip();
     } else if (e.key === 'l' || e.key === 'L') {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -184,6 +198,9 @@ export function installHostControls(socket: Socket) {
     btn('abort').textContent = armedUntil > Date.now() ? 'Wirklich abbrechen?' : 'Spiel abbrechen';
     btn('abort').classList.toggle('armed', armedUntil > Date.now());
     btn('continue').disabled = !waits;
+    const skippable = (phase === 'mini' || phase === 'board') && s?.skippable ? s.skippable : null;
+    btn('skip').disabled = !skippable;
+    btn('skip').textContent = skippable ? `${skippable.label} (S)` : 'Zug überspringen (S)';
     btn('removeBots').disabled = phase !== 'lobby' || !s?.botCount;
     const single = phase === 'results' && !!s?.nochmal;
     btn('pick').disabled = phase !== 'lobby';
