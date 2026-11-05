@@ -1956,13 +1956,17 @@ export interface DateRunState {
 
 // ------------------------------------------------------------------ Spielbrett
 
-export type FieldType = 'start' | 'blue' | 'red' | 'event';
+export type FieldType = 'start' | 'blue' | 'red' | 'event' | 'shop' | 'duel';
+/** Items aus dem Laden: Doppelwürfel, Cocktail-Klau, Taxi zur Bar, Sonnencreme-Schild (siehe ITEM_INFO) */
+export type ItemKind = 'dice2' | 'klau' | 'taxi' | 'schild';
 
 export interface BoardRoll {
   seq: number;
   playerId: string;
   value: number;
   path: number[];
+  /** roll = Würfel aufpoppen + loslaufen, cont = weiter nach einer Entscheidung (ohne Würfel), taxi = ein großer Hüpfer zur Bar */
+  kind: 'roll' | 'cont' | 'taxi';
 }
 
 /** Statistik pro Spieler über die ganze Party (für die Bonus-Cocktails am Ende) */
@@ -1973,6 +1977,49 @@ export interface BoardStats {
   red: number;
   /** Felder gelaufen */
   steps: number;
+  /** An der Bar gekaufte Cocktails (Preisstaffel 10/15/20) */
+  bought: number;
+}
+
+/** Offene Entscheidung des laufenden Spielers am Handy (Bar, Laden, Abzweigung) */
+export interface BoardAsk {
+  seq: number;
+  playerId: string;
+  kind: 'bar' | 'shop' | 'fork';
+  /** Restzeit in ms (Stand beim Senden, ~1×/s aktualisiert) */
+  ms: number;
+  /** bar: Preis des Cocktails */
+  price?: number;
+  /** shop: Angebot */
+  offer?: ItemKind[];
+  /** fork: steht die Bar gerade am langen Weg? */
+  barOnLong?: boolean;
+}
+
+export type DuelPick = 'share' | 'steal';
+
+/** Duell „Teilen oder Klauen“ um einen Pott aus der Bank */
+export interface BoardDuel {
+  seq: number;
+  /** Herausforderer (ist auf dem Duell-Feld gelandet) und Gegner */
+  a: string;
+  b: string;
+  pot: number;
+  /** choose = beide wählen geheim, reveal = TV deckt auf, done = Münzen verteilt */
+  sub: 'choose' | 'reveal' | 'done';
+  /** Restzeit der Wahl in ms */
+  ms: number;
+  /** Wer schon gewählt hat (ohne Inhalt) */
+  chosen: string[];
+  /** Ab `reveal`: die Karten */
+  picks?: Record<string, DuelPick>;
+  /** Ab `done`: Ergebnis als Text */
+  result?: string;
+}
+
+/** Geheime Infos am Brett (Event `private`): die eigene Duell-Wahl */
+export interface BoardPrivate {
+  duelPick: DuelPick | null;
 }
 
 /** Bonus-Cocktail am Ende („Minispiel-Star“, „Pechvogel“, „Wanderer“) */
@@ -1982,6 +2029,8 @@ export interface BoardAward {
   /** z. B. „Meiste Münzen aus Minispielen“ */
   desc: string;
   winners: string[];
+  /** Bei Gleichstand: alle mit dem Bestwert – der Award geht an den, der in der Wertung am weitesten hinten liegt */
+  tied?: string[];
   /** Wert der Gewinner, z. B. 38 (Münzen) */
   value: number;
   /** Einheit zum Wert, z. B. „Münzen“ */
@@ -1999,8 +2048,16 @@ export interface BoardState {
   pos: Record<string, number>;
   coins: Record<string, number>;
   cocktails: Record<string, number>;
+  /** Item im Inventar (höchstens eins) */
+  items: Record<string, ItemKind | null>;
+  /** Im Würfelfenster: wer sein Item für diesen Zug einsetzt (Doppelwürfel, Klau, Taxi) */
+  using: Record<string, ItemKind>;
   barField: number;
   lastRoll: BoardRoll | null;
+  /** Offene Entscheidung am Handy (nur im Schnelldurchlauf) */
+  ask: BoardAsk | null;
+  /** Laufendes Duell „Teilen oder Klauen“ */
+  duel: BoardDuel | null;
   /** Würfelfenster: Augenzahl pro Spieler, der schon gewürfelt hat (selbst oder automatisch) */
   rolls: Record<string, number>;
   /** Restzeit des Würfelfensters in ms (Stand beim Senden, wird ~1×/s aktualisiert; 0 außerhalb) */
@@ -2279,6 +2336,7 @@ export type PrivateState =
   | { kind: 'schaetz'; state: SchaetzPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
+  | { kind: 'board'; state: BoardPrivate }
   | null;
 
 export interface JoinRequest {

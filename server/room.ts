@@ -12,6 +12,7 @@ import type {
   Phase,
   PlayerPublic,
   NochmalState,
+  PrivateState,
   ResultsState,
   ServerHello,
   StartRequest,
@@ -447,6 +448,16 @@ export class Room {
 
     socket.on('board:roll', () => {
       if (playerId && this.phase === 'board') this.board?.roll(playerId);
+    });
+    // Brett-Entscheidungen: Item vor dem Würfeln, Antwort auf Bar/Laden/Gabelung, geheime Duell-Wahl
+    socket.on('board:item', () => {
+      if (playerId && this.phase === 'board') this.board?.useItem(playerId);
+    });
+    socket.on('board:answer', (msg: { seq: number; choice?: unknown }) => {
+      if (playerId && this.phase === 'board') this.board?.answer(playerId, Number(asRecord(msg).seq), asRecord(msg).choice);
+    });
+    socket.on('board:duel', (msg: { seq: number; pick?: unknown }) => {
+      if (playerId && this.phase === 'board') this.board?.duelPick(playerId, Number(asRecord(msg).seq), asRecord(msg).pick);
     });
 
     socket.on('mini:input', (msg: { action: string; payload?: unknown }) => {
@@ -1540,7 +1551,8 @@ export class Room {
     for (const p of this.players.values()) {
       if (!p.socketId) continue;
       seen.add(p.socketId);
-      const priv = this.mini?.privateFor?.(p.id) ?? null;
+      const boardPriv = this.phase === 'board' ? this.board?.privateFor(p.id) : null;
+      const priv: PrivateState = boardPriv ? { kind: 'board', state: boardPriv } : (this.mini?.privateFor?.(p.id) ?? null);
       const json = JSON.stringify(priv);
       if (this.privKeys.get(p.socketId) === json) continue;
       this.privKeys.set(p.socketId, json);
