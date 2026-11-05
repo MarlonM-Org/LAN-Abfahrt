@@ -93,6 +93,13 @@ Produktiv-Build (schneller, ohne Dev-Tools): `npm run build` und dann `npm start
 
 Der TV/Laptop spielt durchgehend 8-Bit-Musik (komplett per WebAudio erzeugt, je nach Szene ein anderer Loop). Browser erlauben Ton erst nach einer Aktion: **einmal in die TV-Ansicht klicken oder eine Taste drücken**. **M** (oder der Knopf „♪ Musik“ in der Lobby) öffnet das **Musik-Menü**: Gesamt-, Musik- und Effektlautstärke, Stumm (wird im Browser gemerkt), Bibliothek zum Vorhören und die Zuordnung „welche Musik läuft wo“ – alles live, ohne Neustart.
 
+### Soundeffekte & Sprecher
+
+- **Effekte:** Rund 28 prozedurale Chiptune-Effekte (`client/host/sfx.ts`: Treffer leicht/schwer, Explosion, Platsch, Münze, Sprung, Power-up, Countdown-Piep, LOS, K.O., Sieg, Niederlage, Fehler, Wusch, Wurf, Schuss, Fang, Auswahl, Tor, Strike, Plopp, Jubel, Trommelwirbel, Fanfare, Bonk, Pfeife, Knacken). Sie laufen über denselben Synth wie die Musik und hören auf den Regler **„Effekte“** (und Gesamt/Stumm). Stereo nach x-Position, jede Wiedergabe variiert die Tonhöhe leicht. Testen in der Browser-Konsole der TV-Ansicht: `__sfx('boom')` oder `__sfxAll()`.
+- **Juice:** `client/host/juice.ts` bündelt Shake (3 Stufen), Flash, Hit-Stop, Zeitlupe, Zoom-Stoß, Partikel (Phaser-Emitter: Puff, Sand, Spritzer, Konfetti, Funken, Rauch, Holz, Feuer), schwebende Texte und Banner. Eingebaut u. a. in Smash, Bomben-Arena, Sumo, Bogen, Ententeich, Kart, Spielbrett und Ergebnis (Plätze von hinten nach vorn, Trommelwirbel, Fanfare + Konfetti für den Sieger).
+- **Countdown:** Jedes Minispiel mit 3-2-1-Countdown piept automatisch und gibt beim Start „LOS“ (zentral in `client/host/ui.ts`).
+- **Sprecher:** Der TV sagt den Countdown („Drei, zwei, eins, los!“), den Sieger („Lena gewinnt!“) und ein paar Höhepunkte an (Darts: „Bullseye!“). Er nutzt die Sprachausgabe des Browsers (deutsche Stimme bevorzugt, Edge unter Windows klingt am besten), die Lautstärke folgt dem Effekt-Regler. Abschalten im Musik-Menü mit **„Sprecher: AN/AUS“** (wird im Browser gemerkt).
+
 ### Musik-Werkstatt (`/musik.html`)
 
 Eigene 8-Bit-Loops bauen – mit demselben Synth, der auch auf dem TV spielt: <http://localhost:3000/musik.html> (oder aus dem Musik-Menü heraus).
