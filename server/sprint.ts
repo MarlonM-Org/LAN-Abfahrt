@@ -50,7 +50,13 @@ export class SprintGame implements MiniGame {
     }
   }
 
-  playerDisconnected() {}
+  playerDisconnected() {
+    const s = this.state;
+    if (s.sub === 'go' && this.ids.filter((id) => this.ctx.isConnected(id)).every((id) => s.times[id] !== null)) {
+      this.timers.clear();
+      this.reveal();
+    }
+  }
 
   dispose() {
     this.timers.clear();

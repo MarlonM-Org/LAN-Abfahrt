@@ -19,7 +19,7 @@ type Cmd = 'abort' | 'continue' | 'removeBots';
 /** Eigenes Stylesheet, damit tv.html unangetastet bleibt */
 const CSS = `
 body.hc-idle { cursor: none; }
-#host-ctl { position: fixed; left: 2vh; bottom: 2vh; z-index: 10; padding: 1.2vh 1.4vh; font: 1.2vh 'Press Start 2P', monospace; color: #fff4d6; background: rgba(45, 27, 18, 0.72); border: 0.3vh solid rgba(247, 228, 181, 0.5); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+#host-ctl { position: fixed; right: 2vh; bottom: 2vh; z-index: 10; padding: 1.2vh 1.4vh; font: 1.2vh 'Press Start 2P', monospace; color: #fff4d6; background: rgba(45, 27, 18, 0.72); border: 0.3vh solid rgba(247, 228, 181, 0.5); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 #host-ctl.show { opacity: 1; pointer-events: auto; }
 #host-ctl .hc-title { color: #f7c948; margin-bottom: 1vh; }
 #host-ctl .hc-row { display: flex; gap: 0.8vh; }

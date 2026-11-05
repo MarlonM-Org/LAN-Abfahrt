@@ -36,6 +36,7 @@ import { WasserScene } from './WasserScene';
 import { StillepostScene } from './StillepostScene';
 import { FangenScene } from './FangenScene';
 import { GeistScene } from './GeistScene';
+import { initPlayersPanel } from './playersPanel';
 import { GrillScene } from './GrillScene';
 import { SumoScene } from './SumoScene';
 import { TouristScene } from './TouristScene';
@@ -70,6 +71,7 @@ async function start() {
   let currentKey = '';
   const socket = io();
   startTimeSync(socket);
+  initPlayersPanel(socket); // Panel „Spieler“ (Taste P)
   connectMusic(socket);
   setupMusicMenu();
   watchServerVersion(socket);

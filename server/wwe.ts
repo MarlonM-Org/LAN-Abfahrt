@@ -54,16 +54,21 @@ export class WweGame implements MiniGame {
     if (!this.ids.includes(playerId) || !this.ids.includes(target)) return;
     this.votes.set(playerId, target);
     this.state.voted = [...this.votes.keys()];
-    if (this.ids.filter((id) => this.ctx.isConnected(id)).every((id) => this.votes.has(id))) {
-      this.timers.clear();
-      this.reveal();
-    } else {
-      this.ctx.onChange();
-    }
+    if (!this.checkAllVoted()) this.ctx.onChange();
+  }
+
+  /** Alle (noch verbundenen) haben abgestimmt → sofort auflösen. */
+  private checkAllVoted() {
+    if (this.state.sub !== 'question' || !this.votes.size) return false;
+    if (!this.ids.filter((id) => this.ctx.isConnected(id)).every((id) => this.votes.has(id))) return false;
+    this.timers.clear();
+    this.reveal();
+    return true;
   }
 
   playerDisconnected() {
-    // Abstimmung läuft einfach per Timer weiter
+    // Wer weg ist, wird nicht mehr abgewartet (sonst läuft die Abstimmung bis zum Timer)
+    this.checkAllVoted();
   }
 
   dispose() {

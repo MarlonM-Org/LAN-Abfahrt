@@ -78,9 +78,10 @@ export class LobbyScene extends Phaser.Scene {
 
     this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
+    const offMin = (p: GameState['players'][number]) => Math.floor((p.offlineMs ?? 0) / 60_000);
     this.hintText.setText(n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : 'Der VIP wählt am Handy ein Spiel!');
 
-    const key = s.mode + s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}`).join('|') + (s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
+    const key = s.mode + s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') + (s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
     if (key === this.renderedPlayers) return;
     this.renderedPlayers = key;
 
@@ -107,6 +108,8 @@ export class LobbyScene extends Phaser.Scene {
       this.playerLayer.add(f);
       this.playerLayer.add(nameTag(this, x, y + 4, p.name.slice(0, 8)));
       if (p.isVip) this.playerLayer.add(this.crown(x, y - 59));
+      // Offline: grau + Hinweis (nach ein paar Minuten fliegt er automatisch raus)
+      if (!p.connected) this.playerLayer.add(ink(this, x, y + 19, offMin(p) ? `offline ${offMin(p)}m` : 'offline', { color: RED_INK }));
     }
   }
 

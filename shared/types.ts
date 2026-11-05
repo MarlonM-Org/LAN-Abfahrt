@@ -18,6 +18,12 @@ export interface PlayerPublic {
   look: Look;
   connected: boolean;
   isVip: boolean;
+  /** Offline: seit wie vielen ms (Stand dieses Snapshots) */
+  offlineMs?: number;
+  /** Vom VIP/Laptop entfernt – bleibt nur bis zur Lobby sichtbar, damit laufende Spiele nicht stolpern */
+  removed?: boolean;
+  /** Testspieler */
+  bot?: boolean;
 }
 
 export type Team = 'A' | 'B';
@@ -1551,6 +1557,8 @@ export interface GameState {
   customQuestionCount: number;
   /** Eigene Startsätze für Stille Post */
   customPostCount: number;
+  /** Wer im laufenden Minispiel mitspielt (wer später zurückkommt, schaut zu) */
+  inGame?: string[] | null;
   /** Eigene Fragen fürs Sprüche-Duell */
   customQuipCount: number;
 }
@@ -1587,6 +1595,15 @@ export interface JoinResponse {
   ok: boolean;
   playerId?: string;
   error?: string;
+  /** Dieser Spieler wurde entfernt → Handy zeigt „Du wurdest aus der Runde entfernt“ */
+  kicked?: boolean;
+}
+
+/** Antwort auf Kick-Befehle (VIP-Handy / Laptop) */
+export interface KickResponse {
+  ok: boolean;
+  error?: string;
+  removed?: number;
 }
 
 /** Erstes Event nach dem Verbinden: Server-Start-ID + alle Minispiele, die der Server kennt */

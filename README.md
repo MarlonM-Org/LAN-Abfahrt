@@ -12,6 +12,8 @@ Aktueller Stand (v0.3):
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 12 Spieler, Pixel-Avatar-Editor auf dem Handy
 - Der erste Spieler ist **VIP** und wählt am Handy, was gespielt wird (und kann jederzeit abbrechen)
+- **Spieler entfernen:** Der VIP sieht in der Lobby alle Spieler und kann einzelne (✕ entfernen) oder alle anderen rauswerfen – im laufenden Spiel über den Knopf „Spieler“ oben links, sobald jemand offline ist. Am Laptop öffnet **P** (oder der Knopf „Spieler“ oben links in der TV-Ansicht) dasselbe Panel inkl. „Alle entfernen“ – das geht nur direkt am Laptop (`localhost`). Wer entfernt wurde, kann einfach neu beitreten
+- **Offline-Spieler** (Tab zu, WLAN weg) bleiben grau in der Lobby („offline seit 2 min“) und spielen beim nächsten Spiel nicht mit; wer innerhalb von 5 Minuten zurückkommt, ist wieder drin, danach fliegt er automatisch raus (`OFFLINE_KICK_MIN=…` ändert die Frist). Laufende Spiele warten nicht auf Abwesende
 - **Party-Modus** (3, 5 oder 8 Runden): Spielbrett „Ferienhaus“ im Mario-Party-Stil
   - Alle würfeln am Handy, Felder geben/nehmen Münzen, `?`-Felder lösen Urlaubs-Ereignisse aus
   - An der **Cocktailbar** wird man beim Vorbeilaufen automatisch 10 Münzen gegen einen Cocktail los
@@ -111,6 +113,7 @@ Beim Rhythmusspiel kommt der Song ebenfalls vom TV/Laptop – TV und Handys glei
 | Spiel abbrechen | `Esc` 2× | laufendes Spiel beenden → zurück in die Lobby |
 | Weiter | `Enter` / `Leertaste` | wie „Weiter“ des VIP (Ergebnis, Date-Night-Karte, Stille-Post-Vorführung, Diskussion im Mörderspiel) |
 | Bots entfernen | – | alle Bots rauswerfen (nur in der Lobby) |
+| Spieler (oben links) | `P` | Spielerliste mit online/offline, einzelne Spieler oder „Alle entfernen“ (auch während eines Spiels) |
 
 Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst kommen** (`127.0.0.1` / `::1`). Öffnet jemand `tv.html` am Handy oder über die LAN-IP bzw. die HTTPS-Domain, gibt es kein Overlay und keine Befehle – deshalb die TV-Ansicht am Laptop immer über `localhost` öffnen.
 
@@ -120,7 +123,7 @@ Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst 
 - Ist er länger weg, wird der am längsten verbundene **Mensch** VIP – ein Bot nur, wenn gar kein Mensch mehr verbunden ist.
 - Der **Gastgeber** (wer den Raum als Erster betreten hat) bekommt den VIP zurück, sobald er wieder da ist.
 - Kann nur noch ein Bot weiterdrücken, schaltet der Server nach ein paar Sekunden selbst weiter (Ergebnis nach 12 s, Date-Night-Karten nach 10 s, Stille-Post-Vorführung nach 5 s) – es bleibt nichts hängen.
-- In der Lobby bleiben Menschen ebenfalls 60 s (ausgegraut) im Raum, bevor sie entfernt werden.
+- In der Lobby bleiben Menschen 5 Minuten (ausgegraut, „offline seit …“) im Raum, bevor sie automatisch entfernt werden (siehe „Offline-Spieler“ oben). Wer früher weg soll: entfernen (VIP-Handy oder **P** am Laptop).
 
 Zum Testen lassen sich die Zeiten verkürzen: `VIP_GRACE_MS=15000 AUTO_CONTINUE_MS=5000 npm run dev`.
 

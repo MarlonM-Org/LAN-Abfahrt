@@ -125,6 +125,11 @@ export class Bot {
       });
     });
     this.socket.on('private', (p: PrivateState) => (this.priv = p));
+    // Vom VIP/Laptop entfernt → Bot beendet sich (kein Neu-Beitreten)
+    this.socket.on('kicked', () => {
+      opts.log?.(`${name}: wurde entfernt`);
+      this.stop();
+    });
     this.socket.on('state', (s: GameState) => {
       this.state = s;
       this.react(s);

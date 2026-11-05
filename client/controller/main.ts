@@ -33,6 +33,7 @@ import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
+import { buildKicked, initVipPlayersButton } from './players';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -54,6 +55,8 @@ function join() {
       store.joined = true;
       store.editing = false;
       requestWakeLock();
+    } else if (r.kicked) {
+      return onKicked();
     } else {
       toast(r.error ?? 'Beitreten hat nicht geklappt.');
       store.joined = false;
@@ -63,18 +66,38 @@ function join() {
   });
 }
 
+/** Vom VIP/Laptop entfernt: gespeicherte Spieler-ID vergessen (kein Bann – „Neu beitreten“ geht immer). */
+function onKicked() {
+  // Selbst trennen – „Neu beitreten“ baut eine frische Verbindung auf
+  if (socket.connected) socket.disconnect();
+  store.kicked = true;
+  store.joined = false;
+  store.playerId = undefined;
+  localStorage.removeItem(LS.id);
+  render();
+}
+
+function rejoin() {
+  store.kicked = false;
+  store.playerId = undefined;
+  if (socket.connected) join();
+  else socket.connect(); // → 'connect' → join()
+  render();
+}
+
 startTimeSync(socket);
 watchServerVersion(socket, () => toast('Handy-Code ist älter als der Server – am Laptop „npm run build“ ausführen.'));
 
+socket.on('kicked', onKicked);
 socket.on('connect', () => {
-  if (store.name && !store.editing) join();
+  if (store.name && !store.editing && !store.kicked) join();
   else render();
 });
 socket.on('disconnect', (reason) => {
   store.joined = false;
   joinPending = false;
   // Vom Server getrennt → socket.io verbindet nicht von selbst neu
-  if (reason === 'io server disconnect') socket.connect();
+  if (reason === 'io server disconnect' && !store.kicked) socket.connect();
   render();
 });
 
@@ -85,7 +108,7 @@ socket.on('disconnect', (reason) => {
  */
 let lastCheck = 0;
 function checkConnection() {
-  if (document.visibilityState === 'hidden') return;
+  if (document.visibilityState === 'hidden' || store.kicked) return;
   const now = Date.now();
   if (now - lastCheck < 1000) return;
   lastCheck = now;
@@ -122,7 +145,7 @@ socket.on('state', (s: GameState) => {
     if (store.name && !store.editing) join();
   }
   // Beitritt wurde abgelehnt (z. B. lief gerade ein Spiel) → in der Lobby erneut versuchen
-  if (!store.joined && retryInLobby && s.phase === 'lobby' && store.name && !store.editing) {
+  if (!store.joined && retryInLobby && !store.kicked && s.phase === 'lobby' && store.name && !store.editing) {
     retryInLobby = false;
     join();
   }
@@ -175,9 +198,11 @@ function outdatedScreen(): Screen {
 }
 
 function pickScreen(): Screen {
+  if (store.kicked) return ['kicked', () => buildKicked(rejoin)];
   if (store.editing || !store.name) return ['edit', () => buildEdit(afterEdit)];
   if (!socket.connected) return ['offline', message('Verbinde ...', 'Bist du im selben WLAN wie der PC?')];
   const s = store.state;
+  if (!store.joined && retryInLobby) return ['waitlobby', message('Gerade läuft ein Spiel', 'Du steigst automatisch ein, sobald die Runde vorbei ist.')];
   if (!store.joined || !s) return ['joining', message('Trete bei ...')];
   const vip = !!me()?.isVip;
 
@@ -195,6 +220,8 @@ function pickScreen(): Screen {
       if (!m) return ['wait', message('Warte ...')];
       if (!knownKind(m.kind)) return outdatedScreen();
       if (!(store.playerId && s.players.some((p) => p.id === store.playerId))) return ['wait', message('Warte ...')];
+      // Erst nach Spielstart zurückgekommen → diese Runde zuschauen
+      if (s.inGame && !s.inGame.includes(store.playerId)) return ['watch', message('Du schaust zu', 'Diese Runde läuft ohne dich – beim nächsten Spiel bist du dabei!')];
       switch (m.kind) {
         case 'flunky':
           return pickFlunky(m.state);
@@ -308,6 +335,7 @@ async function requestWakeLock() {
 }
 
 onKartRerender(() => render());
+initVipPlayersButton();
 
 // Countdowns etc. regelmäßig aktualisieren
 setInterval(() => updater?.(), 250);

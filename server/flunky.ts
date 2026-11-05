@@ -12,6 +12,8 @@ import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './miniga
 
 /** Mindestabstand zwischen zwei Taps eines Spielers (gegen Auto-Clicker / Multi-Touch-Spam) */
 const MIN_TAP_GAP_MS = 55;
+/** Wirft der Werfer so lange nicht (Handy weggelegt), geht der Wurf daneben und das andere Team ist dran */
+const AIM_IDLE_MS = 30_000;
 
 /**
  * Flunkyball: Ein Team wirft auf die Flasche in der Mitte.
@@ -26,6 +28,7 @@ export class FlunkyGame implements MiniGame {
   private lastTap = new Map<string, number>();
   private timers = new Timers();
   private seq = 0;
+  private turnNo = 0;
 
   constructor(
     playerIds: string[],
@@ -93,7 +96,7 @@ export class FlunkyGame implements MiniGame {
     const drinking = s.turnTeam;
     if (s.teams[drinking].includes(playerId) && s.beer[playerId] > 0) {
       s.beer[playerId] = Math.max(0, s.beer[playerId] - DRINK_PER_TAP);
-      if (s.teams[drinking].every((id) => s.beer[id] <= 0)) this.end(drinking);
+      if (this.teamDone(drinking)) this.end(drinking);
       this.ctx.onChange();
     } else if (playerId === s.runnerId) {
       s.runProgress += 1;
@@ -127,6 +130,12 @@ export class FlunkyGame implements MiniGame {
 
   playerDisconnected(id: string) {
     const s = this.state;
+    if (s.sub === 'over') return;
+    // Ein ganzes Team weg → das andere gewinnt; wer noch trinkt, muss nicht auf Abwesende warten
+    for (const t of ['A', 'B'] as Team[]) {
+      if (!s.teams[t].some((p) => this.ctx.isConnected(p))) return this.end(otherTeam(t));
+    }
+    if (s.sub === 'chug' && this.teamDone(s.turnTeam)) return this.end(s.turnTeam);
     if (s.sub === 'aim' && s.throwerId === id) {
       this.advance();
     } else if (s.sub === 'chug' && s.runnerId === id) {
@@ -148,6 +157,17 @@ export class FlunkyGame implements MiniGame {
     s.runnerId = null;
     s.runProgress = 0;
     this.ctx.onChange();
+    const turn = ++this.turnNo;
+    this.timers.later(AIM_IDLE_MS, () => {
+      if (this.turnNo === turn && s.sub === 'aim') this.advance();
+    });
+  }
+
+  /** Team hat ausgetrunken – wer offline/entfernt ist, zählt nicht (sonst gewinnt das Team nie). */
+  private teamDone(team: Team) {
+    const s = this.state;
+    const live = s.teams[team].filter((id) => this.ctx.isConnected(id));
+    return live.length > 0 && live.every((id) => s.beer[id] <= 0);
   }
 
   private advance() {

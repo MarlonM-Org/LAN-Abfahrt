@@ -4,6 +4,8 @@ import { Timers, shuffle } from './minigame';
 
 const STEP_MS = 280;
 const INTRO_MS = 4000;
+/** Würfelt jemand so lange nicht (Handy weggelegt/eingeschlafen), würfelt der Server für ihn */
+const ROLL_IDLE_MS = 45_000;
 
 export interface BoardCtx {
   onChange(): void;
@@ -11,6 +13,8 @@ export interface BoardCtx {
   isConnected(id: string): boolean;
   nameOf(id: string): string;
   connectedCount(): number;
+  /** Vom VIP/Laptop entfernt → Züge werden übersprungen */
+  isGone?(id: string): boolean;
 }
 
 interface PartyEvent {
@@ -125,6 +129,14 @@ export class Board {
     this.beginTurn();
   }
 
+  /** Spieler ist offline gegangen oder wurde entfernt: Ist er gerade dran, nicht ewig auf ihn warten. */
+  playerGone(id: string) {
+    if (this.state.sub === 'roll' && this.currentPlayer === id) {
+      this.timers.clear();
+      this.beginTurn();
+    }
+  }
+
   dispose() {
     this.timers.clear();
   }
@@ -172,11 +184,19 @@ export class Board {
 
   private beginTurn() {
     const s = this.state;
+    // Entfernte Spieler werden übersprungen
+    while (s.turnIdx < s.order.length && this.ctx.isGone?.(this.currentPlayer)) s.turnIdx += 1;
+    if (s.turnIdx >= s.order.length) {
+      s.sub = 'moving';
+      this.ctx.onChange();
+      this.timers.later(1200, () => this.intro());
+      return;
+    }
     s.sub = 'roll';
     this.ctx.onChange();
-    // Wer nicht verbunden ist, würfelt automatisch
+    // Wer nicht verbunden ist, würfelt automatisch – wer ewig nicht würfelt, irgendwann auch
     const id = this.currentPlayer;
-    if (!this.ctx.isConnected(id)) this.timers.later(1500, () => this.roll(id));
+    this.timers.later(this.ctx.isConnected(id) ? ROLL_IDLE_MS : 1500, () => this.roll(id));
   }
 
   private intro() {
@@ -190,7 +210,8 @@ export class Board {
     const pool: MiniKind[] = fitting.filter((k) => k !== this.lastMini);
     if (!pool.length) pool.push(...(fitting.length ? fitting : BOARD_KINDS));
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];
-    const kind: MiniKind = isFinale ? pick(finales) : pick(pool);
+    // Fallback, falls zu wenige übrig sind (z. B. nach Entfernen von Spielern)
+    const kind: MiniKind = (isFinale ? pick(finales) : pick(pool)) ?? 'sprint';
     this.lastMini = kind;
     s.sub = 'intro';
     s.nextMini = kind;
