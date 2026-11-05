@@ -27,6 +27,8 @@ import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, t
 import type { FangenState } from '../shared/types';
 import type { SumoState } from '../shared/types';
 import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
+import type { VolleyState } from '../shared/types';
+import { VOLLEY, vollPredict, vollSide, vollSpot } from '../shared/volley';
 import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
@@ -1049,6 +1051,8 @@ export class Bot {
     }
 
     if (m.kind === 'sumo') sumoBot(this, m.state);
+
+    if (m.kind === 'volley') vballBot(this, m.state);
 
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
@@ -2097,6 +2101,88 @@ function sumoBot(bot: Bot, st: SumoState) {
   mem.moving = true;
   bot.send('stick', { x: Math.round(w.x * 100) / 100, y: Math.round(w.y * 100) / 100 });
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
+}
+
+// ------------------------------------------------------------------ Strand-Volleyball
+
+interface VballBotMemory {
+  nextAt: number;
+  dir: number;
+  jumpAt: number;
+  /** Eigene Ungenauigkeit (px), damit nicht alle Bots gleich spielen */
+  slop: number;
+  /** Wie gern der Bot schmettert */
+  spikeChance: number;
+}
+
+const vballMem = new WeakMap<Bot, VballBotMemory>();
+
+/**
+ * Volleyball-Bot: rechnet aus, wo der Ball auf Schlaghöhe herunterkommt, und läuft
+ * knapp dahinter (dann prallt der Ball Richtung Netz ab). Von mehreren im Team geht nur,
+ * wer am nächsten dran ist – die anderen halten ihre Position. Springt, wenn der Ball nah
+ * ist und fällt, und schmettert manchmal, wenn er in der Luft nah am Netz ist.
+ */
+function vballBot(bot: Bot, st: VolleyState) {
+  let mem = vballMem.get(bot);
+  if (!mem) vballMem.set(bot, (mem = { nextAt: 0, dir: 0, jumpAt: 0, slop: rand(-4, 4), spikeChance: rand(0.2, 0.55) }));
+  const me = st.players[bot.id];
+  const setDir = (d: number) => {
+    if (d === mem!.dir) return;
+    mem!.dir = d;
+    bot.send('move', { dir: d });
+  };
+  if (!me || !me.court || (st.sub !== 'serve' && st.sub !== 'rally')) {
+    setDir(0);
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(50, 90);
+
+  const V = VOLLEY;
+  const d = me.team === 'A' ? 1 : -1;
+  const [lo, hi] = vollSide(me.team);
+  const ownSide = (x: number) => d * (V.NET_X - x) > 0;
+  const b = st.ball;
+  const mates = Object.entries(st.players)
+    .filter(([, p]) => p.team === me.team && p.court)
+    .sort((a, c) => (a[0] < c[0] ? -1 : 1));
+  const home = vollSpot(me.team, Math.max(0, mates.findIndex(([id]) => id === bot.id)));
+
+  let target = home;
+  const hitY = V.GROUND - V.P_BODY - V.P_R - V.BALL_R + 4;
+  const pred = st.sub === 'serve' ? { x: b.x, t: 1 } : vollPredict(b, hitY);
+  if (pred && ownSide(pred.x)) {
+    const closest = mates.reduce((best, cur) => (Math.abs(cur[1].x - pred.x) < Math.abs(best[1].x - pred.x) ? cur : best), mates[0]);
+    if (!closest || closest[0] === bot.id) {
+      // Etwas hinter den Ball (vom Netz aus gesehen), damit er nach vorn abprallt
+      target = pred.x - d * (6 + mem.slop);
+    }
+  } else if (!ownSide(b.x)) {
+    // Ball drüben: auf die Grundposition, leicht zur Mitte der eigenen Hälfte
+    target = home + d * 10;
+  }
+  target = Math.max(lo, Math.min(hi, target));
+  const dx = target - me.x;
+  setDir(Math.abs(dx) < 3 ? 0 : dx > 0 ? 1 : -1);
+
+  // Springen: Ball nah über einem und fällt (oder steigt nur noch langsam).
+  // Nah am Netz springt der Bot früher ab, um von oben zu schmettern.
+  const bx = Math.abs(b.x - me.x);
+  const above = me.y - b.y;
+  const falling = b.vy > -60 || st.sub === 'serve';
+  const nearNet = Math.abs(b.x - V.NET_X) < 80 && ownSide(b.x) && me.cd <= 0;
+  const [jLo, jHi] = nearNet && mem.spikeChance > 0.3 ? [50, 100] : [26, 78];
+  if (!me.air && bx < 22 && above > jLo && above < jHi && falling && now - mem.jumpAt > 350 && Math.random() < 0.85) {
+    mem.jumpAt = now;
+    bot.send('jump');
+  }
+  // Schmettern: in der Luft, Ball in Reichweite, oberhalb der Netzkante und nicht zu weit vom Netz
+  const reach = Math.hypot(b.x - me.x, b.y - (me.y - V.P_BODY));
+  if (me.air && me.cd <= 0 && reach < 36 && b.y < V.NET_TOP - 4 && Math.abs(b.x - V.NET_X) < 90 && ownSide(b.x) && Math.random() < mem.spikeChance + 0.2) {
+    bot.send('spike');
+  }
 }
 
 // ------------------------------------------------------------------ Wer ist der Tourist?

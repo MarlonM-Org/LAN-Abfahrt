@@ -56,6 +56,7 @@ export type MiniKind =
   | 'grill'
   | 'boule'
   | 'sumo'
+  | 'volley'
   | 'tourist'
   | 'sprueche'
   | 'werwolf';
@@ -1388,6 +1389,52 @@ export interface GeistState {
   points: Record<string, number>;
 }
 
+// ------------------------------------------------------------------ Strand-Volleyball
+
+export interface VolleyPlayer {
+  team: Team;
+  /** Gerade im Feld (sonst auf der Bank, wechselt nach dem nächsten Punkt ein) */
+  court: boolean;
+  /** Füße (Weltpixel) */
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** In der Luft */
+  air: boolean;
+  /** Schmetterarm ist gerade draußen */
+  spike: boolean;
+  /** Restliche Abklingzeit fürs Schmettern (ms) */
+  cd: number;
+  /** Laufrichtung (−1, 0, 1) für das Sprite */
+  dir: number;
+  touches: number;
+  spikes: number;
+}
+
+export interface VolleyState {
+  sub: 'intro' | 'serve' | 'rally' | 'point' | 'over';
+  /** Restzeit der aktuellen Phase (Intro, Aufschlag, Punkt) */
+  endsIn: number;
+  /** Restliche Spielzeit (ms) */
+  clock: number;
+  score: Record<Team, number>;
+  target: number;
+  cap: number;
+  serving: Team;
+  server: string | null;
+  /** Zeit abgelaufen bei Gleichstand: der nächste Punkt entscheidet */
+  golden: boolean;
+  ball: { x: number; y: number; vx: number; vy: number };
+  players: Record<string, VolleyPlayer>;
+  /** Zählt bei jedem Ballkontakt hoch (für Effekte) */
+  hitSeq: number;
+  lastHit: { id: string; spike: boolean } | null;
+  pointSeq: number;
+  lastPoint: { team: Team; x: number } | null;
+  winner: Team | null;
+}
+
 // ------------------------------------------------------------------ Sumo-Steg
 
 export interface SumoPlayer {
@@ -1537,6 +1584,7 @@ export type MiniSnapshot =
   | { kind: 'grill'; state: GrillState }
   | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
+  | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
   | { kind: 'werwolf'; state: WolfState };

@@ -152,7 +152,7 @@ export function slugId(title: string): string {
 /** Eingebaute Zuordnung Szene → eingebauter Song, wenn nichts anderes eingestellt ist */
 export function defaultSongForScene(scene: string): string {
   switch (scene) {
-    case 'lobby': case 'board': case 'results':
+    case 'lobby': case 'board': case 'results': case 'volley':
       return 'party';
     case 'story': case 'stars': case 'rhythm': case 'boule':
       return 'romantic';
