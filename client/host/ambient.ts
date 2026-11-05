@@ -43,11 +43,11 @@ function gullTex(scene: Phaser.Scene) {
 }
 
 /** Möwen ziehen in Abständen quer übers Bild (mit Flügelschlag und leichtem Auf und Ab) */
-export function gulls(scene: Phaser.Scene, o: { n?: number; y?: [number, number]; depth?: number; alpha?: number } = {}) {
+export function gulls(scene: Phaser.Scene, o: { n?: number; y?: [number, number]; depth?: number; alpha?: number; scroll?: number } = {}) {
   gullTex(scene);
   const [y0, y1] = o.y ?? [16, 70];
   for (let i = 0; i < (o.n ?? 2); i++) {
-    const img = scene.add.image(-20, rnd(y0, y1), 'amb_gull0').setDepth(o.depth ?? 900).setAlpha(o.alpha ?? 0.9);
+    const img = scene.add.image(-20, rnd(y0, y1), 'amb_gull0').setDepth(o.depth ?? 900).setAlpha(o.alpha ?? 0.9).setScrollFactor(o.scroll ?? 1);
     let frame = 0;
     scene.time.addEvent({ delay: 170 + i * 20, loop: true, callback: () => img.setTexture(`amb_gull${(frame = 1 - frame)}`) });
     const fly = () => {
@@ -133,4 +133,13 @@ export function crowd(scene: Phaser.Scene, spots: [number, number][], o: { depth
       });
     },
   };
+}
+
+/** Funkeln: Sterne am Nachthimmel bzw. Lichtreflexe auf dem Wasser (kleine Punkte, die auf- und abblenden) */
+export function twinkle(scene: Phaser.Scene, o: { n?: number; x?: [number, number]; y: [number, number]; color?: number; depth?: number; w?: number }) {
+  const [x0, x1] = o.x ?? [0, 480];
+  for (let i = 0; i < (o.n ?? 12); i++) {
+    const r = scene.add.rectangle(rnd(x0, x1), rnd(o.y[0], o.y[1]), o.w ?? 1, 1, o.color ?? 0xfff4d6, 0).setDepth(o.depth ?? -900);
+    scene.tweens.add({ targets: r, alpha: rnd(0.5, 1), duration: rnd(500, 1200), yoyo: true, repeat: -1, delay: rnd(0, 3000), repeatDelay: rnd(400, 2500) });
+  }
 }

@@ -331,3 +331,35 @@ function onCueState(s: GameState) {
 }
 
 bus.on('state', onCueState);
+
+// ------------------------------------------------------------------ Lesehintergrund für Overlay-Texte
+
+/**
+ * Dunkle Plakette hinter Overlay-Texten (Banner + Untertitel über den Figuren): folgt jedes Bild
+ * dem Umriss der sichtbaren, nicht leeren Texte und übernimmt deren Deckkraft. Einmal in
+ * `create()` anlegen – die Szene muss sonst nichts tun.
+ */
+export function backPlate(scene: Phaser.Scene, texts: Phaser.GameObjects.Text[], depth: number, pad = 6) {
+  const rect = scene.add.rectangle(0, 0, 10, 10, 0x2d1b12, 0.92).setStrokeStyle(2, 0x8d5629, 0.9).setOrigin(0, 0).setDepth(depth).setVisible(false);
+  const sync = () => {
+    let l = Infinity;
+    let t = Infinity;
+    let r = -Infinity;
+    let b = -Infinity;
+    let a = 0;
+    for (const x of texts) {
+      if (!x.active || !x.visible || !x.text || x.alpha <= 0.02) continue;
+      const k = x.getBounds();
+      l = Math.min(l, k.left);
+      t = Math.min(t, k.top);
+      r = Math.max(r, k.right);
+      b = Math.max(b, k.bottom);
+      a = Math.max(a, x.alpha);
+    }
+    if (!Number.isFinite(l)) return void rect.setVisible(false);
+    rect.setVisible(true).setPosition(Math.floor(l - pad), Math.floor(t - pad + 2)).setSize(Math.ceil(r - l + pad * 2), Math.ceil(b - t + pad * 2 - 2)).setAlpha(a);
+  };
+  scene.events.on(Phaser.Scenes.Events.POST_UPDATE, sync);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.events.off(Phaser.Scenes.Events.POST_UPDATE, sync));
+  return rect;
+}
