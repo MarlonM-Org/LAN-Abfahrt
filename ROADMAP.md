@@ -153,7 +153,7 @@ Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), d
 - [x] **Regelkarte** (#59) / [ ] **Zuschauer:** Raum-Phase `intro` mit `MINI_INFO.howTo` (Ziel + 3 Steuer-Piktogramme), Übungsfeld am Handy, „Bereit!“; Emote-Leiste und Wetten für Ausgeschiedene; eine Spielerfarbe pro Abend mit Kürzel; Ergebnis zweispaltig ab 9
 
 ### Phase 2 · Look und Bewegung (M ×2)
-- [ ] Avatar-Animations-Frames (Laufen, Sprung, Treffer, Jubel, Blinzeln) zentral in `shared/avatar.ts`, Squash & Stretch in `figure()`, Ambient-Bewegung (Wolken, Möwen, Palmen), Parallax in Smash, Igel, Volley, Bogen
+- [x] Avatar-Animations-Frames (Laufen, Sprung, Treffer, Jubel, Blinzeln) *(#61, dazu Spielerfarbe pro Abend; offen: Parallax, Ambient-Bewegung)* zentral in `shared/avatar.ts`, Squash & Stretch in `figure()`, Ambient-Bewegung (Wolken, Möwen, Palmen), Parallax in Smash, Igel, Volley, Bogen
 - [ ] `SnapBuffer` mit Wiedergabe-Uhr statt bildratenabhängiger Glättung (Hit-Stop, Zeitlupe, Wiederholung „TOR!“ fast gratis), Tick 30 Hz für Plattformer, Render-Auflösung ×2/×4 bei unveränderter Welt, Kamera für Igel, Kart-Regie, Sumo-Finale, Brett-Schwenk
 - [ ] Namensschilder entzerren, „Spieler (P)“/„♪ Musik“ nicht über dem HUD, Namen nicht hart kürzen, leere Arenen beleben (Boule, SUP, Golf, Flunky)
 
