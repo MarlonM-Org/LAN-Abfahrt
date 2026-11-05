@@ -1,6 +1,6 @@
 import type { Look, MiniKind } from '../../../shared/types';
 import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
-import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS } from '../../../shared/games';
+import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, fitsPlayers, miniInspired } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
@@ -90,6 +90,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   q(root, '.count').after(plist.root);
   const menu = q(root, '.menu');
   const gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[] = [];
+  /** Arcade-Kacheln + Abstimmung: wird im Updater aufgefrischt */
+  let arcadeUpdate: ((n: number) => void) | null = null;
   if (mode === 'date') q(root, '.q-panel').classList.add('hidden');
 
   if (vip) {
@@ -117,14 +119,22 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   };
 
   if (mode === 'arcade') {
+    const voteOpen = !!store.state?.arcadeVote;
     if (vip) {
       menu.append(el(`<h2>Arcade</h2><p>Jedes Spiel einzeln – die Punkte landen im Leaderboard.</p>`));
+      const tog = el(`<button class="vote-toggle ${voteOpen ? 'on' : 'secondary'}">Alle dürfen wählen: ${voteOpen ? 'AN' : 'AUS'}</button>`).firstElementChild as HTMLButtonElement;
+      tog.addEventListener('click', () => socket.emit('vip:arcadeVote', !voteOpen));
+      menu.append(tog);
       const rnd = el(`<button class="drink-btn">Zufälliges Spiel</button>`).firstElementChild as HTMLButtonElement;
       rnd.addEventListener('click', () => socket.emit('vip:start', { mode: 'random' }));
       menu.append(rnd);
       gated.push({ btn: rnd, min: 1 });
-      for (const g of ARCADE_GROUPS) singles(g.kinds, g.title);
+    } else if (voteOpen) {
+      menu.append(el(`<h2>Arcade</h2><p>Tippe auf dein Wunschspiel – der VIP sieht alle Stimmen und startet.</p>`));
+    } else {
+      menu.append(el(`<div class="center"><h2>Arcade</h2><p>Warte, bis der VIP ein Spiel startet ...</p></div>`));
     }
+    if (vip || voteOpen) arcadeUpdate = arcadeTiles(menu, vip, voteOpen, gated);
     menu.append(leaderboardPanel());
     if (vip) {
       const reset = el(`<button class="secondary small">Leaderboard zurücksetzen</button>`).firstElementChild as HTMLButtonElement;
@@ -235,6 +245,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       mode === 'drink'
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`
         : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen`;
+    arcadeUpdate?.(n);
     for (const g of gated) {
       const tooMany = g.max !== undefined && n > g.max;
       g.btn.disabled = n < g.min || tooMany;
@@ -244,6 +255,73 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
         if (tooMany && !small) g.btn.insertAdjacentHTML('beforeend', `<small class="max-hint"><br/>${g.hint}</small>`);
         else if (!tooMany && small) small.remove();
       }
+    }
+  };
+}
+
+/**
+ * Arcade-Übersicht als Kacheln (Icon, Titel, „à la …“, Stimmen).
+ * VIP: Tippen startet das Spiel. Andere (nur bei „Alle dürfen wählen“): Tippen = Stimme (nochmal = zurückziehen).
+ */
+function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[]) {
+  let top: HTMLButtonElement | null = null;
+  let fav: HTMLButtonElement | null = null;
+  if (vip && voteOpen) {
+    const row = el(`<div class="bot-row vote-actions"><button class="small">Meiste Stimmen starten</button><button class="small secondary">Zufall aus Favoriten</button></div>`);
+    [top, fav] = [...row.querySelectorAll('button')] as HTMLButtonElement[];
+    top.addEventListener('click', () => socket.emit('vip:start', { mode: 'top' }));
+    fav.addEventListener('click', () => socket.emit('vip:start', { mode: 'favorites' }));
+    menu.append(row);
+  }
+  const tiles: { kind: MiniKind; btn: HTMLButtonElement; votes: HTMLElement; key: string }[] = [];
+  for (const g of ARCADE_GROUPS) {
+    menu.append(el(`<h2>${escapeHtml(g.title)}</h2>`));
+    const grid = el(`<div class="arcade-grid"></div>`);
+    for (const kind of g.kinds) {
+      const info = MINI_INFO[kind];
+      const insp = miniInspired(kind);
+      const b = el(
+        `<button class="secondary arcade-tile"><span class="ic">${info.icon}</span><span class="t">${escapeHtml(info.title)}</span>${insp ? `<small class="insp">${escapeHtml(insp)}</small>` : ''}<span class="votes"></span></button>`,
+      ).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => (vip ? socket.emit('vip:start', { mode: kind }) : socket.emit('arcade:vote', kind)));
+      q(grid, '.arcade-grid').append(b);
+      gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
+      tiles.push({ kind, btn: b, votes: q(b, '.votes'), key: '' });
+    }
+    menu.append(grid);
+  }
+
+  return (n: number) => {
+    const st = store.state;
+    const votes = st?.arcadeVote?.votes ?? {};
+    const byKind = new Map<MiniKind, string[]>();
+    for (const [id, k] of Object.entries(votes)) byKind.set(k, [...(byKind.get(k) ?? []), id]);
+    for (const t of tiles) {
+      const ids = byKind.get(t.kind) ?? [];
+      const key = ids.join(',');
+      t.btn.classList.toggle('mine', !!store.playerId && votes[store.playerId] === t.kind);
+      t.btn.classList.toggle('voted', ids.length > 0);
+      if (key === t.key) continue;
+      t.key = key;
+      t.votes.innerHTML = '';
+      if (!ids.length) continue;
+      t.votes.append(el(`<b>${ids.length}</b>`));
+      for (const id of ids.slice(0, 6)) {
+        const p = st?.players.find((pl) => pl.id === id);
+        if (p) t.votes.append(avatarCanvas(1, p.look));
+      }
+    }
+    if (top && fav) {
+      const fitting = [...byKind].filter(([k]) => fitsPlayers(k, n));
+      const best = Math.max(0, ...fitting.map(([, ids]) => ids.length));
+      const leaders = fitting.filter(([, ids]) => ids.length === best);
+      top.disabled = !fitting.length;
+      fav.disabled = !fitting.length;
+      top.textContent = !fitting.length
+        ? 'Meiste Stimmen starten'
+        : leaders.length === 1
+          ? `Starten: ${MINI_INFO[leaders[0][0]].icon} ${MINI_INFO[leaders[0][0]].title} (${best})`
+          : `Meiste Stimmen (${leaders.length}× ${best}) – Zufall`;
     }
   };
 }
@@ -259,7 +337,7 @@ function leaderboardPanel() {
   const per = mine
     ? Object.entries(mine.perGame)
         .sort((a, b) => (b[1]?.points ?? 0) - (a[1]?.points ?? 0))
-        .map(([k, g]) => `<tr><td>${escapeHtml(MINI_INFO[k as MiniKind]?.title ?? k)}</td><td>${g!.points}</td><td>${g!.plays}x</td></tr>`)
+        .map(([k, g]) => `<tr><td>${MINI_INFO[k as MiniKind] ? `${MINI_INFO[k as MiniKind].icon} ${escapeHtml(MINI_INFO[k as MiniKind].title)}` : escapeHtml(k)}</td><td>${g!.points}</td><td>${g!.plays}x</td></tr>`)
         .join('')
     : '';
   return el(`

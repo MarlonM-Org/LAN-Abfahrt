@@ -1793,6 +1793,14 @@ export interface GameState {
   inGame?: string[] | null;
   /** Eigene Fragen fürs Sprüche-Duell */
   customQuipCount: number;
+  /** Arcade: „Alle dürfen wählen“ – Stimmen der Spieler für das nächste Spiel (null = aus) */
+  arcadeVote?: ArcadeVoteState | null;
+}
+
+/** Arcade-Abstimmung in der Lobby: jeder Spieler hat höchstens eine Stimme */
+export interface ArcadeVoteState {
+  /** Spieler-ID → gewähltes Spiel (nur verbundene Spieler) */
+  votes: Record<string, MiniKind>;
 }
 
 export interface LeaderEntry {
@@ -1849,7 +1857,8 @@ export interface ServerHello {
 }
 
 export interface StartRequest {
-  mode: 'party' | 'date' | 'drink' | 'random' | MiniKind;
+  /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung) */
+  mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | MiniKind;
   rounds?: number;
   version?: string;
 }

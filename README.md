@@ -9,6 +9,8 @@ Aktueller Stand (v0.3):
 
 **Arcade:** Alle Spiele einzeln auswählbar – oder „Zufälliges Spiel“. Nach jeder Runde: „Nächstes Spiel (zufällig)“, „Nochmal“ oder „Spiel auswählen“. Jede Runde bringt Punkte nach Platzierung (10/6/3/1, bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – mit Gesamt-Leaderboard auf dem TV und den eigenen Punkten pro Spiel am Handy. Bots zählen nicht.
 
+**Alle dürfen wählen (Arcade):** Der VIP schaltet am Handy „Alle dürfen wählen“ an – dann sehen alle Handys die Arcade-Übersicht (Kacheln mit Icon, Titel und kleinem „à la …“-Untertitel) und tippen ihr Wunschspiel an (nochmal tippen = Stimme zurückziehen). Der VIP sieht auf jeder Kachel die Stimmen (Zahl + Mini-Avatare) und startet mit einem Tipp das meistgewählte Spiel („Starten: …“, bei Gleichstand Zufall), einen „Zufall aus Favoriten“ (mehr Stimmen = höhere Chance) oder einfach jedes beliebige Spiel. Der TV zeigt unten den aktuellen Top-Wunsch. Nach jedem Spiel beginnt die Abstimmung von vorn.
+
 
 - **Lobby** auf dem TV mit QR-Code, bis zu 12 Spieler, Pixel-Avatar-Editor auf dem Handy
 - Der erste Spieler ist **VIP** und wählt am Handy, was gespielt wird (und kann jederzeit abbrechen)
@@ -115,6 +117,7 @@ Beim Rhythmusspiel kommt der Song ebenfalls vom TV/Laptop – TV und Handys glei
 | Spiel abbrechen | `Esc` 2× | laufendes Spiel beenden → zurück in die Lobby |
 | Weiter | `Enter` / `Leertaste` | wie „Weiter“ des VIP (Ergebnis, Date-Night-Karte, Stille-Post-Vorführung, Diskussion im Mörderspiel) |
 | Bots entfernen | – | alle Bots rauswerfen (nur in der Lobby) |
+| Spiel wählen | `A` | Arcade-Auswahl mit allen Spielen (Icons, Spielerzahl, Stimmen): Klick oder Pfeiltasten + `Enter` startet, `Esc`/`A` schließt; „Zufall“ und „Meiste Stimmen“. Ausgegraut = passt nicht zur Spielerzahl (nur in der Lobby) |
 | Spieler (oben links) | `P` | Spielerliste mit online/offline, einzelne Spieler oder „Alle entfernen“ (auch während eines Spiels) |
 
 Der Server nimmt diese Befehle **nur von Verbindungen an, die vom Laptop selbst kommen** (`127.0.0.1` / `::1`). Öffnet jemand `tv.html` am Handy oder über die LAN-IP bzw. die HTTPS-Domain, gibt es kein Overlay und keine Befehle – deshalb die TV-Ansicht am Laptop immer über `localhost` öffnen.
