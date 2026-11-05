@@ -2,7 +2,8 @@ import type { ParcoursState } from '../../../shared/types';
 import { PARCOURS as P, PART_DEFS, type PartType } from '../../../shared/parcours';
 import { partPix } from '../../art/parcours';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { onInputReset, stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 /**
  * Fallen-Parcours am Handy – durchgehend im Querformat (Wählen, Platzieren, Laufen, Warten, Wertung),
@@ -23,6 +24,35 @@ function partIcon(type: PartType, maxW = 84) {
   c.style.width = `${c.width * scale}px`;
   c.style.height = `${c.height * scale}px`;
   return c;
+}
+
+/**
+ * Gemeinsames Querlayout `.lx` für die Daumen-Phasen (Platzieren, Laufen): Kopf · Stick links ·
+ * Infos Mitte · Knöpfe rechts – wie die anderen Quer-Spiele.
+ */
+function lxFrame(s: ParcoursState, mode: string, left: string, mid: string, right: string) {
+  const id = store.playerId!;
+  const color = hex(P.COLORS[s.colors[id] ?? 0]);
+  const root = el(`
+    <div class="lx pc-lx pc-${mode}">
+      <div class="lx-head">
+        <span class="lx-tag"><i class="pc-dot" style="background:${color}"></i>Runde ${Math.max(1, s.round)}/${s.rounds}</span>
+        <span class="pc-pts">${s.points[id] ?? 0}/${s.target} P</span>
+        <span class="grow"></span>
+      </div>
+      <div class="lx-left pc-stick">${left}</div>
+      <div class="lx-mid">${mid}</div>
+      <div class="lx-right">${right}</div>
+    </div>
+  `);
+  app.append(root);
+  const pts = q(root, '.pc-pts');
+  const head = () => {
+    const st = pc();
+    if (st) pts.textContent = `${st.points[store.playerId!] ?? 0}/${st.target} P`;
+    return st;
+  };
+  return { root, head };
 }
 
 /** Querformat-Rahmen: Kopfzeile (Runde, Punkte), Inhalt, Dreh-Hinweis. Liefert Root + Updater für die Kopfzeile. */
@@ -113,7 +143,7 @@ function buildPick(s: ParcoursState) {
     q(btn, '.pc-card-icon').append(partIcon(type));
     tapButton(btn, () => {
       send('pick', { type });
-      navigator.vibrate?.(15);
+      haptic('tap');
     });
     cards.append(btn);
   }
@@ -130,36 +160,37 @@ function buildPick(s: ParcoursState) {
 
 function buildPlace(s: ParcoursState, type: PartType) {
   const d = PART_DEFS[type];
-  const { root, head } = frame(
+  const { root, head } = lxFrame(
     s,
     'place',
+    '<span class="st-label">SCHIEBEN · Daumen irgendwo aufsetzen</span>',
     `
-    <div class="stick-area"></div>
     <div class="pcq-info">
       <span class="pc-card-icon"></span>
       <b>${d.name}</b>
       <small class="pc-status"></small>
       <small class="pcq-hint"></small>
     </div>
-    <div class="pcq-btns">
+  `,
+    `
       <div class="pcq-row">
         <button class="secondary pc-back">Zurück</button>
         ${d.rots > 1 ? '<button class="secondary pc-rot">Drehen</button>' : ''}
       </div>
       <button class="big-btn pc-place">PLATZIEREN</button>
-    </div>
   `,
   );
   q(root, '.pc-card-icon').append(partIcon(type, 64));
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
-  tapButton(q(root, '.pc-back'), () => send('unpick'));
+  stickZone(q(root, '.pc-stick'), (x, y) => send('stick', { x, y }));
+  tapButton(q(root, '.pc-back'), () => (send('unpick'), haptic('tick')));
   const rot = root.querySelector<HTMLButtonElement>('.pc-rot');
-  if (rot) tapButton(rot, () => send('rotate'));
+  if (rot) tapButton(rot, () => (send('rotate'), haptic('tick')));
   const place = q<HTMLButtonElement>(root, '.pc-place');
+  let wasOk = false;
   tapButton(place, () => {
-    if (place.disabled) return;
+    if (place.disabled) return haptic('bad');
     send('place');
-    navigator.vibrate?.(25);
+    haptic('hit');
   });
   const status = q(root, '.pc-status');
   const hint = q(root, '.pcq-hint');
@@ -168,6 +199,8 @@ function buildPlace(s: ParcoursState, type: PartType) {
     const b = st?.builders[store.playerId!];
     if (!st || !b) return;
     place.disabled = !b.ok;
+    if (b.ok && !wasOk) haptic('tick');
+    wasOk = b.ok;
     status.textContent = b.ok ? 'Passt hier!' : 'Hier nicht möglich';
     status.classList.toggle('bad', !b.ok);
     const warn = afkText(b.afk, 'build');
@@ -177,16 +210,14 @@ function buildPlace(s: ParcoursState, type: PartType) {
 }
 
 function buildRun(s: ParcoursState) {
-  const { root, head } = frame(
+  const { root, head } = lxFrame(
     s,
     'run',
-    `
-    <div class="stick-area"></div>
-    <p class="pcq-hint pc-run-hint"></p>
-    <button class="big-btn jump pc-jump">SPRINGEN</button>
-  `,
+    '<span class="st-label">LAUFEN ◀ ▶ · Daumen irgendwo aufsetzen</span>',
+    '<p class="pcq-hint pc-run-hint"></p>',
+    '<button class="big-btn jump pc-jump">SPRINGEN</button>',
   );
-  joystick(q(root, '.stick-area'), (x) => send('stick', { x, y: 0 }));
+  stickZone(q(root, '.pc-stick'), (x) => send('stick', { x, y: 0 }), { axis: 'x' });
   const jump = q<HTMLButtonElement>(root, '.pc-jump');
   let pointer: number | null = null;
   jump.addEventListener('pointerdown', (e) => {
@@ -195,16 +226,22 @@ function buildRun(s: ParcoursState) {
     pointer = e.pointerId;
     jump.classList.add('down');
     send('jump', { down: true });
-    navigator.vibrate?.(10);
+    haptic('tick');
   });
-  const up = (e: PointerEvent) => {
-    if (e.pointerId !== pointer) return;
+  const release = () => {
+    if (pointer === null) return;
     pointer = null;
     jump.classList.remove('down');
     send('jump', { down: false });
   };
+  const up = (e: PointerEvent) => {
+    if (e.pointerId === pointer) release();
+  };
   jump.addEventListener('pointerup', up);
   jump.addEventListener('pointercancel', up);
+  // Handy gedreht / Overlay: Sprung-Taste loslassen
+  onInputReset(root, release);
+
   jump.addEventListener('contextmenu', (e) => e.preventDefault());
   const hint = q(root, '.pc-run-hint');
   return () => {
