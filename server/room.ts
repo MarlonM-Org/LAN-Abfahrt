@@ -76,6 +76,7 @@ import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
+import { FunkGame } from './funk';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 import { EmoteFeed } from './spectator';
 
@@ -863,6 +864,9 @@ export class Room {
         break;
       case 'umzug':
         this.mini = new UmzugGame(ids, ctx);
+        break;
+      case 'funk':
+        this.mini = new FunkGame(ids, ctx);
         break;
     }
     this.results = null;
