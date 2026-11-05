@@ -1,7 +1,7 @@
 import type { ArenaState, SupState, TidyState } from '../../../shared/types';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { type Screen, app, avatarCanvas, colorOfId, el, me, message, myColor, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
-import { stickZone } from '../stick';
+import { stickZone, localPoint } from '../stick';
 import { haptic } from '../haptic';
 import { spectatorBar } from '../spectator';
 import { ARENA } from '../../../shared/arena';
@@ -26,8 +26,9 @@ export function joystick(container: HTMLElement, onMove: (x: number, y: number) 
     onMove(Math.round(x * 100) / 100, Math.round(y * 100) / 100);
   };
   const move = (e: PointerEvent) => {
-    let dx = e.clientX - cx;
-    let dy = e.clientY - cy;
+    const p = localPoint(pad, e);
+    let dx = p.x - cx;
+    let dy = p.y - cy;
     const d = Math.hypot(dx, dy);
     if (d > R) {
       dx = (dx / d) * R;
@@ -40,9 +41,8 @@ export function joystick(container: HTMLElement, onMove: (x: number, y: number) 
     e.preventDefault();
     pad.setPointerCapture(e.pointerId);
     active = e.pointerId;
-    const r = pad.getBoundingClientRect();
-    cx = r.left + r.width / 2;
-    cy = r.top + r.height / 2;
+    cx = pad.clientWidth / 2;
+    cy = pad.clientHeight / 2;
     move(e);
   });
   pad.addEventListener('pointermove', (e) => e.pointerId === active && move(e));

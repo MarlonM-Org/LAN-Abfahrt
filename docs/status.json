@@ -1,11 +1,54 @@
 {
-  "updated": "2026-11-06 00:50",
+  "updated": "2026-11-05T22:21+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Party-Modus 2.0 (M): Items-Laden, Bar-Preisstaffel, Abzweigung, Duell-Feld",
+      "kind": "board",
+      "type": "Spielbrett",
+      "branch": "review/party-items",
+      "detail": "Doppelwürfel, Cocktail-Klau, Taxi, Sonnencreme-Schild; Cocktail 10/15/20; Gabelung; „Teilen oder Klauen“"
+    },
+    {
+      "title": "Party-Modus 2.0 (M): Minispiele 2 gegen 2 / 1 gegen 3 nach Feldfarbe",
+      "kind": "board",
+      "type": "Spielbrett",
+      "branch": "review/party-teams",
+      "detail": "Teams aus Feldfarbe, Handicap für das kleinere Team, Ansage in der Regelkarte"
+    },
+    {
+      "title": "Abend-Statistik, „Titel des Abends“, Turnier als Playlist",
+      "kind": "meta",
+      "type": "Allgemein",
+      "branch": "review/abend-turnier",
+      "detail": "Ereignisprotokoll (FxLog), Titel-Reveal am Ende, Playlists Sportabend/Arena-Cup/Eigene"
+    },
+    {
+      "title": "SnapBuffer mit Wiedergabe-Uhr, Tick 30 Hz, Render-Auflösung ×2",
+      "kind": "meta",
+      "type": "Allgemein",
+      "branch": "review/render-snapbuffer",
+      "detail": "Hit-Stop/Zeitlupe aus der Wiedergabe-Uhr, Tor-Wiederholung in Auto-Fußball"
+    },
+    {
+      "title": "Kamera-Regie (Kart, Sumo-Finale, Brett-Schwenk), Parallax, Ambient, Tageszeit überall",
+      "kind": "meta",
+      "type": "Allgemein",
+      "branch": "review/kamera-parallax",
+      "detail": ""
+    },
+    {
+      "title": "Allgemeine Restpunkte: Pseudo-Quer iPhone, Fragen-Editor-Bug, Smash 12, README-Liste, zwei Fänger/Geister, Parcours-Stick",
+      "kind": "meta",
+      "type": "Allgemein",
+      "branch": "review/allgemein-rest",
+      "detail": ""
+    }
+  ],
   "queue": [],
   "done": [
     {

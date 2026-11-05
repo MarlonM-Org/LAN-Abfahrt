@@ -11,7 +11,7 @@ import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
+import { ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lineFree, nextWaypoint, roomInner } from '../shared/house';
 import { SMASH_STAGES, mainPlatform } from '../shared/smash';
@@ -70,6 +70,8 @@ export interface BotOptions {
   rounds?: number;
   /** Party: gespeicherten Brettstand fortsetzen (data/party.json) statt neu zu starten */
   resume?: boolean;
+  /** Turnier: Playlist-ID (sport, arena, kopf) oder eigene Liste „sumo,sprint,maexchen“ */
+  turnier?: string;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
@@ -693,7 +695,18 @@ export class Bot {
     if (s.phase === 'lobby' && this.leader && me?.isVip && s.players.filter((p) => p.connected).length >= (this.opts.count ?? 1)) {
       this.once('start', async () => {
         await sleep(1500);
-        this.socket.emit('vip:start', this.opts.date ? { mode: 'date' } : this.opts.game ? { mode: this.opts.game } : { mode: 'party', rounds: this.opts.rounds ?? 3, resume: this.opts.resume && !!this.state?.partyResume });
+        this.socket.emit(
+          'vip:start',
+          this.opts.date
+            ? { mode: 'date' }
+            : this.opts.turnier
+              ? this.opts.turnier.includes(',')
+                ? { mode: 'turnier', playlist: 'custom', kinds: this.opts.turnier.split(',').map((k) => k.trim()) }
+                : { mode: 'turnier', playlist: this.opts.turnier }
+              : this.opts.game
+                ? { mode: this.opts.game }
+                : { mode: 'party', rounds: this.opts.rounds ?? 3, resume: this.opts.resume && !!this.state?.partyResume },
+        );
       });
     }
     if (s.phase === 'results' && this.leader && me?.isVip) {
@@ -710,6 +723,15 @@ export class Bot {
           const table = cur.session.rows.map((r) => `${r.rank}. ${r.name} ${r.points}${r.last !== null ? ` (+${r.last})` : ''}`).join(' | ');
           const ser = cur.session.series;
           this.opts.log?.(`Leaderboard nach ${cur.session.games} ${cur.session.games === 1 ? 'Spiel' : 'Spielen'}${ser ? ` [Serie ${ser.label}]` : ''}: ${table}`);
+        }
+        if (cur.turnier) {
+          const t = cur.turnier;
+          const table = t.table.rows.map((r) => `${r.rank}. ${r.name} ${r.points}`).join(' | ');
+          this.opts.log?.(`Turnier ${t.name} – Spiel ${t.index + 1}/${t.kinds.length} (${t.kinds[t.index]}), Zwischenstand nach ${t.played}: ${table}`);
+        }
+        if (s.results?.final && cur.evening?.titles.length) {
+          const names = cur.evening.titles.map((t) => `${t.icon} ${t.title}: ${t.playerId ? s.players.find((p) => p.id === t.playerId)?.name : t.kind} (${t.text})`).join(' | ');
+          this.opts.log?.(`Titel des Abends: ${names}`);
         }
         if (this.opts.game && !drink && this.nochmalCount < (this.opts.nochmal ?? 0)) {
           if (cur.nochmal && !cur.nochmal.disabled) {
@@ -747,7 +769,53 @@ export class Bot {
       const key = `roll-${s.board.round}`;
       if (!this.boardSeen.has(key)) {
         this.boardSeen.add(key);
-        if (Math.random() > 0.1) setTimeout(() => this.socket.emit('board:roll'), rand(1000, 5000));
+        // Item vor dem Würfeln einsetzen (Doppelwürfel, Klau, Taxi) – meistens; das Taxi ersetzt den Wurf
+        const item = s.board.items?.[this.id];
+        const useIt = !!item && ITEM_INFO[item].active && Math.random() < 0.8;
+        if (Math.random() > 0.1) {
+          setTimeout(() => {
+            if (useIt) {
+              this.socket.emit('board:item');
+              this.opts.log?.(`${this.name} setzt ${ITEM_INFO[item!].title} ein`);
+            }
+            if (!useIt || item !== 'taxi') this.socket.emit('board:roll');
+          }, rand(1000, 5000));
+        }
+      }
+    }
+    // Entscheidungen am Brett: Cocktail immer kaufen, im Laden meist etwas kaufen, an der Gabelung zur Bar (wenn sie dort steht)
+    if (s.phase === 'board' && s.board?.sub === 'moving' && s.board.ask?.playerId === this.id) {
+      const b = s.board;
+      const ask = b.ask!;
+      this.once(`ask-${ask.seq}`, async () => {
+        await sleep(rand(600, 2200));
+        let choice: unknown = null;
+        if (ask.kind === 'bar') choice = true;
+        else if (ask.kind === 'shop') {
+          const offer = ask.offer ?? [];
+          choice = offer.length && Math.random() < 0.75 ? offer[Math.floor(Math.random() * offer.length)] : null;
+        } else choice = ask.barOnLong ? 'long' : Math.random() < 0.5 ? 'long' : 'short';
+        this.opts.log?.(`${this.name} entscheidet (${ask.kind}): ${String(choice)}`);
+        this.socket.emit('board:answer', { seq: ask.seq, choice });
+      });
+    }
+    // Duell „Teilen oder Klauen“: 60 % teilen
+    if (s.phase === 'board' && s.board?.duel?.sub === 'choose') {
+      const d = s.board.duel;
+      if ((d.a === this.id || d.b === this.id) && !d.chosen.includes(this.id)) {
+        this.once(`duel-${d.seq}`, async () => {
+          await sleep(rand(800, 3000));
+          const pick = Math.random() < 0.6 ? 'share' : 'steal';
+          this.opts.log?.(`${this.name} im Duell: ${pick}`);
+          this.socket.emit('board:duel', { seq: d.seq, pick });
+        });
+      }
+    }
+    if (s.phase === 'board' && s.board?.duel?.sub === 'done' && this.leader) {
+      const d = s.board.duel;
+      if (!this.boardSeen.has(`duel-${d.seq}`)) {
+        this.boardSeen.add(`duel-${d.seq}`);
+        this.opts.log?.(`Duell: ${d.result}`);
       }
     }
     if (s.phase === 'board' && s.board?.sub === 'bonus' && this.leader && s.board.bonus?.revealed) {

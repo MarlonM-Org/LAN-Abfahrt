@@ -89,7 +89,7 @@ export type MiniKind =
   | 'maexchen'
   | 'werwars';
 
-export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
+export type GameMode = 'party' | 'date' | 'drink' | 'arcade' | 'turnier';
 
 // ------------------------------------------------------------------ Flunkyball
 
@@ -1956,13 +1956,17 @@ export interface DateRunState {
 
 // ------------------------------------------------------------------ Spielbrett
 
-export type FieldType = 'start' | 'blue' | 'red' | 'event';
+export type FieldType = 'start' | 'blue' | 'red' | 'event' | 'shop' | 'duel';
+/** Items aus dem Laden: Doppelwürfel, Cocktail-Klau, Taxi zur Bar, Sonnencreme-Schild (siehe ITEM_INFO) */
+export type ItemKind = 'dice2' | 'klau' | 'taxi' | 'schild';
 
 export interface BoardRoll {
   seq: number;
   playerId: string;
   value: number;
   path: number[];
+  /** roll = Würfel aufpoppen + loslaufen, cont = weiter nach einer Entscheidung (ohne Würfel), taxi = ein großer Hüpfer zur Bar */
+  kind: 'roll' | 'cont' | 'taxi';
 }
 
 /** Statistik pro Spieler über die ganze Party (für die Bonus-Cocktails am Ende) */
@@ -1973,6 +1977,49 @@ export interface BoardStats {
   red: number;
   /** Felder gelaufen */
   steps: number;
+  /** An der Bar gekaufte Cocktails (Preisstaffel 10/15/20) */
+  bought: number;
+}
+
+/** Offene Entscheidung des laufenden Spielers am Handy (Bar, Laden, Abzweigung) */
+export interface BoardAsk {
+  seq: number;
+  playerId: string;
+  kind: 'bar' | 'shop' | 'fork';
+  /** Restzeit in ms (Stand beim Senden, ~1×/s aktualisiert) */
+  ms: number;
+  /** bar: Preis des Cocktails */
+  price?: number;
+  /** shop: Angebot */
+  offer?: ItemKind[];
+  /** fork: steht die Bar gerade am langen Weg? */
+  barOnLong?: boolean;
+}
+
+export type DuelPick = 'share' | 'steal';
+
+/** Duell „Teilen oder Klauen“ um einen Pott aus der Bank */
+export interface BoardDuel {
+  seq: number;
+  /** Herausforderer (ist auf dem Duell-Feld gelandet) und Gegner */
+  a: string;
+  b: string;
+  pot: number;
+  /** choose = beide wählen geheim, reveal = TV deckt auf, done = Münzen verteilt */
+  sub: 'choose' | 'reveal' | 'done';
+  /** Restzeit der Wahl in ms */
+  ms: number;
+  /** Wer schon gewählt hat (ohne Inhalt) */
+  chosen: string[];
+  /** Ab `reveal`: die Karten */
+  picks?: Record<string, DuelPick>;
+  /** Ab `done`: Ergebnis als Text */
+  result?: string;
+}
+
+/** Geheime Infos am Brett (Event `private`): die eigene Duell-Wahl */
+export interface BoardPrivate {
+  duelPick: DuelPick | null;
 }
 
 /** Bonus-Cocktail am Ende („Minispiel-Star“, „Pechvogel“, „Wanderer“) */
@@ -1982,6 +2029,8 @@ export interface BoardAward {
   /** z. B. „Meiste Münzen aus Minispielen“ */
   desc: string;
   winners: string[];
+  /** Bei Gleichstand: alle mit dem Bestwert – der Award geht an den, der in der Wertung am weitesten hinten liegt */
+  tied?: string[];
   /** Wert der Gewinner, z. B. 38 (Münzen) */
   value: number;
   /** Einheit zum Wert, z. B. „Münzen“ */
@@ -1999,8 +2048,16 @@ export interface BoardState {
   pos: Record<string, number>;
   coins: Record<string, number>;
   cocktails: Record<string, number>;
+  /** Item im Inventar (höchstens eins) */
+  items: Record<string, ItemKind | null>;
+  /** Im Würfelfenster: wer sein Item für diesen Zug einsetzt (Doppelwürfel, Klau, Taxi) */
+  using: Record<string, ItemKind>;
   barField: number;
   lastRoll: BoardRoll | null;
+  /** Offene Entscheidung am Handy (nur im Schnelldurchlauf) */
+  ask: BoardAsk | null;
+  /** Laufendes Duell „Teilen oder Klauen“ */
+  duel: BoardDuel | null;
   /** Würfelfenster: Augenzahl pro Spieler, der schon gewürfelt hat (selbst oder automatisch) */
   rolls: Record<string, number>;
   /** Restzeit des Würfelfensters in ms (Stand beim Senden, wird ~1×/s aktualisiert; 0 außerhalb) */
@@ -2142,6 +2199,8 @@ export interface GameMeta {
   customWerwarsCount: number;
   /** Leaderboard des Abends: Punkte über alle Einzelspiele seit Serverstart bzw. letztem Zurücksetzen */
   session: SessionState;
+  /** Abend-Statistik: „Titel des Abends“ aus dem Ereignisprotokoll (server/fx.ts) – ändert sich nur nach einem Spiel */
+  evening?: EveningStats;
 }
 
 /** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */
@@ -2179,6 +2238,8 @@ export interface GameLive {
   partyResume?: PartyResumeInfo | null;
   /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */
   emotes?: import('./spectator').EmoteEntry[];
+  /** Laufendes Turnier (Playlist mit Gesamtwertung) – null, wenn keins läuft */
+  turnier?: TurnierState | null;
 }
 
 /** Kurzinfo zur gespeicherten Party für den „Party fortsetzen?“-Knopf */
@@ -2283,6 +2344,7 @@ export type PrivateState =
   | { kind: 'schaetz'; state: SchaetzPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
+  | { kind: 'board'; state: BoardPrivate }
   | null;
 
 export interface JoinRequest {
@@ -2317,8 +2379,12 @@ export interface ServerHello {
 }
 
 export interface StartRequest {
-  /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung) */
-  mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | MiniKind;
+  /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung), 'turnier' = Playlist mit Gesamtwertung */
+  mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | 'turnier' | MiniKind;
+  /** Turnier: ID der Playlist aus `TURNIER_PLAYLISTS` bzw. 'custom' */
+  playlist?: string;
+  /** Turnier „Eigene“: 3–6 Spiele in Reihenfolge */
+  kinds?: MiniKind[];
   rounds?: number;
   /** Party-Modus: auch lange Minispiele (> 4 min) aufs Brett */
   longGames?: boolean;
@@ -2578,4 +2644,64 @@ export interface MiniTeams {
   B: string[];
   /** Anzeige, kleineres Team zuerst: „2 gegen 2“, „1 gegen 3“ */
   label: string;
+}
+
+// ------------------------------------------------------------------ Abend-Statistik („Titel des Abends“) & Turnier
+
+/**
+ * Ereignis im Protokoll des Abends (`FxLog`, server/fx.ts). Die Minispiele melden markante Momente über
+ * `ctx.log(type, { p, n })`, der Raum zählt Siege, Serien, Münzen und Wetten dazu.
+ *   ko · selfout (Smash) · hit (Arena) · goal · owngoal (Autoball) · igelhit · selfhit (Igel) · out (Sumo) ·
+ *   kartwin · place (Kart) · hidden (Versteckspiel, n = ms) · win · streak · last · coingain · coinloss · bet · play
+ */
+export interface FxEvent {
+  seq: number;
+  at: number;
+  type: string;
+  kind: MiniKind | null;
+  /** Spieler, um den es geht */
+  p?: string;
+  /** Menge (Standard 1) – bei `hidden` Millisekunden */
+  n?: number;
+  /** Zweiter Beteiligter (Opfer, Torschütze …) */
+  o?: string;
+}
+
+/** Ein „Titel des Abends“, z. B. „Meiste K.O.s – Ben (7)“ */
+export interface EveningTitle {
+  /** Schlüssel des Titels (kos, owngoals, kamikaze, hidden, pechvogel, streak, favorite, bets, …) */
+  id: string;
+  title: string;
+  icon: string;
+  /** Träger des Titels (bei „Lieblingsspiel“ leer) */
+  playerId: string | null;
+  /** Lieblingsspiel der Gruppe */
+  kind?: MiniKind;
+  value: number;
+  /** Fertiger Wert-Text, z. B. „7 K.O.s“ oder „2:35 min“ */
+  text: string;
+}
+
+export interface EveningStats {
+  /** Höchstens 5 Titel, nur zu denen es Daten gibt – in Reveal-Reihenfolge */
+  titles: EveningTitle[];
+  /** Gespielte Minispiele des Abends */
+  games: number;
+}
+
+/** Turnier: Playlist aus 3–6 Spielen, die nacheinander laufen – Gesamtwertung mit Arcade-Punkten */
+export interface TurnierState {
+  /** 'sport' | 'arena' | 'kopf' | 'custom' */
+  playlist: string;
+  name: string;
+  icon: string;
+  kinds: MiniKind[];
+  /** Index des laufenden bzw. zuletzt gespielten Spiels (0-basiert) */
+  index: number;
+  /** Schon gewertete Spiele */
+  played: number;
+  /** Zwischenstand (gleiche Tabelle wie das Leaderboard des Abends, nur für dieses Turnier) */
+  table: SessionState;
+  /** Siegerehrung läuft (Endstand in `results`) */
+  final: boolean;
 }

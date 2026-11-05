@@ -317,38 +317,37 @@ const CSS = `
 @keyframes it-bub { from { opacity: 0; translate: 0 6px; } 20% { opacity: 1; translate: 0 0; } to { opacity: 0; translate: 0 -10px; } }
 
 /* Handy quer: Gamepad-Layout wie .lx (links Stick, Mitte Regeln + Figur, rechts Knöpfe + BEREIT), ausgelegt auf 300 px Höhe */
-@media (orientation: landscape) and (max-height: 520px) {
-  #app:has(.it) { padding: 0; border: 0; box-shadow: none; min-height: 0; background: none; }
-  .it { position: fixed; inset: 0; z-index: 1; overflow: hidden; gap: 4px 10px;
-    grid-template-columns: minmax(0, 30%) minmax(0, 1fr) minmax(0, 28%); grid-template-rows: 28px minmax(0, 1fr) minmax(70px, 34%);
-    grid-template-areas: "head head head" "left info right" "left stage foot";
-    padding: max(3px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px));
-    background: var(--paper); background-image: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px); background-size: 9px 9px;
-    border: 3px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--wood); touch-action: none; }
-  .it:has(.it-pad.none) { grid-template-rows: 28px minmax(0, 1fr) minmax(70px, 34%); }
-  .it.it-nostick { grid-template-columns: 0 minmax(0, 1fr) minmax(0, 34%); column-gap: 0 10px; }
-  .it.it-nobtn { grid-template-areas: "head head head" "left info foot" "left stage foot"; }
-  #app:has(> .abort) .it-head { padding-right: 92px; }
-  .it-pad, .it-pad.none { display: contents; }
-  .it-icon { font-size: 20px; }
-  .it-title { flex-direction: row; align-items: baseline; gap: 10px; }
-  .it-title b { font-size: 9px; }
-  .it-info { overflow: hidden; gap: 4px; justify-content: center; }
-  .it-goal { font-size: 8px; line-height: 1.5; }
-  .it-teams { font-size: 7px; line-height: 1.5; }
-  .it-ctrls { gap: 3px; }
-  .it-ctrls li { padding: 2px 5px; font-size: 7px; line-height: 1.4; }
-  .it-ctrls li span { font-size: 13px; }
-  .it-orient { display: none; }
-  .it-left, .it-right { min-height: 0; }
-  .it-left { grid-auto-flow: row; grid-auto-rows: minmax(0, 1fr); grid-auto-columns: auto; }
-  .it-left:has(> .it-move:nth-child(2)) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-  .it-nobtn .it-right { display: none; }
-  .it-nostick .it-left { display: none; }
-  .it-right:has(> :nth-child(3)) { --it-cols: 2; }
-  .it-foot { justify-content: flex-end; gap: 4px; min-height: 0; }
-  .big-btn.it-ready { min-height: 0; flex: 1; font-size: 14px; }
-  .it-status { font-size: 6px; line-height: 1.4; }
-  .it-go { padding: 4px 8px; font-size: 7px; }
-}
+/* war: @media (orientation: landscape) and (max-height: 520px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) #app:has(.it) { padding: 0; border: 0; box-shadow: none; min-height: 0; background: none; }
+:where(html.land-short) .it { position: fixed; inset: 0; z-index: 1; overflow: hidden; gap: 4px 10px;
+  grid-template-columns: minmax(0, 30%) minmax(0, 1fr) minmax(0, 28%); grid-template-rows: 28px minmax(0, 1fr) minmax(70px, 34%);
+  grid-template-areas: "head head head" "left info right" "left stage foot";
+  padding: max(3px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px));
+  background: var(--paper); background-image: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.35) 0 1px, transparent 2px); background-size: 9px 9px;
+  border: 3px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--wood); touch-action: none; }
+:where(html.land-short) .it:has(.it-pad.none) { grid-template-rows: 28px minmax(0, 1fr) minmax(70px, 34%); }
+:where(html.land-short) .it.it-nostick { grid-template-columns: 0 minmax(0, 1fr) minmax(0, 34%); column-gap: 0 10px; }
+:where(html.land-short) .it.it-nobtn { grid-template-areas: "head head head" "left info foot" "left stage foot"; }
+:where(html.land-short) #app:has(> .abort) .it-head { padding-right: 92px; }
+:where(html.land-short) .it-pad, :where(html.land-short) .it-pad.none { display: contents; }
+:where(html.land-short) .it-icon { font-size: 20px; }
+:where(html.land-short) .it-title { flex-direction: row; align-items: baseline; gap: 10px; }
+:where(html.land-short) .it-title b { font-size: 9px; }
+:where(html.land-short) .it-info { overflow: hidden; gap: 4px; justify-content: center; }
+:where(html.land-short) .it-goal { font-size: 8px; line-height: 1.5; }
+:where(html.land-short) .it-teams { font-size: 7px; line-height: 1.5; }
+:where(html.land-short) .it-ctrls { gap: 3px; }
+:where(html.land-short) .it-ctrls li { padding: 2px 5px; font-size: 7px; line-height: 1.4; }
+:where(html.land-short) .it-ctrls li span { font-size: 13px; }
+:where(html.land-short) .it-orient { display: none; }
+:where(html.land-short) .it-left, :where(html.land-short) .it-right { min-height: 0; }
+:where(html.land-short) .it-left { grid-auto-flow: row; grid-auto-rows: minmax(0, 1fr); grid-auto-columns: auto; }
+:where(html.land-short) .it-left:has(> .it-move:nth-child(2)) { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+:where(html.land-short) .it-nobtn .it-right { display: none; }
+:where(html.land-short) .it-nostick .it-left { display: none; }
+:where(html.land-short) .it-right:has(> :nth-child(3)) { --it-cols: 2; }
+:where(html.land-short) .it-foot { justify-content: flex-end; gap: 4px; min-height: 0; }
+:where(html.land-short) .big-btn.it-ready { min-height: 0; flex: 1; font-size: 14px; }
+:where(html.land-short) .it-status { font-size: 6px; line-height: 1.4; }
+:where(html.land-short) .it-go { padding: 4px 8px; font-size: 7px; }
 `;

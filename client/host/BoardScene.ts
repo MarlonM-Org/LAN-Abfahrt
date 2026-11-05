@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import type { BoardAward, BoardState, GameState, MiniKind, MiniTeams, Point, Team } from '../../shared/types';
-import { BOARD_TIMING, FIELD_POS, FIELD_TYPES, FINALE_COCKTAILS, FINALE_KINDS, MINI_INFO, miniInspired, teamHandicapText } from '../../shared/games';
+import type { BoardAward, BoardDuel, BoardState, GameState, MiniKind, MiniTeams, Point, Team } from '../../shared/types';
+import { BOARD_SIZE, BOARD_TIMING, FIELD_POS, FIELD_TYPES, FINALE_COCKTAILS, FINALE_KINDS, FORK_FIELD, ITEM_INFO, MERGE_FIELD, MINI_INFO, SHORTCUT_FIELDS, miniInspired, teamHandicapText } from '../../shared/games';
 import { TEAM_INFO, WORLD } from '../../shared/flunky';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
@@ -13,13 +13,16 @@ import { Juice } from './juice';
 import { sfx } from './sfx';
 import { say, spokenName } from './speech';
 
-const { STEP_MS, MOVE_LEAD_MS } = BOARD_TIMING;
-const GEM: Record<string, [string, 'q' | 's' | undefined]> = {
+const { STEP_MS, MOVE_LEAD_MS, TAXI_MS, DUEL_FLIP_MS } = BOARD_TIMING;
+const GEM: Record<string, [string, 'q' | 's' | 'd' | 'b' | undefined]> = {
   start: [C.green, 's'],
   blue: [C.blue, undefined],
   red: [C.red, undefined],
   event: [C.orange, 'q'],
+  shop: [C.purple, 'b'],
+  duel: [C.pink, 'd'],
 };
+const ASK_ICON = { bar: '🍹', shop: '🛒', fork: '⇄' };
 
 /** Tageszeit → Farbe des Multiply-Overlays (0 Morgen, 0.35 Mittag, 0.8 Sonnenuntergang, 1 Nacht) */
 const DAY_KEYS: [number, number][] = [
@@ -57,6 +60,17 @@ export class BoardScene extends Phaser.Scene {
   private arrow!: Phaser.GameObjects.Text;
   private introLayer!: Phaser.GameObjects.Container;
   private bonusLayer!: Phaser.GameObjects.Container;
+  private duelLayer!: Phaser.GameObjects.Container;
+  private askLayer!: Phaser.GameObjects.Container;
+  /** Item-Symbol neben der Figur */
+  private itemIcons = new Map<string, Phaser.GameObjects.Text>();
+  private prevItems: Record<string, string | null> | null = null;
+  private prevUsing: Record<string, string> = {};
+  private askKey = '';
+  private askMs = 0;
+  private askAt = 0;
+  private askText: Phaser.GameObjects.Text | null = null;
+  private duelKey = '';
   private introShown = false;
   private scoreKey = '';
   private juice!: Juice;
@@ -85,6 +99,14 @@ export class BoardScene extends Phaser.Scene {
   create() {
     this.tokens.clear();
     this.animating.clear();
+    this.itemIcons.clear();
+    this.prevItems = null;
+    this.prevUsing = {};
+    this.askKey = '';
+    this.askMs = 0;
+    this.askAt = 0;
+    this.askText = null;
+    this.duelKey = '';
     this.introShown = false;
     this.scoreKey = '';
     this.prevCoins = null;
@@ -103,15 +125,17 @@ export class BoardScene extends Phaser.Scene {
 
     background(this, 'board', WORLD.W, WORLD.H, (p) => {
       paintGrass(p, 0, 0, WORLD.W, WORLD.H, 12);
-      paintPath(p, FIELD_POS, 12, 14, true);
-      // Teich unten links in der Mitte
-      p.ellipse(120, 212, 34, 13, C.stoneDark);
-      const water = new Pix(70, 26);
-      paintWater(water, 0, 0, 70, 26, 4);
-      const pond = new Pix(70, 26);
-      pond.ellipse(35, 13, 32, 11, '#000');
+      // Rundweg (geschlossen) + Abkürzung durch den Garten (Gabelung → Einmündung)
+      paintPath(p, FIELD_POS.slice(0, BOARD_SIZE), 12, 14, true);
+      paintPath(p, [FIELD_POS[FORK_FIELD], ...SHORTCUT_FIELDS.map((i) => FIELD_POS[i]), FIELD_POS[MERGE_FIELD]], 10, 9);
+      // Kleiner Teich zwischen Abkürzung und unterer Reihe
+      p.ellipse(260, 236, 30, 9, C.stoneDark);
+      const water = new Pix(60, 18);
+      paintWater(water, 0, 0, 60, 18, 4);
+      const pond = new Pix(60, 18);
+      pond.ellipse(30, 9, 28, 7, '#000');
       pond.overlayOn(() => pond.draw(water, 0, 0));
-      p.draw(pond, 85, 199);
+      p.draw(pond, 230, 227);
     });
 
     // Felder
@@ -126,7 +150,9 @@ export class BoardScene extends Phaser.Scene {
     prop(this, 'bush4', () => O.bush(4, true), 176, 118);
     prop(this, 'flowerPink', () => O.flower(C.pink), 64, 186);
     prop(this, 'flowerWhite', () => O.flower(C.white), 178, 190);
-    prop(this, 'rock', () => O.rock(), 180, 232);
+    prop(this, 'rock', () => O.rock(), 466, 200);
+    // Wegweiser an der Abkürzung
+    ink(this, 254, 203, 'Abkürzung', { color: '#7a5a3a' }).setDepth(100);
     prop(this, 'tree7', () => O.tree(7), 466, 46);
     prop(this, 'tree1', () => O.tree(1), 14, 46);
 
@@ -144,6 +170,8 @@ export class BoardScene extends Phaser.Scene {
     this.tweens.add({ targets: this.arrow, y: '+=3', duration: 300, yoyo: true, repeat: -1 });
     this.introLayer = this.add.container(0, 0).setDepth(3000);
     this.bonusLayer = this.add.container(0, 0).setDepth(3000);
+    this.duelLayer = this.add.container(0, 0).setDepth(2900);
+    this.askLayer = this.add.container(0, 0).setDepth(2100);
 
     const onState = (s: GameState) => this.render(s);
     bus.on('state', onState);
@@ -153,7 +181,17 @@ export class BoardScene extends Phaser.Scene {
 
   update() {
     const b = getState()?.board;
-    if (!b || b.sub !== 'roll') return;
+    if (!b) return;
+    // Item-Symbole laufen mit den Figuren mit
+    for (const [id, icon] of this.itemIcons) {
+      const t = this.tokens.get(id);
+      if (t) icon.setPosition(t.x + 9, t.y - 30).setDepth(t.depth + 1);
+    }
+    if (this.askText && b.ask) {
+      const left = Math.max(0, Math.ceil((this.askMs - (this.time.now - this.askAt)) / 1000));
+      this.askText.setText(`${ASK_ICON[b.ask.kind]} ${left}s`);
+    }
+    if (b.sub !== 'roll') return;
     const left = Math.max(0, Math.ceil((this.rollMs - (this.time.now - this.rollAt)) / 1000));
     const here = b.order.filter((id) => !playerById(id)?.removed);
     const done = here.filter((id) => id in b.rolls).length;
@@ -310,9 +348,169 @@ export class BoardScene extends Phaser.Scene {
     this.rollFx(b);
     this.renderDaytime(b);
     this.renderScores(b);
+    this.renderItems(b);
+    this.renderAsk(b);
+    this.renderDuel(b);
     this.renderIntro(b);
     this.renderBonus(b);
     this.changeFx(b);
+  }
+
+  // ---------------------------------------------------------------- Items, Entscheidungen, Duell
+
+  /** Item-Symbol neben der Figur; neues Item / Einsatz / Verbrauch mit Ton und schwebendem Text */
+  private renderItems(b: BoardState) {
+    const items = b.items ?? {};
+    for (const id of b.order) {
+      const item = items[id] ?? null;
+      let icon = this.itemIcons.get(id);
+      if (item && !icon) {
+        icon = txt(this, 0, 0, ITEM_INFO[item].icon, { size: 8 }).setDepth(2000);
+        this.itemIcons.set(id, icon);
+      }
+      if (icon) {
+        if (!item) {
+          icon.destroy();
+          this.itemIcons.delete(id);
+        } else if (icon.text !== ITEM_INFO[item].icon) icon.setText(ITEM_INFO[item].icon);
+      }
+      const t = this.tokens.get(id);
+      const x = t?.x ?? 240, y = (t?.y ?? 140) - 40;
+      const prev = this.prevItems?.[id] ?? null;
+      if (this.prevItems && item && item !== prev) {
+        sfx('powerup', { x, vol: 0.7 });
+        this.juice.float(x, y, `${ITEM_INFO[item].icon} ${ITEM_INFO[item].title}`, 'gold');
+      } else if (this.prevItems && !item && prev === 'schild' && !b.using?.[id]) {
+        sfx('pop', { x });
+        this.juice.float(x, y, '🧴 ABGEPRALLT!', 'heal');
+      }
+      const use = b.using?.[id];
+      if (use && this.prevUsing[id] !== use) {
+        sfx('select', { x, pitch: 1.2 });
+        this.juice.float(x, y, use === 'dice2' ? '🎲🎲 DOPPELWÜRFEL' : use === 'taxi' ? '🚕 TAXI!' : '🦜 KLAU!', 'info');
+      }
+    }
+    this.prevItems = { ...items };
+    this.prevUsing = { ...(b.using ?? {}) };
+  }
+
+  /** Sprechblase über dem Spieler, der gerade am Handy entscheidet (Bar, Laden, Gabelung) */
+  private renderAsk(b: BoardState) {
+    const a = b.sub === 'moving' ? b.ask : null;
+    const key = a ? `${a.seq}` : '';
+    if (a && (a.ms !== this.askMs || key !== this.askKey)) {
+      this.askMs = a.ms;
+      this.askAt = this.time.now;
+    }
+    if (key === this.askKey) return;
+    this.askKey = key;
+    this.askLayer.removeAll(true);
+    this.askText = null;
+    if (!a) return;
+    const t = this.tokens.get(a.playerId);
+    const x = Phaser.Math.Clamp(t?.x ?? 240, 40, WORLD.W - 40);
+    const y = Math.max(70, (t?.y ?? 140) - 46);
+    const bubble = this.add.container(x, y);
+    bubble.add(panel(this, -30, -11, 60, 22));
+    this.askText = ink(this, 0, -4, `${ASK_ICON[a.kind]} ${Math.ceil(a.ms / 1000)}s`, { color: RED_INK });
+    bubble.add(this.askText);
+    bubble.setScale(0.2);
+    this.tweens.add({ targets: bubble, scale: 1, duration: 260, ease: 'Back.out' });
+    this.askLayer.add(bubble);
+    sfx('tick', { x, vol: 0.6 });
+    const name = spokenName(playerById(a.playerId)?.name);
+    say(a.kind === 'bar' ? `${name}: Cocktail für ${a.price} Münzen?` : a.kind === 'shop' ? `${name} im Strandladen.` : `${name}: Abkürzung oder langer Weg?`);
+  }
+
+  /** Duell „Teilen oder Klauen“: Karte mit beiden Porträts; beim Aufdecken drehen sich die Karten nacheinander um */
+  private renderDuel(b: BoardState) {
+    const d = b.sub === 'moving' ? b.duel : null;
+    const key = d ? `${d.seq}-${d.sub}` : '';
+    if (key === this.duelKey) {
+      // Wahl-Haken aktualisieren
+      if (d?.sub === 'choose') for (const id of [d.a, d.b]) (this.duelLayer.getByName(`chk-${id}`) as Phaser.GameObjects.Text | null)?.setVisible(d.chosen.includes(id));
+      return;
+    }
+    const prev = this.duelKey;
+    this.duelKey = key;
+    this.duelLayer.removeAll(true);
+    if (!d) return;
+    const na = playerById(d.a)?.name ?? '?', nb = playerById(d.b)?.name ?? '?';
+    const card = this.duelCard(d);
+    if (d.sub === 'choose') {
+      card.setScale(0.2);
+      this.tweens.add({ targets: card, scale: 1, duration: 420, ease: 'Back.out' });
+      sfx('whistle', { vol: 0.7 });
+      say(`Duell um ${d.pot} Münzen: ${spokenName(na)} gegen ${spokenName(nb)}. Teilen oder klauen?`);
+      return;
+    }
+    if (d.sub === 'reveal') {
+      sfx('drumroll');
+      say('Die Karten werden aufgedeckt.');
+      // Nacheinander umdrehen – der Server verteilt die Münzen nach DUEL_REVEAL_MS
+      [d.a, d.b].forEach((id, i) => {
+        this.time.delayedCall(DUEL_FLIP_MS * (i + 1), () => {
+          if (this.duelKey !== key) return;
+          const back = this.duelLayer.getByName(`back-${id}`) as Phaser.GameObjects.Container | null;
+          const face = this.duelLayer.getByName(`face-${id}`) as Phaser.GameObjects.Container | null;
+          if (!back || !face) return;
+          this.tweens.add({ targets: back, scaleX: 0, duration: 160, onComplete: () => {
+            back.setVisible(false);
+            face.setVisible(true).setScale(0, 1);
+            this.tweens.add({ targets: face, scaleX: 1, duration: 160 });
+            const steal = d.picks?.[id] === 'steal';
+            sfx(steal ? 'crack' : 'select', { x: 240 + (i ? 70 : -70), pitch: steal ? 0.8 : 1.1 });
+            say(`${spokenName(playerById(id)?.name)}: ${steal ? 'klauen!' : 'teilen.'}`);
+          } });
+        });
+      });
+      return;
+    }
+    // done: Ergebnis
+    const pa = d.picks?.[d.a], pb = d.picks?.[d.b];
+    if (pa === 'share' && pb === 'share') {
+      sfx('cheer', { vol: 0.7 });
+      this.juice.burst(WORLD.W / 2, 120, 'confetti', 40);
+    } else if (pa === 'steal' && pb === 'steal') {
+      sfx('lose');
+      this.juice.shake(2);
+    } else {
+      sfx('boom', { vol: 0.8 });
+      this.juice.shake(2);
+      this.juice.flash(0xffffff, 120);
+    }
+    if (prev) say(d.result ?? '');
+  }
+
+  private duelCard(d: BoardDuel) {
+    const bg = this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x1a0818, 0.5).setOrigin(0);
+    const card = this.add.container(WORLD.W / 2, WORLD.H / 2 + 4);
+    card.add(panel(this, -160, -78, 320, 156));
+    card.add(ink(this, 0, -66, `~ Duell um ${d.pot} Münzen ~`, { color: RED_INK }));
+    card.add(ink(this, 0, -50, 'TEILEN oder KLAUEN?', { size: 16 }));
+    [d.a, d.b].forEach((id, i) => {
+      const p = playerById(id);
+      const px = i ? 70 : -70;
+      if (p) {
+        card.add(this.add.image(px, 8, ensurePortrait(this, p.look)).setOrigin(0.5, 1).setScale(2));
+        card.add(ink(this, px, 12, p.name.slice(0, 10)));
+      }
+      // Karte: Rückseite („?“) und Vorderseite (Wahl) – die Vorderseite erst beim Aufdecken
+      const back = this.add.container(px, 44).setName(`back-${id}`);
+      back.add(this.add.rectangle(0, 0, 52, 26, 0x3d2414).setStrokeStyle(2, 0x2d1b12));
+      back.add(txt(this, 0, -5, '?', { size: 8, color: GOLD }));
+      const chk = txt(this, 20, -14, '✓', { size: 8, color: '#7fd47f' }).setName(`chk-${id}`).setVisible(d.chosen.includes(id));
+      back.add(chk);
+      const steal = d.picks?.[id] === 'steal';
+      const face = this.add.container(px, 44).setName(`face-${id}`).setVisible(d.sub === 'done');
+      face.add(this.add.rectangle(0, 0, 52, 26, steal ? 0xc0392b : 0x46b04a).setStrokeStyle(2, 0x2d1b12));
+      face.add(txt(this, 0, -5, steal ? 'KLAUEN' : 'TEILEN', { size: 8 }));
+      if (d.sub === 'done') back.setVisible(false);
+      card.add([back, face]);
+    });
+    card.add(ink(this, 0, 64, d.sub === 'done' ? d.result ?? '' : d.sub === 'reveal' ? 'Aufdecken …' : 'Beide wählen geheim am Handy', { color: d.sub === 'done' ? RED_INK : '#7a5a3a', wrap: 300 }));
+    this.duelLayer.add([bg, card]);
+    return card;
   }
 
   /** Neue Runde: Endspurt-Banner, Nachzügler begrüßen */
@@ -343,7 +541,7 @@ export class BoardScene extends Phaser.Scene {
   private rollFx(b: BoardState) {
     const rolls = b.sub === 'roll' ? b.rolls : {};
     for (const [id, v] of Object.entries(rolls)) {
-      if (this.prevRolls[id] === v) continue;
+      if (this.prevRolls[id] === v || !v) continue;
       const t = this.tokens.get(id);
       if (t) {
         this.juice.float(t.x, t.y - 40, String(v), 'gold');
@@ -395,18 +593,18 @@ export class BoardScene extends Phaser.Scene {
 
   private renderScores(b: BoardState) {
     const rolling = b.sub === 'roll';
-    const key = JSON.stringify([b.order, b.coins, b.cocktails, b.sub, b.turnIdx, rolling ? b.rolls : null]);
+    const key = JSON.stringify([b.order, b.coins, b.cocktails, b.sub, b.turnIdx, b.items, rolling ? b.rolls : null]);
     if (key === this.scoreKey) return;
     this.scoreKey = key;
     this.scoreLayer.removeAll(true);
     const sorted = [...b.order].sort((a, c) => b.cocktails[c] - b.cocktails[a] || b.coins[c] - b.coins[a]);
-    // Ab 9 Spielern: zwei Spalten, sonst ragt die Tafel über den Rundweg
-    const cols = sorted.length > 8 ? 2 : 1;
+    // Ab 7 Spielern: zwei Spalten, sonst ragt die Tafel über die Abkürzung
+    const cols = sorted.length > 6 ? 2 : 1;
     const perCol = Math.ceil(sorted.length / cols);
     const colW = cols === 2 ? 128 : 200;
     const x = cols === 2 ? 168 : 214, y = 92, w = cols === 2 ? colW * 2 + 4 : 200;
     const coinX = cols === 2 ? 98 : 136, cocktailX = cols === 2 ? 116 : 172;
-    const h = 26 + perCol * 15;
+    const h = 26 + perCol * 14;
     this.scoreLayer.add(panel(this, x, y, w, h));
     for (let c = 0; c < cols; c++) {
       this.scoreLayer.add(this.add.image(x + c * colW + coinX, y + 13, ensureTex(this, 'coin', O.coinIcon)));
@@ -417,17 +615,21 @@ export class BoardScene extends Phaser.Scene {
       const p = playerById(id);
       if (!p) return;
       const cx = x + Math.floor(i / perCol) * colW;
-      const ry = y + 22 + (i % perCol) * 15;
+      const ry = y + 22 + (i % perCol) * 14;
       this.scoreLayer.add(this.add.image(cx + 16, ry + 13, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
-      this.scoreLayer.add(ink(this, cx + 26, ry + 3, p.name.slice(0, cols === 2 ? 7 : 11), { origin: [0, 0], color: mover === id ? RED_INK : INK }));
+      this.scoreLayer.add(ink(this, cx + 26, ry + 3, p.name.slice(0, cols === 2 ? 6 : 9), { origin: [0, 0], color: mover === id ? RED_INK : INK }));
+      const item = b.items?.[id];
+      if (item) this.scoreLayer.add(txt(this, cx + (cols === 2 ? 82 : 110), ry + 2, ITEM_INFO[item].icon, { size: 8, shadow: false }));
       this.scoreLayer.add(ink(this, cx + coinX, ry + 3, String(b.coins[id])));
       this.scoreLayer.add(ink(this, cx + cocktailX, ry + 3, String(b.cocktails[id]), { color: '#b0306a' }));
       // Würfelfenster: kleiner Würfel mit Augenzahl bzw. „?“ für alle, die noch nicht gewürfelt haben
       if (rolling && !p.removed) {
         const v = b.rolls[id];
         const dx = cx + (cols === 2 ? 76 : 112);
-        this.scoreLayer.add(this.add.rectangle(dx, ry + 6, 11, 11, v ? 0xfff4d6 : 0xd9c39a).setStrokeStyle(1, 0x3d2414));
-        this.scoreLayer.add(ink(this, dx, ry + 2, v ? String(v) : '?', { color: v ? RED_INK : '#7a5a3a' }));
+        const rolled = id in b.rolls;
+        this.scoreLayer.add(this.add.rectangle(dx, ry + 6, 11, 11, rolled ? 0xfff4d6 : 0xd9c39a).setStrokeStyle(1, 0x3d2414));
+        // 0 = Taxi statt Würfel
+        this.scoreLayer.add(ink(this, dx, ry + 2, rolled ? (v ? String(v) : '🚕') : '?', { color: rolled ? RED_INK : '#7a5a3a' }));
       }
     });
   }
@@ -563,7 +765,8 @@ export class BoardScene extends Phaser.Scene {
         this.tweens.add({ targets: img, scale: n > 3 ? 1.5 : 2, duration: 380, ease: 'Back.out', delay: i * 80 });
       });
       if (n > shown.length) card.add(ink(this, 0, 38, `+${n - shown.length} weitere`, { color: '#7a5a3a' }));
-      card.add(ink(this, 0, 50, `${a.value} ${a.unit}`, { color: '#7a5a3a' }));
+      const tie = a.tied?.filter((id) => !a.winners.includes(id)) ?? [];
+      card.add(ink(this, 0, 50, tie.length ? `${a.value} ${a.unit} – Gleichstand mit ${tie.map((id) => playerById(id)?.name.slice(0, 8) ?? '?').join(', ')}, der Rückstand bekommt ihn` : `${a.value} ${a.unit}`, { color: '#7a5a3a', wrap: 300 }));
       card.add(txt(this, 0, 64, `+1 COCKTAIL${n > 1 ? ' für jeden' : ''}`, { color: GOLD }));
     }
     this.bonusLayer.add([bg, card]);
@@ -579,20 +782,38 @@ export class BoardScene extends Phaser.Scene {
     if (!tok || !roll.path.length) return;
     this.animating.add(roll.playerId);
 
-    // Würfel über der Figur – die Augenzahl steht schon fest (Würfelfenster), nur kurz aufpoppen
-    const dice = this.add.container(Phaser.Math.Clamp(tok.x, 30, WORLD.W - 30), Math.max(78, tok.y - 52)).setDepth(2000);
-    dice.add(panel(this, -13, -13, 26, 26));
-    dice.add(ink(this, 0, -4, String(roll.value), { size: 8 }));
-    dice.setScale(0.3);
-    this.tweens.add({ targets: dice, scale: 1.2, duration: 160, ease: 'Back.Out', onComplete: () => this.tweens.add({ targets: dice, scale: 1, duration: 120 }) });
-    sfx('select', { x: dice.x });
-    const total = MOVE_LEAD_MS + roll.path.length * STEP_MS;
-    this.tweens.add({ targets: dice, alpha: 0, delay: total, duration: 250, onComplete: () => dice.destroy() });
+    if (roll.kind === 'taxi') {
+      // Ein großer Hüpfer direkt zur Bar
+      const p = this.posFor(roll.path[roll.path.length - 1], roll.playerId, b.order);
+      sfx('whoosh', { x: tok.x });
+      this.juice.burst(tok.x, tok.y, 'puff', 8);
+      this.tweens.add({ targets: tok, x: p.x, duration: TAXI_MS - 80, ease: 'Sine.inOut' });
+      this.tweens.add({ targets: tok, y: p.y - 40, duration: (TAXI_MS - 80) / 2, ease: 'Quad.out', yoyo: true, onComplete: () => {
+        tok.setPosition(p.x, p.y);
+        this.juice.burst(p.x, p.y, 'sand', 8);
+        sfx('bonk', { x: p.x, vol: 0.6 });
+        this.animating.delete(roll.playerId);
+      } });
+      return;
+    }
+
+    const lead = roll.kind === 'cont' ? 0 : MOVE_LEAD_MS;
+    if (roll.kind === 'roll') {
+      // Würfel über der Figur – die Augenzahl steht schon fest (Würfelfenster), nur kurz aufpoppen
+      const dice = this.add.container(Phaser.Math.Clamp(tok.x, 30, WORLD.W - 30), Math.max(78, tok.y - 52)).setDepth(2000);
+      dice.add(panel(this, -13, -13, 26, 26));
+      dice.add(ink(this, 0, -4, String(roll.value), { size: 8 }));
+      dice.setScale(0.3);
+      this.tweens.add({ targets: dice, scale: 1.2, duration: 160, ease: 'Back.Out', onComplete: () => this.tweens.add({ targets: dice, scale: 1, duration: 120 }) });
+      sfx('select', { x: dice.x });
+      const total = MOVE_LEAD_MS + roll.path.length * STEP_MS;
+      this.tweens.add({ targets: dice, alpha: 0, delay: total, duration: 250, onComplete: () => dice.destroy() });
+    }
 
     // Schritt für Schritt hüpfen (Schnelldurchlauf)
     const steps = roll.path.map((f) => this.posFor(f, roll.playerId, b.order));
     steps.forEach((p, i) => {
-      this.time.delayedCall(MOVE_LEAD_MS + i * STEP_MS, () => {
+      this.time.delayedCall(lead + i * STEP_MS, () => {
         this.tweens.add({
           targets: tok,
           x: p.x,

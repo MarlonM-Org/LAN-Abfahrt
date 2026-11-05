@@ -96,15 +96,15 @@ export class LobbyScene extends Phaser.Scene {
     const url = joinUrlOf(s);
     if (url !== this.renderedUrl) this.renderQr(url);
 
-    this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
+    this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : s.mode === 'turnier' ? '~ Turnier ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
     const n = s.players.filter((p) => p.connected).length;
     const offMin = (p: GameState['players'][number]) => Math.floor((p.offlineMs ?? 0) / 60_000);
     this.hintText.setText(
-      s.showBoard ? 'Leaderboard des Abends (L / VIP-Handy)' : n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : s.mode === 'arcade' && s.arcadeVote ? this.voteHint(s) : 'Der VIP wählt am Handy ein Spiel!',
+      s.showBoard ? 'Leaderboard des Abends (L / VIP-Handy)' : n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : s.mode === 'arcade' && s.arcadeVote ? this.voteHint(s) : s.mode === 'turnier' ? 'Der VIP wählt am Handy eine Playlist!' : 'Der VIP wählt am Handy ein Spiel!',
     );
 
     // Arcade: Leaderboard des Abends, sobald heute gespielt wurde – vorher die ewige Tabelle
-    const sessionBoard = s.showBoard || (s.mode === 'arcade' && s.session.games > 0);
+    const sessionBoard = s.showBoard || ((s.mode === 'arcade' || s.mode === 'turnier') && s.session.games > 0);
     const key =
       s.mode +
       s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') +
@@ -117,7 +117,7 @@ export class LobbyScene extends Phaser.Scene {
       drawSessionBoard(this, this.playerLayer, s.session, { x: 150, y: 46, w: 316, maxBottom: 228 }, { title: s.session.games ? undefined : 'LEADERBOARD HEUTE · NOCH LEER' });
       return;
     }
-    if (s.mode === 'arcade') return this.renderLeaderboard(s);
+    if (s.mode === 'arcade' || s.mode === 'turnier') return this.renderLeaderboard(s);
     const wide = s.players.length > SLOTS;
     for (let i = 0; i < (wide ? SLOTS_MAX : SLOTS); i++) {
       const p = s.players[i];

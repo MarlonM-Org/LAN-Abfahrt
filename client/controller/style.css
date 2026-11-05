@@ -21,6 +21,9 @@
   --font: 'Press Start 2P', ui-monospace, monospace;
 }
 
+/* Quer/Hochkant NICHT per @media (orientation): orientation.ts setzt `html.land` (Viewport quer ODER Pseudo-Quer am iPhone)
+   und `html.land-short` (dazu höchstens 520 px hoch). Regeln als `:where(html.land) …` schreiben – :where() lässt die
+   Spezifität unverändert, also bleibt die Reihenfolge im Stylesheet entscheidend wie bei einer Media-Query. */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html, body {
@@ -508,14 +511,12 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .ttt-stash .room-btn { font-size: 7px; }
 /* Rollen-Ansage: quer zweispaltig, damit nichts gescrollt werden muss */
 .ttt-roles, .ttt-roles-a { display: flex; flex-direction: column; gap: 14px; }
-@media (orientation: landscape) and (max-height: 500px) {
-  .ttt-roles { display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px; align-items: center; flex: 1; }
-  .ttt-roles-a { gap: 8px; }
-  .ttt-roles .panel { gap: 4px; padding: 8px; font-size: 8px; }
-}
-@media (orientation: portrait) {
-  .ttt-stash { left: 14px; right: 14px; width: auto; top: 64px; bottom: auto; max-height: 70vh; }
-}
+/* war: @media (orientation: landscape) and (max-height: 500px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) .ttt-roles { display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px; align-items: center; flex: 1; }
+:where(html.land-short) .ttt-roles-a { gap: 8px; }
+:where(html.land-short) .ttt-roles .panel { gap: 4px; padding: 8px; font-size: 8px; }
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html:not(.land)) .ttt-stash { left: 14px; right: 14px; width: auto; top: 64px; bottom: auto; max-height: 70vh; }
 
 /* ---------------------------------------------------------------- Versteckspiel mit Möbeln (quer) */
 .lx.vs-hide { --lx-l: 38%; --lx-r: 36%; }
@@ -610,23 +611,20 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .pcq-score .pcq-body { grid-template-columns: 1fr 1fr; align-items: center; }
 .pcq-score .pc-rank { max-height: 100%; }
 
-@media (orientation: portrait) {
-  .pcq-cards { grid-template-columns: 1fr; }
-  .pcq-cards .pc-card { flex-direction: row; text-align: left; }
-  .pcq-cards .pc-card-text { align-items: flex-start; }
-  .pcq-score .pcq-body { grid-template-columns: 1fr; }
-}
-@media (orientation: landscape) and (max-height: 360px) {
-  .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
-}
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html:not(.land)) .pcq-cards { grid-template-columns: 1fr; }
+:where(html:not(.land)) .pcq-cards .pc-card { flex-direction: row; text-align: left; }
+:where(html:not(.land)) .pcq-cards .pc-card-text { align-items: flex-start; }
+:where(html:not(.land)) .pcq-score .pcq-body { grid-template-columns: 1fr; }
+/* war: @media (orientation: landscape) and (max-height: 360px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) .pc-card-icon { width: 80px; min-width: 80px; min-height: 40px; }
 
 /* ---------------------------------------------------------------- Kart-Rennen (quer, Mode-7-Ansicht hinter den Knöpfen) */
 #app:has(.k3) { padding: 0; border: 0; box-shadow: none; background: #000; }
 #app:has(.k3) .abort { position: fixed; right: auto; top: calc(6px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 4px 8px; font-size: 7px; color: #fff4d6; border-color: rgba(255,255,255,0.35); background: rgba(0,0,0,0.35); }
 /* Oben in der Mitte sitzt der TV/Handy-Umschalter – „Abbrechen“ (VIP) rückt links daneben */
-@media (orientation: landscape) {
-  #app:has(.k3:not(.k3-nosplit)) .abort { top: calc(13px + env(safe-area-inset-top, 0px)); left: calc(50% - 92px); transform: translateX(-100%); }
-}
+/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land) #app:has(.k3:not(.k3-nosplit)) .abort { top: calc(13px + env(safe-area-inset-top, 0px)); left: calc(50% - 92px); transform: translateX(-100%); }
 #app:has(.k3-split) .abort { color: var(--ink-soft); border-color: var(--paper-dark); background: rgba(255,246,220,0.6); }
 .k3 {
   position: fixed; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
@@ -710,16 +708,15 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .k3-intro p { color: #cfc1a8; font-size: 7px; }
 .k3-intro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 7.5px; line-height: 1.7; max-width: 640px; }
 .k3-intro b { color: #ffd25e; }
-@media (orientation: portrait) {
-  .k3-intro-grid { grid-template-columns: 1fr; }
-  .k3-left { width: 50%; }
-  .k3-right { width: 50%; }
-  .k3 { --bw: clamp(84px, 24vmin, 120px); }
-  #app:has(.k3) .abort { top: 46%; }
-  /* Hochkant: Pille unter KIPPEN/ITEM (sonst zu schmal nebeneinander) */
-  .k3-viewsw { top: calc(100px + var(--st)); }
-  .k3-viewnote { top: calc(100px + var(--st)); }
-}
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html:not(.land)) .k3-intro-grid { grid-template-columns: 1fr; }
+:where(html:not(.land)) .k3-left { width: 50%; }
+:where(html:not(.land)) .k3-right { width: 50%; }
+:where(html:not(.land)) .k3 { --bw: clamp(84px, 24vmin, 120px); }
+:where(html:not(.land)) #app:has(.k3) .abort { top: 46%; }
+/* Hochkant: Pille unter KIPPEN/ITEM (sonst zu schmal nebeneinander) */
+:where(html:not(.land)) .k3-viewsw { top: calc(100px + var(--st)); }
+:where(html:not(.land)) .k3-viewnote { top: calc(100px + var(--st)); }
 
 /* ---------------------------------------------------------------- Auto-Fußball (gleiches Querformat wie das Kart-Rennen) */
 .afb { background: linear-gradient(180deg, var(--paper) 0%, #f1d49a 100%); }
@@ -820,14 +817,13 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .ig-side .ig-teams { order: 2; }
 .ig-side .ig-sd { order: 3; }
 /* Zuschauen quer: Karte groß links, Zug + Teams rechts */
-@media (orientation: landscape) {
-  .ig-watchw { flex-direction: row; align-items: flex-start; gap: 12px; height: calc(100svh - 50px); }
-  .ig-watchw .ig-map { order: 0; width: auto; height: 100%; max-width: 62%; }
-  .ig-side { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; overflow-y: auto; max-height: 100%; }
-  .ig-side .ig-teams, .ig-side .ig-sd { order: 0; }
-  .ig-turn { padding: 6px; gap: 4px; }
-  .ig-team { padding: 2px 6px; }
-}
+/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land) .ig-watchw { flex-direction: row; align-items: flex-start; gap: 12px; height: calc(100svh - 50px); }
+:where(html.land) .ig-watchw .ig-map { order: 0; width: auto; height: 100%; max-width: 62%; }
+:where(html.land) .ig-side { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; overflow-y: auto; max-height: 100%; }
+:where(html.land) .ig-side .ig-teams, :where(html.land) .ig-side .ig-sd { order: 0; }
+:where(html.land) .ig-turn { padding: 6px; gap: 4px; }
+:where(html.land) .ig-team { padding: 2px 6px; }
 
 /* ---------------------------------------------------------------- Smash-Arena */
 #app:has(.smash) { padding: 8px; gap: 6px; }
@@ -875,22 +871,21 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .sm-btn.b.cooling { color: #d8c8e8; }
 
 /* Smash/Bogen/Zauber sind Quer-Spiele: das Querlayout ist der Standard, hochkant nur Notbehelf (Tablet/Laptop) */
-@media (orientation: landscape) {
-  body:has(.smash) { padding: 4px max(4px, env(safe-area-inset-right, 0px)) 4px max(4px, env(safe-area-inset-left, 0px)); }
-  #app:has(.smash) { padding: 6px 20px; gap: 4px; min-height: calc(100dvh - 8px); }
-  .smash { gap: 4px; }
-  .sm-top { gap: 8px; }
-  .sm-av canvas { height: 22px; }
-  .sm-pct { font-size: 16px; min-width: 70px; }
-  .sm-info { flex-direction: row; align-items: baseline; gap: 10px; padding: 2px 8px; font-size: 7px; }
-  .sm-info b { font-size: 8px; white-space: nowrap; }
-  .sm-pad { grid-template-columns: 1.15fr 1fr; min-height: 0; }
-  .sm-timer { margin-right: 120px; }
-  .sm-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
-  .sm-btn { width: auto; height: 100%; max-height: 150px; }
-  .sm-btn.jump, .sm-btn.a { transform: none; }
-  .sm-btn.jump.pressed, .sm-btn.a.pressed { transform: translateY(2px) scale(0.97); }
-}
+/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land) body:has(.smash) { padding: 4px max(4px, env(safe-area-inset-right, 0px)) 4px max(4px, env(safe-area-inset-left, 0px)); }
+:where(html.land) #app:has(.smash) { padding: 6px 20px; gap: 4px; min-height: calc(100dvh - 8px); }
+:where(html.land) .smash { gap: 4px; }
+:where(html.land) .sm-top { gap: 8px; }
+:where(html.land) .sm-av canvas { height: 22px; }
+:where(html.land) .sm-pct { font-size: 16px; min-width: 70px; }
+:where(html.land) .sm-info { flex-direction: row; align-items: baseline; gap: 10px; padding: 2px 8px; font-size: 7px; }
+:where(html.land) .sm-info b { font-size: 8px; white-space: nowrap; }
+:where(html.land) .sm-pad { grid-template-columns: 1.15fr 1fr; min-height: 0; }
+:where(html.land) .sm-timer { margin-right: 120px; }
+:where(html.land) .sm-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+:where(html.land) .sm-btn { width: auto; height: 100%; max-height: 150px; }
+:where(html.land) .sm-btn.jump, :where(html.land) .sm-btn.a { transform: none; }
+:where(html.land) .sm-btn.jump.pressed, :where(html.land) .sm-btn.a.pressed { transform: translateY(2px) scale(0.97); }
 /* ---------------------------------------------------------------- Bogen-Arena */
 .bogen .bg-top { border-bottom: 3px solid var(--bg-color, var(--wood-dark)); padding-bottom: 4px; }
 .bg-quiver { flex: 1; display: flex; align-items: center; gap: 3px; min-height: 32px; }
@@ -913,13 +908,12 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .bg-btns .bg-shoot.empty { filter: saturate(0.3) brightness(0.9); }
 .bg-btns .bg-jump { grid-column: 1; grid-row: 2; transform: none; }
 .bg-btns .bg-jump.pressed { transform: translateY(2px) scale(0.97); }
-@media (orientation: landscape) {
-  .bg-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
-  .bg-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
-  .bg-btns .bg-shoot { max-height: 170px; }
-  .bg-arrow { height: 18px; }
-  .bogen .bg-wins { margin-right: 120px; }
-}
+/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land) .bg-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+:where(html.land) .bg-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
+:where(html.land) .bg-btns .bg-shoot { max-height: 170px; }
+:where(html.land) .bg-arrow { height: 18px; }
+:where(html.land) .bogen .bg-wins { margin-right: 120px; }
 /* ---------------------------------------------------------------- Zauber-Arena */
 .zauber .zb-top { border-bottom: 3px solid var(--zb-color, #9b5fc0); padding-bottom: 4px; }
 .zb-hp { position: relative; flex: 1; height: 22px; background: #2c2236; border: 3px solid var(--outline); overflow: hidden; }
@@ -943,16 +937,15 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .zb-btns .zb-sprint.active { box-shadow: inset 0 4px 0 #c495e0, inset 0 -6px 0 #6c3a8f, 0 0 0 4px #c79bff; }
 .zb-btns .zb-cast { font-size: 11px; background: #e8661a; box-shadow: inset 0 4px 0 #f7a868, inset 0 -6px 0 #a8341a, 0 3px 0 var(--outline); }
 .zb-btns .sm-btn.cooling { color: rgba(255, 244, 214, 0.6); }
-@media (orientation: portrait) {
-}
-@media (orientation: landscape) {
-  .zb-btns { grid-template-columns: 1fr 1.2fr; align-items: center; justify-items: center; padding-bottom: 0; }
-  .zb-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
-  .zb-btns .zb-cast { max-height: 175px; }
-  .zb-btns .zb-sprint { max-height: 120px; }
-  .zb-hp { height: 18px; }
-  .zauber .zb-wins { margin-right: 120px; }
-}
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+
+/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land) .zb-btns { grid-template-columns: 1fr 1.2fr; align-items: center; justify-items: center; padding-bottom: 0; }
+:where(html.land) .zb-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
+:where(html.land) .zb-btns .zb-cast { max-height: 175px; }
+:where(html.land) .zb-btns .zb-sprint { max-height: 120px; }
+:where(html.land) .zb-hp { height: 18px; }
+:where(html.land) .zauber .zb-wins { margin-right: 120px; }
 /* ---------------------------------------------------------------- Wackel-Prügelei */
 .wackel .wk-top { border-bottom: 3px solid var(--wk-color, #e0503f); padding-bottom: 4px; }
 .wk-wins { flex: 1; display: flex; align-items: center; gap: 4px; color: var(--ink-soft); font-size: 9px; }
@@ -972,14 +965,20 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .wk-btns .wk-grab.hanging { background: #9b5fc0; box-shadow: inset 0 4px 0 #c495e0, inset 0 -6px 0 #6c3a8f, 0 0 0 4px #c79bff; }
 .wk-btns .wk-punch { grid-column: 1; grid-row: 2; font-size: 11px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7e, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
 .wk-btns .sm-btn.cooling { color: rgba(255, 244, 214, 0.6); }
-@media (orientation: landscape) and (max-height: 520px) {
-  .wk-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
-  .wk-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
-  .wk-btns .wk-jump { width: auto; max-height: 110px; }
-  .wk-btns .wk-grab { max-height: 175px; }
-  .wackel .wk-wins { margin-right: 120px; }
-}
+/* war: @media (orientation: landscape) and (max-height: 520px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) .wk-btns { grid-template-rows: 1fr 1fr; align-content: stretch; justify-items: center; padding-bottom: 0; }
+:where(html.land-short) .wk-btns .sm-btn { width: auto; height: 100%; max-height: 150px; }
+:where(html.land-short) .wk-btns .wk-jump { width: auto; max-height: 110px; }
+:where(html.land-short) .wk-btns .wk-grab { max-height: 175px; }
+:where(html.land-short) .wackel .wk-wins { margin-right: 120px; }
 .mode-tabs.four { grid-template-columns: 1fr 1fr; }
+.mode-tabs.five { grid-template-columns: 1fr 1fr 1fr; }
+.tour-btn small { font-size: 7px; line-height: 1.6; display: block; margin-top: 4px; opacity: 0.95; }
+.tour-pick { font-size: 8px; line-height: 1.8; color: var(--ink-soft); min-height: 1em; }
+.tour-pick:empty { display: none; }
+.arcade-tile .votes .tour-num:empty { display: none; }
+.my-title { margin: 4px 0; line-height: 1.6; }
+.my-title small { color: var(--ink-soft); }
 table.lb { width: 100%; border-collapse: collapse; font-size: 9px; }
 table.lb td { padding: 4px 2px; border-bottom: 1px dashed var(--paper-dark); color: var(--ink); }
 table.lb td:not(:nth-child(2)):not(:first-child) { text-align: right; }
@@ -1085,7 +1084,8 @@ textarea.sp-input {
 /* ---------------------------------------------------------------- Geisterjagd */
 .ghost-face { display: flex; justify-content: center; }
 .ghost-img { width: 90px; image-rendering: pixelated; animation: bob 0.9s infinite alternate; }
-@media (orientation: landscape) and (max-height: 500px) { .ghost-img { width: 54px; } }
+/* war: @media (orientation: landscape) and (max-height: 500px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+ :where(html.land-short) .ghost-img { width: 54px; } 
 .lx.gs-hunt { --lx-l: 38%; --lx-r: 30%; }
 .lx.gs-ghost { --lx-l: 24%; --lx-r: 17%; }
 .gs-tag { background: #f2c33a; }
@@ -1152,9 +1152,8 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .big-btn.gr-grab { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
 .big-btn.gr-act { background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
 .big-btn.gr-act.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
-@media (orientation: portrait) {
-  .gr-orders { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-}
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html:not(.land)) .gr-orders { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 
 /* ---------------------------------------------------------------- Umzugschaos */
 .lx.um-lx { --lx-l: 38%; --lx-r: 30%; }
@@ -1559,10 +1558,33 @@ table.lb tr.off td { opacity: 0.55; }
 .or-phone.or-portrait { animation-name: or-turn-back; }
 @keyframes or-turn { 0%, 25% { transform: rotate(0); } 60%, 100% { transform: rotate(-90deg); } }
 @keyframes or-turn-back { 0%, 25% { transform: rotate(-90deg); } 60%, 100% { transform: rotate(0); } }
-@media (orientation: landscape) and (max-height: 500px) {
-  .or-box { gap: 8px; }
-  .or-phone { margin: 6px; }
+/* war: @media (orientation: landscape) and (max-height: 500px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) .or-box { gap: 8px; }
+:where(html.land-short) .or-phone { margin: 6px; }
+
+.or-pseudo { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.or-pseudo small { font-size: 7px; line-height: 1.5; text-transform: none; color: #cfc1a8; }
+.orient.late .or-pseudo { animation: oc-in 0.3s ease-out; }
+
+/* Pseudo-Quer (orientation.ts): iPhone mit Ausrichtungssperre – die ganze Seite liegt um 90° gedreht im Hochformat.
+   body bekommt die getauschten Maße und wird um die linke obere Ecke gedreht; alle `position: fixed`-Elemente
+   (Spiel-Layout, Toast, Ansage-Karte) hängen dann an body und drehen mit. Die Safe-Area des Hochformats (Notch oben,
+   Home-Balken unten) liegt nun links/rechts des gedrehten Layouts. */
+html.pseudo-land body {
+  position: fixed; top: 0; left: 0; margin: 0; padding: 0; overflow: hidden;
+  width: 100vh; height: 100vw;
+  width: 100dvh; height: 100dvw;
+  transform: rotate(90deg) translateY(-100%); transform-origin: top left;
 }
+/* Normale (scrollende) Screens im gedrehten body: #app füllt ihn und scrollt selbst; .lx-Layouts bleiben fixed */
+html.pseudo-land #app { position: absolute; inset: 0; min-height: 0; overflow: auto; }
+/* Layout-Ränder: links = physisch oben (Notch), rechts = physisch unten (Home-Balken), oben/unten = Seitenkanten */
+html.pseudo-land .lx, html.pseudo-land .it {
+  padding: 8px max(24px, env(safe-area-inset-bottom, 0px)) 8px max(24px, env(safe-area-inset-top, 0px));
+}
+html.pseudo-land .orient-card { top: 8px; }
+.orient-card.oc-tap { pointer-events: auto; }
+.oc-unpseudo { display: block; margin: 6px 0 0; padding: 4px 6px; font-size: 7px; line-height: 1.4; color: #fff4d6; background: rgba(255, 244, 214, 0.15); border: 2px solid #cfc1a8; box-shadow: none; text-shadow: none; }
 
 /* Ansage-Karte vor jedem Spiel (nicht blockierend) */
 .orient-card {
@@ -1587,11 +1609,10 @@ table.lb tr.off td { opacity: 0.55; }
 #haptic-flash.strong { border-width: 7px; border-color: #ff8a5c; }
 
 /* Nicht-Quer-Screens (Ansagen, Ergebnis …) quer etwas dichter, damit weniger gescrollt wird */
-@media (orientation: landscape) and (max-height: 500px) {
-  #app { gap: 8px; padding: 10px 14px; }
-  #app:has(> .abort) { padding-top: 30px; }
-  h1 { font-size: 14px; }
-}
+/* war: @media (orientation: landscape) and (max-height: 500px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) #app { gap: 8px; padding: 10px 14px; }
+:where(html.land-short) #app:has(> .abort) { padding-top: 30px; }
+:where(html.land-short) h1 { font-size: 14px; }
 
 /* ================================================================ Gemeinsames Querlayout `.lx`
    Kopfzeile 28 px · links Stick-Zone · Mitte Infos · rechts Knöpfe. Ausgelegt auf 300 px Höhe
@@ -1650,11 +1671,10 @@ table.lb tr.off td { opacity: 0.55; }
 }
 
 /* Tablet/Laptop hochkant (kein Overlay): Querlayout stapeln */
-@media (orientation: portrait) {
-  .lx { grid-template-areas: "head head" "mid mid" "left right"; grid-template-rows: auto auto minmax(0, 1fr); grid-template-columns: 1fr 1fr; padding-top: max(8px, env(safe-area-inset-top, 0px)); }
-  .lx-head { flex-wrap: wrap; white-space: normal; min-height: 28px; }
-  .lx-mid { max-height: 45vh; }
-}
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html:not(.land)) .lx { grid-template-areas: "head head" "mid mid" "left right"; grid-template-rows: auto auto minmax(0, 1fr); grid-template-columns: 1fr 1fr; padding-top: max(8px, env(safe-area-inset-top, 0px)); }
+:where(html:not(.land)) .lx-head { flex-wrap: wrap; white-space: normal; min-height: 28px; }
+:where(html:not(.land)) .lx-mid { max-height: 45vh; }
 /* ------------------------------------------------------------------ Süßigkeiten-Klau */
 .su-role { text-align: center; padding: 6px; border: 3px solid var(--wood-darker); color: #fff4d6; font-size: 11px; }
 .su-role.thief { background: #c8487e; }
@@ -1715,15 +1735,14 @@ button.spec-emote.sent { transform: scale(1.15); }
 .lx-mid button.spec-emote, .lx-left button.spec-emote { font-size: 18px; padding: 3px 0 2px; }
 .lx-mid button.spec-av, .lx-left button.spec-av { width: 38px; font-size: 5px; }
 .lx-mid button.spec-av canvas, .lx-left button.spec-av canvas { height: 20px; }
-@media (orientation: landscape) and (max-height: 500px) {
-  #app > .spec-bar { flex-direction: row; align-items: center; padding: 5px 8px; }
-  #app > .spec-bar .spec-stand { flex: 1; }
-  #app > .spec-bar .spec-emotes { flex: none; width: 46%; }
-  #app > .spec-bar button.spec-emote { font-size: 20px; padding: 3px 0 2px; }
-  #app > .spec-bar button.spec-av { width: 40px; }
-  #app > .spec-bar button.spec-av canvas { height: 20px; }
-  #app:has(> .spec-bar) .center { gap: 6px; }
-}
+/* war: @media (orientation: landscape) and (max-height: 500px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+:where(html.land-short) #app > .spec-bar { flex-direction: row; align-items: center; padding: 5px 8px; }
+:where(html.land-short) #app > .spec-bar .spec-stand { flex: 1; }
+:where(html.land-short) #app > .spec-bar .spec-emotes { flex: none; width: 46%; }
+:where(html.land-short) #app > .spec-bar button.spec-emote { font-size: 20px; padding: 3px 0 2px; }
+:where(html.land-short) #app > .spec-bar button.spec-av { width: 40px; }
+:where(html.land-short) #app > .spec-bar button.spec-av canvas { height: 20px; }
+:where(html.land-short) #app:has(> .spec-bar) .center { gap: 6px; }
 
 /* Geister: Bomben-Arena (Stick + Zielkarte + WERFEN) und Sumo-Steg (WELLE) */
 .lx.ar-ghost { --lx-l: 30%; --lx-r: 24%; }
@@ -1736,7 +1755,26 @@ button.spec-emote.sent { transform: scale(1.15); }
 /* Kurven-Duell: wer raus ist, bekommt mehr Platz in der Mitte für die Zuschauer-Leiste */
 .lx.kv-lx.out { --lx-l: 22%; --lx-r: 22%; }
 .kv-lx:not(.out) .spec-bar { display: none; }
-@media (orientation: portrait) {
-  /* Geister hochkant: Hinweis, Knopf, darunter die Zuschauer-Leiste in voller Breite */
-  .lx.su-ghost { grid-template-areas: "head" "mid" "right" "left"; grid-template-columns: 1fr; grid-template-rows: auto auto minmax(110px, 30vh) auto; align-content: start; }
-}
+/* war: @media (orientation: portrait) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
+/* Geister hochkant: Hinweis, Knopf, darunter die Zuschauer-Leiste in voller Breite */
+:where(html:not(.land)) .lx.su-ghost { grid-template-areas: "head" "mid" "right" "left"; grid-template-columns: 1fr; grid-template-rows: auto auto minmax(110px, 30vh) auto; align-content: start; }
+
+/* Spielbrett: Items, Entscheidungen (Bar, Laden, Gabelung), Duell „Teilen oder Klauen“ */
+.item-card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: var(--paper-light); border: 3px solid var(--wood-dark); color: var(--ink); line-height: 1.5; }
+.item-card small { font-size: 8px; }
+.item-card small.muted { opacity: 0.6; }
+.item-card.used { border-style: dashed; opacity: 0.85; }
+.ask { flex: 1; display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+.ask .ask-title { text-align: center; }
+.ask p { line-height: 1.6; text-align: center; }
+.shop-list { display: flex; flex-direction: column; gap: 8px; }
+button.shop-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; text-align: left; padding: 10px 12px; }
+button.shop-item small { grid-column: 1; font-size: 7px; line-height: 1.5; opacity: 0.9; }
+button.shop-item span { grid-row: 1 / span 2; align-self: center; color: var(--sun); }
+button.fork-btn { display: flex; flex-direction: column; gap: 6px; padding: 16px 12px; text-align: left; line-height: 1.4; }
+button.fork-btn.long { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, inset 0 -4px 0 #b0306a, 0 3px 0 var(--outline); }
+button.fork-btn small { font-size: 7px; opacity: 0.9; }
+.duel { flex: 1; display: flex; flex-direction: column; gap: 10px; justify-content: center; }
+.duel p { line-height: 1.6; text-align: center; }
+.big-btn.duel-share { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.big-btn.duel-steal { background: #c0392b; box-shadow: inset 0 4px 0 #e86a5c, inset 0 -6px 0 #8a2419, 0 3px 0 var(--outline); }

@@ -34,6 +34,11 @@ export interface MiniCtx {
   mode: import('../shared/types').GameMode;
   /** Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) – Team-Spiele übernehmen sie über `splitTeams()` */
   teams?: MiniTeams | null;
+  /**
+   * Markantes Ereignis fürs Protokoll des Abends („Titel des Abends“, server/fx.ts): `p` = Spieler,
+   * `n` = Menge (Standard 1), `o` = zweiter Beteiligter. Typen siehe `FxEvent` in shared/types.ts.
+   */
+  log?(type: string, data?: { p?: string; n?: number; o?: string }): void;
 }
 
 export interface MiniGame {

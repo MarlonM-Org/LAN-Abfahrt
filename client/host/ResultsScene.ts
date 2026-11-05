@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { GameState } from '../../shared/types';
+import type { EveningTitle, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
 import { MINI_INFO } from '../../shared/games';
 import { C } from '../art/palette';
@@ -7,7 +7,7 @@ import * as O from '../art/objects';
 import { paintGrass, paintPath } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
-import { GREEN_INK, PLACE_COLORS, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { GREEN_INK, INK, PLACE_COLORS, RED_INK, background, ensureTex, ink, nameTag, panel, prop, txt } from './ui';
 import { drawSessionBoard, seriesTitle } from './sessionBoard';
 import { Juice } from './juice';
 import { sfx } from './sfx';
@@ -16,6 +16,10 @@ import { say, spokenName } from './speech';
 /** Einzelspiel-Ergebnis: erst dieses Spiel, dann das Leaderboard des Abends – im Wechsel */
 const STAGE_GAME_MS = 7000;
 const STAGE_BOARD_MS = 11000;
+/** „Titel des Abends“: Kacheln nacheinander, dann stehen lassen; Endstand (Podest) bleibt länger */
+const STAGE_TITLES_MS = 14000;
+const STAGE_FINAL_MS = 16000;
+const TITLE_STEP_MS = 1500;
 /** Ergebnis-Aufbau: Plätze von hinten nach vorn im Abstand von 200 ms, Sieger nach dem Trommelwirbel */
 const REVEAL_START = 300;
 const REVEAL_STEP = 200;
@@ -26,8 +30,8 @@ type C = Phaser.GameObjects.Container;
 export class ResultsScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container;
   private stateKey = '';
-  /** Einzelspiel: 'game' = Platzierung dieses Spiels, 'board' = Leaderboard des Abends */
-  private stage: 'game' | 'board' = 'game';
+  /** Einzelspiel: 'game' = Platzierung dieses Spiels, 'board' = Leaderboard des Abends (bzw. Turnier-Zwischenstand), 'titles' = Titel des Abends */
+  private stage: 'game' | 'board' | 'titles' = 'game';
   private stageTimer: Phaser.Time.TimerEvent | null = null;
   private stageFor: unknown = null;
   private juice!: Juice;
@@ -66,11 +70,15 @@ export class ResultsScene extends Phaser.Scene {
     if (s) this.render(s);
   }
 
-  /** Wechsel Spiel ↔ Leaderboard (startet für jedes neue Ergebnis wieder beim Spiel) */
+  /**
+   * Wechsel Spiel ↔ Leaderboard (↔ Titel des Abends) – startet für jedes neue Ergebnis wieder beim Spiel.
+   * Endstand (Party, Turnier): Podest ↔ Titel des Abends, sobald es welche gibt.
+   */
   private scheduleStage(s: GameState) {
     const r = s.results;
     const single = !!r && !r.final && !!r.points && !s.partyActive;
-    if (!single) {
+    const final = !!r?.final;
+    if (!single && !final) {
       this.stageTimer?.remove();
       this.stageTimer = null;
       this.stage = 'game';
@@ -81,20 +89,27 @@ export class ResultsScene extends Phaser.Scene {
     this.stageFor = r;
     this.stage = 'game';
     this.stageTimer?.remove();
+    const order = (): ('game' | 'board' | 'titles')[] => {
+      const titles = (getState()?.evening?.titles.length ?? 0) > 0;
+      if (final) return titles ? ['game', 'titles'] : ['game'];
+      return titles ? ['game', 'board', 'titles'] : ['game', 'board'];
+    };
+    const ms = (st: 'game' | 'board' | 'titles') => (st === 'titles' ? STAGE_TITLES_MS : st === 'board' ? STAGE_BOARD_MS : final ? STAGE_FINAL_MS : STAGE_GAME_MS);
     const flip = () => {
-      this.stage = this.stage === 'game' ? 'board' : 'game';
+      const seq = order();
+      this.stage = seq[(seq.indexOf(this.stage) + 1) % seq.length];
       const cur = getState();
       if (cur) this.render(cur);
-      this.stageTimer = this.time.delayedCall(this.stage === 'game' ? STAGE_GAME_MS : STAGE_BOARD_MS, flip);
+      this.stageTimer = this.time.delayedCall(ms(this.stage), flip);
     };
-    this.stageTimer = this.time.delayedCall(STAGE_GAME_MS, flip);
+    this.stageTimer = this.time.delayedCall(ms('game'), flip);
   }
 
   private render(s: GameState) {
     this.scheduleStage(s);
     const r = s.results;
     const single = !!r && !r.final && !!r.points && !s.partyActive;
-    const key = JSON.stringify(single ? [r, s.session, s.nochmal, this.stage] : r);
+    const key = JSON.stringify(single ? [r, s.session, s.nochmal, s.turnier, this.stage] : [r, this.stage]);
     if (key === this.stateKey) return;
     this.stateKey = key;
     this.layer.removeAll(true);
@@ -104,6 +119,7 @@ export class ResultsScene extends Phaser.Scene {
     this.anim = !!r && rk !== this.revealKey && this.stage === 'game';
     if (r) this.revealKey = rk;
     if (!r) return;
+    if (this.stage === 'titles') return this.renderTitles(s);
     if (single) return this.renderSingle(s);
 
     this.layer.add(panel(this, 60, 2, 360, 64));
@@ -125,6 +141,7 @@ export class ResultsScene extends Phaser.Scene {
    */
   private renderSingle(s: GameState) {
     const r = s.results!;
+    if (s.turnier) return this.renderTurnier(s);
     const ses = s.session;
     const series = seriesTitle(ses);
     const board = this.stage === 'board';
@@ -152,6 +169,74 @@ export class ResultsScene extends Phaser.Scene {
         ? `Nochmal geht nicht: ${n.disabled}`.slice(0, 56)
         : `VIP am Handy: Nochmal (${n.next}) oder anderes Spiel`;
     this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
+  }
+
+  /** Turnier: Ergebnis dieses Spiels ↔ Zwischenstand der Playlist (Spiel 2/4 …) */
+  private renderTurnier(s: GameState) {
+    const r = s.results!;
+    const t = s.turnier!;
+    const board = this.stage === 'board';
+    const no = `Spiel ${t.index + 1}/${t.kinds.length}`;
+    this.layer.add(panel(this, 60, 2, 360, 64));
+    this.layer.add(ink(this, WORLD.W / 2, 9, board ? `~ Turnier · Zwischenstand ~` : `~ Turnier · ${no} ~`, { color: '#7a5a3a' }));
+    const title = board ? `${t.icon} ${t.name}` : r.title;
+    this.layer.add(ink(this, WORLD.W / 2, title.length > 20 ? 25 : 21, title, { size: title.length > 20 ? 8 : 16, color: RED_INK }));
+    const leader = t.table.rows[0];
+    const sub = board ? (leader && leader.points > 0 ? `${leader.name} führt das Turnier mit ${leader.points} Punkten` : 'Punkte aus allen Spielen des Turniers') : r.subtitle;
+    this.layer.add(ink(this, WORLD.W / 2, 40, sub, { wrap: 340 }));
+    if (board) drawSessionBoard(this, this.layer, t.table, { x: 60, y: 70, w: 360, maxBottom: 246 }, { animate: true, title: `${t.name.toUpperCase()} · NACH ${t.played} VON ${t.kinds.length} SPIELEN` });
+    else if (r.hearts !== undefined) this.renderHearts(s);
+    else this.renderList(s);
+    this.layer.add(ink(this, 412, 56, board ? '○●' : '●○', { origin: [1, 0], color: '#7a5a3a' }));
+    const next = t.kinds[t.index + 1];
+    const footer = next ? `VIP am Handy: Weiter – als Nächstes ${MINI_INFO[next].icon} ${MINI_INFO[next].title}`.slice(0, 58) : 'VIP am Handy: Weiter zur Siegerehrung';
+    this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
+  }
+
+  /** „Titel des Abends“: Kacheln nacheinander mit Trommelwirbel-Pop, Konfetti und Ansage */
+  private renderTitles(s: GameState) {
+    const titles = s.evening?.titles ?? [];
+    this.layer.add(panel(this, 60, 2, 360, 40));
+    this.layer.add(ink(this, WORLD.W / 2, 9, '~ Titel des Abends ~', { color: '#7a5a3a' }));
+    this.layer.add(ink(this, WORLD.W / 2, 22, `${s.evening?.games ?? 0} Spiele heute – und das bleibt hängen:`, { wrap: 340 }));
+    const rowH = titles.length > 4 ? 36 : 40;
+    const top = 48;
+    const x = 40, w = 400;
+    const animate = this.stage === 'titles';
+    titles.forEach((t, i) => {
+      const y = top + i * rowH;
+      const c = this.add.container(0, 0);
+      this.layer.add(c);
+      c.add(panel(this, x, y, w, rowH - 4));
+      c.add(txt(this, x + 22, y + (rowH - 4) / 2 - 9, t.icon, { size: 16 }));
+      c.add(ink(this, x + 44, y + 7, t.title.toUpperCase(), { origin: [0, 0], color: RED_INK }));
+      const p = t.playerId ? playerById(t.playerId) : null;
+      if (p) {
+        c.add(this.add.image(x + 56, y + rowH - 6, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
+        c.add(ink(this, x + 70, y + 20, p.name, { origin: [0, 0], color: INK }));
+      } else if (t.kind) {
+        c.add(ink(this, x + 44, y + 20, MINI_INFO[t.kind].title, { origin: [0, 0], color: INK }));
+      }
+      c.add(ink(this, x + w - 12, y + 20, t.text, { origin: [1, 0], color: '#7a5a3a' }));
+      if (!animate) return;
+      c.setAlpha(0).setX(-24);
+      this.at(500 + i * TITLE_STEP_MS, () => {
+        this.tweens.add({ targets: c, alpha: 1, x: 0, duration: 260, ease: 'Back.Out' });
+        sfx('select', { pitch: 1 + i * 0.08 });
+        sfx('coin', { delay: 0.15, pitch: 1.1 });
+        this.juice.burst(x + 22, y + rowH / 2, 'confetti', 18);
+        this.juice.burst(x + w - 30, y + rowH / 2, 'spark', 10);
+        say(this.spokenTitle(t), { interrupt: i === 0 });
+      });
+    });
+    if (animate && titles.length) sfx('drumroll', { delay: 0 });
+    const footer = s.results?.final ? 'VIP: Am Handy zurück zur Lobby' : 'Gleich geht es weiter …';
+    this.layer.add(ink(this, WORLD.W / 2, 258, footer).setBackgroundColor('#f7e4b5').setPadding(4, 2, 4, 2));
+  }
+
+  private spokenTitle(t: EveningTitle) {
+    if (t.kind) return `${t.title}: ${MINI_INFO[t.kind].title}!`;
+    return `${t.title}: ${spokenName(playerById(t.playerId ?? '')?.name)}!`;
   }
 
   private boardSubtitle(s: GameState) {

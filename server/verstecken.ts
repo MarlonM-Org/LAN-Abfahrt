@@ -197,6 +197,7 @@ export class VersteckGame implements MiniGame {
       const ms = now - p.seekStart;
       p.score += Math.floor(ms / 10000) * VS.POINTS.PER_10S + VS.POINTS.SURVIVE;
       p.survived += 1;
+      this.ctx.log?.('hidden', { p: id, n: ms });
     }
     for (const p of this.ps.values()) p.sx = p.sy = 0;
     this.setPhase('reveal', VS.REVEAL_MS);
@@ -388,6 +389,7 @@ export class VersteckGame implements MiniGame {
       hider.foundBy = p.id;
       hider.sx = hider.sy = 0;
       hider.score += Math.floor((now - hider.seekStart) / 10000) * VS.POINTS.PER_10S;
+      this.ctx.log?.('hidden', { p: hider.id, n: now - hider.seekStart, o: p.id });
       this.found.push(hider.id);
       p.score += VS.POINTS.FIND;
       p.finds += 1;

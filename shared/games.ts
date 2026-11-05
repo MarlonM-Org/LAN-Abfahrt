@@ -1,4 +1,4 @@
-import type { FieldType, KurvePower, MiniKind, MiniTeams, Point, Team, TttItemKind, TttRole, TttShopItem } from './types';
+import type { FieldType, ItemKind, KurvePower, MiniKind, MiniTeams, Point, Team, TttItemKind, TttRole, TttShopItem } from './types';
 
 export interface MiniInfo {
   title: string;
@@ -50,7 +50,8 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   kart: { title: 'Kart-Rennen', icon: '🏎️', inspiredBy: 'Mario Kart', tagline: 'Verfolger-Kamera wie auf dem SNES – Gas, Drift, Items!', minPlayers: 2 , orientation: 'landscape' },
   turm: { title: 'Wackelturm', icon: '🗼', inspiredBy: 'Tricky Towers', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2 , orientation: 'landscape' },
   igel: { title: 'Igel-Krieg', icon: '🦔', inspiredBy: 'Worms', tagline: 'Kokosnüsse, Wasserbomben – wer bleibt auf der Insel?', minPlayers: 2 , orientation: 'landscape' },
-  smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2 , orientation: 'landscape' },
+  // max. 8: die Hauptplattform ist 280 px breit, bei 12 Kämpfern (16 px) blieben keine 8 px Abstand zum Nachbarn
+  smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
   wasser: { title: 'Wasserbomben-Schlacht', icon: '💦', tagline: 'Zielen, werfen, platsch – wer wird klatschnass?', minPlayers: 2 , orientation: 'landscape' },
   stillepost: { title: 'Stille Post mit Bildern', icon: '🖍️', inspiredBy: 'Gartic Phone', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3 , orientation: 'portrait' },
   fangen: { title: 'Urlaubs-Fangen', icon: '🕵️', inspiredBy: 'Mario Chase', tagline: 'Der Animateur ist unsichtbar – nur sein Handy kennt die Karte!', minPlayers: 3 , orientation: 'landscape' },
@@ -250,12 +251,14 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   // bis 5 Runden à 15–60 s (Flut beendet jede Runde)
   wackel: 'mittel',
   werwolf: 'lang',
-  // 6–8 Runden à ca. 40–90 s, endet früher bei 10 Punkten
-  funk: 'mittel',
+  // 8–12 Spieler: ab 9 Spielern 8 Runden (sonst 6) à Intro 5 s + Hinweis ≤ 30 s + Drehen ≤ 45 s + Wette ≤ 15 s + Auflösung 9 s
+  // = ≤ 104 s, realistisch ≈ 60 s → 6–8 min (max. 14 min); früher Schluss erst bei 10 Punkten
+  funk: 'lang',
   // Brett: 1 Frage ≈ 90 s (Arcade: 4 Fragen ≈ 4–5 min)
   schaetz: 'kurz',
-  // reihum, 3 Leben bzw. 6 Runden um den Tisch (Trinkspiel: 2) – 6 Spieler ≈ 4 min, 12 Spieler deutlich länger
-  maexchen: 'mittel',
+  // reihum, 3 Leben; Runden um den Tisch: 6 (≤ 6 Spieler), 4 (≤ 9), 3 (≥ 10), Trinkspiel 2. Pro Zug Würfeln ≤ 15 s + Ansage ≤ 15 s
+  // + Heben 2 s + Auflösung 4,6 s (+ Annahme 3,2 s), realistisch ≈ 15–20 s → 8 Spieler: 32 Züge ≈ 8–10 min, 12 Spieler: 36 Züge ≈ 9–12 min
+  maexchen: 'lang',
   // 1 min schreiben + 12 Antworten à ca. 25 s (ab 7 Spielern eine Antwort pro Spieler)
   werwars: 'mittel',
 };
@@ -264,6 +267,7 @@ export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
 // ------------------------------------------------------------------ Spielbrett
 
+/** Felder auf dem Rundweg (0–23); dazu kommt die Abkürzung (24–27) – siehe `BOARD_FIELDS` */
 export const BOARD_SIZE = 24;
 
 /**
@@ -275,6 +279,8 @@ export const BOARD_TIMING = {
   STEP_MS: 160,
   /** Würfel über der Figur, bevor sie losläuft */
   MOVE_LEAD_MS: 150,
+  /** Taxi zur Bar: ein großer Hüpfer */
+  TAXI_MS: 700,
   /** Pause nach einem Zug (vorher 1800) – nach Ereignis oder Cocktail etwas länger zum Lesen */
   PAUSE_MS: 700,
   EVENT_PAUSE_MS: 1100,
@@ -282,19 +288,62 @@ export const BOARD_TIMING = {
   INTRO_MS: 6000,
   /** Würfelfenster: so lange dürfen alle gleichzeitig würfeln */
   ROLL_WINDOW_MS: 10000,
+  /** Entscheidungen am Handy: Bar („Cocktail kaufen?“), Laden, Abzweigung – danach entscheidet der Server */
+  ASK_BAR_MS: 8000,
+  ASK_SHOP_MS: 8000,
+  ASK_FORK_MS: 6000,
+  /** Duell „Teilen oder Klauen“: geheime Wahl, dann deckt der TV die Karten nacheinander auf */
+  DUEL_CHOOSE_MS: 10000,
+  DUEL_FLIP_MS: 1100,
+  DUEL_REVEAL_MS: 3600,
+  DUEL_DONE_MS: 2600,
   /** Bonus-Cocktails am Ende: Trommelwirbel, dann Auflösung pro Karte */
   BONUS_DRUM_MS: 1600,
   BONUS_SHOW_MS: 3600,
 };
-export const COCKTAIL_PRICE = 10;
+/** Cocktail-Preisstaffel pro Spieler: der erste kostet 10, der zweite 15, ab dem dritten 20 */
+export const COCKTAIL_PRICES = [10, 15, 20];
+/** Preis des nächsten Cocktails für jemanden, der schon `bought` gekauft hat */
+export const cocktailPrice = (bought: number) => COCKTAIL_PRICES[Math.min(Math.max(0, bought), COCKTAIL_PRICES.length - 1)];
+/** Grundpreis (für Texte) */
+export const COCKTAIL_PRICE = COCKTAIL_PRICES[0];
+/** Duell „Teilen oder Klauen“: Pott (aus der Bank), Strafe wenn beide klauen */
+export const DUEL_POT = 10;
+export const DUEL_PENALTY = 3;
+/** Cocktail-Klau ohne Cocktails im Umlauf: Trostpreis aus der Bank */
+export const KLAU_COINS = 10;
 /** Finale (Mord/Verräter) im Party-Modus: Sieger bekommen so viele Cocktails (zusätzlich zu den Münzen) */
 export const FINALE_COCKTAILS = 2;
 /** In den letzten Runden zählen blaue/rote Felder doppelt („Endspurt“) */
 export const DOUBLE_ROUNDS = 2;
 export const PARTY_ROUND_OPTIONS = [3, 5, 8];
 
-/** Feldpositionen: Rundweg am Rand der 480 × 270-Welt */
-export const FIELD_POS: Point[] = (() => {
+/** Items aus dem Laden (höchstens eins im Inventar) */
+export const ITEM_KINDS: ItemKind[] = ['dice2', 'klau', 'taxi', 'schild'];
+export const ITEM_INFO: Record<ItemKind, { icon: string; title: string; desc: string; price: number; /** Vor dem Würfeln einsetzen (sonst passiv) */ active: boolean }> = {
+  dice2: { icon: '🎲', title: 'Doppelwürfel', desc: 'Nächster Wurf mit zwei Würfeln', price: 5, active: true },
+  klau: { icon: '🦜', title: 'Cocktail-Klau', desc: `Klaut dem Führenden einen Cocktail (hat niemand einen: +${KLAU_COINS} Münzen)`, price: 12, active: true },
+  taxi: { icon: '🚕', title: 'Taxi zur Bar', desc: 'Fährt dich statt zu würfeln direkt zur Bar', price: 8, active: true },
+  schild: { icon: '🧴', title: 'Sonnencreme-Schild', desc: 'Neutralisiert das nächste rote Feld oder Pech-Ereignis', price: 4, active: false },
+};
+export const ITEM_MIN_PRICE = Math.min(...ITEM_KINDS.map((k) => ITEM_INFO[k].price));
+
+/**
+ * Das Brett: Rundweg am Rand der 480 × 270-Welt (0–23, Start oben links, im Uhrzeigersinn) und eine Abkürzung
+ * durch den Garten (24–27): An der Gabelung (Feld 12, unten rechts) führt der lange Weg über die untere Reihe
+ * (Bar, Ereignis, zwei rote Felder, Duell), die Abkürzung spart drei Felder, hat aber auch ein rotes Feld und keine Bar.
+ * `next` = mögliche nächste Felder; an der Gabelung [langer Weg, Abkürzung].
+ */
+export interface BoardField {
+  x: number;
+  y: number;
+  type: FieldType;
+  next: number[];
+}
+export const FORK_FIELD = 12;
+/** Wo die Abkürzung wieder auf den Rundweg trifft */
+export const MERGE_FIELD = 20;
+export const BOARD_FIELDS: BoardField[] = (() => {
   const pts: Point[] = [];
   const left = 36, right = 444, top = 80, bottom = 252;
   const stepX = (right - left) / 8;
@@ -303,15 +352,27 @@ export const FIELD_POS: Point[] = (() => {
   for (let i = 1; i <= 3; i++) pts.push({ x: right, y: top + i * stepY });
   for (let i = 0; i <= 8; i++) pts.push({ x: right - i * stepX, y: bottom });
   for (let i = 1; i <= 3; i++) pts.push({ x: left, y: bottom - i * stepY });
-  return pts;
+  // Abkürzung durch den Garten
+  pts.push({ x: 392, y: 222 }, { x: 300, y: 220 }, { x: 208, y: 220 }, { x: 116, y: 222 });
+  const types: Record<number, FieldType> = { 0: 'start', 2: 'shop', 3: 'event', 4: 'red', 6: 'duel', 9: 'event', 11: 'duel', 14: 'red', 15: 'event', 17: 'duel', 19: 'red', 21: 'event', 25: 'red' };
+  return pts.map((p, i) => {
+    let next: number[];
+    if (i === FORK_FIELD) next = [i + 1, BOARD_SIZE];
+    else if (i < BOARD_SIZE) next = [(i + 1) % BOARD_SIZE];
+    else if (i === pts.length - 1) next = [MERGE_FIELD];
+    else next = [i + 1];
+    return { x: p.x, y: p.y, type: types[i] ?? 'blue', next };
+  });
 })();
-
-export const FIELD_TYPES: FieldType[] = Array.from({ length: BOARD_SIZE }, (_, i) => {
-  if (i === 0) return 'start';
-  if (i % 6 === 3) return 'event';
-  if (i % 5 === 4) return 'red';
-  return 'blue';
-});
+/** Feldpositionen (für den TV) */
+export const FIELD_POS: Point[] = BOARD_FIELDS.map((f) => ({ x: f.x, y: f.y }));
+export const FIELD_TYPES: FieldType[] = BOARD_FIELDS.map((f) => f.type);
+/** Die Felder der Abkürzung (ohne Gabelung und Einmündung) */
+export const SHORTCUT_FIELDS = BOARD_FIELDS.map((_, i) => i).filter((i) => i >= BOARD_SIZE);
+/** Die Felder des langen Wegs zwischen Gabelung und Einmündung */
+export const LONG_WAY_FIELDS = BOARD_FIELDS.map((_, i) => i).filter((i) => i > FORK_FIELD && i < MERGE_FIELD);
+/** Wo die Bar stehen darf: blaue Felder des Rundwegs (nie auf der Abkürzung) */
+export const BAR_FIELDS = BOARD_FIELDS.map((f, i) => (f.type === 'blue' && i < BOARD_SIZE ? i : -1)).filter((i) => i >= 0);
 
 export const FIELD_COINS = { blue: 3, red: -3 };
 
@@ -815,3 +876,24 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'funk'] },
 ];
+
+/** Turnier: vorgefertigte Playlists (laufen nacheinander, Gesamtwertung mit `arcadePoints`) */
+export interface TurnierPlaylist {
+  id: string;
+  name: string;
+  icon: string;
+  desc: string;
+  kinds: MiniKind[];
+}
+
+export const TURNIER_PLAYLISTS: TurnierPlaylist[] = [
+  { id: 'sport', name: 'Sportabend', icon: '🏅', desc: 'Zielen, werfen, putten – vier Disziplinen am Strand', kinds: ['darts', 'golf', 'bowling', 'boule'] },
+  { id: 'arena', name: 'Arena-Cup', icon: '⚔️', desc: 'Vier Arenen, ein Champion', kinds: ['arena', 'sumo', 'bogen', 'smash'] },
+  { id: 'kopf', name: 'Kopf & Bauch', icon: '🧠', desc: 'Schätzen, abstimmen, bluffen, funken', kinds: ['schaetz', 'wwe', 'maexchen', 'funk'] },
+];
+
+/** Turnier „Eigene“: so viele Spiele darf der VIP wählen */
+export const TURNIER_CUSTOM = { MIN: 3, MAX: 6 };
+
+/** Spiele, die in ein eigenes Turnier dürfen (wie die Zufallsauswahl, ohne reine Trinkspiele und Date-Night-Kapitel) */
+export const TURNIER_KINDS: MiniKind[] = ARCADE_RANDOM;
