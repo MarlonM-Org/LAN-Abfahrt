@@ -8,7 +8,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run typecheck` – TypeScript prüfen (vor jedem Commit)
 - `npm run build` / `npm start` – Produktiv-Build
 - `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
-- `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen) und MIDI-Parser
+- `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen), MIDI-Parser und alle eingebauten Songs (Offline-Rendern: Pegel, Länge, stumme Kanäle, Szenen-Zuordnung); `npm run render:music -- <ordner>` schreibt sie als WAV
 
 ## Architektur-Regeln
 
