@@ -19,6 +19,11 @@ export const HIT_DX = 14;
 export const HIT_DY = 10;
 
 export const FLIGHT_MS = 1300;
+/**
+ * Zielen ist kein Zeitfaktor: `null` = der Werfer hat alle Zeit (vorher 30 s, dann Fehlwurf).
+ * Der VIP kann den Wurf im Menü überspringen; wer offline geht, wird sofort übersprungen.
+ */
+export const FLUNKY_AIM_IDLE_MS: number | null = null;
 /** Taps, die der Läufer braucht (hin zur Flasche + zurück) */
 export const RUN_TAPS = 24;
 /** Wie viel Bier pro Trink-Tap verschwindet */

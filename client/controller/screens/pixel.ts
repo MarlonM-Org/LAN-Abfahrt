@@ -1,6 +1,6 @@
 import type { PixelPrivate, PixelState } from '../../../shared/types';
 import { PIXEL, PIXEL_CELLS, PIXEL_COLORS, PIXEL_NAMES, cellsToPic, floodFill, paintPic, picToCells } from '../../../shared/pixel';
-import { type Screen, app, el, escapeHtml, message, q, secondsLeft, send, socket, store, tapButton, toast } from '../core';
+import { type Screen, app, el, escapeHtml, message, q, send, socket, store, tapButton, timerText, toast } from '../core';
 
 type Tool = 'pen' | 'fill' | 'erase';
 
@@ -283,7 +283,7 @@ function buildPaint(s: PixelState) {
     const st = pix();
     if (!st) return;
     if (!cellPx) resize();
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     const p = priv();
     // Nach Neuladen der Seite: Entwurf vom Server zurückholen
     if (p && !restored) {
@@ -353,7 +353,7 @@ function buildVote(s: PixelState, p: PixelPrivate, vip: boolean) {
   app.append(root);
   refresh();
   return () => {
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     refresh();
   };
 }

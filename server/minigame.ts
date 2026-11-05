@@ -1,4 +1,5 @@
-import type { MiniKind, MiniSnapshot, PrivateState } from '../shared/types';
+import type { MiniKind, MiniSnapshot, PrivateState, SkipInfo } from '../shared/types';
+import { possessive } from '../shared/players';
 
 export interface MiniResult {
   /** Platzierungsgruppen: [[Sieger...], [Zweite...], ...] */
@@ -36,7 +37,35 @@ export interface MiniGame {
   playerDisconnected(playerId: string): void;
   /** Nur der VIP: z. B. Diskussion überspringen */
   vipAction?(action: string): void;
+  /**
+   * Was VIP/Laptop gerade überspringen können (Zug eines Spielers, Schreib-/Abstimmungsphase, Info-Screen) –
+   * null, wenn nichts. Echtzeit-Spiele implementieren das nicht.
+   * Fehlende Eingaben zählen beim Überspringen als „passen“ bzw. werden automatisch ergänzt.
+   */
+  skippable?(): SkipInfo | null;
+  /** Überspringen ausführen (der Raum ruft das nur auf, wenn skippable() etwas liefert) */
+  skip?(): void;
   dispose(): void;
+}
+
+/**
+ * Optionaler Phasen-Timer: `ms === null` heißt „kein Zeitlimit“ (der VIP kann überspringen).
+ * Liefert die Deadline (0 = keine → `endsIn: 0`, Handy/TV zeigen dann keinen Countdown).
+ */
+export function phaseTimer(timers: Timers, ms: number | null, fn: () => void): number {
+  if (ms == null) return 0;
+  timers.later(ms, fn);
+  return Date.now() + ms;
+}
+
+/** Restzeit für den Snapshot (0 = kein Zeitlimit bzw. abgelaufen) */
+export const endsIn = (deadline: number) => (deadline ? Math.max(0, deadline - Date.now()) : 0);
+
+/**
+ * Knopftext für „auf Eingaben warten“: fehlt genau einer → „Bens Antwort überspringen“, sonst der allgemeine Text.
+ */
+export function waitLabel(ctx: MiniCtx, missing: string[], what: string, general: string): string {
+  return missing.length === 1 ? `${possessive(ctx.nameOf(missing[0]))} ${what} überspringen` : general;
 }
 
 /** Kleine Helferklasse, damit beim Beenden eines Spiels keine Timer weiterlaufen. */

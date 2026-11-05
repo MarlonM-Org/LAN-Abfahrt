@@ -28,9 +28,12 @@ export const BOWL = {
   ANGLE_MAX: 0.05,
   /** maximale seitliche Hakenbeschleunigung (cm/s²) durch Effet */
   HOOK_MAX: 60,
-  /** Zeit fürs Zielen am Handy */
-  AIM_MS: 30000,
-  INTRO_MS: 5000,
+  /** Zeit fürs Zielen am Handy: `null` = kein Limit (vorher 30 s) – der VIP kann den Wurf im Menü überspringen */
+  AIM_MS: null as number | null,
+  /** Wer offline ist, wirft nach so kurzer Zeit automatisch (schwacher Wurf) */
+  OFFLINE_AIM_MS: 1500,
+  /** Erklär-Screen vor dem ersten Wurf (VIP kann überspringen; vorher 5 s) */
+  INTRO_MS: 8000,
   /** Pause nach dem Abspielen eines Wurfs (Banner) */
   RESULT_MS: 1700,
   OVER_MS: 3000,

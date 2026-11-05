@@ -1,5 +1,6 @@
 import { io } from 'socket.io-client';
 import type { GameState, Look, PlayerPublic, PrivateState, Team } from '../../shared/types';
+import type { PhoneOrientation } from '../../shared/games';
 import { AV_H, AV_W, drawAvatar, randomLook, sanitizeLook } from '../../shared/avatar';
 import { TEAM_INFO } from '../../shared/flunky';
 
@@ -26,10 +27,13 @@ export const store = {
   kicked: false,
   /** performance.now()-Zeitpunkt, an dem der aktuelle Countdown abläuft */
   endsAt: 0,
+  /** Aktuelle Phase hat kein Zeitlimit (Server schickt endsIn 0) → keinen Countdown zeigen */
+  noTimer: false,
 };
 
 export type Builder = () => (() => void) | null;
-export type Screen = [string, Builder];
+/** [Key, Builder, optional: Handy-Haltung für genau diesen Screen – übersteuert MINI_INFO[kind].orientation] */
+export type Screen = [key: string, build: Builder, orient?: PhoneOrientation];
 
 export const app = document.getElementById('app')!;
 const toastEl = document.getElementById('toast')!;
@@ -49,6 +53,11 @@ export function nameOf(id: string | null | undefined): string {
 
 export function secondsLeft(): number {
   return Math.max(0, Math.ceil((store.endsAt - performance.now()) / 1000));
+}
+
+/** Countdown-Text – leer, wenn die Phase kein Zeitlimit hat (dann wird in Ruhe gespielt) */
+export function timerText(fmt: (sec: number) => string = (sec) => `${sec}s`): string {
+  return store.noTimer ? '' : fmt(secondsLeft());
 }
 
 export function el(html: string) {

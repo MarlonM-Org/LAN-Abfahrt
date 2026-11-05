@@ -1,32 +1,11 @@
 {
-  "updated": "2026-11-05 18:50",
+  "updated": "2026-11-05 19:55",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
-    {
-      "title": "Zug überspringen + mehr Ruhe",
-      "kind": "",
-      "type": "Feature",
-      "branch": "feature/skip-und-ruhe",
-      "detail": "Kleines VIP-Menü + Laptop-Taste S zum Überspringen; Timer nur noch wo Zeit zum Spiel gehört"
-    },
-    {
-      "title": "Süßigkeiten-Klau",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/suessigkeiten",
-      "detail": "à la Sweet Day: Naschkatzen sammeln, Wächter jagen, schwer beladen = langsam"
-    },
-    {
-      "title": "Spion unter Gästen",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/spion",
-      "detail": "Spieler verstecken sich unter vielen gleichen NPC-Gästen, Aufgaben erfüllen, andere enttarnen"
-    },
     {
       "title": "Umzugschaos",
       "kind": "",
@@ -49,36 +28,45 @@
       "detail": "changed() sofort senden, meta-Event, private nur bei Änderung, 3 s Gnadenfrist statt sofort raus, Stick-Timeout, WebSocket"
     },
     {
-      "title": "Review Phase 0: Fairness + Parcours-Bug",
-      "kind": "parcours",
-      "type": "Review-Umsetzung",
-      "branch": "review/fairness",
-      "detail": "Alle 12 laufen im Parcours, Punkte nach Spielerzahl, Startspieler rotiert, Koop-Münzen Flieger/Grill, Sprint serverseitig"
-    },
-    {
       "title": "Review Phase 1: Ton + Juice am TV",
       "kind": "",
       "type": "Review-Umsetzung",
       "branch": "review/sound-juice",
       "detail": "sfx.ts über den fxBus, juice.ts (Shake, Hit-Stop, Partikel, Banner), Sprecher, Ergebnis-Reveal"
-    },
-    {
-      "title": "Review Phase 1: Handy-Ausrichtung (Marlons Feedback)",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/ausrichtung",
-      "detail": "orientation pro Spiel, Ansage + Overlay, ein schwebender Stick, Querlayout, Haptik-Ersatz fürs iPhone, erste 8 Spiele quer"
-    },
-    {
-      "title": "Review Phase 0/4: Pacing + Igel Stufe S",
-      "kind": "igel",
-      "type": "Review-Umsetzung",
-      "branch": "review/pacing-igel",
-      "detail": "Brett-Listen, Spieldauer-Klassen, TTT/Golf/Sprüche kürzer, Igel: Wind driftet, Zugzeit, Flut pro Runde, Kamera, HP-Countdown"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Zug überspringen (VIP-Menü ⋯ + Laptop S) + mehr Ruhe bei Timern",
+      "pr": 48,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Handy-Ausrichtung pro Spiel, Overlay, schwebender Stick, Querlayout für 19 Spiele",
+      "pr": 45,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Pacing-Leitplanken, Brett zieht nach Spieldauer, Igel-Krieg Stufe S (Wind, Zugzeit, Flut, Kamera)",
+      "pr": 46,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review Phase 0: Fairness, Parcours für 12 Läufer, Koop-Münzen, Sprint serverseitig",
+      "pr": 43,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Süßigkeiten-Klau",
+      "pr": 41,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Spion unter Gästen",
+      "pr": 40,
+      "date": "2026-11-05"
+    },
     {
       "title": "Kofferpacken",
       "pr": 37,
@@ -221,7 +209,7 @@
     },
     "parcours": {
       "status": "umgesetzt",
-      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer"
+      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer; ab 9 Spielern laufen jetzt alle 12 (#43)"
     },
     "turm": {
       "status": "umgesetzt",
@@ -234,6 +222,14 @@
     "boule": {
       "status": "umgesetzt",
       "notes": "Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
+    },
+    "igel": {
+      "status": "umgesetzt",
+      "notes": "Review Stufe S: Wind driftet, Zugzeit/HP nach Spielerzahl, Flut pro Runde, Kamera, HP-Countdown, FEUER-Knopf, quer (#45, #46)"
+    },
+    "ttt": {
+      "status": "umgesetzt",
+      "notes": "Runden auf 100 s / 2 Runden gekürzt, quer (#45, #46)"
     }
   },
   "general": [
@@ -275,11 +271,11 @@
     },
     {
       "title": "Zug überspringen (VIP-Menü + Laptop)",
-      "status": "in Arbeit"
+      "status": "umgesetzt"
     },
     {
       "title": "Timer zu knapp – mehr Ruhe",
-      "status": "in Arbeit"
+      "status": "umgesetzt"
     },
     {
       "title": "Sensor-Rückmeldung für Bewegungsspiele",
@@ -287,7 +283,7 @@
     },
     {
       "title": "Handy-Ausrichtung pro Spiel (hochkant/quer) festlegen, immer anzeigen, Layout dafür optimieren",
-      "status": "in Arbeit"
+      "status": "umgesetzt"
     },
     {
       "title": "Spiel-Review: Soundeffekte, Juice, Pacing ab 8 Spielern, Zuschauer-Rollen, Spielbrett 2.0, Igel→Worms (Umsetzungs-Briefing im Review)",

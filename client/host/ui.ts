@@ -89,9 +89,12 @@ export function prop(scene: Phaser.Scene, key: string, make: () => Pix, x: numbe
 /** Lokaler Countdown aus dem Server-Wert "endsIn" (ms). */
 export class Countdown {
   private endsAt = 0;
+  /** Phase ohne Zeitlimit (Server schickt endsIn 0) → keinen Countdown anzeigen */
+  none = false;
 
   set(endsInMs: number) {
     this.endsAt = performance.now() + endsInMs;
+    this.none = endsInMs <= 0;
   }
 
   get remaining() {

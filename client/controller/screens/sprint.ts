@@ -1,5 +1,6 @@
 import type { SprintState } from '../../../shared/types';
 import { type Screen, app, el, q, send, store, tapButton } from '../core';
+import { rttMs } from '../../timesync';
 
 export function pickSprint(s: SprintState): Screen {
   const id = store.playerId!;
@@ -45,7 +46,8 @@ function buildGo(s: SprintState) {
     if (done) return;
     done = true;
     const ms = Math.round(performance.now() - t0);
-    send('tap', { seq: s.goSeq, ms });
+    // Der Server misst selbst; rtt hilft ihm, die Netzlaufzeit abzuziehen
+    send('tap', { seq: s.goSeq, ms, rtt: Math.round(rttMs()) });
     btn.textContent = `${ms} ms`;
     navigator.vibrate?.(30);
   });

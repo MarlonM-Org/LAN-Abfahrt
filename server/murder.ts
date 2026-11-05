@@ -1,6 +1,6 @@
-import type { MiniSnapshot, MurderPrivate, MurderState, PrivateState } from '../shared/types';
+import type { MiniSnapshot, MurderPrivate, MurderState, PrivateState, SkipInfo } from '../shared/types';
 import { MURDER, ROOMS } from '../shared/games';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, phaseTimer, shuffle, waitLabel } from './minigame';
 
 interface Body {
   victim: string;
@@ -68,7 +68,7 @@ export class MurderGame implements MiniGame {
     }
     return {
       kind: 'murder',
-      state: { ...this.state, roomCounts: counts, endsIn: Math.max(0, this.deadline - Date.now()) },
+      state: { ...this.state, roomCounts: counts, endsIn: endsIn(this.deadline) },
     };
   }
 
@@ -133,6 +133,28 @@ export class MurderGame implements MiniGame {
       this.timers.clear();
       this.startVote();
     }
+  }
+
+  /** VIP/Laptop: Rollen-Screen, Diskussion, Abstimmung (fehlende Stimmen verfallen) und Rauswurf-Screen abkürzen */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub === 'roles') return { label: 'Los geht’s', info: true };
+    if (s.sub === 'meeting') return { label: 'Diskussion beenden', info: true };
+    if (s.sub === 'vote') {
+      const missing = this.ids.filter((v) => s.alive[v] && this.ctx.isConnected(v) && !this.votes.has(v));
+      return { label: waitLabel(this.ctx, missing, 'Stimme', 'Abstimmung beenden') };
+    }
+    if (s.sub === 'ejected') return { label: 'Weiter', info: true };
+    return null;
+  }
+
+  skip() {
+    const s = this.state;
+    this.timers.clear();
+    if (s.sub === 'roles') this.startTasks();
+    else if (s.sub === 'meeting') this.startVote();
+    else if (s.sub === 'vote') this.tallyVotes();
+    else if (s.sub === 'ejected' && !this.checkWin()) this.startTasks();
   }
 
   playerDisconnected() {
@@ -228,8 +250,7 @@ export class MurderGame implements MiniGame {
         s.deaths.push(b.victim);
       }
     }
-    this.setDeadline(MURDER.MEETING_MS);
-    this.timers.later(MURDER.MEETING_MS, () => this.startVote());
+    this.deadline = phaseTimer(this.timers, MURDER.MEETING_MS, () => this.startVote());
     this.ctx.onChange();
   }
 
@@ -238,8 +259,7 @@ export class MurderGame implements MiniGame {
     s.sub = 'vote';
     s.voted = [];
     this.votes.clear();
-    this.setDeadline(MURDER.VOTE_MS);
-    this.timers.later(MURDER.VOTE_MS, () => this.tallyVotes());
+    this.deadline = phaseTimer(this.timers, MURDER.VOTE_MS, () => this.tallyVotes());
     this.ctx.onChange();
   }
 

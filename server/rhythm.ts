@@ -1,6 +1,6 @@
-import type { MiniSnapshot, RhythmNote, RhythmState } from '../shared/types';
+import type { MiniSnapshot, RhythmNote, RhythmState, SkipInfo } from '../shared/types';
 import { RHYTHM, RHYTHM_TOPICS } from '../shared/dategames';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, phaseTimer, shuffle } from './minigame';
 
 /**
  * Das erste Gespräch: Ein Rhythmusspiel. Abwechselnd "redet" einer (viele Noten),
@@ -60,8 +60,19 @@ export class RhythmGame implements MiniGame {
       sympathy: 50,
     };
     for (const id of ids) this.judged.set(id, new Set());
-    // Falls jemand nicht "bereit" drückt, geht es trotzdem los
-    this.timers.later(25000, () => this.play());
+    // Falls jemand nicht "bereit" drückt: VIP startet über das Menü (oder nach READY_MS, falls gesetzt)
+    phaseTimer(this.timers, RHYTHM.READY_MS, () => this.play());
+  }
+
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub !== 'ready') return null;
+    const missing = this.ids.filter((p) => this.ctx.isConnected(p) && !s.ready.includes(p));
+    return { label: missing.length === 1 ? 'Ohne Bereit-Knopf starten' : 'Los geht’s' };
+  }
+
+  skip() {
+    if (this.state.sub === 'ready') this.play();
   }
 
   snapshot(): MiniSnapshot {

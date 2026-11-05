@@ -2,7 +2,8 @@ import { GRILL_INGS, GRILL_RECIPES, type GrillItem, type GrillState, grillHint, 
 import { TEAM_INFO } from '../../../shared/flunky';
 import { grillItemKey, grillItemPix } from '../../art/grill';
 import { type Screen, app, el, message, q, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { onInputReset, stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 /** Gegenstand groß und pixelig auf ein Canvas malen */
 function paintItem(cv: HTMLCanvasElement, item: GrillItem | null, scale: number) {
@@ -34,31 +35,31 @@ export function pickGrill(s: GrillState): Screen {
     () => {
       const kit = s.kitchens[me.k];
       const badge = kit.team
-        ? `<div class="team-badge team-${kit.team}">${TEAM_INFO[kit.team].name} – Küche ${kit.team === 'A' ? 'links' : 'rechts'}</div>`
-        : `<div class="team-badge gr-coop">Gemeinsam kochen!</div>`;
+        ? `<span class="lx-tag team-${kit.team}">${TEAM_INFO[kit.team].name} · Küche ${kit.team === 'A' ? 'links' : 'rechts'}</span>`
+        : `<span class="lx-tag gr-coop">Gemeinsam kochen!</span>`;
+      // Quer wie am Gamepad: links Stick, Mitte Bestellungen + „Du trägst“, rechts NEHMEN über AKTION
       const root = el(`
-        <div class="gr">
-          ${badge}
-          <div class="top-row"><span class="timer"></span><span class="score"></span></div>
-          <div class="gr-carry">
-            <canvas class="gr-held" width="88" height="80"></canvas>
-            <div class="gr-carry-txt"><small>DU TRÄGST</small><b class="gr-what"></b></div>
-          </div>
-          <p class="gr-hint"></p>
-          <div class="gr-orders"></div>
-          <div class="gr-controls">
-            <div class="stick-area"></div>
-            <div class="gr-btns">
-              <button class="big-btn gr-grab"><span class="gr-grab-l">NEHMEN</span><small class="gr-grab-s">aufheben</small></button>
-              <button class="big-btn gr-act">AKTION<small>halten: schneiden/löschen</small></button>
+        <div class="lx gr gr-lx">
+          <div class="lx-head">${badge}<span class="timer"></span><span class="score grow"></span></div>
+          <div class="lx-left gr-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
+          <div class="lx-mid">
+            <div class="gr-orders"></div>
+            <div class="gr-carry">
+              <canvas class="gr-held" width="88" height="80"></canvas>
+              <div class="gr-carry-txt"><small>DU TRÄGST</small><b class="gr-what"></b></div>
             </div>
+            <p class="gr-hint"></p>
+          </div>
+          <div class="lx-right gr-btns">
+            <button class="big-btn gr-grab"><span class="gr-grab-l">NEHMEN</span><small class="gr-grab-s">aufheben</small></button>
+            <button class="big-btn gr-act">AKTION<small>halten: schneiden/löschen</small></button>
           </div>
         </div>
       `);
-      joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+      stickZone(q(root, '.gr-stick'), (x, y) => send('stick', { x, y }));
       tapButton(q(root, '.gr-grab'), () => {
         send('grab');
-        navigator.vibrate?.(12);
+        haptic(12);
       });
       // AKTION: gedrückt halten (regelmäßig wiederholen, falls ein Paket verloren geht)
       const act = q<HTMLButtonElement>(root, '.gr-act');
@@ -77,7 +78,7 @@ export function pickGrill(s: GrillState): Screen {
         actPointer = e.pointerId;
         act.classList.add('held');
         send('act', { down: true });
-        navigator.vibrate?.(8);
+        haptic(8);
         clearInterval(actTimer);
         actTimer = window.setInterval(() => {
           if (!act.isConnected) return clearInterval(actTimer);
@@ -86,6 +87,7 @@ export function pickGrill(s: GrillState): Screen {
       });
       act.addEventListener('pointerup', release);
       act.addEventListener('pointercancel', release);
+      onInputReset(act, () => actPointer !== null && release());
       act.addEventListener('contextmenu', (e) => e.preventDefault());
       app.append(root);
 
@@ -139,8 +141,8 @@ export function pickGrill(s: GrillState): Screen {
           b.el.style.width = `${Math.round(f * 100)}%`;
           b.el.className = f < 0.25 ? 'low' : f < 0.5 ? 'mid' : '';
         }
-        if (p.no > prevNo) navigator.vibrate?.([30, 40, 30]);
-        if (p.sv > prevSv) navigator.vibrate?.(60);
+        if (p.no > prevNo) haptic([30, 40, 30]);
+        if (p.sv > prevSv) haptic(60);
         prevNo = p.no;
         prevSv = p.sv;
       };

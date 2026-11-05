@@ -1,6 +1,6 @@
 import type { BombState, HiloState, NhieState } from '../../../shared/types';
 import { cardLabel } from '../../../shared/games';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
+import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton, timerText } from '../core';
 
 const sipText = (n: number) => (n === 1 ? '1 Schluck' : `${n} Schlücke`);
 
@@ -13,7 +13,7 @@ export function pickNhie(s: NhieState): Screen {
     if (s.answered.includes(id)) return [`nh-wait-${s.round}`, message('Antwort gespeichert', 'Warte auf die anderen ...')];
     return [`nh-q-${s.round}`, () => {
       const root = el(`
-        <p>Runde ${s.round}/${s.rounds} · <span class="timer"></span></p>
+        <p>Runde ${s.round}/${s.rounds}<span class="timer"></span></p>
         <h2>Ich hab noch nie ${escapeHtml(s.statement.replace(/^\.\.\.\s*/, ''))}</h2>
         <button class="big-btn half drink-btn" data-v="1">Hab ich schon!</button>
         <button class="big-btn half secondary" data-v="0">Noch nie!</button>
@@ -27,7 +27,7 @@ export function pickNhie(s: NhieState): Screen {
         }),
       );
       app.append(root);
-      return () => (q(root, '.timer').textContent = `${secondsLeft()}s`);
+      return () => (q(root, '.timer').textContent = timerText((sec) => ` · ${sec}s`));
     }];
   }
   if (s.sub === 'reveal') {
@@ -48,7 +48,7 @@ export function pickHilo(s: HiloState): Screen {
     if (s.guessed.includes(id)) return [`hl-wait-${s.round}`, message('Getippt!', 'Warte auf die anderen ...')];
     return [`hl-g-${s.round}`, () => {
       const root = el(`
-        <p>Karte ${s.round}/${s.rounds} · <span class="timer"></span></p>
+        <p>Karte ${s.round}/${s.rounds}<span class="timer"></span></p>
         <div class="card-big">${cardLabel(s.card)}</div>
         <p>Ist die nächste Karte höher oder tiefer?</p>
         <button class="big-btn half drink-btn" data-d="higher">HÖHER ▲</button>
@@ -63,7 +63,7 @@ export function pickHilo(s: HiloState): Screen {
         }),
       );
       app.append(root);
-      return () => (q(root, '.timer').textContent = `${secondsLeft()}s`);
+      return () => (q(root, '.timer').textContent = timerText((sec) => ` · ${sec}s`));
     }];
   }
   if (s.sub === 'reveal') {

@@ -1,11 +1,8 @@
-import type { BoardState, MiniKind } from '../shared/types';
-import { BOARD_KINDS, BOARD_SIZE, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, fitsPlayers, miniLabel } from '../shared/games';
+import type { BoardState, MiniKind, SkipInfo } from '../shared/types';
+import { BOARD_KINDS, BOARD_SIZE, BOARD_TIMING, COCKTAIL_PRICE, FIELD_COINS, FIELD_TYPES, FINALE_KINDS, MINI_LENGTH, fitsPlayers, miniLabel } from '../shared/games';
 import { Timers, shuffle } from './minigame';
 
-const STEP_MS = 280;
-const INTRO_MS = 4000;
-/** Würfelt jemand so lange nicht (Handy weggelegt/eingeschlafen), würfelt der Server für ihn */
-const ROLL_IDLE_MS = 45_000;
+const { STEP_MS, INTRO_MS, ROLL_IDLE_MS, OFFLINE_ROLL_MS } = BOARD_TIMING;
 
 export interface BoardCtx {
   onChange(): void;
@@ -63,6 +60,8 @@ export class Board {
     ids: string[],
     maxRounds: number,
     private ctx: BoardCtx,
+    /** VIP-Option „Lange Spiele“: auch Minispiele über 4 min ziehen (sonst nur kurz + mittel) */
+    private longGames = false,
   ) {
     this.state = {
       round: 1,
@@ -109,10 +108,28 @@ export class Board {
     this.timers.later(900 + value * STEP_MS, () => this.land(playerId, path));
   }
 
+  /** VIP/Laptop: Würfeln für den Spieler, der dran ist – bzw. Minispiel-Ansage überspringen */
+  skippable(): SkipInfo | null {
+    const s = this.state;
+    if (s.sub === 'roll') return { label: `Für ${this.ctx.nameOf(this.currentPlayer)} würfeln` };
+    if (s.sub === 'intro' && s.nextMini) return { label: 'Minispiel starten', info: true };
+    return null;
+  }
+
+  skip() {
+    const s = this.state;
+    if (s.sub === 'roll') return this.roll(this.currentPlayer);
+    if (s.sub === 'intro' && s.nextMini) {
+      this.timers.clear();
+      const kind = s.nextMini;
+      this.ctx.startMini(kind);
+    }
+  }
+
   /** Spieler ist mitten im eigenen Zug weg (Handy gesperrt, App gewechselt) → nach kurzer Zeit automatisch würfeln */
   playerDisconnected(id: string) {
     if (this.state.sub !== 'roll' || id !== this.currentPlayer) return;
-    this.timers.later(5000, () => {
+    this.timers.later(OFFLINE_ROLL_MS, () => {
       if (!this.ctx.isConnected(id)) this.roll(id);
     });
   }
@@ -122,6 +139,9 @@ export class Board {
     for (const [id, c] of Object.entries(coins)) if (id in this.state.coins) this.addCoins(id, c);
     const s = this.state;
     s.round += 1;
+    // Startspieler rotiert: wer diese Runde als Erster dran war, ist nächste Runde Letzter.
+    // So kommt nicht immer dieselbe Person zuerst an die Bar (Clients lesen order[turnIdx]).
+    if (s.order.length > 1) s.order = [...s.order.slice(1), s.order[0]];
     s.turnIdx = 0;
     s.nextMini = null;
     if (this.finished) return;
@@ -194,9 +214,11 @@ export class Board {
     }
     s.sub = 'roll';
     this.ctx.onChange();
-    // Wer nicht verbunden ist, würfelt automatisch – wer ewig nicht würfelt, irgendwann auch
+    // Wer nicht verbunden ist, würfelt automatisch. Wer verbunden ist, hat alle Zeit der Welt
+    // (der VIP kann im Menü „Für … würfeln“) – nur nach sehr langer Zeit würfelt der Server.
     const id = this.currentPlayer;
-    this.timers.later(this.ctx.isConnected(id) ? ROLL_IDLE_MS : 1500, () => this.roll(id));
+    const wait = this.ctx.isConnected(id) ? ROLL_IDLE_MS : 1500;
+    if (wait !== null) this.timers.later(wait, () => this.roll(id));
   }
 
   private intro() {
@@ -206,7 +228,10 @@ export class Board {
     const finales = FINALE_KINDS.filter((k) => fitsPlayers(k, n));
     const isFinale = s.round === s.maxRounds && finales.length > 0;
     // Nur Spiele, die zur Spielerzahl passen (z. B. Urlaubs-Fangen ab 3, max. 8 Spieler)
-    const fitting = BOARD_KINDS.filter((k) => fitsPlayers(k, n));
+    // … und standardmäßig nur kurze/mittlere (≤ 4 min), damit die Party nicht stockt
+    const fitsAll = BOARD_KINDS.filter((k) => fitsPlayers(k, n));
+    const short = fitsAll.filter((k) => MINI_LENGTH[k] !== 'lang');
+    const fitting = this.longGames || !short.length ? fitsAll : short;
     const pool: MiniKind[] = fitting.filter((k) => k !== this.lastMini);
     if (!pool.length) pool.push(...(fitting.length ? fitting : BOARD_KINDS));
     const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)];

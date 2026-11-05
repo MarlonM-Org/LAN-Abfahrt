@@ -1,6 +1,6 @@
 import type { TourPrivate, TourState } from '../../../shared/types';
 import { TOUR_LOCATIONS, tourOutcomeText } from '../../../shared/tourist';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store } from '../core';
+import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store, timerText } from '../core';
 
 const tour = () => (store.state?.mini?.kind === 'tourist' ? store.state.mini.state : null);
 const priv = (): TourPrivate | null => (store.priv?.kind === 'tourist' ? store.priv.state : null);
@@ -258,7 +258,7 @@ function buildVote(role: 'accused' | 'accuser' | 'voter') {
   return () => {
     const s = tour();
     if (!s?.vote) return;
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     const need = Object.keys(s.points).length - 2;
     q(root, '.tour-count').textContent = `${s.vote.voted.length}/${need} haben abgestimmt`;
   };

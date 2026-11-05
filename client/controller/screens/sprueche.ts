@@ -1,6 +1,6 @@
 import type { SpruechePrivate, SpruecheState } from '../../../shared/types';
 import { SPRUECHE } from '../../../shared/sprueche';
-import { type Screen, app, el, escapeHtml, message, q, secondsLeft, send, socket, store, toast } from '../core';
+import { type Screen, app, el, escapeHtml, message, q, send, socket, store, timerText, toast } from '../core';
 
 /** Lokaler Entwurf – überlebt einen Neuaufbau des Screens (z. B. kurzer WLAN-Aussetzer) */
 const local = { key: '', text: '' };
@@ -140,7 +140,7 @@ function buildAnswer(s: SpruecheState, task: { id: number; prompt: string }) {
   return () => {
     const st = quip();
     if (!st) return;
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     const p = priv();
     if (p?.suggest && p.suggest.seq !== lastSuggest && !sent) {
       lastSuggest = p.suggest.seq;
@@ -163,7 +163,7 @@ function buildAnswered() {
   return () => {
     const st = quip();
     if (!st) return;
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     const missing = st.players.filter((id) => (st.answered[id] ?? 0) < st.need).length;
     q(root, '.wait').textContent = missing ? `Warte noch auf ${missing} ...` : 'Alle fertig!';
   };
@@ -214,7 +214,7 @@ function buildVote(s: SpruecheState, p: SpruechePrivate) {
   refresh();
   app.append(root);
   return () => {
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
   };
 }
 
@@ -275,7 +275,7 @@ function buildFinalVote(s: SpruecheState, p: SpruechePrivate) {
   refresh();
   app.append(root);
   return () => {
-    q(root, '.timer').textContent = `${secondsLeft()}s`;
+    q(root, '.timer').textContent = timerText();
     // Nur "fertig" vom Server übernehmen – die eigene Auswahl ist lokal aktueller
     if (priv()?.voteDone && !finished) {
       finished = true;

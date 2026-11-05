@@ -1,6 +1,6 @@
 import type { WolfPrivate, WolfState } from '../../../shared/werwolf';
 import { WOLF_CAUSE_TEXT, WOLF_ROLES, type WolfRole } from '../../../shared/werwolf';
-import { type Screen, app, avatarCanvas, el, escapeHtml, me, message, nameOf, q, secondsLeft, send, socket, store, toast } from '../core';
+import { type Screen, app, avatarCanvas, el, escapeHtml, me, message, nameOf, q, send, socket, store, timerText, toast } from '../core';
 
 const wolfState = () => (store.state?.mini?.kind === 'werwolf' ? store.state.mini.state : null);
 const priv = (): WolfPrivate | null => (store.priv?.kind === 'werwolf' ? store.priv.state : null);
@@ -125,7 +125,7 @@ function buildRoles() {
     el(`<p>Merk sie dir gut. Die Karte kannst du jederzeit wieder aufdecken – aber nur heimlich!</p>`),
   );
   return () => {
-    q(app, '.timer').textContent = `${secondsLeft()}s`;
+    q(app, '.timer').textContent = timerText();
     card.update();
   };
 }
@@ -205,7 +205,7 @@ function buildNight() {
     const p = priv();
     if (!w || !p) return;
     card.update();
-    q(box, '.timer').textContent = clock(secondsLeft());
+    q(box, '.timer').textContent = timerText(clock);
     const qEl = q(box, '.ww-q');
     const sub = q(box, '.ww-sub');
     const hexe = isHexeTurn();
@@ -329,7 +329,7 @@ function buildDay() {
     app.append(b);
   }
   return () => {
-    q(app, '.timer').textContent = clock(secondsLeft());
+    q(app, '.timer').textContent = timerText(clock);
     card.update();
   };
 }
@@ -365,7 +365,7 @@ function buildVote() {
   return () => {
     const s = wolfState();
     if (!s) return;
-    q(app, '.timer').textContent = `${secondsLeft()}s`;
+    q(app, '.timer').textContent = timerText();
     const voters = Object.keys(s.alive).filter((id) => s.alive[id]).length;
     q(app, '.ww-count').textContent = `${s.voted.length}/${voters} haben abgestimmt`;
   };
@@ -407,7 +407,7 @@ function buildHunter() {
   }
   app.append(g.root);
   return () => {
-    q(app, '.timer').textContent = `${secondsLeft()}s`;
+    q(app, '.timer').textContent = timerText();
   };
 }
 

@@ -1,8 +1,9 @@
-import type { BouleBall, BouleSide, BouleState, BouleTrack, MiniSnapshot, Point, Team } from '../shared/types';
+import type { BouleBall, BouleSide, BouleState, BouleTrack, MiniSnapshot, Point, SkipInfo, Team } from '../shared/types';
+import { possessive } from '../shared/players';
 import { BOULE, bouleDist, bouleDistance, bouleSetup } from '../shared/boule';
 import { TEAM_INFO } from '../shared/flunky';
 import { SHIRTS } from '../shared/avatar';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const num = (v: unknown, def = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : def);
@@ -281,13 +282,29 @@ export class BouleGame implements MiniGame {
     this.sub = 'aim';
     this.aimSeq += 1;
     this.aimShoot = false;
-    this.deadline = Date.now() + (this.ctx.isConnected(member) ? BOULE.AIM_MS : 1500);
     const seq = this.aimSeq;
-    // Zeit abgelaufen oder Spieler weg → automatischer, eher ungenauer Wurf
-    this.timers.later(this.deadline - Date.now(), () => {
+    // Spieler weg (oder – falls gesetzt – Zeit abgelaufen) → automatischer, eher ungenauer Wurf
+    this.deadline = phaseTimer(this.timers, this.ctx.isConnected(member) ? BOULE.AIM_MS : BOULE.OFFLINE_AIM_MS, () => {
       if (this.sub === 'aim' && this.aimSeq === seq) this.throwBall(this.autoThrow());
     });
     this.ctx.onChange();
+  }
+
+  /** VIP/Laptop: Erklärung überspringen bzw. für den Spieler, der dran ist, automatisch (ungenau) werfen */
+  skippable(): SkipInfo | null {
+    if (this.sub === 'intro') return { label: 'Los geht’s', info: true };
+    if (this.sub === 'aim' && this.turn) return { label: `${possessive(this.ctx.nameOf(this.turn))} Wurf überspringen` };
+    return null;
+  }
+
+  skip() {
+    if (this.sub === 'intro') {
+      this.timers.clear();
+      this.startEnd();
+    } else if (this.sub === 'aim') {
+      this.timers.clear();
+      this.throwBall(this.autoThrow());
+    }
   }
 
   private autoThrow(): BouleThrow {
@@ -389,7 +406,7 @@ export class BouleGame implements MiniGame {
       kind: 'boule',
       state: {
         sub: this.sub,
-        endsIn: Math.max(0, this.deadline - Date.now()),
+        endsIn: endsIn(this.deadline),
         teams: this.teams,
         sides: this.sides,
         ballsPer: this.ballsPer,

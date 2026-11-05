@@ -1,3 +1,4 @@
+import { fairRoleScores } from './rolefair';
 import type { GeistHunter, GeistPrivate, GeistState, MiniSnapshot, PrivateState } from '../shared/types';
 import { GEIST, collide, inCone, roomCenter, roomRect } from '../shared/geist';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
@@ -53,6 +54,10 @@ export class GeistGame implements MiniGame {
   private roundWinner: GeistState['roundWinner'] = null;
   private roundReason: string | null = null;
   private points: Record<string, number>;
+  /** Anteil der Punkte aus der Geister-Rolle (für die faire Wertung) */
+  private ghostPts: Record<string, number>;
+  private huntedRounds: Record<string, number>;
+  private ghosts: string[] = [];
   private stats = new Map<string, Stats>();
   private timers = new Timers();
   private tickLast = 0;
@@ -64,6 +69,8 @@ export class GeistGame implements MiniGame {
     this.order = shuffle(ids);
     this.rounds = Math.min(ids.length, 3);
     this.points = Object.fromEntries(ids.map((id) => [id, 0]));
+    this.ghostPts = Object.fromEntries(ids.map((id) => [id, 0]));
+    this.huntedRounds = Object.fromEntries(ids.map((id) => [id, 0]));
     for (const id of ids) this.stats.set(id, { scares: 0, damage: 0, revives: 0, wins: 0, paid: 0 });
     this.timers.every(TICK_MS, () => {
       const now = Date.now();
@@ -80,6 +87,8 @@ export class GeistGame implements MiniGame {
     this.round += 1;
     this.ghostId = this.order[(this.round - 1) % this.order.length];
     const hunterIds = this.ids.filter((id) => id !== this.ghostId);
+    for (const id of hunterIds) this.huntedRounds[id] += 1;
+    if (!this.ghosts.includes(this.ghostId)) this.ghosts.push(this.ghostId);
     this.maxHealth = GEIST.HEALTH_BASE + GEIST.HEALTH_PER_HUNTER * hunterIds.length;
     this.health = this.maxHealth;
     // Jäger starten im Flur (unten Mitte), der Geist in Küche oder Bad (oben, weit weg)
@@ -223,6 +232,7 @@ export class GeistGame implements MiniGame {
         h.reviveMs = 0;
         this.stats.get(this.ghostId)!.scares += 1;
         this.points[this.ghostId] += 1;
+        this.ghostPts[this.ghostId] += 1;
         this.lastScare = { victim: id, seq: ++this.seq };
         this.scareReady = now + GEIST.SCARE_COOLDOWN;
         this.reveal(now, 'touch', GEIST.TOUCH_REVEAL_MS);
@@ -284,6 +294,7 @@ export class GeistGame implements MiniGame {
     const hunterIds = [...this.hunters.keys()];
     if (winner === 'ghost') {
       this.points[this.ghostId] += 5;
+      this.ghostPts[this.ghostId] += 5;
       this.stats.get(this.ghostId)!.wins += 1;
     } else {
       for (const id of hunterIds) {
@@ -311,13 +322,15 @@ export class GeistGame implements MiniGame {
     this.sub = 'over';
     this.setDeadline(0);
     this.ctx.onChange();
+    // Mehr Spieler als Runden: Geister-Punkte nur unter Geistern vergleichen (sonst entscheidet das Los)
+    const fair = fairRoleScores(this.ids, this.rounds, this.points, this.ghostPts, this.huntedRounds, this.ghosts);
     this.timers.later(3500, () =>
       this.ctx.finish({
-        groups: groupByScore(this.ids, (id) => this.points[id]),
+        groups: groupByScore(this.ids, (id) => fair[id]),
         details: Object.fromEntries(
           this.ids.map((id) => {
             const st = this.stats.get(id)!;
-            const parts = [`${this.points[id]} Pkt`];
+            const parts = [`${Math.round(fair[id])} Pkt`];
             if (st.scares) parts.push(`${st.scares}x Buh`);
             if (st.damage >= 1) parts.push(`${Math.round(st.damage)} Licht`);
             if (st.revives) parts.push(`${st.revives}x gerettet`);
