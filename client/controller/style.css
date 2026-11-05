@@ -1022,6 +1022,24 @@ textarea.sp-input {
 .fg-heat small { font-size: 9px; text-align: center; }
 .fg-heat.hot { animation: shake 0.2s infinite; }
 
+/* ---------------------------------------------------------------- Spion unter Gästen */
+.sp-id { text-align: center; padding: 6px; border: 3px solid var(--wood-darker); background: #3b3b4f; color: #ffd25e; font-size: 11px; }
+.sp-id b { font-size: 16px; font-weight: normal; color: #fff4d6; }
+.sp-tasks { display: flex; gap: 4px; }
+.sp-tasks span { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 3px 0; background: var(--paper-light); border: 2px solid var(--paper-dark); font-size: 16px; line-height: 1.3; }
+.sp-tasks small { font-size: 6px; color: var(--ink-soft); }
+.sp-tasks span.done { background: #9be37f; border-color: var(--green); }
+.sp-tasks span.done small::after { content: ' ✓'; }
+.sp-map { position: relative; border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); line-height: 0; background: var(--outline); }
+.sp-map canvas { width: 100%; height: auto; image-rendering: pixelated; display: block; touch-action: none; }
+.sp-map .sp-zoom { position: absolute; right: 4px; top: 4px; padding: 4px 6px; font-size: 12px; line-height: 1.2; opacity: 0.85; }
+.sp-hint { min-height: 3.4em; margin: 0; }
+.sp-modes, .sp-acts { display: flex; gap: 8px; }
+.sp-modes button, .sp-acts button { flex: 1; padding: 12px 4px; font-size: 10px; }
+.sp-modes button.active { background: var(--sun); color: var(--ink); text-shadow: none; box-shadow: inset 0 3px 0 #ffe08a, inset 0 -4px 0 #c08316, 0 3px 0 var(--outline); }
+.sp-acts button { min-height: 64px; }
+.sp-throwrow button { font-size: 13px; }
+
 /* ---------------------------------------------------------------- Geisterjagd */
 .ghost-face { display: flex; justify-content: center; }
 .ghost-img { width: 90px; image-rendering: pixelated; animation: bob 0.9s infinite alternate; }

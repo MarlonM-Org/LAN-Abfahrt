@@ -22,6 +22,7 @@ import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
 import { grillBot } from './grillbot';
 import { golfBot } from './golfbot';
+import { spionBot } from './spionbot';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
 import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, tileOf } from '../shared/fangen';
@@ -1148,6 +1149,8 @@ export class Bot {
     if (m.kind === 'angeln') angelBot(this, m.state);
 
     if (m.kind === 'suess') suessBot(this, m.state);
+
+    if (m.kind === 'spion') spionBot(this, m.state);
 
     if (m.kind === 'autoball') afbBot(this, m.state);
 

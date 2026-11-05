@@ -92,7 +92,7 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
   👥 4–12 · 📱 Joystick + Verwandeln/Einrasten
 - [ ] ⭐ **Verräter im Ferienhaus** *(Vorbild: Trouble in Terrorist Town)* – Unschuldige, Verräter, Detektiv. Waffen im Haus verteilt, Verräter-Shop auf dem Handy, Detektiv kann Leichen untersuchen. **Als neuer Modus von „Mord im Ferienhaus“ bauen** (Räume, Rollen, Meetings existieren schon).
   👥 5–12 · 📱 geheime Rolle + Shop
-- [ ] **Spion unter Gästen** – Viele gleich aussehende NPC-Gäste am TV; jeder weiß nur auf seinem Handy, welche Figur er ist. Unauffällig bewegen, andere Spieler entlarven. Mit 12 Spielern großartig.
+- [x] **Spion unter Gästen** – Viele gleich aussehende NPC-Gäste am TV; jeder weiß nur auf seinem Handy, welche Figur er ist. Unauffällig bewegen, andere Spieler entlarven. Mit 12 Spielern großartig.
   👥 3–12 · 📱 privater Bildschirm
 - [ ] **Werwolf** – Komplett per Handy, kein Spielleiter nötig.
   👥 6–12

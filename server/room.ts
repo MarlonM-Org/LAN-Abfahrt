@@ -61,6 +61,7 @@ import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
 import { VersteckGame } from './verstecken';
+import { SpionGame } from './spion';
 import { StillepostGame } from './stillepost';
 import { isLoopback } from './net';
 import { TouristGame } from './tourist';
@@ -634,6 +635,9 @@ export class Room {
         break;
       case 'fangen':
         this.mini = new FangenGame(ids, ctx);
+        break;
+      case 'spion':
+        this.mini = new SpionGame(ids, ctx);
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);

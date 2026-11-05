@@ -177,7 +177,7 @@ export function defaultSongForScene(scene: string): string {
       return 'bar';
     case 'geist': case 'fangen': case 'werwolf':
       return 'spooky';
-    case 'murder': case 'ttt': case 'tourist': case 'verstecken': case 'suess':
+    case 'murder': case 'ttt': case 'tourist': case 'verstecken': case 'suess': case 'spion':
       return 'krimi';
     case 'zauber':
       return 'zauber';
