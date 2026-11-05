@@ -4,6 +4,8 @@ import { SHIRTS } from '../../../shared/avatar';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
 import { stickZone } from '../stick';
 import { haptic } from '../haptic';
+import { spectatorBar } from '../spectator';
+import { SPECTATOR } from '../../../shared/spectator';
 
 /** Sumo-Steg (quer): schwebender Stick links, REMPELN rechts */
 export function pickSumo(s: SumoState): Screen {
@@ -11,7 +13,8 @@ export function pickSumo(s: SumoState): Screen {
   const mine = s.players[id];
   if (!mine) return ['spectate', message('Du schaust zu', 'Sumo-Steg läuft – schau auf den Fernseher!')];
   if (s.sub === 'over') return ['su-over', message('Sumo-Steg vorbei!', 'Schau auf den Fernseher!')];
-  if (!mine.alive && s.sub === 'play') return [`su-dead-${s.round}`, message('Im Wasser – zuschauen', 'PLATSCH! Du dümpelst im Schwimmring und schaust zu, bis die Runde vorbei ist.')];
+  // Raus: als Geist alle 5 s eine Welle über den Steg schicken + auf den Rundensieger tippen
+  if (!mine.alive && (s.sub === 'play' || s.sub === 'roundOver')) return [`su-dead-${s.round}`, buildSumoGhost, 'any'];
   return ['su-ctl', () => {
     const look = me()?.look;
     const color = look ? SHIRTS[look.shirt] : '#f2c33a';
@@ -58,4 +61,42 @@ export function pickSumo(s: SumoState): Screen {
       cd.style.transform = `scaleY(${frac})`;
     };
   }];
+}
+
+/** Quer: links Hinweis + Zuschauer-Leiste, rechts der WELLE-Knopf */
+function buildSumoGhost() {
+  const id = store.playerId!;
+  const root = el(`
+    <div class="lx su-ghost">
+      <div class="lx-head"><b>🌊 Im Wasser</b><span class="arena-round su-round"></span><span class="arena-stats grow su-ghint"></span></div>
+      <div class="lx-left su-ghost-info"></div>
+      <div class="lx-mid"><p class="su-gtext">PLATSCH! Schick eine Welle vom Rand über den Steg – sie schubst alle, die sie erwischt.</p></div>
+      <div class="lx-right"><button class="big-btn ghost-wave">🌊<br/>WELLE<small>alle 5 s</small><i class="cd"></i></button></div>
+    </div>
+  `);
+  const wave = q<HTMLButtonElement>(root, '.ghost-wave');
+  const cd = q(root, '.ghost-wave .cd');
+  tapButton(wave, () => {
+    if (wave.disabled) return;
+    send('wave');
+    haptic([20, 30, 40]);
+  });
+  const bar = spectatorBar(q(root, '.su-ghost-info'));
+  app.append(root);
+  haptic([60, 40, 120]);
+  return () => {
+    bar();
+    const st = store.state?.mini?.kind === 'sumo' ? store.state.mini.state : null;
+    if (!st) return;
+    const g = st.ghosts?.[id];
+    const p = st.players[id];
+    q(root, '.su-round').textContent = `Runde ${st.round}`;
+    q(root, '.su-ghint').textContent = p ? `${p.pushes}× ins Wasser geschubst` : '';
+    q(root, '.su-gtext').textContent =
+      st.sub === 'roundOver'
+        ? st.roundWinner ? `${nameOf(st.roundWinner)} gewinnt die Runde.` : 'Alle im Wasser – Unentschieden!'
+        : g && g.cd > 0 ? `Die nächste Welle baut sich auf … ${Math.ceil(g.cd / 1000)}s` : 'PLATSCH! Schick eine Welle vom Rand über den Steg – sie schubst alle, die sie erwischt.';
+    wave.disabled = !(st.sub === 'play' && g && g.cd <= 0);
+    cd.style.transform = `scaleY(${g && st.sub === 'play' ? Math.min(1, g.cd / SPECTATOR.SUMO_WAVE_MS) : 1})`;
+  };
 }

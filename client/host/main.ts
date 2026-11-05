@@ -93,6 +93,7 @@ async function start() {
   connectMusic(socket);
   setupMusicMenu();
   watchServerVersion(socket);
+  void import('./emotes').then((m) => m.initSpectatorOverlay()); // Emotes + Wetten der Zuschauer als DOM-Overlay über allen Szenen
 
   // Browser erlauben Ton erst nach einer Nutzeraktion → einmal klicken/Taste drücken
   const overlay = document.getElementById('sound');

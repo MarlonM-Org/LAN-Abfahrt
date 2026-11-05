@@ -76,6 +76,7 @@ import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
+import { EmoteFeed } from './spectator';
 
 const MAX_PLAYERS = 12;
 const BOT_NAMES = ['Bot Lena', 'Bot Tobi', 'Bot Jule', 'Bot Ben', 'Bot Mia', 'Bot Finn', 'Bot Ida', 'Bot Max', 'Bot Ela', 'Bot Jan', 'Bot Pia', 'Bot Ole'];
@@ -179,6 +180,8 @@ export class Room {
   private miniIds: string[] | null = null;
   /** Gekickte Spieler-IDs (Handy mit alter ID bekommt „Du wurdest entfernt“) */
   private kicks = new KickList();
+  /** Zuschauer-Emotes (😂 😱 👏 🍅) – für alle Spiele, unabhängig vom Minispiel */
+  private emotes = new EmoteFeed();
   private offlineBucket = '';
   /** Gastgeber = erster Mensch, der beigetreten ist. Kommt er zurück, ist er wieder VIP. */
   private hostId: string | null = null;
@@ -422,6 +425,11 @@ export class Room {
       const payload = asRecord(msg).payload;
       this.trackHold(playerId, this.mini.kind, action, payload);
       this.mini.input(playerId, action, payload);
+    });
+
+    // Zuschauer-Emotes: generisch für alle Spiele (das Minispiel merkt davon nichts), 2 s Abklingzeit pro Spieler
+    socket.on('emote', (i: unknown) => {
+      if (playerId && this.players.has(playerId) && this.emotes.add(playerId, i)) this.changed();
     });
 
     socket.on('question:add', (text: string, ack?: (r: { ok: boolean; question?: string }) => void, kind?: string) => {
@@ -1374,6 +1382,7 @@ export class Room {
       skippable: this.skippable(),
       nochmal: this.nochmalState(),
       showBoard: this.phase === 'lobby' && this.showBoard,
+      emotes: this.emotes.state(),
     };
   }
 

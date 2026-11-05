@@ -1,6 +1,8 @@
 import type { ArenaPlayer, ArenaState, MiniSnapshot } from '../shared/types';
 import { ARENA, ARENA_SPAWNS, type ArenaCell, type ArenaItem, FLOOD_ORDER, blastCells, cellIdx, isSolidTile, spawnClearing } from '../shared/arena';
-import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, shuffle } from './minigame';
+import { SPECTATOR } from '../shared/spectator';
+import { BetBook } from './spectator';
 
 type Axis = 'x' | 'y';
 
@@ -33,6 +35,17 @@ const ASSIST = 0.12;
 /** Ab welchem Stick-Anteil eine Richtung zählt */
 const DEAD = 0.3;
 
+/** Geister-Kachelring: 0 = äußerster begehbarer Ring, steigt nach innen */
+const ringOf = (x: number, y: number) => Math.min(x - 1, y - 1, ARENA.COLS - 2 - x, ARENA.ROWS - 2 - y);
+
+interface Ghost {
+  x: number;
+  y: number;
+  sx: number;
+  sy: number;
+  readyAt: number;
+}
+
 /**
  * Bomben-Arena (Bomberman am Strand): Kokosnüsse/Wasserbomben legen, Sandburgen &
  * Liegestühle sprengen, Power-ups sammeln. Wer getroffen wird, ist nass und für die
@@ -57,6 +70,9 @@ export class ArenaGame implements MiniGame {
   private deaths: string[] = [];
   private seq = 0;
   private timers = new Timers();
+  /** Zuschauer: Wetten der Ausgeschiedenen + Geister mit Wasserbomben */
+  private bets = new BetBook();
+  private ghosts = new Map<string, Ghost>();
 
   constructor(
     private ids: string[],
@@ -89,6 +105,8 @@ export class ArenaGame implements MiniGame {
     this.endAt = 0;
     this.roundWinner = null;
     this.deaths = [];
+    this.ghosts.clear();
+    this.bets.newRound(this.round);
     const active = shuffle(this.ids.filter((id) => this.ctx.isConnected(id)));
     const spawns = ARENA_SPAWNS.slice(0, Math.max(1, active.length));
     // Feld bauen: Rand + Säulen fest, Rest zufällig Kisten (außer um die Startplätze)
@@ -139,6 +157,7 @@ export class ArenaGame implements MiniGame {
     this.deaths.forEach((id, i) => (this.players.get(id)!.survival += i));
     for (const id of alive) this.players.get(id)!.survival += n - 1;
     if (this.roundWinner) this.players.get(this.roundWinner)!.wins += 1;
+    this.bets.resolve(this.roundWinner);
     this.sub = 'roundOver';
     this.deadline = now + ARENA.ROUND_OVER_MS;
     this.ctx.onChange();
@@ -156,7 +175,7 @@ export class ArenaGame implements MiniGame {
       const p = this.players.get(id)!;
       return p.wins * 1000 + p.survival;
     };
-    const groups = groupByScore(this.ids, score);
+    const groups = this.bets.rank(this.ids, score);
     const top = groups[0] ?? [];
     const champ = top.length === 1 ? this.ctx.nameOf(top[0]) : null;
     this.timers.later(1500, () =>
@@ -165,7 +184,7 @@ export class ArenaGame implements MiniGame {
         details: Object.fromEntries(
           this.ids.map((id) => {
             const p = this.players.get(id)!;
-            return [id, `${p.wins} ${p.wins === 1 ? 'Sieg' : 'Siege'} · ${p.kills} Treffer`];
+            return [id, `${p.wins} ${p.wins === 1 ? 'Sieg' : 'Siege'} · ${p.kills} Treffer${this.bets.detail(id)}`];
           }),
         ),
         subtitle: champ ? `${champ} bleibt am längsten trocken!` : 'Alle gleich nass – Unentschieden!',
@@ -186,6 +205,7 @@ export class ArenaGame implements MiniGame {
       if (p.away && (this.ctx.offlineMs?.(id) ?? 0) >= OFFLINE_OUT_MS) this.kill(id, null);
     }
     for (const p of this.players.values()) if (p.alive && !p.away) this.move(p, dt);
+    for (const g of this.ghosts.values()) this.moveGhost(g, dt);
 
     // Power-ups einsammeln
     for (const p of this.players.values()) {
@@ -239,6 +259,10 @@ export class ArenaGame implements MiniGame {
     p.moving = false;
     p.away = false;
     this.deaths.push(id);
+    // Ab jetzt Geist: Zielkreuz startet am Rand nahe der Stelle, an der man nass wurde
+    const g: Ghost = { x: p.x, y: p.y, sx: 0, sy: 0, readyAt: Date.now() + 3000 };
+    this.snapGhost(g);
+    this.ghosts.set(id, g);
     if (by && by !== id) {
       const k = this.players.get(by);
       if (k) k.kills += 1;
@@ -273,6 +297,64 @@ export class ArenaGame implements MiniGame {
       if (other) chain.push(other);
     }
     for (const o of chain) if (this.bombs.includes(o)) this.explode(o, now);
+  }
+
+  // ---------------------------------------------------------------- Geister
+
+  /** Äußerster Ring, den Geister treffen dürfen: der Rand plus ein Ring – mit der Flut wandert das nach innen */
+  private ghostRing() {
+    const next = FLOOD_ORDER[Math.min(this.flood, FLOOD_ORDER.length - 1)];
+    const edge = this.flood > 0 ? ringOf(next % ARENA.COLS, Math.floor(next / ARENA.COLS)) : 0;
+    return edge + 1;
+  }
+
+  /** Zielkreuz auf den erlaubten Randbereich schieben */
+  private snapGhost(g: Ghost) {
+    g.x = clamp(g.x, 1, ARENA.COLS - 2);
+    g.y = clamp(g.y, 1, ARENA.ROWS - 2);
+    const max = this.ghostRing();
+    if (ringOf(g.x, g.y) <= max) return;
+    const d = [g.x - 1, ARENA.COLS - 2 - g.x, g.y - 1, ARENA.ROWS - 2 - g.y];
+    const side = d.indexOf(Math.min(...d));
+    if (side === 0) g.x = 1 + max;
+    else if (side === 1) g.x = ARENA.COLS - 2 - max;
+    else if (side === 2) g.y = 1 + max;
+    else g.y = ARENA.ROWS - 2 - max;
+  }
+
+  private moveGhost(g: Ghost, dt: number) {
+    if (Math.hypot(g.sx, g.sy) < DEAD) return;
+    g.x += g.sx * SPECTATOR.ARENA_GHOST_SPEED * dt;
+    g.y += g.sy * SPECTATOR.ARENA_GHOST_SPEED * dt;
+    this.snapGhost(g);
+  }
+
+  /** Geist wirft eine Wasserbombe auf die nächste freie Randkachel am Zielkreuz */
+  private ghostThrow(id: string, g: Ghost) {
+    const now = Date.now();
+    if (this.sub !== 'play' || now < g.readyAt) return;
+    const max = this.ghostRing();
+    const gx = Math.round(g.x);
+    const gy = Math.round(g.y);
+    let best: [number, number] | null = null;
+    let bestD = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const x = gx + dx;
+        const y = gy + dy;
+        if (x < 1 || y < 1 || x > ARENA.COLS - 2 || y > ARENA.ROWS - 2 || ringOf(x, y) > max) continue;
+        if (this.cellAt(x, y) !== '.' || this.bombAt(x, y)) continue;
+        const d = Math.hypot(x - g.x, y - g.y);
+        if (d < bestD) {
+          bestD = d;
+          best = [x, y];
+        }
+      }
+    }
+    if (!best) return;
+    g.readyAt = now + SPECTATOR.ARENA_GHOST_MS;
+    this.bombs.push({ id: ++this.seq, x: best[0], y: best[1], at: now + ARENA.FUSE_MS, owner: id, range: SPECTATOR.ARENA_GHOST_RANGE });
+    this.ctx.onChange();
   }
 
   // ---------------------------------------------------------------- Bewegung
@@ -362,6 +444,19 @@ export class ArenaGame implements MiniGame {
   input(id: string, action: string, payload: unknown) {
     const p = this.players.get(id);
     if (!p) return;
+    if (action === 'bet') {
+      const open = this.sub === 'play' && !this.endAt;
+      if (this.bets.place(id, payload, this.ids, this.alive(), open)) this.ctx.onChange();
+      return;
+    }
+    const ghost = !p.alive ? this.ghosts.get(id) : undefined;
+    if (ghost && (action === 'stick' || action === 'ghost')) {
+      const pl = asRecord(payload);
+      ghost.sx = clamp(Number(pl.x) || 0, -1, 1);
+      ghost.sy = clamp(Number(pl.y) || 0, -1, 1);
+      return;
+    }
+    if (ghost && (action === 'bomb' || action === 'throw')) return this.ghostThrow(id, ghost);
     if (action === 'stick') {
       const pl = asRecord(payload);
       p.sx = clamp(Number(pl.x) || 0, -1, 1);
@@ -409,6 +504,10 @@ export class ArenaGame implements MiniGame {
           ]),
         ),
         roundWinner: this.roundWinner,
+        spectator: this.bets.info(this.alive(), this.round, this.sub === 'play' && !this.endAt, this.sub === 'play' || this.sub === 'countdown' ? undefined : this.roundWinner),
+        ghosts: Object.fromEntries(
+          [...this.ghosts.entries()].map(([id, g]) => [id, { x: r2(g.x), y: r2(g.y), cd: Math.max(0, g.readyAt - now) }]),
+        ),
       },
     };
   }

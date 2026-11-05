@@ -508,6 +508,8 @@ export interface KurveState {
   deaths: { id: string; x: number; y: number; seq: number }[];
   pickup: { id: string; type: KurvePower; x: number; y: number; seq: number } | null;
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Bomben-Arena
@@ -546,6 +548,10 @@ export interface ArenaState {
   players: Record<string, ArenaPlayer>;
   /** Nur in roundOver/over: Rundensieger (null = Unentschieden) */
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+  /** Geister (Ausgeschiedene): Zielkreuz in Kacheln + Abklingzeit der Wasserbombe (ms) */
+  ghosts?: Record<string, { x: number; y: number; cd: number }>;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Bowling
@@ -1262,6 +1268,8 @@ export interface SmashState {
   items: { id: number; type: import('./smash').ItemKind; x: number; y: number }[];
   fx: SmashFx[];
   winner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 // ------------------------------------------------------------------ Stille Post mit Bildern
@@ -1679,6 +1687,12 @@ export interface SumoState {
   sudden: boolean;
   players: Record<string, SumoPlayer>;
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
+  /** Geister (Ausgeschiedene): Abklingzeit der Welle (ms) */
+  ghosts?: Record<string, { cd: number }>;
+  /** Laufende Geister-Wellen: Start (x, y), Richtung (dx, dy), zurückgelegte Strecke d (px) */
+  waves?: { seq: number; by: string; x: number; y: number; dx: number; dy: number; d: number }[];
 }
 
 // ------------------------------------------------------------------ Zauber-Arena
@@ -1822,6 +1836,8 @@ export interface BogenState {
   chest: { x: number; y: number } | null;
   fx: BogenFx[];
   roundWinner: string | null;
+  /** Zuschauer-Ebene: Lebende, Rundensieger, Wetten (siehe shared/spectator.ts) */
+  spectator?: import('./spectator').SpectatorInfo;
 }
 
 /** Nur an den jeweiligen Spieler */
@@ -2001,6 +2017,8 @@ export interface GameLive {
   nochmal: NochmalState | null;
   /** Lobby: Leaderboard des Abends groß auf dem TV */
   showBoard: boolean;
+  /** Zuschauer-Emotes der letzten Sekunden (Ringpuffer, siehe shared/spectator.ts) */
+  emotes?: import('./spectator').EmoteEntry[];
 }
 
 /** Was TV, Handy und Bots lesen: `meta` + `state` zusammengeführt ({ ...meta, ...live }). */

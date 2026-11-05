@@ -52,6 +52,7 @@ import { pickWerwolf } from './screens/werwolf';
 import { buildKicked, initVipPlayersButton } from './players';
 import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
+import { attachSpectator } from './spectator';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -223,6 +224,8 @@ function renderNow() {
     app.innerHTML = '';
     try {
       updater = build();
+      // Zuschauer-/Warte-Screens: Live-Stand, Wetten und Emote-Leiste (spectator.ts)
+      updater = attachSpectator(app, key, updater);
     } catch (e) {
       console.error(e);
       updater = null;
