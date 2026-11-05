@@ -4,7 +4,7 @@ import { itemIcon } from '../../art/kartsprites';
 import { Mode7Renderer } from '../../kart3d/render';
 import { KartWorld } from '../../kart3d/world';
 import { onInputReset } from '../stick';
-import { type Screen, LS, app, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
+import { type Screen, LS, app, colorOfId, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
 import { steerFromRoll, tiltLabel, tiltRoll } from '../tilt';
 import { haptic } from '../haptic';
@@ -405,6 +405,8 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   // Diagnose (Playwright): Renderzeit pro Frame und Korrekturen der Vorhersage
   (window as unknown as { __kartDebug?: () => unknown }).__kartDebug = () => ({ frameMs, corrections: [...world.corrections], diag: { ...world.diag } });
   const lookOf = (id: string) => store.state?.players.find((p) => p.id === id)?.look;
+  // Kart-Farbe = Spielerfarbe des Abends (wie am TV, `KartScene`)
+  const colorOf = (id: string) => colorOfId(id).hex;
 
   let lastSnapT = 0;
   let wasCharged = false;
@@ -465,7 +467,7 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     const mine = poses.find((p) => p.id === store.playerId);
     if (mine) {
       camA += wrapAngle(mine.angle - camA) * (1 - Math.exp(-dt / 160));
-      renderer.render(Mode7Renderer.chase(mine, camA), st, poses, { lookOf, now });
+      renderer.render(Mode7Renderer.chase(mine, camA), st, poses, { lookOf, colorOf, now });
     }
     frameMs = frameMs * 0.9 + (performance.now() - t0) * 0.1;
   };

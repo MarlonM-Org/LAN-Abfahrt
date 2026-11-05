@@ -559,9 +559,6 @@ export const KURVE = {
   WRAP_MS: 6000,
   /** So viele Spurpunkte pro Spieler stehen im Snapshot */
   TAIL: 32,
-  /** 12 gut unterscheidbare Farben – Index 0–9 passt zu den T-Shirt-Farben (SHIRTS) */
-  COLORS: ['#e0503f', '#3f8fe0', '#46b04a', '#f2c33a', '#b07ae0', '#f0973a', '#2fb5a5', '#f4efe2', '#8fd8ff', '#f07aa8', '#b6e05a', '#c98a5a'],
-  COLOR_NAMES: ['Rot', 'Blau', 'Grün', 'Gelb', 'Lila', 'Orange', 'Türkis', 'Weiß', 'Hellblau', 'Rosa', 'Limette', 'Kupfer'],
 };
 
 export const KURVE_POWER_INFO: Record<KurvePower, { label: string; desc: string; color: string }> = {
@@ -600,8 +597,6 @@ export const ENTEN = {
     { name: 'Möwen-Alarm!', ms: 26000, maxBirds: 4, every: 850, speed: 1.25, life: 5500, floats: 2, weights: { duck: 0.55, gull: 0.35, flamingo: 0.1 } },
     { name: 'Flamingo-Fieber', ms: 26000, maxBirds: 6, every: 620, speed: 1.5, life: 4600, floats: 3, weights: { duck: 0.45, gull: 0.37, flamingo: 0.18 } },
   ],
-  /** 12 gut unterscheidbare Fadenkreuz-Farben */
-  COLORS: [0xff4040, 0x3f8fff, 0x4ee04e, 0xffe03a, 0xff7ad8, 0xff9a2e, 0xa67bff, 0x3fe8d8, 0xffffff, 0xc8ff3a, 0xd89a5a, 0xc0305f],
 };
 
 // ------------------------------------------------------------------ Verräter im Ferienhaus
@@ -694,8 +689,6 @@ export const TURM = {
   COUNTDOWN_MS: 3500,
   GUST_EVERY_MS: 30000,
   GUST_MS: 3500,
-  /** Bahnfarben (Bestmarke, Namensschild) */
-  COLORS: [0xe0503f, 0x3f8fe0, 0x46b04a, 0xf2c33a, 0x9b5fc0, 0xf0973a, 0x2fb5a5, 0xf07aa8, 0x8d5629, 0x5f6bd6, 0xa8c43a, 0x7f7b73],
 };
 
 /** Urlaubs-Teile in Tetromino-Form. Zellen als [Spalte, Zeile], Zeile nach unten. */

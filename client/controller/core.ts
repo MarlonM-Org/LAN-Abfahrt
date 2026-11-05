@@ -56,6 +56,14 @@ export function myColor() {
   return m ? playerColor(m.color) : null;
 }
 
+/**
+ * Spielerfarbe des Abends für eine beliebige Spieler-ID (wie `pcol()` am TV).
+ * `fallback` greift nur, wenn der Spieler nicht (mehr) in der Liste steht – z. B. die Reihenfolge im Spiel.
+ */
+export function colorOfId(id: string | null | undefined, fallback = 0) {
+  return playerColor(store.state?.players.find((p) => p.id === id)?.color ?? fallback);
+}
+
 // Rahmen von #app dauerhaft in der eigenen Farbe – nach dem Zusammenführen von meta/state in main.ts
 function paintMyColor() {
   const c = myColor();

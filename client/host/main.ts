@@ -150,22 +150,33 @@ async function start() {
     showOrientBanner(s);
   }
 
-  // Beim Start eines Minispiels 6 s „📱↔ Handys QUER halten“ bzw. hochkant – auch ohne Brett-Intro (Arcade, Trinkspiel, Date)
+  // „📱↔ Handys QUER halten“ bzw. hochkant, 4 s unten mittig – nur wenn ein Minispiel OHNE Regelkarte startet
+  // (Trinkspiel, Date Night, „Nochmal“); nach der Phase `intro` hat die IntroScene die Haltung schon gezeigt
   const orientTv = document.getElementById('orient-tv');
   let orientKind = '';
+  let orientPrev = '';
   let orientTimer: number | undefined;
+  const hideOrient = (now: boolean) => {
+    clearTimeout(orientTimer);
+    orientTv?.classList.toggle('now', now);
+    orientTv?.classList.add('off');
+  };
   function showOrientBanner(s: GameState) {
+    const prev = orientPrev;
+    orientPrev = s.phase;
+    if (s.phase === 'results' || s.phase === 'board' || s.phase === 'lobby') hideOrient(true);
     const kind = s.phase === 'mini' && s.mini ? s.mini.kind : '';
     if (kind === orientKind) return;
     orientKind = kind;
-    const info = kind ? MINI_INFO[kind as keyof typeof MINI_INFO] : undefined;
+    if (!kind || prev === 'intro') return;
+    const info = MINI_INFO[kind as keyof typeof MINI_INFO];
     if (!orientTv || !info) return;
     const text = ORIENT_TEXT[info.orientation].replace('Handy ', 'Handys ').replace('Halte das Handy, wie du magst', 'Haltet die Handys, wie ihr mögt');
     orientTv.textContent = `${info.icon} ${info.title} · ${text}`;
     orientTv.classList.toggle('landscape', info.orientation === 'landscape');
-    orientTv.classList.remove('off');
+    orientTv.classList.remove('off', 'now');
     clearTimeout(orientTimer);
-    orientTimer = window.setTimeout(() => orientTv.classList.add('off'), 6000);
+    orientTimer = window.setTimeout(() => hideOrient(false), 4000);
   }
 }
 

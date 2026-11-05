@@ -8,6 +8,7 @@ import { figure, playAvatar } from './textures';
 import { GOLD, NameTags, ensureTex, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { pcol } from './playerColor';
 
 const HEAT_COLORS = [0x5aa0e8, 0xf2e05a, 0xf0973a, 0xe0402f];
 const HEAT_CSS = ['#8cc4ff', '#fff07a', '#ffb867', '#ff6a5a'];
@@ -79,7 +80,7 @@ export class FangenScene extends Phaser.Scene {
       playAvatar(img, h.moving ? 'walk' : 'idle', h.sprinting ? 1.6 : 1);
       a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
       a.ring.setPosition(a.x, a.y + 5).setDepth(a.y - 1);
-      tagSpecs.push({ id, x: a.x, y: a.y - 29, name: a.name, color: '#fff4d6' });
+      tagSpecs.push({ id, x: a.x, y: a.y - 29, name: a.name, color: pcol(id).hex });
       if (h.sprinting && !a.sprinting) sfx('whoosh', { x: a.x, vol: 0.5 });
       a.sprinting = h.sprinting;
       const heat = st.sub === 'chase' ? h.heat : -1;

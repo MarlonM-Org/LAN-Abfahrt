@@ -52,17 +52,17 @@ export type MiniKind =
   | 'sup' | 'tidy'
   | 'flieger' | 'kurve' | 'arena'
   | 'bowling'
-  | 'sup' | 'tidy' | 'enten'
-  | 'sup' | 'tidy' | 'ttt'
+  | 'enten'
+  | 'ttt'
   | 'verstecken'
-  | 'sup' | 'tidy' | 'parcours'
-  | 'sup' | 'tidy' | 'kart'
-  | 'sup' | 'tidy' | 'turm'
-  | 'sup' | 'tidy' | 'igel'
+  | 'parcours'
+  | 'kart'
+  | 'turm'
+  | 'igel'
   | 'smash'
-  | 'sup' | 'tidy' | 'wasser'
+  | 'wasser'
   | 'stillepost'
-  | 'sup' | 'tidy' | 'fangen'
+  | 'fangen'
   | 'geist'
   | 'grill'
   | 'boule'
@@ -482,7 +482,7 @@ export interface KurveHead {
   /** aktuelle Geschwindigkeit (px/s) – zum Glätten auf dem TV */
   v: number;
   alive: boolean;
-  /** Index in KURVE.COLORS */
+  /** Spurfarbe: Index in `PLAYER_COLORS` (= Spielerfarbe des Abends, `shared/players.ts`) */
   color: number;
   score: number;
   /** Gerade in einer Lücke (Kopf zieht keine Spur) */

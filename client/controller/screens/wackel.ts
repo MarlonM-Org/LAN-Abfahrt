@@ -1,7 +1,6 @@
 import type { WackelState } from '../../../shared/wackel';
-import { SHIRTS } from '../../../shared/avatar';
 import { haptic } from '../haptic';
-import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store } from '../core';
+import { type Screen, app, avatarCanvas, el, me, message, myColor, nameOf, q, secondsLeft, send, store } from '../core';
 import { floatingStick, holdButton } from './smash';
 
 /**
@@ -28,7 +27,7 @@ export function pickWackel(s: WackelState): Screen {
 
   return ['wk-play', () => {
     const look = me()?.look;
-    const color = look ? SHIRTS[look.shirt] : '#e0503f';
+    const color = myColor()?.hex ?? '#e0503f';
     const root = el(`
       <div class="smash wackel" style="--wk-color:${color}">
         <div class="sm-top wk-top">
