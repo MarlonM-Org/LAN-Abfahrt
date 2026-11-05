@@ -46,6 +46,7 @@ import { WP, type WpistoleState, wpTargetAt } from '../shared/wpistole';
 import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
 import type { AngelnState } from '../shared/angeln';
+import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
 
 export interface BotOptions {
   url: string;
@@ -870,6 +871,37 @@ export class Bot {
             if (Math.abs(dx) < 1) break;
             this.send('shift', { dir: Math.sign(dx) });
             await sleep(rand(100, 170));
+          }
+          await sleep(rand(100, 400));
+          if (cur()?.id === act.id) this.send('drop', { on: true });
+          for (let i = 0; i < 60 && cur()?.id === act.id; i++) await sleep(100);
+          this.send('drop', { on: false });
+        });
+      }
+    }
+
+    if (m.kind === 'koffer' && m.state.sub === 'play') {
+      const car = m.state.cars.find((c) => c.owners.includes(this.id));
+      const act = car?.active;
+      if (car && act && act.owner === this.id) {
+        this.once(`koffer-${act.id}`, async () => {
+          const plan = planKoffer(car);
+          await sleep(rand(250, 600));
+          for (let i = 0; i < (plan.rot - act.rot + 4) % 4; i++) {
+            this.send('rotate');
+            await sleep(rand(110, 200));
+          }
+          const cur = () => {
+            const s2 = this.state?.mini?.kind === 'koffer' ? this.state.mini.state : null;
+            return s2?.cars.find((c) => c.id === car.id)?.active;
+          };
+          for (let i = 0; i < 50; i++) {
+            const a = cur();
+            if (!a || a.id !== act.id) return;
+            const dx = plan.x - a.x;
+            if (Math.abs(dx) < 1) break;
+            this.send('shift', { dir: Math.sign(dx) });
+            await sleep(rand(90, 160));
           }
           await sleep(rand(100, 400));
           if (cur()?.id === act.id) this.send('drop', { on: true });
@@ -1961,6 +1993,73 @@ function fangenHunter(bot: Bot, st: FangenState, fg: FangenMemory) {
   if (Math.hypot(c.x - meH.x, c.y - meH.y) < 3) fg.until = 0;
   fangenSteer(bot, meH, fg.goal);
 
+}
+
+/**
+ * Kofferpacken-Bot: legt das Teil an die tiefste passende Stelle im Kofferraum.
+ * Oberflächen-Karte in Viertelblock-Spalten; bewertet Landehöhe, Lücken darunter, Kippgefahr
+ * und Zellen über der Dachlinie. Hinten über die Ladekante plant er nie.
+ */
+export function planKoffer(car: KofferCar): { rot: number; x: number } {
+  const B = KOFFER.BLOCK;
+  const W = KOFFER.W * B;
+  const bw = B / 4;
+  const n = Math.round(W / bw);
+  const binX = (i: number) => (i + 0.5) * bw;
+  const surf = Array.from({ length: n }, () => 0);
+  const binsOf = (cx: number, r: number) => {
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) if (Math.abs(binX(i) - cx) < r) out.push(i);
+    return out;
+  };
+  const p = car.pieces;
+  for (let k = 0; k < p.length; k += 6) {
+    const [, item, , x, y, a] = p.slice(k, k + 6);
+    for (const o of kofferCellOffsets(item, a / 100)) {
+      const top = y - o.y + B / 2 + 1;
+      for (const i of binsOf(x + o.x, B / 2 + 1)) surf[i] = Math.max(surf[i], top);
+    }
+  }
+  const act = car.active!;
+  let best = { rot: 0, x: W / 2, score: Infinity };
+  for (let rot = 0; rot < 4; rot++) {
+    const offs = kofferCellOffsets(act.item, (rot * Math.PI) / 2);
+    const minOx = Math.min(...offs.map((o) => o.x));
+    const maxOx = Math.max(...offs.map((o) => o.x));
+    for (let x0 = 0; x0 <= W; x0 += B / 2) {
+      const x = kofferSnapX(act.item, rot, x0);
+      if (x + minOx - B / 2 < -0.5 || x + maxOx + B / 2 > W + 0.5) continue;
+      let comY = -Infinity;
+      const under: number[] = [];
+      for (const o of offs) {
+        const bins = binsOf(x + o.x, B / 2 - 1);
+        const s = bins.length ? Math.max(...bins.map((i) => surf[i])) : 0;
+        under.push(s);
+        comY = Math.max(comY, s + o.y + B / 2);
+      }
+      let holes = 0;
+      let top = -Infinity;
+      let above = 0;
+      let supLo = Infinity;
+      let supHi = -Infinity;
+      offs.forEach((o, j) => {
+        const bottom = comY - o.y - B / 2;
+        const cellTop = comY - o.y + B / 2;
+        top = Math.max(top, cellTop);
+        if (cellTop - B / 2 > KOFFER.ROOF * B) above++;
+        if (offs.some((q) => Math.abs(q.x - o.x) < 2 && q.y > o.y + 2)) return;
+        holes += Math.max(0, bottom - under[j]);
+        if (bottom - under[j] < 2) {
+          supLo = Math.min(supLo, x + o.x - B / 2);
+          supHi = Math.max(supHi, x + o.x + B / 2);
+        }
+      });
+      const tips = x < supLo + 3 || x > supHi - 3 ? B * 2 : 0;
+      const score = top + holes * 1.2 + tips + above * B * 2 + x * 0.02 + Math.random() * B * 0.3;
+      if (score < best.score) best = { rot, x, score };
+    }
+  }
+  return { rot: best.rot, x: best.x };
 }
 
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */
