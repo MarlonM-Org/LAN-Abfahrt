@@ -2,7 +2,9 @@ import { DARTS, DART_SEGMENTS, type DartsState, POWER_TEXT, dartsCalm, dartsPhas
 import type { Point } from '../../../shared/types';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store } from '../core';
 import type { BowlThrow } from '../bowlingThrow';
-import { flickToThrow } from '../dartsThrow';
+import { FLICK_SCALE, flickToThrow } from '../dartsThrow';
+import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, rememberFeedback } from '../motionFeedback';
+import { dartsFeedback } from '../throwFeedback';
 import { onMotion } from '../motion';
 import { mountThrowInput } from '../throwInput';
 
@@ -16,6 +18,7 @@ export function pickDarts(s: DartsState): Screen {
   const id = store.playerId!;
   if (!s.players.some((p) => p.id === id)) return ['spectate', message('Du schaust zu', 'Nächstes Spiel bist du dabei!')];
   if (s.sub === 'intro') {
+    forgetFeedback('darts');
     return [
       'da-intro',
       message(
@@ -103,6 +106,9 @@ function buildRound(s0: DartsState) {
   const result = q(root, '.da-result');
   const scoreEl = q(root, '.da-score');
   const roundEl = q(root, '.da-round');
+  const card = feedbackCard(true);
+  area.before(card.root);
+  card.set(lastFeedback('darts'));
 
   // Größe: quadratisch, passt in Breite und ~36 % der Höhe
   const css = Math.floor(Math.min(app.clientWidth - 28, window.innerHeight * 0.36, 360));
@@ -197,17 +203,22 @@ function buildRound(s0: DartsState) {
         button: 'HALTEN &amp;<br/>WERFEN',
         holding: 'SCHNIPPEN …<br/><small>und loslassen!</small>',
         swing: flickToThrow,
+        scale: FLICK_SCALE,
       },
-      (t: BowlThrow) => {
+      (t: BowlThrow, info) => {
         held = false;
         navigator.vibrate?.(30);
         const now = performance.now();
         flying = cross(now);
         send('throw', { n, ax: r1(aim.x), ay: r1(aim.y), t: Math.round(now - t0), amp: r1(amp), power: t.speed, side: t.angle });
         const hint = dartsPowerHint(t.speed);
+        const fb = dartsFeedback(t, info);
+        rememberFeedback('darts', fb);
+        card.set(fb);
         area.innerHTML = '';
-        area.append(el(`<div class="center"><h2>Wurf!</h2><p>Kraft ${Math.round(t.speed * 100)} % – ${POWER_TEXT[hint]}${hint === 'low' ? ' (landet tiefer)' : hint === 'high' ? ' (landet höher)' : ''}</p></div>`));
+        area.append(el(`<div class="center"><h2>Wurf!</h2><p>Kraft ${POWER_TEXT[hint]}</p></div>`));
       },
+      { onStart: () => card.dim(), onFail: (reason, info) => card.set(failFeedback(reason, info)) },
     );
   };
   mount();
@@ -318,6 +329,8 @@ function buildWatch() {
   `);
   app.append(root);
   const list = q(root, '.da-list');
+  const card = feedbackCard(true);
+  list.before(card.root);
   let key = '';
   return () => {
     const s = darts();
@@ -339,6 +352,8 @@ function buildWatch() {
     }
     q(root, '.headline').textContent = head;
     q(root, '.sub').textContent = sub;
+    const fb = lastFeedback('darts');
+    if (fb !== card.current) card.set(fb);
     const k = JSON.stringify(ranked.map((p) => [p.id, p.total, p.round]));
     if (k === key) return;
     key = k;

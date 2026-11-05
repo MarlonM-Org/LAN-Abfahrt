@@ -5,7 +5,7 @@ import { Mode7Renderer } from '../../kart3d/render';
 import { KartWorld } from '../../kart3d/world';
 import { type Screen, LS, app, el, message, q, secondsLeft, send, socket, store, toast } from '../core';
 import { enableMotion, motionSupport, onMotion } from '../motion';
-import { steerFromRoll, tiltRoll } from '../tilt';
+import { steerFromRoll, tiltLabel, tiltRoll } from '../tilt';
 
 /**
  * Kart-Rennen am Handy (quer halten):
@@ -152,7 +152,7 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       <div class="k3-left">
         ${
           mode === 'tilt'
-            ? '<div class="k3-wheel"><div class="k3-wheel-in"></div></div><div class="k3-leftlabel">Handy kippen = lenken<br/>Tippen = Mitte setzen</div>'
+            ? '<div class="k3-wheel"><div class="k3-wheel-in"></div><b class="k3-tiltdeg">0°</b></div><div class="k3-leftlabel">Handy kippen = lenken<br/>Tippen = Mitte setzen</div>'
             : '<div class="k3-stick"><div class="k3-base"></div><div class="k3-knob"></div></div><div class="k3-leftlabel">◀ Daumen schieben ▶</div>'
         }
       </div>
@@ -470,6 +470,9 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       inp.steer = Math.round(tilt.smooth * 100) / 100;
       const wheel = root.querySelector('.k3-wheel-in') as HTMLElement | null;
       if (wheel) wheel.style.transform = `rotate(${inp.steer * 90}deg)`;
+      const degEl = root.querySelector('.k3-tiltdeg');
+      const lbl = tiltLabel(tilt.roll, tilt.center);
+      if (degEl && degEl.textContent !== lbl) degEl.textContent = lbl;
     }
     push();
     // Vorhersage + Haptik

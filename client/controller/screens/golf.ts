@@ -1,8 +1,10 @@
 import type { GolfState } from '../../../shared/types';
-import { GOLF, type GolfHole, golfBounds, golfHole, moverSeg, spinnerBlades } from '../../../shared/golf';
+import { GOLF, type GolfHole, golfBounds, golfHole, golfIdealPutt, moverSeg, spinnerBlades } from '../../../shared/golf';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store, toast } from '../core';
 import { type MotionSample, enableMotion, motionSupport, onMotion } from '../motion';
-import { dragToPutt, swingToPutt } from '../golfPutt';
+import { PUTT_SCALE, dragToPutt, swingToPutt } from '../golfPutt';
+import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, motionInfo, rememberFeedback } from '../motionFeedback';
+import { golfFeedback } from '../throwFeedback';
 
 const golf = () => (store.state?.mini?.kind === 'golf' ? store.state.mini.state : null);
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -13,6 +15,7 @@ export function pickGolf(s: GolfState): Screen {
   const id = store.playerId!;
   if (!s.order.includes(id)) return ['spectate', message('Du schaust zu', 'Nächstes Spiel bist du dabei!')];
   if (s.sub === 'intro') {
+    forgetFeedback('golf');
     return [
       'golf-intro',
       message(
@@ -254,6 +257,14 @@ function buildPlay(hole: number) {
   const swingBtn = q<HTMLButtonElement>(root, '.gf-swing');
   const modeBtn = q<HTMLButtonElement>(root, '.gf-mode');
   q(root, '.gf-sw').style.background = hex(golf()?.colors[id] ?? 0xffffff);
+  // Feedback zum letzten Putt (bleibt stehen, bis der nächste beginnt)
+  const card = feedbackCard(true);
+  swingBtn.before(card.root);
+  card.set(lastFeedback('golf'));
+  const showFb = (fb: ReturnType<typeof golfFeedback>) => {
+    rememberFeedback('golf', fb);
+    card.set(fb);
+  };
 
   // Karte einpassen (Welt → Bildschirm, nicht gedreht)
   const bounds = golfBounds(h);
@@ -318,6 +329,11 @@ function buildPlay(hole: number) {
     const b = myBall();
     return b ? Math.atan2(h.cup.y - b.y, h.cup.x - b.x) : 0;
   };
+  /** geschätzt nötige Kraft vom aktuellen Ball aus (fürs Feedback) */
+  const idealPower = () => {
+    const b = myBall();
+    return b ? golfIdealPutt(h, b).power : 0.5;
+  };
 
   // ---- Zurückziehen (Schleuder) bzw. Zielen (Sensor-Modus)
   let pid: number | null = null;
@@ -330,6 +346,7 @@ function buildPlay(hole: number) {
     pid = e.pointerId;
     start = { x: e.clientX, y: e.clientY };
     if (mode === 'motion') aimAt(e);
+    else card.dim();
   });
   const aimAt = (e: PointerEvent) => {
     const b = myBall();
@@ -359,8 +376,11 @@ function buildPlay(hole: number) {
       return;
     }
     const r = dragToPutt(e.clientX - start.x, e.clientY - start.y, maxLen());
-    if (r.ok && canPutt()) putt(r.putt.angle, r.putt.power);
-    else {
+    if (r.ok && canPutt()) {
+      const fb = golfFeedback(r.putt.power, idealPower(), null, null);
+      putt(r.putt.angle, r.putt.power);
+      showFb(fb);
+    } else {
       aim = null;
       sendAim(null, 0, true);
       if (!r.ok) hint.textContent = r.reason;
@@ -400,6 +420,7 @@ function buildPlay(hole: number) {
     samples = [];
     recording = true;
     swingBtn.classList.add('holding');
+    card.dim();
     swingBtn.innerHTML = 'PENDELN …<br/><small>und loslassen!</small>';
     navigator.vibrate?.(15);
   });
@@ -408,9 +429,17 @@ function buildPlay(hole: number) {
     recording = false;
     swingBtn.classList.remove('holding');
     swingBtn.innerHTML = 'HALTEN &amp;<br/>SCHWINGEN';
-    const r = swingToPutt(samples, motionAim ?? defaultAim());
-    if (r.ok) putt(r.putt.angle, r.putt.power);
-    else hint.textContent = r.reason;
+    const aimA = motionAim ?? defaultAim();
+    const r = swingToPutt(samples, aimA);
+    const info = motionInfo(samples, PUTT_SCALE);
+    if (r.ok) {
+      const fb = canPutt() ? golfFeedback(r.putt.power, idealPower(), info, ((r.putt.angle - aimA) * 180) / Math.PI) : null;
+      putt(r.putt.angle, r.putt.power);
+      if (fb) showFb(fb);
+    } else {
+      hint.textContent = r.reason;
+      card.set(failFeedback(r.reason, info));
+    }
   };
   swingBtn.addEventListener('pointerup', release);
   swingBtn.addEventListener('pointercancel', release);

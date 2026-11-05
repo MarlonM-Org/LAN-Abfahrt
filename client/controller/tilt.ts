@@ -34,3 +34,17 @@ export function steerFromRoll(rollDeg: number, centerDeg: number, fullDeg = 28, 
   const mag = Math.max(0, Math.abs(d) - deadDeg) / Math.max(1, fullDeg - deadDeg);
   return Math.round(sign * Math.min(1, mag) * 100) / 100;
 }
+
+/**
+ * Anzeige für die Kipp-Lenkung: gemessener Winkel relativ zur Mitte, z. B. „◀ 12°“ oder „8° ▶“.
+ * Innerhalb der Totzone „0°“, ab voller Lenkung mit „MAX“.
+ */
+export function tiltLabel(rollDeg: number, centerDeg: number, fullDeg = 28, deadDeg = 2.5): string {
+  let d = rollDeg - centerDeg;
+  if (d > 180) d -= 360;
+  if (d < -180) d += 360;
+  const a = Math.round(Math.abs(d));
+  if (Math.abs(d) < deadDeg) return '0°';
+  const txt = Math.abs(d) >= fullDeg ? `${a}° MAX` : `${a}°`;
+  return d < 0 ? `◀ ${txt}` : `${txt} ▶`;
+}

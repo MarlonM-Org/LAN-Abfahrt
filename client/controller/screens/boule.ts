@@ -3,6 +3,8 @@ import { BOULE, bouleAim, boulePowerFor } from '../../../shared/boule';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store } from '../core';
 import type { BowlThrow } from '../bowlingThrow';
 import { mountThrowInput } from '../throwInput';
+import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, rememberFeedback } from '../motionFeedback';
+import { bouleFeedback } from '../throwFeedback';
 
 const boule = () => (store.state?.mini?.kind === 'boule' ? store.state.mini.state : null);
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -12,6 +14,7 @@ export function pickBoule(s: BouleState): Screen {
   const id = store.playerId!;
   if (!(id in s.ballsPer)) return ['spectate', message('Du schaust zu', 'Nächstes Spiel bist du dabei!')];
   if (s.sub === 'intro') {
+    forgetFeedback('boule');
     const mine = mySide(s);
     const team = s.teams && mine ? `Du spielst für ${mine.name}. ` : '';
     return [
@@ -104,6 +107,9 @@ function buildAim(s: BouleState) {
   app.append(root);
   drawMap(q<HTMLCanvasElement>(root, '.bo-map'), s);
   const area = q(root, '.bw-area');
+  const card = feedbackCard(true);
+  area.before(card.root);
+  card.set(lastFeedback('boule'));
 
   let shoot = false;
   const legen = q(root, '.bo-legen');
@@ -128,16 +134,17 @@ function buildAim(s: BouleState) {
       padText: 'Kugel nach oben wischen!<br/>Schnell = weit · schräg = Richtung · im Bogen = Effet',
       padClass: 'bo-pad',
     },
-    (t: BowlThrow) => {
+    (t: BowlThrow, info) => {
       navigator.vibrate?.(40);
       send('throw', { seq, ...t, shoot });
+      const fb = bouleFeedback(t, info, s.jack ? jackPow / 100 : null, jackAng, shoot);
+      rememberFeedback('boule', fb);
+      card.set(fb);
       q(root, '.bo-head').classList.add('hidden');
       area.innerHTML = '';
-      const dir = Math.abs(t.angle) < 0.05 ? 'gerade' : t.angle > 0 ? 'rechts' : 'links';
-      area.append(
-        el(`<div class="center"><h2>${shoot ? 'Schuss!' : 'Wurf!'}</h2><p>Kraft ${Math.round(t.speed * 100)} % · ${dir}${t.spin ? ` · Effet ${t.spin > 0 ? 'rechts' : 'links'}` : ''}</p><p>(Schweinchen: ${jackPow} %)</p><p>Schau auf den Fernseher!</p></div>`),
-      );
+      area.append(el(`<div class="center"><h2>${shoot ? 'Schuss!' : 'Wurf!'}</h2><p>Schau auf den Fernseher!</p></div>`));
     },
+    { onStart: () => card.dim(), onFail: (reason, info) => card.set(failFeedback(reason, info)) },
   );
 
   return () => {
@@ -158,6 +165,8 @@ function buildWatch() {
   `);
   app.append(root);
   const board = q(root, '.bo-board');
+  const card = feedbackCard();
+  board.before(card.root);
   let boardKey = '';
   return () => {
     const s = boule();
@@ -189,6 +198,8 @@ function buildWatch() {
     }
     q(root, '.headline').textContent = head;
     q(root, '.sub').textContent = sub;
+    const fb = lastFeedback('boule');
+    if (fb !== card.current) card.set(fb);
 
     const key = JSON.stringify([s.sides.map((x) => x.score), s.left, s.turn, s.sub === 'over']);
     if (key === boardKey) return;
