@@ -441,6 +441,15 @@ export const TURM = {
   /** Fallgeschwindigkeit in Blöcken pro Sekunde (normal / mit ▼) */
   FALL: 2,
   FAST: 11,
+  /** Seitliches Raster des gesteuerten Teils (Blöcke): Zellkanten liegen immer auf diesem Raster */
+  STEP: 0.5,
+  /** Lock-Delay: so lange bleibt ein aufgesetztes Teil noch steuerbar (ms) – mit ▼ kürzer */
+  LOCK_MS: 450,
+  LOCK_FAST_MS: 120,
+  /** Höchstens so lange ab dem ersten Aufsetzen (verhindert endloses Hin- und Herschieben) */
+  LOCK_MAX_MS: 1600,
+  /** Ausweichen beim Verschieben/Drehen, wenn es knapp klemmt (Blöcke, nach oben/unten) */
+  KICK: 0.5,
   /** Neue Teile erscheinen zufällig bis zu so viele Blöcke neben der Mitte */
   SPAWN_JITTER: 1.5,
   /** Abstand des neuen Teils über dem höchsten Punkt des Turms (Blöcke) */
@@ -500,6 +509,18 @@ export function turmCellOffsets(shape: number, angle: number): { x: number; y: n
     const dy = (r + 0.5 - com.y) * TURM.BLOCK;
     return { x: dx * cos - dy * sin, y: dx * sin + dy * cos };
   });
+}
+
+/**
+ * Rastet die x-Position (Schwerpunkt) so ein, dass die Zellkanten auf dem Halbblock-Raster liegen
+ * (wie die Plattformkanten). Der Schwerpunkt selbst liegt bei L-, J- und gedrehten T-Teilen ein
+ * Viertel daneben – deshalb wird über die Kanten gerastert, nicht über den Schwerpunkt.
+ */
+export function turmSnapX(shape: number, rot: number, x: number): number {
+  const offs = turmCellOffsets(shape, (rot * Math.PI) / 2);
+  const h = TURM.STEP * TURM.BLOCK;
+  const left = x + Math.min(...offs.map((o) => o.x)) - TURM.BLOCK / 2;
+  return Math.round((x + Math.round(left / h) * h - left) * 1000) / 1000;
 }
 
 // ------------------------------------------------------------------ Arcade
