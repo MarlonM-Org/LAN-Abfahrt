@@ -87,7 +87,7 @@ export class TttGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    this.rounds = ids.length >= 8 ? 2 : 3;
+    this.rounds = ids.length >= 6 ? 2 : 3;
     this.scores = Object.fromEntries(ids.map((id) => [id, 0]));
     this.traitorRounds = Object.fromEntries(ids.map((id) => [id, 0]));
     let last = Date.now();

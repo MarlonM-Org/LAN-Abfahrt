@@ -2012,5 +2012,7 @@ export interface StartRequest {
   /** 'top' = meiste Stimmen, 'favorites' = Zufall aus den gewählten Spielen (Arcade-Abstimmung) */
   mode: 'party' | 'date' | 'drink' | 'random' | 'top' | 'favorites' | MiniKind;
   rounds?: number;
+  /** Party-Modus: auch lange Minispiele (> 4 min) aufs Brett */
+  longGames?: boolean;
   version?: string;
 }
