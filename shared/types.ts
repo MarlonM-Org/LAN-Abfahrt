@@ -1129,7 +1129,14 @@ export interface TurmState {
 
 // ------------------------------------------------------------------ Controller-Spiele: Igel-Krieg
 
-export type IgelWeapon = 'bazooka' | 'grenade' | 'teleport' | 'punch';
+export type IgelWeapon =
+  | 'bazooka' | 'grenade' | 'shotgun' | 'airstrike' | 'dynamite' | 'mine'
+  | 'cluster' | 'paddle' | 'holy' | 'punch' | 'teleport' | 'bridge';
+
+/** Terrain-Operation: Krater sprengen (`carve`) oder Fläche aufschütten (`add`, z. B. Surfbrett-Brücke) */
+export type IgelOp = [number, number, number, 'carve' | 'add'];
+
+export type IgelProjType = 'bazooka' | 'grenade' | 'cluster' | 'frag' | 'gull' | 'dynamite' | 'holy';
 
 export interface IgelHog {
   id: number;
@@ -1146,51 +1153,105 @@ export interface IgelHog {
   shown: number;
 }
 
+/** Gegenstände auf der Insel: Seeigel-Minen, Gaskartuschen vom Grill, Kisten am Sonnenschirm */
+export interface IgelObj {
+  id: number;
+  type: 'mine' | 'barrel' | 'crate';
+  x: number;
+  y: number;
+  /** Mine scharf */
+  armed?: boolean;
+  /** Mine/Kartusche ausgelöst – gleich knallt's */
+  lit?: boolean;
+  /** Kiste schwebt noch am Sonnenschirm */
+  chute?: boolean;
+}
+
 export interface IgelFx {
   seq: number;
-  /** taunt = Zuschauer-Spruch als Sprechblase über dem Igel `hog` */
-  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt';
+  /**
+   * taunt = Zuschauer-Spruch als Sprechblase über dem Igel `hog`; shot = Wasserstrahl von (x, y) nach (x2, y2);
+   * gull = Möwe fliegt über x; crate = Kiste eingesammelt; land = Kiste gelandet; beep = Mine ausgelöst;
+   * holy = Heilige Ananas geworfen; fire = Abschuss
+   */
+  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt' | 'shot' | 'gull' | 'crate' | 'land' | 'beep' | 'holy' | 'fire';
   x: number;
   y: number;
   r?: number;
   text?: string;
   /** Igel, über dem die Sprechblase hängt (taunt) */
   hog?: number;
+  x2?: number;
+  y2?: number;
+}
+
+/** Live-Zielvorschau: Winkel + Kraft, beim Luftschlag die Ziel-x auf der Karte */
+export interface IgelAim {
+  angle: number;
+  power: number;
+  tx?: number;
+}
+
+/** Spieler-Team (ab 5 Spielern): Sonne, Meer, Sand, Palme */
+export interface IgelSquad {
+  name: string;
+  color: string;
+  members: string[];
 }
 
 export interface IgelState {
-  /** countdown → aim (Zug) → flight (Geschoss unterwegs) → retreat (Rückzug) → settle → aim … → over */
-  sub: 'countdown' | 'aim' | 'flight' | 'retreat' | 'settle' | 'over';
+  /**
+   * Rundlauf (bis 6 Spieler): countdown → aim (Zug) → flight (Geschoss unterwegs) → retreat (Rückzug) → settle → aim … → over
+   * „Alle gleichzeitig“ (ab 7): countdown → aimAll → flightAll → retreatAll → settle → aimAll … → over
+   */
+  sub: 'countdown' | 'aim' | 'flight' | 'retreat' | 'settle' | 'aimAll' | 'flightAll' | 'retreatAll' | 'over';
+  /** true = Modus „Alle gleichzeitig“ */
+  simul: boolean;
   endsIn: number;
-  /** Terrain = genTerrain(seed) + alle Krater in Reihenfolge */
+  /** Terrain = genTerrain(seed) + alle Operationen in Reihenfolge */
   seed: number;
-  craters: [number, number, number][];
+  ops: IgelOp[];
   water: number;
   /** −1 … 1, positiv = nach rechts */
   wind: number;
-  /** Spieler-IDs in Zugreihenfolge (jeder Spieler = ein Team) */
+  /** Spieler-IDs in Zugreihenfolge (bei Teams abwechselnd A1, B1, C1, A2 …) */
   teams: string[];
+  /** Spieler-Teams (ab 5 Spielern), sonst null = jeder für sich */
+  squads: IgelSquad[] | null;
   hogs: IgelHog[];
+  objs: IgelObj[];
   turn: number;
+  /** Rundlauf: wer gerade steuert (bei Teams evtl. den Igel eines Mitspielers) */
   active: string | null;
   activeHog: number | null;
   next: string | null;
+  /** Waffe des aktiven Spielers (Rundlauf) */
   weapon: IgelWeapon;
+  /** Gewählte Waffe pro Spieler */
+  weapons: Record<string, IgelWeapon>;
+  /** Wasserbomben-Zünder pro Spieler (1–5 s) */
+  fuse: Record<string, number>;
   /** Restmunition pro Spieler, −1 = unbegrenzt */
   ammo: Record<string, Record<IgelWeapon, number>>;
   /** Live-Zielvorschau des aktiven Spielers (für die Ziellinie am TV) */
-  aim: { angle: number; power: number } | null;
-  projs: { id: number; type: 'bazooka' | 'grenade'; x: number; y: number }[];
+  aim: IgelAim | null;
+  /** Alle gleichzeitig: Zielvorschau pro Spieler */
+  aims: Record<string, IgelAim>;
+  /** Alle gleichzeitig: wer schon FEUER gedrückt hat */
+  locked: string[];
+  /** Schrotflinte: Restschüsse im laufenden Zug (Rundlauf) */
+  shotsLeft: number;
+  projs: { id: number; type: IgelProjType; x: number; y: number; owner: string }[];
   fx: IgelFx[];
   suddenDeath: boolean;
   /** ms bis Sudden Death (0 = läuft schon) */
   suddenIn: number;
-  /** Start-HP pro Igel (100, ab 8 Spielern 60) */
+  /** Start-HP pro Igel (100; nur im Rundlauf ab 8 Spielern 60 – „Alle gleichzeitig“ hat immer 100) */
   maxHp: number;
   /** Zugzeit dieser Partie (nach Spielerzahl) */
   turnMs: number;
   damage: Record<string, number>;
-  /** Ausgeschiedene Spieler in Reihenfolge */
+  /** Ausgeschiedene Spieler in Reihenfolge (bei Teams erst, wenn das ganze Team raus ist) */
   out: string[];
 }
 
