@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 19:25",
+  "updated": "2026-11-05 20:05",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -40,24 +40,20 @@
       "type": "Review-Umsetzung",
       "branch": "review/sound-juice",
       "detail": "sfx.ts über den fxBus, juice.ts (Shake, Hit-Stop, Partikel, Banner), Sprecher, Ergebnis-Reveal"
-    },
-    {
-      "title": "Review Phase 1: Handy-Ausrichtung (Marlons Feedback)",
-      "kind": "",
-      "type": "Review-Umsetzung",
-      "branch": "review/ausrichtung",
-      "detail": "orientation pro Spiel, Ansage + Overlay, ein schwebender Stick, Querlayout, Haptik-Ersatz fürs iPhone, erste 8 Spiele quer"
-    },
-    {
-      "title": "Review Phase 0/4: Pacing + Igel Stufe S",
-      "kind": "igel",
-      "type": "Review-Umsetzung",
-      "branch": "review/pacing-igel",
-      "detail": "Brett-Listen, Spieldauer-Klassen, TTT/Golf/Sprüche kürzer, Igel: Wind driftet, Zugzeit, Flut pro Runde, Kamera, HP-Countdown"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Review: Handy-Ausrichtung pro Spiel, Overlay, schwebender Stick, Querlayout für 19 Spiele",
+      "pr": 45,
+      "date": "2026-11-05"
+    },
+    {
+      "title": "Review: Pacing-Leitplanken, Brett zieht nach Spieldauer, Igel-Krieg Stufe S (Wind, Zugzeit, Flut, Kamera)",
+      "pr": 46,
+      "date": "2026-11-05"
+    },
     {
       "title": "Review Phase 0: Fairness, Parcours für 12 Läufer, Koop-Münzen, Sprint serverseitig",
       "pr": 43,
@@ -228,6 +224,14 @@
     "boule": {
       "status": "umgesetzt",
       "notes": "Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
+    },
+    "igel": {
+      "status": "umgesetzt",
+      "notes": "Review Stufe S: Wind driftet, Zugzeit/HP nach Spielerzahl, Flut pro Runde, Kamera, HP-Countdown, FEUER-Knopf, quer (#45, #46)"
+    },
+    "ttt": {
+      "status": "umgesetzt",
+      "notes": "Runden auf 100 s / 2 Runden gekürzt, quer (#45, #46)"
     }
   },
   "general": [
@@ -281,7 +285,7 @@
     },
     {
       "title": "Handy-Ausrichtung pro Spiel (hochkant/quer) festlegen, immer anzeigen, Layout dafür optimieren",
-      "status": "in Arbeit"
+      "status": "umgesetzt"
     },
     {
       "title": "Spiel-Review: Soundeffekte, Juice, Pacing ab 8 Spielern, Zuschauer-Rollen, Spielbrett 2.0, Igel→Worms (Umsetzungs-Briefing im Review)",
