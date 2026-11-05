@@ -2,7 +2,7 @@
  * Minigolf: Umrechnung von Zurückziehen (Schleuder) bzw. Putter-Schwung in einen Schlag.
  * Reine Funktionen (kein DOM) – damit lassen sie sich mit Testdaten prüfen (`npm run test:golf`).
  */
-import type { MotionSample } from './motion';
+import { type MotionSample, type SwingScale, swingAcc, swingRot } from './motion';
 
 export interface Putt {
   /** Richtung in Welt-Koordinaten (rad, 0 = nach rechts, π/2 = nach unten) */
@@ -65,3 +65,10 @@ export function swingToPutt(samples: MotionSample[], aimAngle: number): PuttResu
   const corr = (clamp(-yaw, -24, 24) * 0.5 * Math.PI) / 180;
   return { ok: true, putt: { angle: r3(aimAngle + corr), power: Math.round(power * 100) / 100 } };
 }
+
+/** Feedback-Skala zu swingToPutt (gleiche Schwellen) */
+export const PUTT_SCALE: SwingScale = {
+  level: (s) => Math.max((swingRot(s) - 25) / 420, (swingAcc(s) - 0.8) / 14),
+  windowMs: 1000,
+  yawLimit: 60,
+};

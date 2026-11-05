@@ -3,7 +3,7 @@
  * Reine Funktionen (kein DOM) – damit lassen sie sich mit Testdaten prüfen.
  * Alles ist bewusst großzügig eingestellt: Ein lockerer Schwung soll einen ordentlichen Wurf ergeben.
  */
-import type { MotionSample } from './motion';
+import { type MotionSample, type SwingScale, swingAcc, swingRot } from './motion';
 
 export interface BowlThrow {
   /** 0 … 1 */
@@ -70,6 +70,17 @@ export function swingToThrow(samples: MotionSample[]): ThrowResult {
 
   return { ok: true, t: { speed: r2(speed), angle: r2(angle), spin: r2(spin) } };
 }
+
+/** Feedback-Skala zu swingToThrow (gleiche Schwellen: Roh-Stärke vor der Umrechnung in das Tempo) */
+export const BOWL_SCALE: SwingScale = {
+  level: (s) => Math.max((swingRot(s) - 100) / 520, (swingAcc(s) - 3) / 22),
+  windowMs: 1000,
+  yawLimit: 80,
+};
+
+/** Feedback-Skala zu swipeToThrow: Fingertempo (px/ms) → Roh-Stärke, ausgewertet werden die letzten 120 ms */
+export const swipeLevel = (v: number) => (v - 0.35) / 2.2;
+export const SWIPE_WINDOW_MS = 120;
 
 export interface SwipePoint {
   x: number;

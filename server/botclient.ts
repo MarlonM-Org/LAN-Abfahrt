@@ -41,6 +41,9 @@ import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
+import { WP, type WpistoleState, wpTargetAt } from '../shared/wpistole';
+import type { ZauberState } from '../shared/types';
+import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
 import type { AngelnState } from '../shared/angeln';
 
 export interface BotOptions {
@@ -1127,6 +1130,10 @@ export class Bot {
     if (m.kind === 'werwolf') wolfBot(this, m.state);
 
     if (m.kind === 'pixel') pixBot(this, m.state);
+
+    if (m.kind === 'wpistole') wpistBot(this, m.state);
+
+    if (m.kind === 'zauber') zaubBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -2936,4 +2943,199 @@ function afbBot(bot: Bot, st: AfbState) {
   } else mem.stuckSince = 0;
   mem.idle = false;
   bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
+}
+
+// ------------------------------------------------------------------ Wasserpistolen-Duell
+
+interface WpistMem {
+  rk: string;
+  armed: boolean;
+  seen: number;
+  fakeSeen: number;
+  /** Diese Runde zu nervös → Frühstart */
+  jumpy: boolean;
+  jumped: boolean;
+}
+const wpistMem = new WeakMap<Bot, WpistMem>();
+
+/** Wasserpistolen-Duell: Holster, auf „ZIEHT!“ warten (manchmal Frühstart), nach 250–700 ms treffen */
+function wpistBot(bot: Bot, st: WpistoleState) {
+  const d = st.duels.find((x) => x.a.id === bot.id || x.b.id === bot.id);
+  if (!d) return;
+  const me = d.a.id === bot.id ? d.a : d.b;
+  const other = me === d.a ? d.b : d.a;
+  const rk = `${st.final}-${st.round}`;
+  let mem = wpistMem.get(bot);
+  if (!mem || mem.rk !== rk) {
+    mem = { rk, armed: false, seen: mem?.seen ?? 0, fakeSeen: mem?.fakeSeen ?? 0, jumpy: Math.random() < 0.05, jumped: false };
+    wpistMem.set(bot, mem);
+  }
+  const m = mem;
+  const cur = () => (bot.state?.mini?.kind === 'wpistole' ? bot.state.mini.state : null);
+  const stillWait = () => cur()?.sub === 'wait' && `${cur()!.final}-${cur()!.round}` === rk;
+
+  if ((st.sub === 'arm' || st.sub === 'wait') && !m.armed) {
+    m.armed = true;
+    bot.once(`wpist-arm-${rk}`, async () => {
+      await sleep(rand(150, 900));
+      bot.send('arm', { on: true });
+    });
+  }
+  // Auf einen falschen Ruf reinfallen
+  if (st.sub === 'wait' && st.call && !st.callReal && st.callSeq !== m.fakeSeen) {
+    m.fakeSeen = st.callSeq;
+    if (Math.random() < 0.12) {
+      bot.once(`wpist-fake-${st.callSeq}`, async () => {
+        await sleep(rand(250, 450));
+        if (stillWait()) bot.send('draw', { seq: m.seen, t: 0 });
+      });
+    }
+  }
+  // Einfach zu nervös
+  if (st.sub === 'wait' && m.jumpy && !m.jumped) {
+    m.jumped = true;
+    bot.once(`wpist-jump-${rk}`, async () => {
+      await sleep(rand(300, 1400));
+      if (stillWait()) bot.send('draw', { seq: m.seen, t: 0 });
+    });
+  }
+  if (st.sub === 'draw' && st.drawSeq !== m.seen) {
+    const seq = st.drawSeq;
+    m.seen = seq;
+    const t0 = Date.now();
+    bot.send('ack', { seq });
+    const path = other.path;
+    bot.once(`wpist-duel-${seq}`, async () => {
+      const react = rand(250, 700);
+      await sleep(react * 0.5);
+      bot.send('draw', { seq, t: Date.now() - t0 });
+      for (let k = 0; k < WP.SHOTS; k++) {
+        await sleep(k === 0 ? react * 0.5 : rand(280, 520));
+        const c = cur();
+        const dd = c?.duels.find((x) => x.a.id === bot.id || x.b.id === bot.id);
+        if (!c || c.sub !== 'draw' || c.drawSeq !== seq || !dd || dd.done) return;
+        const t = Date.now() - t0;
+        const p = wpTargetAt(path, t);
+        const miss = Math.random() < 0.22;
+        const dx = miss ? rand(10, 16) * (Math.random() < 0.5 ? -1 : 1) : rand(-3, 3);
+        bot.send('shoot', { seq, t, x: p.x + dx, y: p.y + rand(-2, 2), m: 'touch' });
+      }
+    });
+  }
+}
+
+// ------------------------------------------------------------------ Zauber-Arena
+
+interface ZaubBotMemory {
+  nextAt: number;
+  stick: string;
+  /** Umkreist den Gegner im (1) oder gegen den Uhrzeigersinn (−1) */
+  orbit: number;
+  orbitAt: number;
+  /** Eigene Treffsicherheit (Streuung in rad) und Angriffslust */
+  slop: number;
+  eager: number;
+}
+
+const zaubBotMem = new WeakMap<Bot, ZaubBotMemory>();
+
+/**
+ * Zauber-Bot: hält sich Richtung Plattform-Mitte, umkreist den nächsten Gegner auf
+ * Feuerball-Distanz und wirft, sobald ANGRIFF bereit ist. EILE nutzt er, um anfliegenden
+ * Feuerbällen seitlich auszuweichen oder aus der Lava zu flüchten.
+ */
+function zaubBot(bot: Bot, st: ZauberState) {
+  let mem = zaubBotMem.get(bot);
+  if (!mem) zaubBotMem.set(bot, (mem = { nextAt: 0, stick: '', orbit: Math.random() < 0.5 ? 1 : -1, orbitAt: 0, slop: rand(0.05, 0.3), eager: rand(0.25, 0.6) }));
+  const me = st.players[bot.id];
+  const stick = (x: number, y: number) => {
+    const key = `${x.toFixed(2)},${y.toFixed(2)}`;
+    if (key === mem!.stick) return;
+    mem!.stick = key;
+    bot.send('stick', { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+  };
+  if (st.sub !== 'play' || !me?.alive) {
+    stick(0, 0);
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 140);
+
+  const arena = zauberArena(st.seed, st.n);
+  const safe = (x: number, y: number) => {
+    const cell = zauberCellAt(x, y);
+    return !!cell && arena.rank[zauberIdx(cell[0], cell[1])] >= st.cracked;
+  };
+  const centre = zauberSafeCenter(arena, st.cracked);
+  const norm = (x: number, y: number) => {
+    const l = Math.hypot(x, y);
+    return l > 0.0001 ? { x: x / l, y: y / l, l } : { x: 0, y: 0, l: 0 };
+  };
+  const home = norm(centre.x - me.x, centre.y - me.y);
+
+  // 1) Lava: sofort zurück, notfalls mit EILE
+  if (me.lava || !safe(me.x, me.y)) {
+    stick(home.x, home.y);
+    if (me.lava && me.cdB <= 0) bot.send('sprint', { x: home.x, y: home.y });
+    return;
+  }
+
+  // 2) Anfliegende Feuerbälle: seitlich ausweichen (zur Mitte hin)
+  let dodge: { x: number; y: number } | null = null;
+  let threat = Infinity;
+  for (const b of st.bolts) {
+    if (b.o === bot.id) continue;
+    const dx = me.x - b.x;
+    const dy = me.y - 5 - b.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 70 || d >= threat) continue;
+    const ha = (b.a * Math.PI) / 180;
+    const hx = Math.cos(ha);
+    const hy = Math.sin(ha);
+    if ((dx * hx + dy * hy) / (d || 1) < 0.55) continue;
+    threat = d;
+    // Senkrecht zur Flugbahn, die Seite Richtung Mitte bevorzugen
+    let px = -hy;
+    let py = hx;
+    if (px * home.x + py * home.y < 0) {
+      px = -px;
+      py = -py;
+    }
+    dodge = { x: px, y: py };
+  }
+  if (dodge) {
+    stick(dodge.x, dodge.y);
+    if (threat < 42 && me.cdB <= 0 && safe(me.x + dodge.x * 40, me.y + dodge.y * 40)) bot.send('sprint', { x: dodge.x, y: dodge.y });
+    return;
+  }
+
+  // 3) Gegner suchen, umkreisen und beschießen
+  const foes = Object.entries(st.players).filter(([id, p]) => id !== bot.id && p.alive);
+  foes.sort((a, b) => Math.hypot(a[1].x - me.x, a[1].y - me.y) - Math.hypot(b[1].x - me.x, b[1].y - me.y));
+  const foe = foes[0]?.[1];
+  let want = { x: home.x * 0.5, y: home.y * 0.5 };
+  if (foe) {
+    const to = norm(foe.x - me.x, foe.y - me.y);
+    if (now > mem.orbitAt) {
+      mem.orbitAt = now + rand(1500, 4000);
+      if (Math.random() < 0.4) mem.orbit = -mem.orbit;
+    }
+    const side = { x: -to.y * mem.orbit, y: to.x * mem.orbit };
+    const k = to.l > 105 ? 1 : to.l < 55 ? -0.8 : 0;
+    want = { x: to.x * k + side.x * 0.7, y: to.y * k + side.y * 0.7 };
+    if (me.cdA <= 0 && to.l < 160 && Math.random() < mem.eager) {
+      const ang = Math.atan2(foe.y - me.y, foe.x - me.x) + rand(-mem.slop, mem.slop);
+      bot.send('cast', { x: Math.round(Math.cos(ang) * 100) / 100, y: Math.round(Math.sin(ang) * 100) / 100 });
+    }
+  }
+  // Je weiter draußen, desto stärker zur Mitte; vorausschauen, ob der Weg in Lava führt
+  const w0 = norm(want.x, want.y);
+  const aheadBad = w0.l > 0 && (!safe(me.x + w0.x * 16, me.y + w0.y * 16) || !safe(me.x + w0.x * 30, me.y + w0.y * 30));
+  const far = Math.hypot(centre.x - me.x, centre.y - me.y);
+  const pull = aheadBad ? 1.6 : Math.max(0, (far - 40) / 60);
+  const w = norm(want.x + home.x * pull, want.y + home.y * pull);
+  if (w.l < 0.05) stick(0, 0);
+  else stick(w.x, w.y);
+  if (aheadBad && !me.stun && me.cdB <= 0 && far > 50 && Math.random() < 0.3) bot.send('sprint', { x: home.x, y: home.y });
 }
