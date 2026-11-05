@@ -7,7 +7,7 @@
  * - Kraft: Spitze der Drehrate (°/s) bzw. Beschleunigung ohne Schwerkraft in den letzten 600 ms
  * - Seite: Drehung um die Hochachse (Kompass) zwischen Drücken und Loslassen
  */
-import type { MotionSample } from './motion';
+import { type MotionSample, type SwingScale, swingAcc, swingRot } from './motion';
 import { type ThrowResult, wrapDeg } from './bowlingThrow';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -43,3 +43,10 @@ export function flickToThrow(samples: MotionSample[]): ThrowResult {
   const angle = clamp(dead(-yaw / 25, 0.12), -1, 1);
   return { ok: true, t: { speed: r2(speed), angle: r2(angle), spin: 0 } };
 }
+
+/** Feedback-Skala zu flickToThrow (gleiche Schwellen) */
+export const FLICK_SCALE: SwingScale = {
+  level: (s) => Math.max((swingRot(s) - 120) / 960, (swingAcc(s) - 2.5) / 22),
+  windowMs: 600,
+  yawLimit: 60,
+};

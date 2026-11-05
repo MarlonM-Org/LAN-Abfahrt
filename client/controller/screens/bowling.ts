@@ -3,6 +3,8 @@ import { scoreFrames } from '../../../shared/bowling';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store } from '../core';
 import type { BowlThrow } from '../bowlingThrow';
 import { mountThrowInput } from '../throwInput';
+import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, rememberFeedback } from '../motionFeedback';
+import { bowlingFeedback } from '../throwFeedback';
 
 const bowling = () => (store.state?.mini?.kind === 'bowling' ? store.state.mini.state : null);
 
@@ -10,6 +12,7 @@ export function pickBowling(s: BowlingState): Screen {
   const id = store.playerId!;
   if (!s.order.includes(id)) return ['spectate', message('Du schaust zu', 'Nächstes Spiel bist du dabei!')];
   if (s.sub === 'intro') {
+    forgetFeedback('bowling');
     return ['bw-intro', message('Strand-Bowling!', `${s.frames} Frames pro Person. Reihum werfen – am Handy schwingen oder wischen. Strike = alle 10 Pins!`)];
   }
   if (s.sub === 'over') return ['bw-over', () => buildWatch(true)];
@@ -39,6 +42,10 @@ function buildAim(s: BowlingState) {
   const area = q(root, '.bw-area');
   const strip = q(root, '.bw-strip');
   const marker = q(root, '.bw-marker');
+  // Feedback zum letzten Wurf bleibt stehen, bis der nächste beginnt
+  const card = feedbackCard();
+  area.before(card.root);
+  card.set(lastFeedback('bowling'));
 
   // --- Startposition
   let start = 0;
@@ -77,13 +84,17 @@ function buildAim(s: BowlingState) {
       motionHint: 'Halten, Arm nach vorn schwingen, am Ende loslassen. Handgelenk drehen = Effet.',
       padText: 'Kugel nach oben wischen!<br/>Schnell = hart · schräg = Richtung · im Bogen = Effet',
     },
-    (t: BowlThrow) => {
+    (t: BowlThrow, info) => {
       navigator.vibrate?.(40);
       send('throw', { seq, start, ...t });
+      const fb = bowlingFeedback(t, info);
+      rememberFeedback('bowling', fb);
+      card.set(fb);
       q(root, '.bw-startbox').classList.add('hidden');
       area.innerHTML = '';
-      area.append(el(`<div class="center"><h2>Wurf!</h2><p>Tempo ${Math.round(t.speed * 100)}%${t.spin ? ` · Effet ${t.spin > 0 ? 'rechts' : 'links'}` : ''}</p><p>Schau auf den Fernseher!</p></div>`));
+      area.append(el(`<div class="center"><h2>Wurf!</h2><p>Schau auf den Fernseher!</p></div>`));
     },
+    { onStart: () => card.dim(), onFail: (reason, info) => card.set(failFeedback(reason, info)) },
   );
   const stopMotion = input.stop;
 
@@ -118,6 +129,8 @@ function buildWatch(over: boolean) {
   `);
   app.append(root);
   const board = q(root, '.bw-board');
+  const card = feedbackCard();
+  board.before(card.root);
   let boardKey = '';
   return () => {
     const s = bowling();
@@ -145,6 +158,8 @@ function buildWatch(over: boolean) {
     }
     q(root, '.headline').textContent = head;
     q(root, '.sub').textContent = sub;
+    const fb = lastFeedback('bowling');
+    if (fb !== card.current) card.set(fb);
 
     // Während die Kugel rollt, das Ergebnis noch nicht verraten (der TV zeigt es gleich)
     const rolls = { ...s.rolls };

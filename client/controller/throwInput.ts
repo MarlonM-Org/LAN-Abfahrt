@@ -3,8 +3,9 @@
  * oder Wischen als Touch-Alternative. Die Wahl wird gespeichert und gilt für alle Wurfspiele.
  */
 import { el, q, toast } from './core';
-import { type MotionSample, enableMotion, motionSupport, onMotion } from './motion';
-import { type BowlThrow, type SwipePoint, type ThrowResult, swingToThrow, swipeToThrow } from './bowlingThrow';
+import { type MotionSample, type SwingScale, enableMotion, motionSupport, onMotion } from './motion';
+import { BOWL_SCALE, type BowlThrow, type SwipePoint, type ThrowResult, swingToThrow, swipeToThrow } from './bowlingThrow';
+import { type ThrowInfo, motionInfo, swipeInfo } from './motionFeedback';
 
 const PREF_KEY = 'lanabfahrt.bowlMode';
 type Mode = 'motion' | 'touch' | 'ask';
@@ -24,6 +25,16 @@ export interface ThrowInputTexts {
   holding?: string;
   /** Umrechnung der Sensordaten (Standard: Bowling-Schwung) – z. B. Darts: kurzes Schnippen */
   swing?: (samples: MotionSample[]) => ThrowResult;
+  /** Skala von `swing` fürs Feedback (Standard: Bowling) */
+  scale?: SwingScale;
+}
+
+/** Rückmeldungen für die Feedback-Karte (siehe motionFeedback.ts) */
+export interface ThrowInputHooks {
+  /** Ein neuer Versuch beginnt (Knopf gedrückt / Finger aufs Wischfeld) */
+  onStart?: () => void;
+  /** Versuch zählte nicht als Wurf */
+  onFail?: (reason: string, info: ThrowInfo) => void;
 }
 
 function initialMode(): Mode {
@@ -38,13 +49,19 @@ function initialMode(): Mode {
  * Baut die Wurf-Steuerung in `area` ein. `onThrow` wird genau einmal aufgerufen.
  * Rückgabe: stop() meldet den Bewegungssensor ab.
  */
-export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: ThrowInputTexts, onThrow: (t: BowlThrow) => void) {
+export function mountThrowInput(
+  area: HTMLElement,
+  root: HTMLElement,
+  texts: ThrowInputTexts,
+  onThrow: (t: BowlThrow, info: ThrowInfo) => void,
+  hooks: ThrowInputHooks = {},
+) {
   let thrown = false;
-  const doThrow = (t: BowlThrow) => {
+  const doThrow = (t: BowlThrow, info: ThrowInfo) => {
     if (thrown) return;
     thrown = true;
     stopMotion();
-    onThrow(t);
+    onThrow(t, info);
   };
 
   let unsub: (() => void) | null = null;
@@ -117,6 +134,7 @@ export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: Thr
       samples = [];
       recording = true;
       btn.classList.add('holding');
+      hooks.onStart?.();
       btn.innerHTML = texts.holding ?? 'SCHWINGEN …<br/><small>und loslassen!</small>';
       navigator.vibrate?.(15);
     });
@@ -126,8 +144,12 @@ export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: Thr
       btn.classList.remove('holding');
       btn.innerHTML = btnText;
       const r = (texts.swing ?? swingToThrow)(samples);
-      if (r.ok) doThrow(r.t);
-      else hint.textContent = r.reason;
+      const info = motionInfo(samples, texts.scale ?? BOWL_SCALE);
+      if (r.ok) doThrow(r.t, info);
+      else {
+        hint.textContent = r.reason;
+        hooks.onFail?.(r.reason, info);
+      }
     };
     btn.addEventListener('pointerup', release);
     btn.addEventListener('pointercancel', release);
@@ -163,6 +185,7 @@ export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: Thr
       pts = [{ x: e.clientX, y: e.clientY, t: e.timeStamp }];
       const r = pad.getBoundingClientRect();
       origin = { x: r.left, y: r.top };
+      hooks.onStart?.();
     });
     pad.addEventListener('pointermove', (e) => {
       if (e.pointerId !== pid) return;
@@ -177,8 +200,13 @@ export function mountThrowInput(area: HTMLElement, root: HTMLElement, texts: Thr
       ball.style.left = '';
       ball.style.top = '';
       const r = swipeToThrow(pts, pad.clientHeight);
-      if (r.ok) doThrow(r.t);
-      else text.textContent = r.reason;
+      const info = swipeInfo(pts);
+      if (r.ok) doThrow(r.t, info);
+      else {
+        text.textContent = r.reason;
+        // bloßes Antippen braucht keine Auswertung
+        if (pts.length > 2) hooks.onFail?.(r.reason, info);
+      }
     };
     pad.addEventListener('pointerup', up);
     pad.addEventListener('pointercancel', up);
