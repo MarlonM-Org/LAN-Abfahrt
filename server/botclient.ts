@@ -3,10 +3,10 @@
  * direkt vom Server ("Bot hinzufügen" in der Lobby) benutzt.
  */
 import { io, type Socket } from 'socket.io-client';
-import type { ArenaState, GameLive, GameMeta, GameState, IgelState, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
+import type { ArenaState, GameLive, GameMeta, GameState, IgelState, IgelWeapon, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
 import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
-import { BAZOOKA, GRENADE, PUNCH, type Mask, buildTerrain, carve, simulateBazooka, surfaceY } from '../shared/igel';
+import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
@@ -1711,45 +1711,69 @@ function shuffleArr<T>(arr: T[]): T[] {
   return a;
 }
 
-/** Igel-Krieg: kurz laufen, dann per Simulation zielen und schießen */
+/** Igel-Krieg: kurz laufen (gern zu einer Kiste), dann per Simulation zielen und schießen */
 function igelBot(bot: Bot, st: IgelState) {
+  const cur = () => (bot.state?.mini?.kind === 'igel' ? bot.state.mini.state : null);
+  const myHog = (s: IgelState) => s.hogs.find((h) => h.owner === bot.id && h.state === 'ok') ?? null;
   // Zuschauer-Sprüche ab und zu (Server: Abklingzeit 8 s)
-  if (st.active !== bot.id && st.sub !== 'over' && st.sub !== 'countdown') {
+  const watching = st.simul ? !myHog(st) || st.locked.includes(bot.id) || st.sub !== 'aimAll' : st.active !== bot.id;
+  if (watching && st.sub !== 'over' && st.sub !== 'countdown') {
     bot.once('igel-taunt', async () => {
       await sleep(rand(4000, 14000));
-      if (Math.random() < 0.5) bot.send('taunt', { i: Math.floor(Math.random() * 4) });
+      if (Math.random() < 0.5) bot.send('taunt', { i: Math.floor(Math.random() * IGEL_TAUNTS.length) });
     });
   }
+  if (st.simul) {
+    const hog = myHog(st);
+    if (!hog) return;
+    if (st.sub === 'aimAll' && !st.locked.includes(bot.id)) {
+      bot.once(`igel-sim-${st.turn}`, async () => {
+        await sleep(rand(1200, 5000));
+        const still = () => {
+          const s = cur();
+          return s && s.sub === 'aimAll' && s.turn === st.turn ? s : null;
+        };
+        const s0 = still();
+        if (!s0) return;
+        await igelWalk(bot, s0, myHog(s0)!);
+        const now = still();
+        const h = now && myHog(now);
+        if (!now || !h) return;
+        await igelShoot(bot, planIgelShot(now, bot.id, h.id));
+      });
+    }
+    if (st.sub === 'retreatAll') {
+      bot.once(`igel-done-${st.turn}`, async () => {
+        await sleep(rand(600, 2000));
+        bot.send('done');
+      });
+    }
+    return;
+  }
   if (st.active !== bot.id || st.activeHog === null) return;
-  const cur = () => (bot.state?.mini?.kind === 'igel' ? bot.state.mini.state : null);
   if (st.sub === 'aim') {
     bot.once(`igel-${st.turn}`, async () => {
       await sleep(rand(700, 1400));
-      const hog = st.hogs[st.activeHog!];
-      const foe = st.hogs.filter((h) => h.state === 'ok' && h.owner !== bot.id).sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
-      const dir = foe ? (foe.x > hog.x ? 1 : -1) : hog.x < 240 ? 1 : -1;
-      // Nur laufen, wenn vorne sicherer Boden ist (nicht ins Meer stolpern)
-      const mask = igelMask(st);
-      const ahead = surfaceY(mask, hog.x + dir * 24);
-      const safe = ahead < st.water - 12 && Math.abs(ahead - hog.y) < 20;
-      if (safe && Math.random() < 0.4) {
-        bot.send('move', { dir });
-        await sleep(rand(300, 900));
-        bot.send('move', { dir: 0 });
-        if (Math.random() < 0.2) bot.send('jump');
-        await sleep(600);
+      const still = () => {
+        const s = cur();
+        return s && s.active === bot.id && s.sub === 'aim' && s.turn === st.turn ? s : null;
+      };
+      await igelWalk(bot, st, st.hogs[st.activeHog!]);
+      const now = still();
+      if (!now) return;
+      const plan = planIgelShot(now, bot.id, now.activeHog!);
+      await igelShoot(bot, plan);
+      // Schrotflinte: zweiter Schuss im selben Zug
+      if (plan.weapon === 'shotgun') {
+        await sleep(900);
+        const again = still();
+        if (again && again.shotsLeft > 0) {
+          const p2 = planIgelShot(again, bot.id, again.activeHog!, 'shotgun');
+          bot.send('aim', { angle: p2.angle, power: p2.power });
+          await sleep(300);
+          bot.send('fire', { angle: p2.angle, power: p2.power });
+        }
       }
-      const now = cur();
-      if (!now || now.active !== bot.id || now.sub !== 'aim' || now.turn !== st.turn) return;
-      const plan = planIgelShot(now, bot.id);
-      bot.send('weapon', { weapon: plan.weapon });
-      await sleep(250);
-      for (let i = 1; i <= 5; i++) {
-        bot.send('aim', { angle: plan.angle, power: (plan.power * i) / 5 });
-        await sleep(110);
-      }
-      await sleep(300);
-      bot.send('fire', { angle: plan.angle, power: plan.power });
     });
   }
   if (st.sub === 'retreat') {
@@ -1760,31 +1784,88 @@ function igelBot(bot: Bot, st: IgelState) {
   }
 }
 
+/** Ein Stück laufen – bevorzugt zu einer nahen Kiste, sonst manchmal Richtung Gegner (nie ins Meer) */
+async function igelWalk(bot: Bot, st: IgelState, hog: IgelState['hogs'][number]) {
+  const mask = igelMask(st);
+  const crate = st.objs
+    .filter((o) => o.type === 'crate' && !o.chute && Math.abs(o.x - hog.x) < 80 && Math.abs(o.y - hog.y) < 16)
+    .sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
+  const foe = st.hogs.filter((h) => h.state === 'ok' && !sameSide(st, h.owner, bot.id)).sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
+  const dir = crate ? (crate.x > hog.x ? 1 : -1) : foe ? (foe.x > hog.x ? 1 : -1) : hog.x < 240 ? 1 : -1;
+  // Nur laufen, wenn der Weg nicht ins Meer oder einen Abgrund führt
+  const dist = crate ? Math.abs(crate.x - hog.x) + 4 : 24;
+  let safe = true;
+  for (let d = 6; d <= dist; d += 6) {
+    const sy = surfaceY(mask, hog.x + dir * d);
+    if (sy > st.water - 12 || Math.abs(sy - hog.y) > 20) safe = false;
+  }
+  if (!safe || (!crate && Math.random() >= 0.4)) return;
+  bot.send('move', { dir });
+  await sleep(crate ? Math.min(3000, (dist / IGEL.WALK) * 1000) : rand(300, 900));
+  bot.send('move', { dir: 0 });
+  if (!crate && Math.random() < 0.2) bot.send('jump');
+  await sleep(600);
+}
+
+type IgelPlan = { weapon: IgelWeapon; angle: number; power: number; tx?: number };
+
+async function igelShoot(bot: Bot, plan: IgelPlan) {
+  bot.send('weapon', { weapon: plan.weapon });
+  await sleep(250);
+  if (plan.tx !== undefined) {
+    bot.send('aim', { tx: plan.tx });
+    await sleep(500);
+    bot.send('fire', { tx: plan.tx });
+    return;
+  }
+  for (let i = 1; i <= 5; i++) {
+    bot.send('aim', { angle: plan.angle, power: (plan.power * i) / 5 });
+    await sleep(110);
+  }
+  await sleep(300);
+  bot.send('fire', { angle: plan.angle, power: plan.power });
+}
+
 let terrainCache: { seed: number; n: number; mask: Mask } | null = null;
 
 function igelMask(st: IgelState): Mask {
-  if (!terrainCache || terrainCache.seed !== st.seed || terrainCache.n > st.craters.length) {
-    terrainCache = { seed: st.seed, n: st.craters.length, mask: buildTerrain(st.seed, st.craters) };
+  if (!terrainCache || terrainCache.seed !== st.seed || terrainCache.n > st.ops.length) {
+    terrainCache = { seed: st.seed, n: st.ops.length, mask: buildTerrain(st.seed, st.ops) };
   }
-  for (; terrainCache.n < st.craters.length; terrainCache.n++) {
-    const [x, y, r] = st.craters[terrainCache.n];
-    carve(terrainCache.mask, x, y, r);
-  }
+  for (; terrainCache.n < st.ops.length; terrainCache.n++) applyOp(terrainCache.mask, st.ops[terrainCache.n]);
   return terrainCache.mask;
 }
 
-/** Probiert viele Winkel/Stärken durch und nimmt den Schuss mit dem meisten Schaden beim Gegner */
-export function planIgelShot(st: IgelState, me: string): { weapon: 'bazooka' | 'grenade' | 'teleport' | 'punch'; angle: number; power: number } {
-  const hog = st.hogs[st.activeHog!];
-  const enemies = st.hogs.filter((h) => h.state === 'ok' && h.owner !== me);
-  const friends = st.hogs.filter((h) => h.state === 'ok' && h.owner === me);
+/**
+ * Bot-Zielwahl: Bazooka per Simulation (meister Schaden beim Gegner), Schlag bei direktem Nachbarn,
+ * Möwen-Luftschlag auf den nächsten Gegner, selten Wasserbombe/Teleport. Teamkameraden werden geschont.
+ */
+export function planIgelShot(st: IgelState, me: string, hogId: number, force?: IgelWeapon): IgelPlan {
+  const hog = st.hogs[hogId];
+  const enemies = st.hogs.filter((h) => h.state === 'ok' && !sameSide(st, h.owner, me));
+  const friends = st.hogs.filter((h) => h.state === 'ok' && sameSide(st, h.owner, me));
   const near = [...enemies].sort((a, b) => Math.hypot(a.x - hog.x, a.y - hog.y) - Math.hypot(b.x - hog.x, b.y - hog.y))[0];
-  if (near && Math.abs(near.x - hog.x) < PUNCH.REACH - 2 && Math.abs(near.y - hog.y) < 10) {
+  const ammo = st.ammo[me];
+  // Zum Testen aller Waffen: IGEL_BOT_CHAOS=1 npm run bots -- 8 --game=igel
+  if (!force && process.env.IGEL_BOT_CHAOS && Math.random() < 0.6) {
+    const pool = (Object.keys(ammo ?? {}) as IgelWeapon[]).filter((w) => ammo[w] !== 0);
+    const w = pool[Math.floor(Math.random() * pool.length)] ?? 'bazooka';
+    const toward = near ? (near.x >= hog.x ? 0 : Math.PI) : 0;
+    const angle = toward + (toward ? 0.5 : -0.5) + rand(-0.3, 0.3);
+    return { weapon: w, angle, power: rand(0.35, 0.8), tx: w === 'airstrike' ? Math.round(near?.x ?? 240) : undefined };
+  }
+  if (!force && near && Math.abs(near.x - hog.x) < PUNCH.REACH - 2 && Math.abs(near.y - hog.y) < 10) {
     return { weapon: 'punch', angle: near.x >= hog.x ? -0.3 : Math.PI + 0.3, power: 0.5 };
   }
-  const ammo = st.ammo[me];
-  if (ammo?.teleport && Math.random() < 0.05) {
+  if (!force && near && ammo?.airstrike && Math.random() < 0.4 && friends.every((f) => Math.abs(f.x - near.x) > 30)) {
+    return { weapon: 'airstrike', angle: 0, power: 0, tx: Math.round(near.x) };
+  }
+  if (!force && ammo?.teleport && Math.random() < 0.05) {
     return { weapon: 'teleport', angle: -Math.PI / 2 + rand(-0.8, 0.8), power: rand(0.2, 0.45) };
+  }
+  if (force === 'shotgun' && near) {
+    const a = Math.atan2(near.y - 4 - (hog.y - 4), near.x - hog.x);
+    return { weapon: 'shotgun', angle: a + rand(-0.04, 0.04), power: 1 };
   }
   const mask = igelMask(st);
   const from = { x: hog.x, y: hog.y - 4 };
