@@ -3,7 +3,7 @@ import type { AfbState } from '../../../shared/autoball';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { type Screen, app, el, message, q, secondsLeft, send, store, toast } from '../core';
 import { motionSupport } from '../motion';
-import { steerFromRoll } from '../tilt';
+import { steerFromRoll, tiltLabel } from '../tilt';
 import { leaveFullscreen, startTilt, stopTilt, tilt, tryFullscreen, vibrate } from './kart';
 
 /**
@@ -56,7 +56,7 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
       <div class="k3-left">
         ${
           mode === 'tilt'
-            ? '<div class="k3-wheel"><div class="k3-wheel-in"></div></div><div class="k3-leftlabel">Handy kippen = lenken<br/>Tippen = Mitte setzen</div>'
+            ? '<div class="k3-wheel"><div class="k3-wheel-in"></div><b class="k3-tiltdeg">0°</b></div><div class="k3-leftlabel">Handy kippen = lenken<br/>Tippen = Mitte setzen</div>'
             : '<div class="k3-stick"><div class="k3-base"></div><div class="k3-knob"></div></div><div class="k3-leftlabel">◀ Daumen schieben ▶</div>'
         }
       </div>
@@ -264,6 +264,9 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
       inp.steer = Math.round(tilt.smooth * 100) / 100;
       const wheel = root.querySelector('.k3-wheel-in') as HTMLElement | null;
       if (wheel) wheel.style.transform = `rotate(${inp.steer * 90}deg)`;
+      const degEl = root.querySelector('.k3-tiltdeg');
+      const lbl = tiltLabel(tilt.roll, tilt.center);
+      if (degEl && degEl.textContent !== lbl) degEl.textContent = lbl;
     }
     push();
   };

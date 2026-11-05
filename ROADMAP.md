@@ -64,8 +64,10 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
 - [ ] **Boule am Strand** – Gleiche Wurfmechanik wie Bowling, passt perfekt zum Urlaub.
   👥 2–12 · 📱 Bewegungssensor
 - [x] **Minigolf** – Urlaubs-Minigolf: alle putten gleichzeitig, Zurückziehen wie eine Schleuder oder Putter-Schwung
-- [ ] **Darts**, **Angeln** (Auswerfen per Schwung, Kurbeln zum Einholen)
+- [ ] **Darts**
   👥 1–12 · 📱 Bewegungssensor
+- [x] **Angeln** – alle angeln gleichzeitig vom Steg: Auswerfen per Schwung/Wischen, Anschlagen beim Biss, Drill mit Spannungsbalken
+  👥 2–12 · 📱 Bewegungssensor oder Wischen
 
 ### Zielen
 - [ ] ⭐ **Ententeich** *(Vorbild: Duck Hunt)* – Mit dem Handy zielen (Bewegungssensor, Fadenkreuz am TV), Enten/Möwen abschießen, Punkte für Trefferserien, keine Badegäste treffen.

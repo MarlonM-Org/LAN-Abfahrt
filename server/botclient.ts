@@ -42,6 +42,9 @@ import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
 import { WP, type WpistoleState, wpTargetAt } from '../shared/wpistole';
+import type { ZauberState } from '../shared/types';
+import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
+import type { AngelnState } from '../shared/angeln';
 
 export interface BotOptions {
   url: string;
@@ -1088,6 +1091,8 @@ export class Bot {
 
     if (m.kind === 'bogen') bogenBot(this, m.state);
 
+    if (m.kind === 'angeln') angelBot(this, m.state);
+
     if (m.kind === 'autoball') afbBot(this, m.state);
 
     if (m.kind === 'volley') vballBot(this, m.state);
@@ -1109,6 +1114,8 @@ export class Bot {
     if (m.kind === 'pixel') pixBot(this, m.state);
 
     if (m.kind === 'wpistole') wpistBot(this, m.state);
+
+    if (m.kind === 'zauber') zaubBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;
@@ -2145,6 +2152,87 @@ function sumoBot(bot: Bot, st: SumoState) {
   if (dashOk && !me.stun && Math.random() < 0.22) bot.send('dash');
 }
 
+// ------------------------------------------------------------------ Angeln
+
+interface AngelBotMemory {
+  nextAt: number;
+  /** Für welchen Wurf schon geplant wurde (Auswerfen / Anschlagen) */
+  castFor: number;
+  castAt: number;
+  strikeFor: number;
+  strikeAt: number;
+  nibbles: number;
+  hold: boolean;
+  tilt: number;
+  /** Eigene Ruhe/Hektik beim Drill */
+  calm: number;
+  dreamUntil: number;
+}
+
+const angelBotMem = new WeakMap<Bot, AngelBotMemory>();
+
+/**
+ * Angel-Bot: wirft mit zufälliger Kraft aus, schlägt mit Reaktionszeit an (manchmal zu spät,
+ * selten zu früh) und hält beim Drill die Spannung grob in der Mitte – mit etwas Rauschen.
+ */
+function angelBot(bot: Bot, st: AngelnState) {
+  let mem = angelBotMem.get(bot);
+  if (!mem) {
+    mem = { nextAt: 0, castFor: -1, castAt: 0, strikeFor: -1, strikeAt: 0, nibbles: 0, hold: false, tilt: 0, calm: rand(0.05, 0.16), dreamUntil: 0 };
+    angelBotMem.set(bot, mem);
+  }
+  const me = st.players[bot.id];
+  if (!me || st.sub === 'over' || st.sub === 'intro') return;
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(70, 130);
+
+  if (me.st === 'idle' && st.sub === 'play') {
+    if (mem.castFor !== me.castSeq) {
+      mem.castFor = me.castSeq;
+      mem.castAt = now + rand(500, 2200);
+    } else if (now >= mem.castAt) {
+      mem.castAt = Infinity;
+      bot.send('cast', { power: Math.round(rand(0.15, 1) * 100) / 100, aim: Math.round(rand(-0.7, 0.7) * 100) / 100 });
+    }
+    return;
+  }
+  if (me.st === 'wait') {
+    // Selten auf ein Zupfen reinfallen
+    if (me.nibbles > mem.nibbles && Math.random() < 0.06) bot.send('strike');
+    mem.nibbles = me.nibbles;
+    return;
+  }
+  mem.nibbles = 0;
+  if (me.st === 'bite') {
+    if (mem.strikeFor !== me.castSeq) {
+      mem.strikeFor = me.castSeq;
+      // Reaktionszeit: meist rechtzeitig, ab und zu verpennt
+      mem.strikeAt = now + (Math.random() < 0.12 ? rand(1100, 1600) : rand(250, 850));
+    } else if (now >= mem.strikeAt) {
+      mem.strikeAt = Infinity;
+      bot.send('strike');
+    }
+    return;
+  }
+  if (me.st === 'reel') {
+    // Spannung um die Mitte halten; bei Zug lieber früher loslassen
+    const target = 0.5 - (me.pull ? 0.08 : 0) + rand(-mem.calm, mem.calm);
+    // Ab und zu träumt der Bot und kurbelt einfach weiter (→ Schnur reißt manchmal)
+    if (Math.random() < 0.004) mem.dreamUntil = now + rand(900, 1800);
+    const hold = now < mem.dreamUntil || (mem.hold ? me.tension < target + 0.06 : me.tension < target - 0.06);
+    const tilt = me.pull && Math.random() < 0.7 ? -me.pull * 0.8 : 0;
+    if (hold !== mem.hold || Math.abs(tilt - mem.tilt) > 0.3) {
+      mem.hold = hold;
+      mem.tilt = tilt;
+      bot.send('reel', { hold, tilt });
+    }
+    return;
+  }
+  mem.hold = false;
+  mem.tilt = 0;
+}
+
 // ------------------------------------------------------------------ Strand-Volleyball
 
 interface VballBotMemory {
@@ -2916,4 +3004,120 @@ function wpistBot(bot: Bot, st: WpistoleState) {
       }
     });
   }
+}
+
+// ------------------------------------------------------------------ Zauber-Arena
+
+interface ZaubBotMemory {
+  nextAt: number;
+  stick: string;
+  /** Umkreist den Gegner im (1) oder gegen den Uhrzeigersinn (−1) */
+  orbit: number;
+  orbitAt: number;
+  /** Eigene Treffsicherheit (Streuung in rad) und Angriffslust */
+  slop: number;
+  eager: number;
+}
+
+const zaubBotMem = new WeakMap<Bot, ZaubBotMemory>();
+
+/**
+ * Zauber-Bot: hält sich Richtung Plattform-Mitte, umkreist den nächsten Gegner auf
+ * Feuerball-Distanz und wirft, sobald ANGRIFF bereit ist. EILE nutzt er, um anfliegenden
+ * Feuerbällen seitlich auszuweichen oder aus der Lava zu flüchten.
+ */
+function zaubBot(bot: Bot, st: ZauberState) {
+  let mem = zaubBotMem.get(bot);
+  if (!mem) zaubBotMem.set(bot, (mem = { nextAt: 0, stick: '', orbit: Math.random() < 0.5 ? 1 : -1, orbitAt: 0, slop: rand(0.05, 0.3), eager: rand(0.25, 0.6) }));
+  const me = st.players[bot.id];
+  const stick = (x: number, y: number) => {
+    const key = `${x.toFixed(2)},${y.toFixed(2)}`;
+    if (key === mem!.stick) return;
+    mem!.stick = key;
+    bot.send('stick', { x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+  };
+  if (st.sub !== 'play' || !me?.alive) {
+    stick(0, 0);
+    return;
+  }
+  const now = Date.now();
+  if (now < mem.nextAt) return;
+  mem.nextAt = now + rand(80, 140);
+
+  const arena = zauberArena(st.seed, st.n);
+  const safe = (x: number, y: number) => {
+    const cell = zauberCellAt(x, y);
+    return !!cell && arena.rank[zauberIdx(cell[0], cell[1])] >= st.cracked;
+  };
+  const centre = zauberSafeCenter(arena, st.cracked);
+  const norm = (x: number, y: number) => {
+    const l = Math.hypot(x, y);
+    return l > 0.0001 ? { x: x / l, y: y / l, l } : { x: 0, y: 0, l: 0 };
+  };
+  const home = norm(centre.x - me.x, centre.y - me.y);
+
+  // 1) Lava: sofort zurück, notfalls mit EILE
+  if (me.lava || !safe(me.x, me.y)) {
+    stick(home.x, home.y);
+    if (me.lava && me.cdB <= 0) bot.send('sprint', { x: home.x, y: home.y });
+    return;
+  }
+
+  // 2) Anfliegende Feuerbälle: seitlich ausweichen (zur Mitte hin)
+  let dodge: { x: number; y: number } | null = null;
+  let threat = Infinity;
+  for (const b of st.bolts) {
+    if (b.o === bot.id) continue;
+    const dx = me.x - b.x;
+    const dy = me.y - 5 - b.y;
+    const d = Math.hypot(dx, dy);
+    if (d > 70 || d >= threat) continue;
+    const ha = (b.a * Math.PI) / 180;
+    const hx = Math.cos(ha);
+    const hy = Math.sin(ha);
+    if ((dx * hx + dy * hy) / (d || 1) < 0.55) continue;
+    threat = d;
+    // Senkrecht zur Flugbahn, die Seite Richtung Mitte bevorzugen
+    let px = -hy;
+    let py = hx;
+    if (px * home.x + py * home.y < 0) {
+      px = -px;
+      py = -py;
+    }
+    dodge = { x: px, y: py };
+  }
+  if (dodge) {
+    stick(dodge.x, dodge.y);
+    if (threat < 42 && me.cdB <= 0 && safe(me.x + dodge.x * 40, me.y + dodge.y * 40)) bot.send('sprint', { x: dodge.x, y: dodge.y });
+    return;
+  }
+
+  // 3) Gegner suchen, umkreisen und beschießen
+  const foes = Object.entries(st.players).filter(([id, p]) => id !== bot.id && p.alive);
+  foes.sort((a, b) => Math.hypot(a[1].x - me.x, a[1].y - me.y) - Math.hypot(b[1].x - me.x, b[1].y - me.y));
+  const foe = foes[0]?.[1];
+  let want = { x: home.x * 0.5, y: home.y * 0.5 };
+  if (foe) {
+    const to = norm(foe.x - me.x, foe.y - me.y);
+    if (now > mem.orbitAt) {
+      mem.orbitAt = now + rand(1500, 4000);
+      if (Math.random() < 0.4) mem.orbit = -mem.orbit;
+    }
+    const side = { x: -to.y * mem.orbit, y: to.x * mem.orbit };
+    const k = to.l > 105 ? 1 : to.l < 55 ? -0.8 : 0;
+    want = { x: to.x * k + side.x * 0.7, y: to.y * k + side.y * 0.7 };
+    if (me.cdA <= 0 && to.l < 160 && Math.random() < mem.eager) {
+      const ang = Math.atan2(foe.y - me.y, foe.x - me.x) + rand(-mem.slop, mem.slop);
+      bot.send('cast', { x: Math.round(Math.cos(ang) * 100) / 100, y: Math.round(Math.sin(ang) * 100) / 100 });
+    }
+  }
+  // Je weiter draußen, desto stärker zur Mitte; vorausschauen, ob der Weg in Lava führt
+  const w0 = norm(want.x, want.y);
+  const aheadBad = w0.l > 0 && (!safe(me.x + w0.x * 16, me.y + w0.y * 16) || !safe(me.x + w0.x * 30, me.y + w0.y * 30));
+  const far = Math.hypot(centre.x - me.x, centre.y - me.y);
+  const pull = aheadBad ? 1.6 : Math.max(0, (far - 40) / 60);
+  const w = norm(want.x + home.x * pull, want.y + home.y * pull);
+  if (w.l < 0.05) stick(0, 0);
+  else stick(w.x, w.y);
+  if (aheadBad && !me.stun && me.cdB <= 0 && far > 50 && Math.random() < 0.3) bot.send('sprint', { x: home.x, y: home.y });
 }
