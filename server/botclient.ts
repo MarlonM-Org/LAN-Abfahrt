@@ -11,7 +11,7 @@ import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
+import { ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lineFree, nextWaypoint, roomInner } from '../shared/house';
 import { SMASH_STAGES, mainPlatform } from '../shared/smash';
@@ -743,7 +743,53 @@ export class Bot {
       const key = `roll-${s.board.round}`;
       if (!this.boardSeen.has(key)) {
         this.boardSeen.add(key);
-        if (Math.random() > 0.1) setTimeout(() => this.socket.emit('board:roll'), rand(1000, 5000));
+        // Item vor dem Würfeln einsetzen (Doppelwürfel, Klau, Taxi) – meistens; das Taxi ersetzt den Wurf
+        const item = s.board.items?.[this.id];
+        const useIt = !!item && ITEM_INFO[item].active && Math.random() < 0.8;
+        if (Math.random() > 0.1) {
+          setTimeout(() => {
+            if (useIt) {
+              this.socket.emit('board:item');
+              this.opts.log?.(`${this.name} setzt ${ITEM_INFO[item!].title} ein`);
+            }
+            if (!useIt || item !== 'taxi') this.socket.emit('board:roll');
+          }, rand(1000, 5000));
+        }
+      }
+    }
+    // Entscheidungen am Brett: Cocktail immer kaufen, im Laden meist etwas kaufen, an der Gabelung zur Bar (wenn sie dort steht)
+    if (s.phase === 'board' && s.board?.sub === 'moving' && s.board.ask?.playerId === this.id) {
+      const b = s.board;
+      const ask = b.ask!;
+      this.once(`ask-${ask.seq}`, async () => {
+        await sleep(rand(600, 2200));
+        let choice: unknown = null;
+        if (ask.kind === 'bar') choice = true;
+        else if (ask.kind === 'shop') {
+          const offer = ask.offer ?? [];
+          choice = offer.length && Math.random() < 0.75 ? offer[Math.floor(Math.random() * offer.length)] : null;
+        } else choice = ask.barOnLong ? 'long' : Math.random() < 0.5 ? 'long' : 'short';
+        this.opts.log?.(`${this.name} entscheidet (${ask.kind}): ${String(choice)}`);
+        this.socket.emit('board:answer', { seq: ask.seq, choice });
+      });
+    }
+    // Duell „Teilen oder Klauen“: 60 % teilen
+    if (s.phase === 'board' && s.board?.duel?.sub === 'choose') {
+      const d = s.board.duel;
+      if ((d.a === this.id || d.b === this.id) && !d.chosen.includes(this.id)) {
+        this.once(`duel-${d.seq}`, async () => {
+          await sleep(rand(800, 3000));
+          const pick = Math.random() < 0.6 ? 'share' : 'steal';
+          this.opts.log?.(`${this.name} im Duell: ${pick}`);
+          this.socket.emit('board:duel', { seq: d.seq, pick });
+        });
+      }
+    }
+    if (s.phase === 'board' && s.board?.duel?.sub === 'done' && this.leader) {
+      const d = s.board.duel;
+      if (!this.boardSeen.has(`duel-${d.seq}`)) {
+        this.boardSeen.add(`duel-${d.seq}`);
+        this.opts.log?.(`Duell: ${d.result}`);
       }
     }
     if (s.phase === 'board' && s.board?.sub === 'bonus' && this.leader && s.board.bonus?.revealed) {
