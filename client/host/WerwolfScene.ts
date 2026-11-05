@@ -7,7 +7,8 @@ import { nightCottage, nightTree, paintWolfDay, paintWolfNight, wolfHead } from 
 import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { BLUE_INK, Countdown, GOLD, GREEN_INK, RED_INK, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { BLUE_INK, Countdown, GOLD, GREEN_INK, RED_INK, ensureTex, fitText, ink, nameTag, panel, tagName, txt } from './ui';
+import { sfx } from './sfx';
 
 const clock = (ms: number) => {
   const sec = Math.ceil(ms / 1000);
@@ -42,6 +43,7 @@ export class WerwolfScene extends Phaser.Scene {
   private countdown = new Countdown();
   private total = 1;
   private phaseKey = '';
+  private votedN = 0;
   private stateKey = '';
   private clockShown = '';
 
@@ -119,10 +121,15 @@ export class WerwolfScene extends Phaser.Scene {
     const w = s.mini.state;
     const pk = `${w.sub}-${w.phaseNo}-${w.shotDone}`;
     if (pk !== this.phaseKey) {
+      const prevSub = this.phaseKey.split('-')[0];
       this.phaseKey = pk;
       this.countdown.set(w.endsIn);
       this.total = Math.max(1, w.endsIn);
+      this.phaseJingle(w, prevSub);
     }
+    // Abstimmung: Tick pro neuer Stimme
+    if (w.sub === 'vote' && w.voted.length > this.votedN) sfx('tick', { pitch: 1 + w.voted.length * 0.05 });
+    this.votedN = w.sub === 'vote' ? w.voted.length : 0;
     const players = s.players.filter((p) => p.id in w.alive);
     const key = JSON.stringify([w.sub, w.phaseNo, w.shotDone, w.alive, w.voted, w.nightDone, w.nightTotal, players.map((p) => [p.name, p.connected, p.removed])]);
     if (key === this.stateKey) return;
@@ -248,10 +255,10 @@ export class WerwolfScene extends Phaser.Scene {
 
   private renderVerdict(w: WolfState) {
     this.bigPanel();
-    const name = (id: string) => (id === 'none' ? 'Niemand' : (playerById(id)?.name ?? '?'));
+    const name = (id: string) => (id === 'none' ? 'Niemand' : tagName(playerById(id)?.name ?? '?'));
     // Stimmen zählen (öffentlich – wie Handheben)
     const tally = new Map<string, string[]>();
-    for (const [voter, t] of Object.entries(w.votes ?? {})) tally.set(t, [...(tally.get(t) ?? []), playerById(voter)?.name ?? '?']);
+    for (const [voter, t] of Object.entries(w.votes ?? {})) tally.set(t, [...(tally.get(t) ?? []), tagName(playerById(voter)?.name ?? '?')]);
     const rows = [...tally.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 4);
     if (w.lynched) {
       const role = w.revealed[w.lynched] ?? 'dorf';
@@ -265,8 +272,9 @@ export class WerwolfScene extends Phaser.Scene {
       this.layer.add(ink(this, WORLD.W / 2, 78, w.tie ? 'Bei Gleichstand fliegt niemand raus.' : 'Die Werwölfe reiben sich die Pfoten ...', { color: '#7a5a3a' }));
     }
     rows.forEach(([t, voters], i) => {
-      this.layer.add(ink(this, 80, 100 + i * 16, `${name(t).slice(0, 10)}: ${voters.length}`, { origin: [0, 0], color: t === w.lynched ? RED_INK : '#3d2414' }));
-      this.layer.add(ink(this, 208, 100 + i * 16, voters.join(', ').slice(0, 25), { origin: [0, 0], color: '#7a5a3a' }));
+      this.layer.add(fitText(ink(this, 80, 100 + i * 16, `${name(t)}: ${voters.length}`, { origin: [0, 0], color: t === w.lynched ? RED_INK : '#3d2414' }), 124));
+      this.layer.add(fitText(ink(this, 208, 100 + i * 16, voters.join(', '), { origin: [0, 0], color: '#7a5a3a' }), 200));
+
     });
     if (!rows.length) this.layer.add(ink(this, WORLD.W / 2, 110, 'Keine Stimmen abgegeben.', { color: '#7a5a3a' }));
   }
@@ -305,11 +313,33 @@ export class WerwolfScene extends Phaser.Scene {
     if (wolf) this.tweens.add({ targets: head, angle: { from: -8, to: 8 }, duration: 300, yoyo: true, repeat: -1 });
   }
 
+  /** Nacht-/Morgen-Jingle und Töne für Rauswurf, Jäger und Ende */
+  private phaseJingle(w: WolfState, prev: string) {
+    if (w.sub === prev) {
+      if (w.sub === 'hunter') sfx('shoot', { pitch: 0.6 });
+      return;
+    }
+    if (w.sub === 'night') {
+      // Nacht: tiefes, langsames Abwärts-Motiv
+      sfx('lose', { pitch: 0.5, vol: 0.6 });
+      sfx('whoosh', { pitch: 0.4, vol: 0.5, delay: 0.4 });
+    } else if (w.sub === 'dawn') {
+      // Morgen: Hahn-artiges Aufwärts-Motiv
+      sfx('powerup', { pitch: 0.9 });
+      sfx('win', { pitch: 1.2, vol: 0.6, delay: 0.35 });
+    } else if (w.sub === 'witch') sfx('pop', { pitch: 0.7 });
+    else if (w.sub === 'vote') sfx('select');
+    else if (w.sub === 'verdict') sfx(w.lynched ? 'drumroll' : 'tick');
+    else if (w.sub === 'day') sfx('whistle', { vol: 0.5 });
+    else if (w.sub === 'hunter') sfx('shoot', { pitch: 0.6 });
+    else if (w.sub === 'over') sfx('fanfare');
+  }
+
   /** Alle Spieler unten: Tote liegen (mit Rolle), Abgestimmte bekommen ein OK */
   private renderRow(w: WolfState, players: PlayerPublic[]) {
     const n = players.length;
     const spacing = Math.min(38, 456 / Math.max(1, n));
-    const maxChars = Math.max(3, Math.floor(spacing / 8) - 1);
+    const tagW = spacing - 2;
     const night = NIGHT_SUBS.has(w.sub);
     players.forEach((p, i) => {
       const x = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
@@ -335,9 +365,10 @@ export class WerwolfScene extends Phaser.Scene {
         this.layer.add(z);
         this.tweens.add({ targets: z, y: y - 50, alpha: { from: 1, to: 0 }, duration: 1600, repeat: -1, delay: i * 170 });
       }
-      this.layer.add(nameTag(this, x, y + 2, p.name.slice(0, maxChars), alive ? undefined : '#7a5a3a'));
+      // Name ohne „Bot “ und auf Schildbreite verkleinert (statt „Bot“ ×8)
+      this.layer.add(nameTag(this, x, y + 2, p.name, alive ? undefined : '#7a5a3a', tagW));
       const role = w.sub === 'over' ? w.roles?.[p.id] : w.revealed[p.id];
-      if (role) this.layer.add(txt(this, x, y + 16, WOLF_ROLES[role].short.slice(0, maxChars), { color: role === 'wolf' ? '#ff9a8a' : '#fff4d6' }));
+      if (role) this.layer.add(fitText(txt(this, x, y + 16, WOLF_ROLES[role].short, { color: role === 'wolf' ? '#ff9a8a' : '#fff4d6' }), tagW));
       if (w.sub === 'vote' && w.voted.includes(p.id)) {
         this.layer.add(ink(this, x, y - 52, 'OK', { color: GREEN_INK }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
       }

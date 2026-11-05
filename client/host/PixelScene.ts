@@ -8,7 +8,8 @@ import { Pix, shade } from '../art/pix';
 import { paintWoodFloor } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait, figure } from './textures';
-import { GREEN_INK, INK, RED_INK, Countdown, background, ensureTex, ink, nameTag, panel, prop } from './ui';
+import { GREEN_INK, INK, RED_INK, Countdown, background, ensureTex, fitText, ink, nameTag, panel, prop, tagName } from './ui';
+import { sfx } from './sfx';
 
 const SOFT = '#7a5a3a';
 /** Füllstand der Staffelei: so viele Felder gelten als "voll" (ganze Fläche bemalt ist selten) */
@@ -71,9 +72,21 @@ export class PixelScene extends Phaser.Scene {
     }
     const key = JSON.stringify([tKey, st.filled, st.done, st.voted, st.gallery.map((g) => g.votes), s.players.map((p) => p.connected)]);
     if (key === this.stateKey) return;
-    const prevKey = this.stateKey ? (JSON.parse(this.stateKey) as string[])[0] : '';
+    const prev = this.stateKey ? (JSON.parse(this.stateKey) as unknown[]) : null;
+    const prevKey = prev ? (prev[0] as string) : '';
     this.stateKey = key;
     const fresh = prevKey !== tKey;
+    // Töne: Phasen-Jingle, Fertig-/Abstimmungs-Tick, Auflösungs-Pling
+    if (prev && fresh) {
+      if (st.sub === 'paint') sfx('select');
+      if (st.sub === 'vote') sfx('pop', { pitch: 0.9 });
+      if (st.sub === 'reveal') (sfx('drumroll', { vol: 0.7 }), sfx('coin', { delay: 0.6 }), sfx('cheer', { delay: 0.7, vol: 0.6 }));
+      if (st.sub === 'scores') sfx('coin', { pitch: 1.3 });
+      if (st.sub === 'over') sfx('fanfare');
+    } else if (prev) {
+      if (st.voted.length > ((prev[3] as string[] | undefined)?.length ?? 0)) sfx('tick', { pitch: 1 + st.voted.length * 0.05 });
+      if (st.done.length > ((prev[2] as string[] | undefined)?.length ?? 0)) sfx('tick', { pitch: 1.4, vol: 0.5 });
+    }
 
     this.clearLayer();
     this.timerY = 0;
@@ -151,8 +164,7 @@ export class PixelScene extends Phaser.Scene {
       const f = figure(this, p.look, Math.round(x + 14 * es), y, scale);
       if (!done) f.setAlpha(p.connected ? 0.75 : 0.3);
       this.layer.add(f);
-      const tagW = Math.max(4, Math.floor(spacing / 8) - 1);
-      this.layer.add(nameTag(this, x, y + 3, p.name.slice(0, tagW), done ? GREEN_INK : INK));
+      this.layer.add(nameTag(this, x, y + 3, p.name, done ? GREEN_INK : INK, spacing - 2));
       const iconY = y - Math.round(54 * es) - 2;
       if (done) {
         const c = this.add.image(ex, iconY, ensureTex(this, 'px_check', checkIcon)).setScale(2);
@@ -207,9 +219,8 @@ export class PixelScene extends Phaser.Scene {
       }
       const votes = e.votes ?? 0;
       const top = votes > 0 && votes === max;
-      const who = playerById(e.by)?.name ?? '?';
-      const maxChars = Math.max(4, Math.floor((L.frame + L.gap) / 8) - 1);
-      const tag = ink(this, cx, ly, who.slice(0, maxChars), { color: top ? RED_INK : INK }).setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1);
+      const who = tagName(playerById(e.by)?.name ?? '?');
+      const tag = fitText(ink(this, cx, ly, who, { color: top ? RED_INK : INK }).setBackgroundColor('#f7e4b5').setPadding(3, 1, 3, 1), L.frame + L.gap - 4);
       this.layer.add(tag);
       // Stimmen-Plakette unten rechts am Rahmen
       const bx = cx + L.frame / 2 - 12;
@@ -266,7 +277,8 @@ export class PixelScene extends Phaser.Scene {
       const p = playerById(id);
       this.layer.add(ink(this, 126, y, `${place}.`, { origin: [0, 0], color: place === 1 ? RED_INK : INK }));
       if (p) this.layer.add(this.add.image(156, y + 3, ensurePortrait(this, p.look)));
-      this.layer.add(ink(this, 170, y, (p?.name ?? '?').slice(0, 10), { origin: [0, 0] }));
+      this.layer.add(ink(this, 170, y, tagName(p?.name ?? '?').slice(0, 10), { origin: [0, 0] }));
+
       this.layer.add(ink(this, 312, y, String(pts), { origin: [1, 0] }));
       const gain = st.roundGain[id] ?? 0;
       if (gain) {

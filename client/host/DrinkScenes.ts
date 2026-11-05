@@ -7,7 +7,9 @@ import { Pix, rng } from '../art/pix';
 import { paintWoodFloor } from '../art/ground';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { GREEN_INK, RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { GREEN_INK, RED_INK, background, ensureTex, fitText, ink, nameTag, panel, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 /** Gemütliche Strandbar am Abend */
 function paintBar(p: Pix) {
@@ -51,17 +53,21 @@ function card(value: number | null): Pix {
 
 abstract class DrinkScene extends Phaser.Scene {
   protected layer!: Phaser.GameObjects.Container;
+  protected juice!: Juice;
   private key = '';
 
   protected base() {
     this.key = '';
     background(this, 'bar', WORLD.W, WORLD.H, paintBar);
     this.layer = this.add.container(0, 0);
+    this.juice = new Juice(this, { depth: 500 });
     const fn = (s: GameState) => {
       const k = this.stateKey(s);
       if (k === this.key) return;
+      const first = this.key === '';
       this.key = k;
       this.layer.removeAll(true);
+      if (!first) this.onChange(s);
       this.draw(s);
     };
     bus.on('state', fn);
@@ -72,6 +78,8 @@ abstract class DrinkScene extends Phaser.Scene {
 
   protected abstract stateKey(s: GameState): string;
   protected abstract draw(s: GameState): void;
+  /** Töne/Juice bei einer Zustandsänderung (nicht beim ersten Bild) */
+  protected onChange(_s: GameState): void {}
 
   /** Spielerreihe vor der Theke */
   protected row(ids: string[], label: (id: string) => { text: string; color?: string } | null, y = 222) {
@@ -79,16 +87,24 @@ abstract class DrinkScene extends Phaser.Scene {
     const spacing = Math.min(60, 440 / Math.max(1, n));
     // Viele Spieler (ab 10): Namensschilder abwechselnd versetzt und kurze Labels, damit nichts überlappt
     const crowded = spacing < 48;
+    // Ergebnis-Schilder: feste Breite pro Figur (nicht je nach Text unterschiedlich breit)
+    const signW = Math.max(18, Math.min(56, (crowded ? 2 * spacing : spacing) - 4));
     ids.forEach((id, i) => {
       const p = playerById(id);
       if (!p) return;
       const x = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
       this.layer.add(figure(this, p.look, x, y, 2));
-      const name = crowded ? p.name.replace(/^Bot\s+/, '').slice(0, Math.floor((2 * spacing) / 8) - 1) : p.name.slice(0, Math.max(4, Math.floor(spacing / 8) - 1));
-      this.layer.add(nameTag(this, x, y + 4 + (crowded && i % 2 ? 11 : 0), name));
+      // Name ohne „Bot “, Schrift auf Schildbreite verkleinert statt abgeschnitten
+      this.layer.add(nameTag(this, x, y + 4 + (crowded && i % 2 ? 11 : 0), p.name, undefined, (crowded ? 2 * spacing : spacing) - 4));
       const l = label(id);
       const text = l && crowded ? l.text.replace(/ Schlucke?$/, '') : l?.text;
-      if (l && text) this.layer.add(ink(this, x, y - 66, text, { color: l.color }).setBackgroundColor('#f7e4b5').setPadding(2, 1, 2, 1));
+      if (l && text) {
+        const sy = y - 66 - (crowded && i % 2 ? 11 : 0);
+        this.layer.add(this.add.rectangle(x, sy + 5, signW, 12, 0xf7e4b5).setStrokeStyle(1, 0x8d5629));
+        const t = fitText(ink(this, x, sy, text, { color: l.color }), signW - 4, 0.5);
+        t.setY(sy + 5 - t.displayHeight / 2 + 0.5);
+        this.layer.add(t);
+      }
     });
   }
 
@@ -119,8 +135,25 @@ export class NhieScene extends DrinkScene {
     } else {
       const have = n.have ?? [];
       this.row(ids, (id) => (have.includes(id) ? { text: have.length === 1 ? '+2 Schluck' : '+1 Schluck', color: RED_INK } : { text: 'Nie!', color: GREEN_INK }));
-      if (have.length === 1) this.layer.add(txt(this, WORLD.W / 2, 104, `Nur ${playerById(have[0])?.name} – erzähl!`, { color: C.gold }));
+      if (have.length === 1) this.layer.add(txt(this, WORLD.W / 2, 104, `Nur ${tagName(playerById(have[0])?.name ?? '?')} – erzähl!`, { color: C.gold }));
     }
+  }
+  private answered = 0;
+  protected onChange(s: GameState) {
+    if (s.mini?.kind !== 'nhie') return;
+    const n = s.mini.state;
+    if (n.sub === 'question') {
+      if (n.answered.length > this.answered) sfx('tick', { pitch: 1 + n.answered.length * 0.05 });
+      else sfx('select');
+      this.answered = n.answered.length;
+      return;
+    }
+    // Auflösung: Pling, bei nur einem Lacher-Jingle
+    this.answered = 0;
+    const have = n.have ?? [];
+    sfx('coin');
+    if (have.length === 1) (sfx('cheer', { delay: 0.2 }), this.juice.burst(WORLD.W / 2, 110, 'confetti', 30));
+    else if (have.length) sfx('pop', { delay: 0.15, pitch: 0.8 });
   }
 }
 
@@ -153,12 +186,30 @@ export class HiloScene extends DrinkScene {
       this.tweens.add({ targets: c, scaleX: 2, duration: 250 });
     }
     const ids = Object.keys(h.sips);
+    if (h.nextCard !== null && h.sub !== 'guess') this.juice.burst(275, 96, 'spark', 10);
     if (h.sub === 'guess') this.row(ids, (id) => (h.guessed.includes(id) ? { text: 'OK!', color: GREEN_INK } : null));
     else this.row(ids, (id) => {
       const g = h.guesses?.[id];
       const drink = h.roundSips?.[id];
       return { text: `${g === 'higher' ? '▲' : g === 'lower' ? '▼' : '?'}${drink ? '+1' : 'ok'}`, color: drink ? RED_INK : GREEN_INK };
     });
+  }
+  private guessed = 0;
+  protected onChange(s: GameState) {
+    if (s.mini?.kind !== 'hilo') return;
+    const h = s.mini.state;
+    if (h.sub === 'guess') {
+      if (h.guessed.length > this.guessed) sfx('tick', { pitch: 1 + h.guessed.length * 0.05 });
+      else sfx('select');
+      this.guessed = h.guessed.length;
+      return;
+    }
+    // Karte umdrehen: Wisch + Pling; viele Trinker = Lacher
+    this.guessed = 0;
+    sfx('whoosh', { pitch: 1.4 });
+    const drinkers = Object.values(h.roundSips ?? {}).filter(Boolean).length;
+    sfx(drinkers ? 'pop' : 'coin', { delay: 0.25 });
+    if (drinkers >= Math.max(2, Object.keys(h.sips).length / 2)) sfx('cheer', { delay: 0.35, vol: 0.7 });
   }
 }
 
@@ -185,9 +236,11 @@ export class BombScene extends DrinkScene {
     const i = ids.indexOf(b.holder);
     const x = WORLD.W / 2 + (i - (n - 1) / 2) * spacing;
     if (b.sub === 'boom') {
-      this.cameras.main.shake(400, 0.02);
-      this.cameras.main.flash(300, 255, 180, 80);
-      this.layer.add(txt(this, WORLD.W / 2, 110, `BUMM! ${playerById(b.holder)?.name} trinkt 3!`, { size: 16, color: C.gold }));
+      this.juice.shake(3);
+      this.juice.flash(0xffb450, 300);
+      this.juice.burst(x, 140, 'fire', 24);
+      this.juice.burst(x, 140, 'smoke', 10);
+      this.layer.add(txt(this, WORLD.W / 2, 110, `BUMM! ${tagName(playerById(b.holder)?.name ?? '?')} trinkt 3!`, { size: 16, color: C.gold }));
       return;
     }
     const bomb = this.add.image(x, 140, ensureTex(this, 'bomb', bombPix)).setScale(2);
@@ -195,7 +248,14 @@ export class BombScene extends DrinkScene {
     this.tweens.add({ targets: bomb, scale: 2.2, duration: 220, yoyo: true, repeat: -1 });
     this.layer.add(txt(this, WORLD.W / 2, 104, 'Begriff sagen – weitergeben!', { color: '#fff4d6' }));
   }
+  protected onChange(s: GameState) {
+    if (s.mini?.kind !== 'bomb') return;
+    const b = s.mini.state;
+    if (b.sub === 'boom') (sfx('boom'), sfx('cheer', { delay: 0.4, vol: 0.6 }));
+    else sfx('tick', { pitch: 1.2 });
+  }
 }
+
 
 function bombPix(): Pix {
   const p = new Pix(16, 18);

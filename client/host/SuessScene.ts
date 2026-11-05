@@ -5,7 +5,9 @@ import { STASHES, type SuessState } from '../../shared/suess';
 import { candySprite, dizzyStar, guardCap, lootSack, paintSuessHouse } from '../art/suess';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { GOLD, ensureTex, txt } from './ui';
+import { GOLD, ensureTex, tagName, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 interface Actor {
   f: Phaser.GameObjects.Container;
@@ -34,6 +36,8 @@ export class SuessScene extends Phaser.Scene {
   private round = 0;
   private hudKey = '';
   private overlayKey = '';
+  private juice!: Juice;
+  private lastSub = '';
   private lastEvent = 0;
 
   constructor() {
@@ -41,6 +45,8 @@ export class SuessScene extends Phaser.Scene {
   }
 
   create() {
+    this.juice = new Juice(this, { depth: 1180 });
+    this.lastSub = '';
     this.actors.clear();
     this.candies.clear();
     this.latest = null;
@@ -115,6 +121,7 @@ export class SuessScene extends Phaser.Scene {
     this.syncCandy(st);
     this.playEvents(st);
     this.updateOverlay(st);
+    this.lastSub = st.sub;
     this.updateHud(st);
   }
 
@@ -133,7 +140,7 @@ export class SuessScene extends Phaser.Scene {
       // Sack hinter der Figur, Mütze darüber
       if (guard) f.add(extra);
       else f.addAt(extra, 1);
-      const name = txt(this, 0, -38, pl.name.slice(0, 8), { color: guard ? '#9ec3ff' : '#fff4d6' }).setScale(0.7);
+      const name = txt(this, 0, -38, tagName(pl.name), { color: guard ? '#9ec3ff' : '#fff4d6' }).setScale(0.7);
       const label = txt(this, 0, 2, '', { color: GOLD }).setScale(0.75);
       f.add([name, label]);
       this.actors.set(id, { f, img, extra, label, x, y, guard, dust: 0 });
@@ -147,6 +154,7 @@ export class SuessScene extends Phaser.Scene {
     for (const [id, img] of this.candies) {
       if (alive.has(id)) continue;
       this.candies.delete(id);
+      if (st.sub === 'play') sfx('pop', { x: img.x, pitch: 1.5 + Math.random() * 0.3, vol: 0.4 });
       this.tweens.add({ targets: img, y: img.y - 8, alpha: 0, duration: 180, onComplete: () => img.destroy() });
     }
     for (const c of st.candy) {
@@ -168,10 +176,16 @@ export class SuessScene extends Phaser.Scene {
         this.tweens.add({ targets: t, y: t.y - 18, alpha: 0, duration: 1200, onComplete: () => t.destroy() });
         const ring = this.add.circle(e.x, e.y, 6, 0xffd25e, 0).setStrokeStyle(2, 0xffd25e).setDepth(1100);
         this.tweens.add({ targets: ring, scale: 4, alpha: 0, duration: 600, onComplete: () => ring.destroy() });
+        sfx('coin', { x: e.x, pitch: 1 + Math.min(0.6, e.n * 0.05) });
+        this.juice.burst(e.x, e.y - 6, 'spark', 6 + e.n);
       } else if (e.kind === 'catch') {
+        sfx('catch', { x: e.x });
+        sfx('whistle', { x: e.x, delay: 0.05 });
+        this.juice.hitStop(70);
+        if (e.n > 0) this.juice.burst(e.x, e.y - 8, 'confetti', Math.min(30, 6 + e.n * 2));
         const name = playerById(e.id)?.name ?? '?';
         const t = txt(this, e.x, e.y - 34, e.n > 0 ? `GESCHNAPPT! −${e.n}` : 'GESCHNAPPT!', { color: '#ff6a5a' }).setDepth(1200);
-        const n = txt(this, e.x, e.y - 24, name.slice(0, 10), { color: '#fff4d6' }).setScale(0.7).setDepth(1200);
+        const n = txt(this, e.x, e.y - 24, tagName(name), { color: '#fff4d6' }).setScale(0.7).setDepth(1200);
         this.tweens.add({ targets: [t, n], y: '-=14', alpha: 0, delay: 500, duration: 1100, onComplete: () => (t.destroy(), n.destroy()) });
         this.cameras.main.shake(140, 0.004);
         for (let i = 0; i < 4; i++) {
@@ -180,6 +194,7 @@ export class SuessScene extends Phaser.Scene {
           this.tweens.add({ targets: s, x: e.x + Math.cos(ang) * 16, y: e.y - 8 + Math.sin(ang) * 10, alpha: 0, angle: 180, duration: 800, onComplete: () => s.destroy() });
         }
       } else if (e.kind === 'drop') {
+        sfx('bonk', { x: e.x, pitch: 1.2, vol: 0.5 });
         const t = txt(this, e.x, e.y - 30, 'Abgelegt!', { color: '#c8e6ff' }).setScale(0.75).setDepth(1200);
         this.tweens.add({ targets: t, y: t.y - 10, alpha: 0, duration: 900, onComplete: () => t.destroy() });
       }
@@ -187,7 +202,7 @@ export class SuessScene extends Phaser.Scene {
   }
 
   private names(ids: string[]) {
-    return ids.map((id) => playerById(id)?.name ?? '?').join(' & ');
+    return ids.map((id) => tagName(playerById(id)?.name ?? '?')).join(' & ');
   }
 
   private updateOverlay(st: SuessState) {
@@ -201,7 +216,10 @@ export class SuessScene extends Phaser.Scene {
       this.overlay.add(this.add.rectangle(W / 2, 138, 360, 132, 0x1d1838, 0.9).setStrokeStyle(2, 0xffd25e));
       this.overlay.add(txt(this, W / 2, 80, `Runde ${st.round}/${st.rounds}`, { color: '#fff4d6' }));
       this.overlay.add(txt(this, W / 2, 96, guards.length > 1 ? 'Die Wächter:' : 'Der Wächter:', { color: '#9ec3ff' }));
-      this.overlay.add(txt(this, W / 2, 110, this.names(guards).slice(0, 26), { size: 16, color: '#9ec3ff' }));
+      const gn = txt(this, W / 2, 110, this.names(guards), { size: 16, color: '#9ec3ff' });
+      if (gn.width > 340) gn.setScale(340 / gn.width);
+      this.overlay.add(gn);
+
       this.overlay.add(txt(this, W / 2, 136, 'Alle anderen sind Naschkatzen!', { color: GOLD }));
       this.overlay.add(txt(this, W / 2, 150, `Bringt ${st.target} Süßes ins Versteck.`, { color: GOLD }));
       this.overlay.add(txt(this, W / 2, 166, 'Volle Taschen machen langsam!', { color: '#fff4d6' }));
@@ -209,6 +227,10 @@ export class SuessScene extends Phaser.Scene {
     } else if ((st.sub === 'roundEnd' || st.sub === 'over') && st.outcome) {
       const o = st.outcome;
       const thieves = o.winner === 'thieves';
+      if (this.lastSub !== st.sub) {
+        sfx(st.sub === 'over' ? 'fanfare' : 'win');
+        this.juice.burst(W / 2, 110, 'confetti', 40);
+      }
       this.overlay.add(this.add.rectangle(W / 2, 126, 400, 72, 0x1d1838, 0.88).setStrokeStyle(2, thieves ? 0xffd25e : 0x6f9be8));
       this.overlay.add(txt(this, W / 2, 100, thieves ? 'NASCHKATZEN GEWINNEN!' : 'WÄCHTER GEWINNEN!', { size: 16, color: thieves ? GOLD : '#9ec3ff' }));
       const sub = thieves

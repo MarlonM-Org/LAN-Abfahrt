@@ -5,6 +5,8 @@ import { GF, guestPix, paintParty, partyBalloon, partyObjects, puddle } from '..
 import { C } from '../art/palette';
 import { bus, getState, playerById } from './store';
 import { GOLD, INK, RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 const fmt = (ms: number) => {
   const s = Math.ceil(ms / 1000);
@@ -49,7 +51,7 @@ export class SpionScene extends Phaser.Scene {
   private newsSeq = 0;
   private throwSeen = new Map<number, boolean | null>();
   private flying = new Map<number, Phaser.GameObjects.Image>();
-  private audio: AudioContext | null = null;
+  private juice!: Juice;
 
   constructor() {
     super('spion');
@@ -86,17 +88,11 @@ export class SpionScene extends Phaser.Scene {
     this.strip = this.add.container(0, SPION.BOTTOM).setDepth(2001);
     this.overlay = this.add.container(0, 0).setDepth(2500);
 
-    const unlock = () => void this.sound0();
-    this.input.on('pointerdown', unlock);
-    window.addEventListener('keydown', unlock, { once: true });
+    // Töne über den gemeinsamen Effekt-Bus (sfx.ts) statt eines eigenen AudioContext
+    this.juice = new Juice(this, { depth: 1440 });
     const onState = (s: GameState) => this.onState(s);
     bus.on('state', onState);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      bus.off('state', onState);
-      window.removeEventListener('keydown', unlock);
-      void this.audio?.close();
-      this.audio = null;
-    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', onState));
     if (st) this.onState(st);
   }
 
@@ -180,6 +176,7 @@ export class SpionScene extends Phaser.Scene {
     if (this.guests.length !== m.guests.length) this.resetGuests(m);
     if (m.news && m.news.seq !== this.newsSeq) {
       this.newsSeq = m.news.seq;
+      sfx('tick', { pitch: 1.4, vol: 0.5 });
       this.newsText.setText(m.news.text.length > 45 ? `${m.news.text.slice(0, 44)}…` : m.news.text);
       this.tweens.add({ targets: this.newsText, alpha: { from: 0.2, to: 1 }, duration: 250 });
     }
@@ -238,7 +235,7 @@ export class SpionScene extends Phaser.Scene {
           const img = this.add.image(0, -20, ensureTex(this, 'sp_balloon', partyBalloon)).setDepth(1400);
           img.setData('g', t.g).setData('t0', performance.now());
           this.flying.set(t.seq, img);
-          this.beep([880, 660], 0.06, 'triangle');
+          sfx('throw', { pitch: 1.2, vol: 0.6 });
         }
         continue;
       }
@@ -261,10 +258,14 @@ export class SpionScene extends Phaser.Scene {
     const label = hit ? `ENTTARNT: ${short(playerById(victim)?.name ?? '?', 10)}!` : 'PLATSCH! NUR EIN GAST';
     const t = txt(this, Phaser.Math.Clamp(x, 90, SPION.W - 90), Math.max(30, y - 44), label, { color: hit ? C.gold : '#ff8a7a' }).setDepth(1450);
     this.tweens.add({ targets: t, y: t.y - 10, alpha: 0, delay: 1300, duration: 700, onComplete: () => t.destroy() });
+    sfx('splash', { x, vol: 0.7 });
     if (hit) {
-      this.cameras.main.shake(180, 0.005);
-      this.beep([523, 659, 784, 1046], 0.08, 'square');
-    } else this.beep([300, 200], 0.1, 'sawtooth');
+      // Enttarnt: Fanfare, Konfetti, kurzer Stopp
+      this.juice.shake(2);
+      this.juice.hitStop(80);
+      this.juice.burst(x, y - 12, 'confetti', 30);
+      sfx('fanfare', { delay: 0.1 });
+    } else sfx('error', { x, delay: 0.1 });
   }
 
   // ---------------------------------------------------------------- HUD
@@ -329,27 +330,5 @@ export class SpionScene extends Phaser.Scene {
     if (m.sub === 'reveal') this.tweens.add({ targets: this.overlay, alpha: 0, delay: 3800, duration: 600 });
   }
 
-  // ---------------------------------------------------------------- Ton
-
-  private async sound0() {
-    if (!this.audio) this.audio = new AudioContext();
-    if (this.audio.state === 'suspended') await this.audio.resume();
-  }
-
-  private beep(freqs: number[], dur: number, type: OscillatorType) {
-    const ac = this.audio;
-    if (!ac || ac.state !== 'running') return;
-    freqs.forEach((f, i) => {
-      const o = ac.createOscillator();
-      const g = ac.createGain();
-      o.type = type;
-      o.frequency.value = f;
-      const t = ac.currentTime + i * dur;
-      g.gain.setValueAtTime(0.05, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-      o.connect(g).connect(ac.destination);
-      o.start(t);
-      o.stop(t + dur + 0.02);
-    });
-  }
 }
+
