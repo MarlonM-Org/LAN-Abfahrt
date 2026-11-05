@@ -169,11 +169,11 @@ export function defaultSongForScene(scene: string): string {
       return 'poolparty';
     case 'pixel':
       return 'strandpromenade';
-    case 'sprint': case 'tidy': case 'kurve':
+    case 'sprint': case 'tidy': case 'kurve': case 'koffer':
       return 'pixel-arcade';
     case 'flieger': case 'turm':
       return 'gipfelsturm';
-    case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'stillepost': case 'sprueche':
+    case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'kingscup': case 'stillepost': case 'sprueche':
       return 'bar';
     case 'geist': case 'fangen': case 'werwolf':
       return 'spooky';

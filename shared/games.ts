@@ -24,6 +24,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   nhie: { title: 'Ich hab noch nie ...', icon: '🙊', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2 },
   hilo: { title: 'Höher oder Tiefer', icon: '🃏', tagline: 'Falsch geraten? Schluck!', minPlayers: 2 },
   bomb: { title: 'Tick-Tack-Bumm', icon: '⏰', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 },
+  kingscup: { title: 'Kings Cup', icon: '👑', tagline: 'Karte ziehen, Regel befolgen – auf den König!', minPlayers: 2 },
   sup: { title: 'SUP-Rennen', icon: '🏄', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 },
   tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 },
   flieger: { title: 'Urlaubsflieger', icon: '✈️', inspiredBy: 'Spaceteam', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2 },
@@ -56,6 +57,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   wpistole: { title: 'Wasserpistolen-Duell', icon: '🔫', inspiredBy: 'Wild Gunman', tagline: 'Hand ans Holster ... ZIEHT! Wer zuerst spritzt, bleibt trocken.', minPlayers: 2 },
   zauber: { title: 'Zauber-Arena', icon: '🧙', inspiredBy: 'Spellsworn', tagline: 'Feuerbälle, Eilzauber, Lava – wer bleibt auf der Plattform?', minPlayers: 2 },
   angeln: { title: 'Angeln', icon: '🎣', tagline: 'Auswerfen, anschlagen, drillen – wer zieht den dicksten Hecht aus dem See?', minPlayers: 2 },
+  koffer: { title: 'Kofferpacken', icon: '🚗', tagline: 'Alles muss mit! Stapelt den Kofferraum voll, bevor Papa hupt.', minPlayers: 2 },
   suess: { title: 'Süßigkeiten-Klau', icon: '🍬', inspiredBy: 'Animal Crossing: Sweet Day', tagline: 'Plündert die Minibar – aber je voller die Taschen, desto langsamer!', minPlayers: 3 },
   werwolf: { title: 'Werwölfe im Ferienhaus', icon: '🐺', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6 },
 };
@@ -66,17 +68,17 @@ export const miniLabel = (kind: MiniKind) => `${MINI_INFO[kind].icon} ${MINI_INF
 export const miniInspired = (kind: MiniKind) => (MINI_INFO[kind].inspiredBy ? `à la ${MINI_INFO[kind].inspiredBy}` : '');
 
 /** Minispiele im Trinkspiel-Modus */
-export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb'];
+export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup'];
 
 /** Passt die Spielerzahl zu einem Minispiel (min. und ggf. max.)? */
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'suess'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /** Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter) */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'suess'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess'];
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 
@@ -526,17 +528,24 @@ export function turmSnapX(shape: number, rot: number, x: number): number {
 
 // ------------------------------------------------------------------ Arcade
 
-/** Punkte nach Platzierung im Arcade-Modus */
-export const ARCADE_POINTS = [10, 6, 3, 1];
+/**
+ * Leaderboard-Punkte nach Platzierungsgruppe (1. 10, 2. 7, 3. 5, 4. 4, 5. 3, 6. 2, Rest 1).
+ * Teamsiege: alle Sieger stehen in Gruppe 1 und bekommen die vollen Punkte.
+ */
+export const ARCADE_POINTS = [10, 7, 5, 4, 3, 2, 1];
+
+/** Wort für ein Spiel einer Serie („Kart-Rennen · Rennen 3“) */
+const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'Rennen', sprint: 'Lauf', parcours: 'Lauf', golf: 'Turnier', bowling: 'Spiel', darts: 'Spiel' };
+export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'suess'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'rhythm', 'stars', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess'] },
-  { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm'] },
+  { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'tourist', 'werwolf'] },
-  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'stillepost', 'sprueche', 'pixel'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel'] },
 ];

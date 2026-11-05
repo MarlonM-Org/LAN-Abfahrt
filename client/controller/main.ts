@@ -12,6 +12,7 @@ import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
 import { pickBomb, pickHilo, pickNhie } from './screens/drink';
+import { pickKingsCup } from './screens/kingscup';
 import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
@@ -37,6 +38,7 @@ import { pickSprueche } from './screens/sprueche';
 import { pickPixel } from './screens/pixel';
 import { pickWpistole } from './screens/wpistole';
 import { pickAngeln } from './screens/angeln';
+import { pickKoffer } from './screens/koffer';
 import { pickSuess } from './screens/suess';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
@@ -256,6 +258,8 @@ function pickScreen(): Screen {
           return pickHilo(m.state);
         case 'bomb':
           return pickBomb(m.state);
+        case 'kingscup':
+          return pickKingsCup(m.state, vip);
         case 'sup':
           return pickSup(m.state);
         case 'tidy':
@@ -322,6 +326,8 @@ function pickScreen(): Screen {
           return pickZauber(m.state);
         case 'angeln':
           return pickAngeln(m.state);
+        case 'koffer':
+          return pickKoffer(m.state);
         case 'suess':
           return pickSuess(m.state);
       }

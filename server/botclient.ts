@@ -41,10 +41,12 @@ import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
 import { PIXEL, PIXEL_COLORS, cellsToPic } from '../shared/pixel';
+import type { KingsState } from '../shared/kingscup';
 import { WP, type WpistoleState, wpTargetAt } from '../shared/wpistole';
 import type { ZauberState } from '../shared/types';
 import { zauberArena, zauberCellAt, zauberIdx, zauberSafeCenter } from '../shared/zauber';
 import type { AngelnState } from '../shared/angeln';
+import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
 import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt, isWalk as suessWalk, stepAlong as suessStep, suessBfs, tileCenter as suessCenter, tileOf as suessTile } from '../shared/suess';
 
 export interface BotOptions {
@@ -54,6 +56,8 @@ export interface BotOptions {
   game?: string;
   date?: boolean;
   count?: number;
+  /** Einzelspiel: so oft drückt der VIP-Bot im Ergebnis „Nochmal“ (Leaderboard des Abends testen) */
+  nochmal?: number;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
@@ -72,6 +76,7 @@ export class Bot {
 
   leader: boolean;
   private resultCount = 0;
+  private nochmalCount = 0;
   private resultsEntered = 0;
   private lastPhase = '';
   /** Stille Post: bereits erledigte Schritte/Abstimmungen */
@@ -662,6 +667,21 @@ export class Bot {
         await sleep(4000);
         this.resultCount++;
         const drink = this.opts.game === 'drink';
+        const cur = this.state ?? s;
+        if (cur.session?.games && cur.results?.points) {
+          const table = cur.session.rows.map((r) => `${r.rank}. ${r.name} ${r.points}${r.last !== null ? ` (+${r.last})` : ''}`).join(' | ');
+          const ser = cur.session.series;
+          this.opts.log?.(`Leaderboard nach ${cur.session.games} ${cur.session.games === 1 ? 'Spiel' : 'Spielen'}${ser ? ` [Serie ${ser.label}]` : ''}: ${table}`);
+        }
+        if (this.opts.game && !drink && this.nochmalCount < (this.opts.nochmal ?? 0)) {
+          if (cur.nochmal && !cur.nochmal.disabled) {
+            this.nochmalCount++;
+            this.opts.log?.(`Nochmal ${this.nochmalCount}/${this.opts.nochmal}: ${cur.nochmal.next}${cur.nochmal.detail ? ` · ${cur.nochmal.detail}` : ''}`);
+            this.socket.emit('vip:continue', 'again');
+            return;
+          }
+          this.opts.log?.(`Nochmal nicht möglich: ${cur.nochmal?.disabled ?? 'kein Einzelspiel-Ergebnis'}`);
+        }
         const done = s.results?.final || (this.opts.game && !drink);
         if (done && !this.opts.date) {
           const rows = s.results!.rows.map((r) => `${r.place}. ${s.players.find((p) => p.id === r.playerId)?.name} (${r.detail})`).join(' | ');
@@ -811,6 +831,8 @@ export class Bot {
       });
     }
 
+    if (m.kind === 'kingscup') kingsBot(this, m.state);
+
     if (m.kind === 'sup' && m.state.sub === 'race') {
       const b = m.state.boards.find((bb) => bb.left === this.id || bb.right === this.id);
       if (b && !b.finished && !b.fallen) {
@@ -850,6 +872,37 @@ export class Bot {
             if (Math.abs(dx) < 1) break;
             this.send('shift', { dir: Math.sign(dx) });
             await sleep(rand(100, 170));
+          }
+          await sleep(rand(100, 400));
+          if (cur()?.id === act.id) this.send('drop', { on: true });
+          for (let i = 0; i < 60 && cur()?.id === act.id; i++) await sleep(100);
+          this.send('drop', { on: false });
+        });
+      }
+    }
+
+    if (m.kind === 'koffer' && m.state.sub === 'play') {
+      const car = m.state.cars.find((c) => c.owners.includes(this.id));
+      const act = car?.active;
+      if (car && act && act.owner === this.id) {
+        this.once(`koffer-${act.id}`, async () => {
+          const plan = planKoffer(car);
+          await sleep(rand(250, 600));
+          for (let i = 0; i < (plan.rot - act.rot + 4) % 4; i++) {
+            this.send('rotate');
+            await sleep(rand(110, 200));
+          }
+          const cur = () => {
+            const s2 = this.state?.mini?.kind === 'koffer' ? this.state.mini.state : null;
+            return s2?.cars.find((c) => c.id === car.id)?.active;
+          };
+          for (let i = 0; i < 50; i++) {
+            const a = cur();
+            if (!a || a.id !== act.id) return;
+            const dx = plan.x - a.x;
+            if (Math.abs(dx) < 1) break;
+            this.send('shift', { dir: Math.sign(dx) });
+            await sleep(rand(90, 160));
           }
           await sleep(rand(100, 400));
           if (cur()?.id === act.id) this.send('drop', { on: true });
@@ -1945,6 +1998,73 @@ function fangenHunter(bot: Bot, st: FangenState, fg: FangenMemory) {
 
 }
 
+/**
+ * Kofferpacken-Bot: legt das Teil an die tiefste passende Stelle im Kofferraum.
+ * Oberflächen-Karte in Viertelblock-Spalten; bewertet Landehöhe, Lücken darunter, Kippgefahr
+ * und Zellen über der Dachlinie. Hinten über die Ladekante plant er nie.
+ */
+export function planKoffer(car: KofferCar): { rot: number; x: number } {
+  const B = KOFFER.BLOCK;
+  const W = KOFFER.W * B;
+  const bw = B / 4;
+  const n = Math.round(W / bw);
+  const binX = (i: number) => (i + 0.5) * bw;
+  const surf = Array.from({ length: n }, () => 0);
+  const binsOf = (cx: number, r: number) => {
+    const out: number[] = [];
+    for (let i = 0; i < n; i++) if (Math.abs(binX(i) - cx) < r) out.push(i);
+    return out;
+  };
+  const p = car.pieces;
+  for (let k = 0; k < p.length; k += 6) {
+    const [, item, , x, y, a] = p.slice(k, k + 6);
+    for (const o of kofferCellOffsets(item, a / 100)) {
+      const top = y - o.y + B / 2 + 1;
+      for (const i of binsOf(x + o.x, B / 2 + 1)) surf[i] = Math.max(surf[i], top);
+    }
+  }
+  const act = car.active!;
+  let best = { rot: 0, x: W / 2, score: Infinity };
+  for (let rot = 0; rot < 4; rot++) {
+    const offs = kofferCellOffsets(act.item, (rot * Math.PI) / 2);
+    const minOx = Math.min(...offs.map((o) => o.x));
+    const maxOx = Math.max(...offs.map((o) => o.x));
+    for (let x0 = 0; x0 <= W; x0 += B / 2) {
+      const x = kofferSnapX(act.item, rot, x0);
+      if (x + minOx - B / 2 < -0.5 || x + maxOx + B / 2 > W + 0.5) continue;
+      let comY = -Infinity;
+      const under: number[] = [];
+      for (const o of offs) {
+        const bins = binsOf(x + o.x, B / 2 - 1);
+        const s = bins.length ? Math.max(...bins.map((i) => surf[i])) : 0;
+        under.push(s);
+        comY = Math.max(comY, s + o.y + B / 2);
+      }
+      let holes = 0;
+      let top = -Infinity;
+      let above = 0;
+      let supLo = Infinity;
+      let supHi = -Infinity;
+      offs.forEach((o, j) => {
+        const bottom = comY - o.y - B / 2;
+        const cellTop = comY - o.y + B / 2;
+        top = Math.max(top, cellTop);
+        if (cellTop - B / 2 > KOFFER.ROOF * B) above++;
+        if (offs.some((q) => Math.abs(q.x - o.x) < 2 && q.y > o.y + 2)) return;
+        holes += Math.max(0, bottom - under[j]);
+        if (bottom - under[j] < 2) {
+          supLo = Math.min(supLo, x + o.x - B / 2);
+          supHi = Math.max(supHi, x + o.x + B / 2);
+        }
+      });
+      const tips = x < supLo + 3 || x > supHi - 3 ? B * 2 : 0;
+      const score = top + holes * 1.2 + tips + above * B * 2 + x * 0.02 + Math.random() * B * 0.3;
+      if (score < best.score) best = { rot, x, score };
+    }
+  }
+  return { rot: best.rot, x: best.x };
+}
+
 /** Findet das Sternbild im (verschobenen/skalierten) Himmel wieder – nur für Bots */
 /**
  * Wackelturm-Bot: wählt Drehung und Position fürs fallende Teil.
@@ -2930,6 +3050,54 @@ function afbBot(bot: Bot, st: AfbState) {
   } else mem.stuckSince = 0;
   mem.idle = false;
   bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
+}
+
+// ------------------------------------------------------------------ Kings Cup
+
+/** Kings Cup: ziehen, zufällig wählen, Knöpfe mit Reaktionszeit, „Haus“/„Tiere“, als Schiri meist „weiter“ */
+function kingsBot(bot: Bot, st: KingsState) {
+  const me = bot.id;
+  const cur = () => (bot.state?.mini?.kind === 'kingscup' ? bot.state.mini.state : null);
+  const others = st.order.filter((id) => id !== me);
+  if (st.sub === 'draw' && st.drawer === me) {
+    bot.once(`kc-draw-${st.drawSeq}`, async () => {
+      await sleep(rand(1200, 3000));
+      if (cur()?.sub === 'draw' && cur()?.drawer === me) bot.send('draw');
+    });
+  }
+  if (st.sub === 'draw' && st.qm && st.qm !== me && Math.random() < 0.002) bot.once(`kc-fool-${st.drawSeq}`, () => bot.send('fooled'));
+  if (st.sub === 'pick' && st.drawer === me) {
+    bot.once(`kc-pick-${st.drawSeq}`, async () => {
+      await sleep(rand(1000, 2500));
+      bot.send('pick', { target: others[Math.floor(Math.random() * others.length)] });
+    });
+  }
+  if (st.sub === 'race' && st.race?.phase === 'go' && st.race.players.includes(me) && !(me in st.race.times)) {
+    bot.once(`kc-race-${st.drawSeq}`, async () => {
+      await sleep(rand(250, 1100));
+      bot.send('tap');
+    });
+  }
+  if (st.sub === 'word' && st.drawer === me) {
+    bot.once(`kc-word-${st.drawSeq}`, async () => {
+      await sleep(rand(1500, 3500));
+      bot.send('word', { text: st.card?.rank === 9 ? 'Haus' : 'Tiere' });
+    });
+  }
+  if (st.sub === 'rule' && st.drawer === me) {
+    bot.once(`kc-rule-${st.drawSeq}`, async () => {
+      await sleep(rand(2000, 4000));
+      bot.send('rule', { text: ['Nur mit links trinken', 'Keine Vornamen sagen', 'Vor dem Trinken „Prost“ rufen', 'Wer flucht, trinkt'][Math.floor(Math.random() * 4)] });
+    });
+  }
+  if (st.sub === 'chain' && st.chain && st.drawer === me) {
+    const step = st.chain.step;
+    bot.once(`kc-chain-${st.drawSeq}-${step}`, async () => {
+      await sleep(rand(1200, 2600));
+      if (cur()?.chain?.step !== step) return;
+      bot.send(Math.random() < 0.22 ? 'fail' : 'next', { step });
+    });
+  }
 }
 
 // ------------------------------------------------------------------ Wasserpistolen-Duell
