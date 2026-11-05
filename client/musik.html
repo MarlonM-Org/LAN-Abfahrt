@@ -34,7 +34,7 @@
       <label class="toggle"><input id="loop" type="checkbox" checked /> Loop</label>
       <label>BPM <input id="bpm" type="number" min="40" max="260" step="1" /></label>
       <label>Swing <input id="swing" type="range" min="0" max="0.5" step="0.01" /><span id="swingVal"></span></label>
-      <label>Takte <input id="bars" type="number" min="1" max="16" step="1" /></label>
+      <label>Takte <input id="bars" type="number" min="1" max="32" step="1" /></label>
       <span class="sep"></span>
       <button id="undo" class="btn" title="Strg+Z">↶</button>
       <button id="redo" class="btn" title="Strg+Y">↷</button>
@@ -64,8 +64,8 @@
         <div class="sing">
           <h3>🎤 Einsingen</h3>
           <label>Ziel <select id="singChannel"><option value="lead">Melodie</option><option value="bass">Bass</option><option value="harmony">Begleitung</option></select></label>
-          <label>Ab Takt <input id="singFrom" type="number" min="1" max="16" value="1" /></label>
-          <label>Takte <input id="singBars" type="number" min="1" max="16" value="4" /></label>
+          <label>Ab Takt <input id="singFrom" type="number" min="1" max="32" value="1" /></label>
+          <label>Takte <input id="singBars" type="number" min="1" max="32" value="4" /></label>
           <label class="toggle"><input id="singCount" type="checkbox" checked /> Einzähler (1 Takt)</label>
           <label class="toggle"><input id="singClick" type="checkbox" checked /> Metronom</label>
           <label class="toggle"><input id="singBacking" type="checkbox" checked /> Begleitung mitspielen</label>
