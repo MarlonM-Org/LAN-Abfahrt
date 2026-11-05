@@ -9,6 +9,52 @@ import { sessionPanel } from './leaderboard';
 /** VIP-Schalter im Party-Modus: auch lange Minispiele (> 4 min) aufs Brett – bleibt bis zum Neuladen */
 let partyLongGames = false;
 
+/**
+ * „Online mitspielen“: erscheint, sobald der Laptop einen Tunnel offen hat (`npm run online`).
+ * Teilen-Menü des Handys (nur über HTTPS) → sonst in die Zwischenablage → sonst Link zum Abschreiben markieren.
+ */
+function onlineInvite() {
+  const root = el(`
+    <div class="panel online-invite hidden">
+      <p class="label-left">Online mitspielen</p>
+      <p class="invite-text">Freunde woanders spielen über diesen Link mit – den Fernseher öffnen sie unter …/tv.html.</p>
+      <p class="invite-url"></p>
+      <button class="small" data-act="share">Link teilen</button>
+    </div>
+  `).firstElementChild as HTMLElement;
+  const urlEl = q(root, '.invite-url');
+  let url: string | null = null;
+  q(root, '[data-act=share]').addEventListener('click', async () => {
+    if (!url) return;
+    const text = `Spiel mit bei LAN-Abfahrt! Handy: ${url} · Fernseher/Laptop: ${url}tv.html`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'LAN-Abfahrt', text });
+        return;
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return; // Teilen-Menü selbst geschlossen
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      return toast('Link kopiert – jetzt in den Gruppenchat einfügen.');
+    } catch {
+      // Ohne HTTPS gibt es weder Teilen noch Zwischenablage: Adresse markieren, Kopieren macht man selbst
+      getSelection()?.selectAllChildren(urlEl);
+      toast('Link markiert – kopieren und schicken.');
+    }
+  });
+  return {
+    root,
+    update(next: string | null) {
+      if (next === url) return;
+      url = next;
+      root.classList.toggle('hidden', !url);
+      urlEl.textContent = url ?? '';
+    },
+  };
+}
+
 /** Avatar-Editor. `onDone` tritt dem Spiel bei bzw. aktualisiert den Charakter. */
 export function buildEdit(onDone: () => void) {
   const preview = avatarCanvas(8);
@@ -93,6 +139,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   q(root, '.row-center').append(avatarCanvas(6, store.look));
   const plist = lobbyPlayerList();
   q(root, '.count').after(plist.root);
+  const invite = onlineInvite();
+  plist.root.after(invite.root);
   const menu = q(root, '.menu');
   const gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[] = [];
   /** Arcade-Kacheln + Abstimmung: wird im Updater aufgefrischt */
@@ -281,6 +329,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     q(root, '.hello').innerHTML = `Hi ${escapeHtml(store.name)}!` + ((c) => (c ? ` Du bist <span class="me-color" style="background:${c.hex};color:${c.ink}">${c.name.toUpperCase()}</span>` : ''))(myColor());
     q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}${off ? ` · ${off} offline` : ''}`;
     plist.update();
+    invite.update(st?.onlineUrl ?? null);
     q(root, '.q-count').textContent =
       mode === 'drink'
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`

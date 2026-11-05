@@ -8,6 +8,7 @@ import { Server } from 'socket.io';
 import { domainConfigFromEnv, prepareDomain } from './domain';
 import { getLanAddress } from './net';
 import { MusicStore, musicRouter } from './music';
+import { QUICK_TUNNEL_HOSTS, onlineUrlFromEnv, startQuickTunnel } from './online';
 import { Room } from './room';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,9 @@ try {
 }
 
 const PROD = process.argv.includes('--prod');
+// Online spielen: --online startet einen Cloudflare-Quick-Tunnel, ONLINE_URL = eigener Tunnel mit fester Adresse
+const ONLINE_URL = onlineUrlFromEnv();
+const QUICK_TUNNEL = process.argv.includes('--online') && !ONLINE_URL;
 const PORT = Number(process.env.PORT ?? 3000);
 const HTTPS_PORT = Number(process.env.HTTPS_PORT ?? 3443);
 const PUBLIC_HOST = process.env.PUBLIC_HOST ?? getLanAddress();
@@ -47,6 +51,7 @@ const httpsServer = tls ? https.createServer(tls, app) : null;
 const io = new Server(httpServer, { pingInterval: 10_000, pingTimeout: 12_000 });
 if (httpsServer) io.attach(httpsServer);
 const room = new Room(io, joinUrl, `http://localhost:${PORT}`);
+room.setOnlineUrl(ONLINE_URL);
 io.on('connection', (socket) => room.handle(socket));
 
 // Musik-Bibliothek (eigene Songs + Szenen-Zuordnung) – REST für TV-Menü und /musik.html
@@ -72,8 +77,8 @@ if (PROD) {
     server: {
       middlewareMode: true,
       hmr: { server: httpServer },
-      // Vite blockt fremde Hostnamen – die eigene Domain freigeben
-      allowedHosts: PUBLIC_DOMAIN ? [PUBLIC_DOMAIN] : undefined,
+      // Vite blockt fremde Hostnamen – die eigene Domain und die Tunnel-Adresse freigeben
+      allowedHosts: allowedHosts(),
       fs: { allow: [...new Set([searchForWorkspaceRoot(process.cwd()), root, nodeModules, realNodeModules])] },
     },
     appType: 'mpa',
@@ -86,6 +91,11 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`  TV / Spielbrett:  http://localhost:${PORT}/tv.html`);
   console.log(`  Musik-Werkstatt:  http://localhost:${PORT}/musik.html`);
   console.log(`  Handys:           ${joinUrl}  (oder QR-Code auf dem TV scannen)\n`);
+  if (ONLINE_URL) console.log(`  🌍 Online:          ${ONLINE_URL}  (ONLINE_URL – den Tunnel dorthin startest du selbst)\n`);
+  if (QUICK_TUNNEL) {
+    console.log('  🌍 Starte Cloudflare-Tunnel …');
+    startQuickTunnel(PORT, (url) => room.setOnlineUrl(url));
+  }
   if (PUBLIC_DOMAIN && !tls) {
     console.log(`  ⚠️  PUBLIC_DOMAIN gesetzt, aber kein Zertifikat unter ${TLS_CERT} – HTTPS bleibt aus.\n`);
   }
@@ -94,3 +104,9 @@ httpsServer?.listen(HTTPS_PORT, '0.0.0.0', () => {
   console.log(`  🔒 HTTPS aktiv:    https://${PUBLIC_DOMAIN}:${HTTPS_PORT}/  (Bewegungssensor auf iPhones)`);
   console.log(`     ${PUBLIC_DOMAIN} muss auf ${PUBLIC_HOST} zeigen.\n`);
 });
+
+/** Hostnamen, die Vite im Dev-Modus durchlässt (localhost und IP-Adressen gehen immer) */
+function allowedHosts(): string[] | undefined {
+  const hosts = [PUBLIC_DOMAIN, ONLINE_URL && new URL(ONLINE_URL).hostname, QUICK_TUNNEL && QUICK_TUNNEL_HOSTS].filter((h): h is string => !!h);
+  return hosts.length ? hosts : undefined;
+}
