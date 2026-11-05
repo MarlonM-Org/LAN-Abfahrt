@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-05 20:35",
+  "updated": "2026-11-05 20:10",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -14,13 +14,6 @@
       "detail": "à la Moving Out: Ferienhaus ausräumen, schwere Möbel zu zweit, Fenster als Abkürzung"
     },
     {
-      "title": "Wackel-Prügelei",
-      "kind": "",
-      "type": "Neues Spiel",
-      "branch": "spiel/wackel-pruegelei",
-      "detail": "à la Gang Beasts: labbrige Ragdolls, Greifen und vom Steg ins Meer werfen"
-    },
-    {
       "title": "Review Phase 0: Netz + Reconnect",
       "kind": "",
       "type": "Review-Umsetzung",
@@ -30,6 +23,11 @@
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Wackel-Prügelei (à la Gang Beasts)",
+      "pr": 52,
+      "date": "2026-11-05"
+    },
     {
       "title": "Review: Soundeffekte, Juice-Modul (Partikel, Hit-Stop, Zeitlupe), Sprecher, Ergebnis-Reveal",
       "pr": 50,
