@@ -168,18 +168,30 @@ export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
 export const BOARD_SIZE = 24;
 
 /**
- * Zeiten auf dem Spielbrett. `null` = kein Zeitlimit – der VIP kann im Menü „Für … würfeln“,
- * offline gegangene Spieler würfeln nach OFFLINE_ROLL_MS automatisch.
+ * Zeiten auf dem Spielbrett. Alle würfeln gleichzeitig im Würfelfenster (wer nicht würfelt, für den würfelt
+ * am Ende der Server), danach laufen die Züge nacheinander im Schnelldurchlauf.
  */
 export const BOARD_TIMING = {
-  STEP_MS: 280,
+  /** Ein Feld weiterhüpfen (vorher 280) */
+  STEP_MS: 160,
+  /** Würfel über der Figur, bevor sie losläuft */
+  MOVE_LEAD_MS: 150,
+  /** Pause nach einem Zug (vorher 1800) – nach Ereignis oder Cocktail etwas länger zum Lesen */
+  PAUSE_MS: 700,
+  EVENT_PAUSE_MS: 1100,
   /** Ansage des nächsten Minispiels (VIP kann sie überspringen) */
   INTRO_MS: 6000,
-  /** vorher 45 s */
-  ROLL_IDLE_MS: null as number | null,
-  OFFLINE_ROLL_MS: 5000,
+  /** Würfelfenster: so lange dürfen alle gleichzeitig würfeln */
+  ROLL_WINDOW_MS: 10000,
+  /** Bonus-Cocktails am Ende: Trommelwirbel, dann Auflösung pro Karte */
+  BONUS_DRUM_MS: 1600,
+  BONUS_SHOW_MS: 3600,
 };
 export const COCKTAIL_PRICE = 10;
+/** Finale (Mord/Verräter) im Party-Modus: Sieger bekommen so viele Cocktails (zusätzlich zu den Münzen) */
+export const FINALE_COCKTAILS = 2;
+/** In den letzten Runden zählen blaue/rote Felder doppelt („Endspurt“) */
+export const DOUBLE_ROUNDS = 2;
 export const PARTY_ROUND_OPTIONS = [3, 5, 8];
 
 /** Feldpositionen: Rundweg am Rand der 480 × 270-Welt */

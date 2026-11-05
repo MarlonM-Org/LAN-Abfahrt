@@ -61,6 +61,10 @@ export interface BotOptions {
   count?: number;
   /** Einzelspiel: so oft drückt der VIP-Bot im Ergebnis „Nochmal“ (Leaderboard des Abends testen) */
   nochmal?: number;
+  /** Party: Rundenzahl (3, 5, 8) */
+  rounds?: number;
+  /** Party: gespeicherten Brettstand fortsetzen (data/party.json) statt neu zu starten */
+  resume?: boolean;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
@@ -73,6 +77,8 @@ export class Bot {
   socket: Socket;
   id = '';
   state: GameState | null = null;
+  /** Brett: schon entschiedene Würfelfenster / geloggte Bonus-Karten */
+  private boardSeen = new Set<string>();
   priv: PrivateState = null;
   busy = new Set<string>();
   phasesSeen = new Set<string>();
@@ -667,6 +673,7 @@ export class Bot {
 
   react(s: GameState) {
     if (!this.id) return;
+    if (s.phase === 'lobby') this.boardSeen.clear();
     const me = s.players.find((p) => p.id === this.id);
     const tag = s.phase === 'mini' ? `mini:${s.mini?.kind}` : s.phase;
     if (s.phase !== this.lastPhase) {
@@ -681,7 +688,7 @@ export class Bot {
     if (s.phase === 'lobby' && this.leader && me?.isVip && s.players.filter((p) => p.connected).length >= (this.opts.count ?? 1)) {
       this.once('start', async () => {
         await sleep(1500);
-        this.socket.emit('vip:start', this.opts.date ? { mode: 'date' } : this.opts.game ? { mode: this.opts.game } : { mode: 'party', rounds: 3 });
+        this.socket.emit('vip:start', this.opts.date ? { mode: 'date' } : this.opts.game ? { mode: this.opts.game } : { mode: 'party', rounds: this.opts.rounds ?? 3, resume: this.opts.resume && !!this.state?.partyResume });
       });
     }
     if (s.phase === 'results' && this.leader && me?.isVip) {
@@ -726,11 +733,21 @@ export class Bot {
         this.socket.emit('story:next');
       });
     }
-    if (s.phase === 'board' && s.board?.sub === 'roll' && s.board.order[s.board.turnIdx] === this.id) {
-      this.once(`roll-${s.board.round}-${s.board.turnIdx}`, async () => {
-        await sleep(rand(600, 1500));
-        this.socket.emit('board:roll');
-      });
+    // Würfelfenster: alle gleichzeitig – meist nach 1–5 s, ab und zu verpennt ein Bot (dann würfelt der Server am Ende)
+    if (s.phase === 'board' && s.board?.sub === 'roll' && s.board.order.includes(this.id) && !(this.id in s.board.rolls)) {
+      const key = `roll-${s.board.round}`;
+      if (!this.boardSeen.has(key)) {
+        this.boardSeen.add(key);
+        if (Math.random() > 0.1) setTimeout(() => this.socket.emit('board:roll'), rand(1000, 5000));
+      }
+    }
+    if (s.phase === 'board' && s.board?.sub === 'bonus' && this.leader && s.board.bonus?.revealed) {
+      const b = s.board.bonus;
+      const a = b.awards[b.shown - 1];
+      if (!this.boardSeen.has(`bonus-${b.shown}`)) {
+        this.boardSeen.add(`bonus-${b.shown}`);
+        this.opts.log?.(`Bonus ${a.title}: ${a.winners.map((id) => s.players.find((p) => p.id === id)?.name).join(', ')} (${a.value} ${a.unit})`);
+      }
     }
     // Bot als VIP (nur, wenn kein Mensch da ist): Info-Screens (Auflösung, Intro, Zwischenstand) nach ~2 s weiterschalten –
     // so wie ein Mensch „Weiter“ im VIP-Menü drücken würde. Züge/Abstimmungen überspringt er nicht (die Bots spielen sie).
