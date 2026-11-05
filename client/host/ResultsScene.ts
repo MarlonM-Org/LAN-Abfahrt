@@ -246,7 +246,10 @@ export class ResultsScene extends Phaser.Scene {
       sfx('cheer', { vol: 0.8, delay: 0.3 });
       this.juice.flash(0xfff4d6, 220);
       const names = winners.map((id) => spokenName(playerById(id)?.name));
-      if (announce && names.length) say(names.length === 1 ? `${names[0]} gewinnt!` : `${names.slice(0, -1).join(', ')} und ${names.at(-1)} gewinnen!`);
+      if (!announce || !names.length) return;
+      if (names.length === 1) say(`${names[0]} gewinnt!`);
+      else if (names.length <= 3) say(`${names.slice(0, -1).join(', ')} und ${names.at(-1)} gewinnen!`);
+      else say(`${names.length} Sieger!`);
     });
   }
 
