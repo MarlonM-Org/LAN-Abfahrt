@@ -11,6 +11,8 @@ import { KartWorld } from '../kart3d/world';
 import { bus, getState, playerById } from './store';
 import { ensurePortrait } from './textures';
 import { Countdown, GOLD, background, ensureTex, panel, txt } from './ui';
+import { Juice } from './juice';
+import { sfx } from './sfx';
 
 interface KartView {
   root: Phaser.GameObjects.Container;
@@ -79,6 +81,11 @@ export class KartScene extends Phaser.Scene {
   private minimap: { root: Phaser.GameObjects.Container; dots: Map<string, Phaser.GameObjects.Arc>; scale: number; ox: number; oy: number } | null = null;
   private lastSnapT = 0;
   private view: KartState['view'] = 'phone';
+  private juice!: Juice;
+  /** Für Töne: zuletzt gesehenes Ereignis, Boxen, Turbo/Drift-Ladung pro Kart */
+  private evSeen = -1;
+  private boxOn: boolean[] = [];
+  private carFx = new Map<string, { boost: boolean; charged: boolean }>();
 
   constructor() {
     super('kart');
@@ -101,7 +108,11 @@ export class KartScene extends Phaser.Scene {
     this.lastSnapT = 0;
     this.view = 'phone';
     this.bg = null;
+    this.evSeen = -1;
+    this.boxOn = [];
+    this.carFx.clear();
     this.topdown = this.add.container(0, 0);
+    this.juice = new Juice(this, { layer: this.topdown });
     this.paneLayer = this.add.container(0, 0).setDepth(500);
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.bannerBg = panel(this, 80, 90, 320, 66, 'dark').setDepth(1001).setVisible(false);
@@ -318,6 +329,66 @@ export class KartScene extends Phaser.Scene {
     this.tweens.add({ targets: c, scale: 0.2, alpha: 0, duration: ms, onComplete: () => c.destroy() });
   }
 
+  /** Töne + Partikel zu Ereignissen, Item-Boxen und Turbo (Partikel nur in der Draufsicht) */
+  private soundFx(st: KartState, top: boolean) {
+    const at = (id: string) => st.karts[id];
+    // Ereignisse (Item, Treffer, Möwe, Zieleinlauf)
+    const maxSeq = st.events.reduce((m, e) => Math.max(m, e.seq), 0);
+    if (this.evSeen < 0) this.evSeen = maxSeq;
+    for (const ev of st.events) {
+      if (ev.seq <= this.evSeen) continue;
+      const car = at(ev.who);
+      const x = car?.x ?? 240;
+      switch (ev.kind) {
+        case 'item':
+          sfx('throw', { x });
+          break;
+        case 'hit':
+          sfx('hitHard', { x });
+          sfx('bonk', { x, delay: 0.06 });
+          if (top && car) this.juice.burst(car.x, car.y, 'spark', 10);
+          this.juice.shake(1);
+          break;
+        case 'gull':
+          sfx('whoosh', { x, pitch: 1.2 });
+          sfx('error', { x, pitch: 1.8, vol: 0.6, delay: 0.1 });
+          if (top && car) this.juice.burst(car.x, car.y - 6, 'puff', 6);
+          break;
+        case 'finish':
+          if (car?.place === 1) {
+            sfx('fanfare');
+            if (top) this.juice.burst(car.x, car.y, 'confetti', 40);
+            this.juice.flash(0xffffff, 200);
+          } else sfx('coin', { x, pitch: car && car.place <= 3 ? 1.2 : 1 });
+          break;
+        case 'turbo':
+          sfx('whoosh', { x, pitch: 1.6 });
+          break;
+      }
+    }
+    this.evSeen = Math.max(this.evSeen, maxSeq);
+    // Item-Box eingesammelt
+    st.boxes.forEach((b, i) => {
+      if (this.boxOn[i] && !b.on && st.sub === 'race') {
+        sfx('pop', { x: b.x, pitch: 1.2, vol: 0.7 });
+        if (top) this.juice.burst(b.x, b.y, 'spark', 8);
+      }
+      this.boxOn[i] = b.on;
+    });
+    // Drift-Turbo geladen / gezündet
+    for (const [id, car] of Object.entries(st.karts)) {
+      const prev = this.carFx.get(id);
+      if (prev && st.sub === 'race') {
+        if (car.charged && !prev.charged) sfx('select', { x: car.x, vol: 0.4 });
+        if (car.boost && !prev.boost) {
+          sfx('whoosh', { x: car.x, pitch: 1.6, vol: 0.8 });
+          if (top) this.juice.burst(car.x - Math.cos(car.angle) * 8, car.y - Math.sin(car.angle) * 8, 'fire', 10);
+        }
+      }
+      this.carFx.set(id, { boost: car.boost, charged: car.charged });
+    }
+  }
+
   private setView(view: KartState['view']) {
     if (view === this.view) return;
     this.view = view;
@@ -344,6 +415,7 @@ export class KartScene extends Phaser.Scene {
 
     // Boxen, Hindernisse, Möwen (Draufsicht)
     st.boxes.forEach((b, i) => this.boxes[i]?.setVisible(b.on && top));
+    this.soundFx(st, top);
     const alive = new Set(st.hazards.map((h) => h.id));
     for (const [id, img] of this.hazards) {
       if (alive.has(id)) continue;
