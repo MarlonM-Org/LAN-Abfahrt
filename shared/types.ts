@@ -9,6 +9,7 @@ import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
 import type { KofferState } from './koffer';
+import type { SuessState } from './suess';
 
 export interface Look {
   skin: number;
@@ -75,7 +76,8 @@ export type MiniKind =
   | 'wpistole'
   | 'zauber'
   | 'angeln'
-  | 'koffer';
+  | 'koffer'
+  | 'suess';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -1928,6 +1930,7 @@ export type MiniSnapshot =
   | { kind: 'zauber'; state: ZauberState }
   | { kind: 'angeln'; state: AngelnState }
   | { kind: 'koffer'; state: KofferState }
+  | { kind: 'suess'; state: SuessState }
   | { kind: 'spion'; state: SpionState };
 
 export interface GameState {

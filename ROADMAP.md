@@ -86,7 +86,7 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
   👥 3–8 · 📱 privater Bildschirm + Vibration
 - [ ] **Urlaubs-Fangen** *(Vorbild: Mario Chase aus Nintendo Land)* – Einer flieht und sieht die ganze Karte auf dem Handy, die Jäger nur den TV.
   👥 3–12
-- [ ] **Süßigkeiten-Klau** *(Vorbild: Animal Crossing Sweet Day aus Nintendo Land)* – Gruppe sammelt Snacks aus der Minibar, zwei Wächter jagen sie.
+- [x] **Süßigkeiten-Klau** *(Vorbild: Animal Crossing Sweet Day aus Nintendo Land)* – Gruppe sammelt Snacks aus der Minibar, zwei Wächter jagen sie.
   👥 4–12
 - [ ] ⭐ **Versteckspiel mit Möbeln** *(Vorbild: Prop Hunt)* – Verstecker verwandeln sich in Gegenstände im Ferienhaus (Topfpflanze, Kühlbox, Flamingo-Schwimmring), Sucher haben begrenzte „Schüsse“. Verstecker sehen auf dem Handy, ob sie gerade angeschaut werden.
   👥 4–12 · 📱 Joystick + Verwandeln/Einrasten
