@@ -351,6 +351,25 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .big-btn.su-dash:disabled { filter: saturate(0.4) brightness(0.9); }
 .su-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
 
+/* ---------------------------------------------------------------- Strand-Volleyball */
+.vb { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+.vb-head { display: flex; gap: 10px; align-items: center; padding: 6px 8px; border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); color: var(--ink); }
+.vb-head canvas { display: block; }
+.vb-team { font-size: 11px; margin-bottom: 6px; }
+.vb-score { font-size: 9px; }
+.vb-status { color: var(--ink); text-align: center; min-height: 2.6em; margin: 0; font-size: 9px; line-height: 1.5; }
+.vb-pad { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
+.vb-pad.bench { opacity: 0.4; }
+.vb-move { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.vb-act { display: grid; grid-template-rows: 2fr 3fr; gap: 8px; }
+.big-btn.vb-btn { min-height: 0; height: auto; -webkit-touch-callout: none; position: relative; overflow: hidden; }
+.big-btn.vb-left, .big-btn.vb-right { min-height: 52vh; font-size: 26px; background: #e8a14a; box-shadow: inset 0 4px 0 #f6c27a, inset 0 -6px 0 #b0702a, 0 3px 0 var(--outline); }
+.big-btn.vb-jump { font-size: 15px; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.big-btn.vb-spike { font-size: 10px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.big-btn.vb-spike.ready { filter: brightness(1.15); }
+.big-btn.vb-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+.vb-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
+
 /* ---------------------------------------------------------------- Bowling */
 .bw-start { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
 .bw-start button { padding: 10px 12px; }
@@ -547,6 +566,11 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 /* ---------------------------------------------------------------- Kart-Rennen (quer, Mode-7-Ansicht hinter den Knöpfen) */
 #app:has(.k3) { padding: 0; border: 0; box-shadow: none; background: #000; }
 #app:has(.k3) .abort { position: fixed; top: calc(6px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 4px 8px; font-size: 7px; color: #fff4d6; border-color: rgba(255,255,255,0.35); background: rgba(0,0,0,0.35); }
+/* Oben in der Mitte sitzt der TV/Handy-Umschalter – „Abbrechen“ (VIP) rückt links daneben */
+@media (orientation: landscape) {
+  #app:has(.k3:not(.k3-nosplit)) .abort { top: calc(13px + env(safe-area-inset-top, 0px)); left: calc(50% - 92px); transform: translateX(-100%); }
+}
+#app:has(.k3-split) .abort { color: var(--ink-soft); border-color: var(--paper-dark); background: rgba(255,246,220,0.6); }
 .k3 {
   position: fixed; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
   background: var(--paper); font-size: 10px;
@@ -560,14 +584,31 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .k3-place small { font-size: 11px; color: #fff4d6; }
 .k3-lap { margin-top: 6px; font-size: 9px; }
 .k3-msg { margin-top: 6px; font-size: 8px; color: #ffd25e; max-width: 46vw; line-height: 1.5; }
-.k3-split .k3-hud { color: var(--ink); text-shadow: none; left: 0; right: 0; top: 16vh; text-align: center; }
+.k3-split .k3-hud { color: var(--ink); text-shadow: none; left: 0; right: 0; top: max(16vh, calc(54px + var(--st))); text-align: center; }
 .k3-split .k3-place { font-size: 44px; color: var(--red); }
 .k3-split .k3-place small { font-size: 14px; color: var(--ink-soft); }
 .k3-split .k3-lap { font-size: 12px; margin-top: 10px; }
 .k3-split .k3-msg { color: var(--red); margin: 8px auto 0; max-width: 70vw; }
 .k3-tv { font-size: 7px; color: var(--ink-soft); margin-top: 6px; }
+.k3-phone .k3-tv { display: none; }
+/* TV/Handy-Umschalter: Pille oben in der Mitte (außerhalb von Stick-, GAS- und ITEM-Bereich), aktive Hälfte gold */
+.k3-viewsw {
+  position: absolute; left: 50%; top: calc(8px + var(--st)); transform: translateX(-50%); z-index: 6;
+  display: flex; width: 168px; height: 32px; padding: 0; min-height: 0; border-radius: 16px; overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.7); background: rgba(0,0,0,0.5); box-shadow: 0 2px 0 var(--outline); text-shadow: none;
+}
+.k3-viewsw:active, .k3-viewsw.down { transform: translateX(-50%) translateY(2px); box-shadow: none; }
+.k3-seg { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 7px; color: rgba(255,244,214,0.75); white-space: nowrap; }
+.k3-viewsw:not(.on-phone) .k3-seg-tv, .k3-viewsw.on-phone .k3-seg-phone { background: var(--gold); color: var(--ink); }
+.k3-split .k3-viewsw { background: var(--paper-light); border-color: var(--wood-dark); }
+.k3-split .k3-seg { color: var(--ink-soft); }
+.k3-nosplit .k3-viewsw { display: none; }
+.k3-viewnote { display: none; position: absolute; left: 50%; top: calc(40px + var(--st)); transform: translateX(-50%); z-index: 6; pointer-events: none;
+  padding: 6px 10px; border-radius: 12px; background: rgba(0,0,0,0.45); font-size: 7px; color: #fff4d6; text-shadow: 1px 1px 0 var(--outline); white-space: nowrap; }
+.k3-nosplit:not(.k3-racing) .k3-viewnote { display: block; }
 .k3-center { position: absolute; left: 0; right: 0; top: 30%; text-align: center; z-index: 4; pointer-events: none; color: #fff4d6; text-shadow: 3px 3px 0 var(--outline); font-size: 14px; }
-.k3-split .k3-center { top: 8vh; color: var(--ink); text-shadow: none; }
+/* TV-Modus: Platz/Runde unter der Ansichts-Pille, Countdown/Meldungen darunter (überlappen sich nicht mehr) */
+.k3-split .k3-center { top: 62%; color: var(--ink); text-shadow: none; }
 .k3-center.count { font-size: 44px; color: var(--gold); }
 .k3-center.go { font-size: 36px; color: #b9e39a; }
 .k3-center.turbo { font-size: 24px; color: #ffd25e; }
@@ -621,6 +662,39 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
   .k3 { --bw: clamp(84px, 24vmin, 120px); }
   #app:has(.k3) .abort { top: 46%; }
   .k3-portrait { top: 60%; }
+  /* Hochkant: Pille unter KIPPEN/ITEM (sonst zu schmal nebeneinander) */
+  .k3-viewsw { top: calc(100px + var(--st)); }
+  .k3-viewnote { top: calc(100px + var(--st)); }
+}
+
+/* ---------------------------------------------------------------- Auto-Fußball (gleiches Querformat wie das Kart-Rennen) */
+.afb { background: linear-gradient(180deg, var(--paper) 0%, #f1d49a 100%); }
+.afb-A { box-shadow: inset 0 6px 0 #f4c542; }
+.afb-B { box-shadow: inset 0 6px 0 #3fa7e0; }
+.afb .k3-hud { top: calc(30px + var(--st)); }
+.afb-score { font-size: 34px; line-height: 1; color: var(--ink); }
+.afb-score .sa { color: #c8961c; }
+.afb-score .sb { color: #2a86c0; }
+.afb-score i { font-style: normal; margin: 0 8px; color: var(--ink-soft); }
+.afb-clock { margin-top: 8px; font-size: 11px; color: var(--ink); }
+.afb-team { margin-top: 8px; font-size: 7px; color: var(--ink-soft); }
+.afb-A .afb-team b { color: #c8961c; }
+.afb-B .afb-team b { color: #2a86c0; }
+.afb .k3-center { top: auto; bottom: calc(30% + var(--sb)); }
+.afb .k3-center.count { color: #c8961c; }
+.afb .k3-center.go { color: var(--green-ink, #2f7d32); }
+.afb .k3-center.hit { color: var(--red); }
+.afb .k3-btn small { text-align: center; line-height: 1.5; }
+.afb-boost { background: #f0973a; box-shadow: inset 0 4px 0 #f7bd7a, inset 0 -6px 0 #b8661c, 0 3px 0 var(--outline); }
+.afb-boost.empty { filter: grayscale(0.8) brightness(0.9); }
+.afb-bar { width: 76%; height: 9px; border: 2px solid var(--outline); background: rgba(0,0,0,0.35); box-sizing: border-box; }
+.afb-bar i { display: block; height: 100%; width: 0; background: #ffd25e; transition: width 120ms linear; }
+.afb-hop { right: calc(12px + var(--sr) + var(--bw) + var(--gap)); bottom: calc(12px + var(--sb) + var(--bh) + var(--gap)); width: calc(var(--bw) * 0.72); height: calc(var(--bh) * 0.78);
+  background: #9b5fc0; box-shadow: inset 0 4px 0 #c08fe0, inset 0 -6px 0 #6e3f8f, 0 3px 0 var(--outline); font-size: 9px; }
+.afb-hop.cool { filter: grayscale(0.7) brightness(0.85); }
+.afb .k3-brake.afb-charged { box-shadow: inset 0 2px 0 rgba(0,0,0,0.25), 0 0 0 4px #ffd25e; }
+@media (orientation: portrait) {
+  .afb .k3-portrait { display: block; }
 }
 
 /* ---------------------------------------------------------------- Wackelturm */
@@ -949,3 +1023,77 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .sq-answer:disabled { opacity: 0.45; }
 .sq-answer.active:disabled { opacity: 1; }
 .sq-next { min-height: 26vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }
+
+/* ---------------------------------------------------------------- Urlaubs-Minigolf */
+.gf-status { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+.gf-status .gf-msg { flex: 1; color: var(--red); font-size: 11px; }
+.gf-status b { font-weight: normal; font-size: 10px; color: var(--ink); }
+.gf-sw { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--outline); display: inline-block; }
+.gf-pad {
+  flex: 1; min-height: 46vh; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 3px 10px;
+  touch-action: none; position: relative;
+  background: repeating-linear-gradient(90deg, #4fa63c 0 14px, #58b043 14px 28px);
+  border: 4px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--wood-light), 0 3px 0 var(--outline);
+}
+.gf-pad.locked { filter: saturate(0.6); }
+.gf-pad.motion { min-height: 30vh; }
+.gf-map { display: block; image-rendering: auto; border: 2px solid var(--outline); background: #f1d49a; pointer-events: none; }
+.gf-power { width: 80%; height: 10px; border: 2px solid var(--outline); background: var(--paper-dark); pointer-events: none; }
+.gf-power > div { height: 100%; width: 0; background: linear-gradient(90deg, #46b04a, #f2c33a 60%, #e0503f); }
+.gf-hint { color: var(--paper-light); text-shadow: 1px 1px 0 var(--outline); font-size: 9px; pointer-events: none; padding: 0 6px; }
+.gf-note { font-size: 8px; }
+.big-btn.gf-swing { min-height: 22vh; font-size: 16px; flex: none; }
+.gf-card { gap: 4px; padding: 8px; }
+.gf-row { display: grid; grid-template-columns: 26px 18px 1fr 30px 36px; gap: 6px; align-items: center; font-size: 9px; padding: 3px 4px; }
+.gf-row.me { background: #fff0c4; }
+.gf-row b { text-align: right; color: var(--red); font-size: 11px; }
+.gf-row .gf-sw { width: 14px; height: 14px; border-width: 2px; }
+.gf-this { text-align: center; color: var(--ink-soft); }
+.gf-cardhead { flex: 0 0 auto; }
+.gf-row.gf-head { font-size: 8px; color: var(--ink-soft); }
+.gf-row.gf-head b { font-size: 8px; color: var(--ink-soft); }
+
+/* ---------------------------------------------------------------- Werwölfe im Ferienhaus */
+.ww-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  min-height: 84px; padding: 10px; text-align: center; cursor: pointer;
+  background: repeating-linear-gradient(45deg, #2b3a72 0 8px, #34458a 8px 16px);
+  color: #fff4d6; text-shadow: 1px 1px 0 var(--outline);
+  border: 3px solid var(--outline); box-shadow: inset 0 0 0 3px #b9c3ff, 0 3px 0 var(--outline);
+}
+.ww-card.big { min-height: 40vh; }
+.ww-card.open { background: var(--paper-light); color: var(--ink); text-shadow: none; box-shadow: inset 0 0 0 3px var(--gold), 0 3px 0 var(--outline); }
+.ww-card-back, .ww-card-front { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ww-card-back b { font-size: 13px; font-weight: normal; }
+.ww-card small { font-size: 8px; opacity: 0.8; }
+.ww-card span { font-size: 9px; line-height: 1.6; }
+.ww-role { font-size: 16px; font-weight: normal; }
+.ww-card b, .ww-death b, .ww-list b, .ww-rolerow b { font-weight: normal; }
+.ww-red { color: var(--red); }
+.ww-green { color: #2f7d32; }
+
+/* Nacht: dunkle Fläche – alle Handys sehen gleich aus */
+.ww-night {
+  display: flex; flex-direction: column; gap: 10px;
+  margin: -8px -6px; padding: 10px 8px;
+  background: #141a45; border: 3px solid var(--outline);
+}
+.ww-night .top-row { color: #b9c3ff; }
+.ww-night .ww-prompt { background: #1f2a5e; border-color: #0b1030; box-shadow: inset 0 0 0 2px #2b3a72; }
+.ww-night .ww-prompt h2 { color: #ffd25e; }
+.ww-night .ww-prompt p { color: #d6dcff; font-size: 9px; line-height: 1.6; }
+.ww-night .ww-prompt .ww-red { color: #ff8a7a; }
+.ww-night .ww-prompt .ww-green { color: #7fd47f; }
+.ww-night .player-btn { background: #2b3a72; color: #e6eaff; border-color: #0b1030; box-shadow: inset 0 -3px 0 #1f2a5e, 0 3px 0 #0b1030; }
+.ww-night .player-btn.picked { background: #ffd25e; color: var(--ink); box-shadow: inset 0 -3px 0 #d99a2b, 0 3px 0 #0b1030; }
+.ww-night .player-btn:disabled { opacity: 0.3; }
+.ww-grid .player-btn { position: relative; }
+.ww-mark { position: absolute; top: 3px; right: 4px; font-style: normal; font-size: 7px; color: #ff8a7a; }
+.ww-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ww-actions button { padding: 16px 4px; font-size: 10px; background: #4a3f8a; border-color: #0b1030; box-shadow: inset 0 3px 0 #6a5fb0, inset 0 -4px 0 #2e2660, 0 3px 0 #0b1030; }
+.ww-death { align-items: center; text-align: center; }
+.ww-death b { font-size: 13px; }
+.ww-list p { text-align: left; }
+.ww-names { color: var(--ink); line-height: 1.8; }
+.ww-allroles, .ww-rolerow { width: 100%; }
+.ww-rolerow { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; padding: 3px 0; border-bottom: 1px dashed var(--paper-dark); }

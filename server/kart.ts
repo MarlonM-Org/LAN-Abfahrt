@@ -1,5 +1,5 @@
 import type { KartCar, KartEvent, KartItem, KartState, MiniSnapshot } from '../shared/types';
-import { KART, KART_TRACKS, type KartInput, type KartView, type Track, autopilot, getTrack, keepInside, project, stepKart } from '../shared/kart';
+import { KART, KART_TRACKS, type KartInput, type Track, autopilot, getTrack, keepInside, project, stepKart } from '../shared/kart';
 import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
 
 const TICK_MS = KART.TICK_MS;
@@ -43,8 +43,9 @@ interface Gull {
 
 /**
  * Kart-Rennen: GAS, BREMSE (im Stand rückwärts), DRIFT (halten + lenken → Funken → loslassen = Mini-Turbo), gelenkt per Touch oder Kippen.
- * Ansicht: bis 4 Menschen Verfolger-Splitscreen auf dem TV, sonst rendert jedes Handy seine eigene Verfolger-Ansicht
- * (TV zeigt dann die Draufsicht). Die Physik (`stepKart`) ist geteilt, damit die Handys ihr eigenes Kart vorhersagen können.
+ * Ansicht: bis 4 Menschen Verfolger-Splitscreen auf dem TV – jeder kann aber für sich auf die eigene Ansicht am Handy
+ * umschalten (fliegt dann aus dem Splitscreen). Ab 5 Menschen rendert jedes Handy seine eigene Verfolger-Ansicht.
+ * Fährt keiner auf dem TV, zeigt der TV die Draufsicht. Die Physik (`stepKart`) ist geteilt, damit die Handys ihr eigenes Kart vorhersagen können.
  * Items aus den ?-Boxen: Kokosnuss (nach vorn), Bananenschale (nach hinten), Turbo-Eis, Möwe (nur hinten im Feld).
  */
 export class KartGame implements MiniGame {
@@ -63,15 +64,19 @@ export class KartGame implements MiniGame {
   private closing = false;
   private startedAt = 0;
   private lastTick = Date.now();
-  private view: KartView;
-  private panes: string[];
+  /** Splitscreen-Kandidaten in fester Reihenfolge (Menschen; ohne Menschen – Test – die ersten Karts) */
+  private paneOrder: string[];
   private splitOk: boolean;
+  /** Wer seine Verfolger-Ansicht lieber am eigenen Handy hat */
+  private phoneWant = new Set<string>();
   private timers = new Timers();
 
   constructor(
     private ids: string[],
     private ctx: MiniCtx,
     trackIndex = Math.floor(Math.random() * KART_TRACKS.length),
+    /** Gespeicherte Wahl der Spieler aus früheren Rennen (true = Handy-Ansicht) */
+    phonePref: (id: string) => boolean = () => false,
   ) {
     this.trackIndex = trackIndex;
     this.track = getTrack(trackIndex);
@@ -79,8 +84,8 @@ export class KartGame implements MiniGame {
     // Splitscreen-Ansichten nur für Menschen (Bots brauchen keine); ohne Menschen (Test) die ersten Karts
     const humans = ids.filter((id) => !ctx.isBot?.(id));
     this.splitOk = humans.length <= KART.SPLIT_MAX;
-    this.panes = (humans.length ? humans : ids).slice(0, KART.SPLIT_MAX);
-    this.view = this.splitOk ? 'split' : 'phone';
+    this.paneOrder = (humans.length ? humans : ids).slice(0, KART.SPLIT_MAX);
+    for (const id of humans) if (phonePref(id)) this.phoneWant.add(id);
     shuffle(ids).forEach((id, i) => {
       const g = this.track.grid[i % this.track.grid.length];
       this.cars.set(id, {
@@ -103,6 +108,7 @@ export class KartGame implements MiniGame {
         vy: 0,
         dc: 0,
         bm: 0,
+        phoneView: false,
         inp: { steer: 0, gas: false, brake: false, drift: false },
         nextCp: 0,
         prog: 0,
@@ -473,8 +479,10 @@ export class KartGame implements MiniGame {
         vy: r1(c.vy),
         dc: Math.round(c.driftCharge * 100) / 100,
         bm: Math.round(c.boostMs),
+        phoneView: this.isPhoneView(c.id),
       };
     }
+    const panes = this.panes();
     return {
       kind: 'kart',
       state: {
@@ -483,8 +491,8 @@ export class KartGame implements MiniGame {
         closing: this.closing,
         track: this.trackIndex,
         laps: KART.LAPS,
-        view: this.view,
-        panes: this.panes,
+        view: panes.length ? 'split' : 'phone',
+        panes,
         splitOk: this.splitOk,
         t: this.sub === 'race' ? this.lastTick : Date.now(),
         karts,
@@ -502,13 +510,23 @@ export class KartGame implements MiniGame {
     if (c) c.inp = { steer: 0, gas: false, brake: false, drift: false };
   }
 
-  /** VIP: Ansicht umschalten (view:split / view:phone / view:toggle) */
-  vipAction(action: string) {
-    if (!action.startsWith('view:') || this.sub === 'over') return;
-    const want = action === 'view:toggle' ? (this.view === 'split' ? 'phone' : 'split') : action.slice(5);
-    if (want !== 'split' && want !== 'phone') return;
-    if (want === 'split' && !this.splitOk) return;
-    this.view = want;
+  // ---------------------------------------------------------------- Ansicht (TV-Splitscreen / Handy)
+
+  private isPhoneView(id: string) {
+    return !this.splitOk || this.phoneWant.has(id);
+  }
+
+  /** Wer gerade eine Ansicht im TV-Splitscreen hat (Reihenfolge bleibt fest, Umschalter fallen raus) */
+  private panes(): string[] {
+    return this.splitOk ? this.paneOrder.filter((id) => !this.phoneWant.has(id)) : [];
+  }
+
+  /** Spieler schaltet seine Verfolger-Ansicht zwischen TV und Handy um (geht auch mitten im Rennen) */
+  setPhoneView(id: string, phone: boolean) {
+    if (!this.cars.has(id) || this.ctx.isBot?.(id) || this.sub === 'over') return;
+    if (phone === this.phoneWant.has(id)) return;
+    if (phone) this.phoneWant.add(id);
+    else this.phoneWant.delete(id);
     this.ctx.onChange();
   }
 

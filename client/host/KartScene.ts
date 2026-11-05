@@ -46,8 +46,10 @@ const HUD_H = 20;
 
 /**
  * Kart-Rennen auf dem TV:
- * - Ansicht „split“: bis zu 4 Verfolger-Ansichten (Mode 7) auf dem geteilten Bildschirm, bei 3 Spielern eine Minikarte im freien Viertel
- * - Ansicht „phone“: Draufsicht auf die ganze Strecke (die Handys rendern ihre eigene Ansicht)
+ * - Ansicht „split“: bis zu 4 Verfolger-Ansichten (Mode 7) auf dem geteilten Bildschirm – 1 Ansicht = ganzer Schirm,
+ *   2 = übereinander, 3–4 = Raster (bei 3 eine Minikarte im freien Viertel). Wer am Handy auf „Handy“ umschaltet,
+ *   fällt raus, der TV teilt beim nächsten Stand neu auf.
+ * - Ansicht „phone“ (niemand fährt auf dem TV): Draufsicht auf die ganze Strecke (die Handys rendern ihre eigene Ansicht)
  */
 export class KartScene extends Phaser.Scene {
   private karts = new Map<string, KartView>();
@@ -102,9 +104,9 @@ export class KartScene extends Phaser.Scene {
     this.topdown = this.add.container(0, 0);
     this.paneLayer = this.add.container(0, 0).setDepth(500);
     this.hud = this.add.container(0, 0).setDepth(1000);
-    this.bannerBg = panel(this, 80, 90, 320, 62, 'dark').setDepth(1001).setVisible(false);
+    this.bannerBg = panel(this, 80, 90, 320, 66, 'dark').setDepth(1001).setVisible(false);
     this.banner = txt(this, WORLD.W / 2, 100, '', { size: 24, color: GOLD }).setDepth(1002);
-    this.sub = txt(this, WORLD.W / 2, 134, '', { size: 8 }).setDepth(1002);
+    this.sub = txt(this, WORLD.W / 2, 128, '', { size: 8 }).setDepth(1002);
     this.ticker = txt(this, WORLD.W / 2, WORLD.H - 14, '', { size: 8 }).setDepth(1002);
     this.clock = txt(this, WORLD.W - 4, 24, '', { size: 8, color: GOLD, origin: [1, 0] }).setDepth(1002);
     const fn = (s: GameState) => this.onState(s);
@@ -305,8 +307,9 @@ export class KartScene extends Phaser.Scene {
     const name = getTrack(st.track).def.name;
     this.banner.setText(secs > 3 ? name.toUpperCase() : String(Math.max(1, secs)));
     this.banner.setFontSize(secs > 3 ? 16 : 24);
-    const where = st.view === 'split' ? 'Splitscreen auf dem TV' : 'Jeder fährt auf seinem Handy';
-    this.sub.setText(secs > 3 ? `${st.laps} Runden – ${where}${st.splitOk ? '  (VIP: Ansicht ⇄)' : ''}` : '');
+    const where = !st.splitOk ? 'jeder fährt auf seinem Handy' : st.view === 'split' ? 'Splitscreen auf dem TV' : 'alle fahren am Handy';
+    // Bis 4 Spieler wählt jeder selbst (Knopf oben in der Mitte am Handy)
+    this.sub.setText(secs > 3 ? `${st.laps} Runden – ${where}${st.splitOk ? '\nAm Handy oben: TV / HANDY wählen' : ''}` : '');
     this.bannerBg.setVisible(true);
   }
 

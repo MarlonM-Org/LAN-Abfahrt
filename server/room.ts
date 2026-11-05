@@ -22,6 +22,7 @@ import { KurveGame } from './kurve';
 import { ArenaGame } from './arena';
 import { BowlingGame } from './bowling';
 import { BouleGame } from './boule';
+import { GolfGame } from './golf';
 import { EntenGame } from './enten';
 import { ParcoursGame } from './parcours';
 import { KartGame } from './kart';
@@ -44,6 +45,8 @@ import { FlunkyGame } from './flunky';
 import { GeistGame } from './geist';
 import { SumoGame } from './sumo';
 import { DartsGame } from './darts';
+import { AutoballGame } from './autoball';
+import { VolleyGame } from './volley';
 import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
@@ -55,6 +58,7 @@ import { VersteckGame } from './verstecken';
 import { StillepostGame } from './stillepost';
 import { isLoopback } from './net';
 import { TouristGame } from './tourist';
+import { WerwolfGame } from './werwolf';
 import { SpruecheGame } from './sprueche';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 
@@ -81,6 +85,8 @@ interface Player extends PlayerPublic {
   /** Zeitpunkt der letzten Trennung (0 = verbunden) */
   disconnectedAt: number;
   isBot?: boolean;
+  /** Kart-Rennen: eigene Verfolger-Ansicht am Handy statt im TV-Splitscreen (vom Handy gespeichert) */
+  kartView?: 'phone' | 'tv';
 }
 
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
@@ -178,6 +184,7 @@ export class Room {
       p.connected = true;
       p.disconnectedAt = 0;
       p.isBot = msg.bot === true;
+      if (msg.kartView === 'phone' || msg.kartView === 'tv') p.kartView = msg.kartView;
       if (!p.isBot && !this.hostId) this.hostId = p.id;
       playerId = p.id;
       socket.join('players');
@@ -267,6 +274,14 @@ export class Room {
 
     socket.on('vip:mini', (action: string) => {
       if (isVip() && this.phase === 'mini') this.mini?.vipAction?.(String(action));
+    });
+
+    // Kart-Rennen: jeder Spieler wählt selbst, ob seine Verfolger-Ansicht auf dem TV oder dem Handy läuft (gilt auch für spätere Rennen)
+    socket.on('kart:view', (view: string) => {
+      const p = playerId ? this.players.get(playerId) : undefined;
+      if (!p) return;
+      p.kartView = view === 'phone' ? 'phone' : 'tv';
+      if (this.phase === 'mini' && this.mini instanceof KartGame) this.mini.setPhoneView(p.id, p.kartView === 'phone');
     });
 
     socket.on('board:roll', () => {
@@ -365,6 +380,7 @@ export class Room {
       onChange: () => this.changed(),
       finish: (r) => this.finishMini(kind, r),
       isConnected: (id) => this.isOnline(id),
+      isGone: (id) => !!this.players.get(id)?.removed,
       nameOf: (id) => this.nameOf(id),
       isBot: (id) => !!this.players.get(id)?.isBot,
       lookOf: (id) => this.players.get(id)?.look,
@@ -435,7 +451,7 @@ export class Room {
         this.mini = new ParcoursGame(ids, ctx);
         break;
       case 'kart':
-        this.mini = new KartGame(ids, ctx);
+        this.mini = new KartGame(ids, ctx, undefined, (id) => this.players.get(id)?.kartView === 'phone');
         break;
       case 'turm':
         this.mini = new TurmGame(ids, ctx);
@@ -470,11 +486,23 @@ export class Room {
       case 'darts':
         this.mini = new DartsGame(ids, ctx);
         break;
+      case 'volley':
+        this.mini = new VolleyGame(ids, ctx);
+        break;
       case 'tourist':
         this.mini = new TouristGame(ids, ctx);
         break;
       case 'sprueche':
         this.mini = new SpruecheGame(ids, ctx, this.quips.all);
+        break;
+      case 'golf':
+        this.mini = new GolfGame(ids, ctx);
+        break;
+      case 'autoball':
+        this.mini = new AutoballGame(ids, ctx);
+        break;
+      case 'werwolf':
+        this.mini = new WerwolfGame(ids, ctx);
         break;
     }
     this.results = null;
@@ -665,6 +693,7 @@ export class Room {
     }
     if (m?.kind === 'stillepost' && m.state.sub === 'vote') return { key: `sp-vote-${m.state.chain}`, ms: null };
     if (m?.kind === 'murder' && m.state.sub === 'meeting') return { key: `murder-${m.state.phaseNo}`, ms: null };
+    if (m?.kind === 'werwolf' && m.state.sub === 'day') return { key: `werwolf-${m.state.phaseNo}`, ms: null };
     return null;
   }
 

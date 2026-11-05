@@ -3,6 +3,8 @@ import type { PropType } from './verstecken';
 import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
 import type { DartsState } from './darts';
+import type { AfbState } from './autoball';
+import type { WolfPrivate, WolfState } from './werwolf';
 
 export interface Look {
   skin: number;
@@ -56,9 +58,13 @@ export type MiniKind =
   | 'grill'
   | 'boule'
   | 'sumo'
+  | 'volley'
   | 'tourist'
   | 'sprueche'
-  | 'darts';
+  | 'darts'
+  | 'golf'
+  | 'autoball'
+  | 'werwolf';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade';
 
@@ -635,6 +641,54 @@ export interface BouleState {
   history: { side: string | null; points: number }[];
 }
 
+// ------------------------------------------------------------------ Minigolf
+
+/** Ball eines Spielers (kompakt, wird bis zu ~25×/s gesendet) */
+export interface GolfBallPub {
+  x: number;
+  y: number;
+  /** Schläge auf diesem Loch (inkl. Strafschläge) */
+  s: number;
+  /** 0 = spielt, 1 = eingelocht, 2 = aufgegeben (Schlag-Limit/Zeit) */
+  d: 0 | 1 | 2;
+  /** rollt gerade (oder steckt in der Röhre / ist ins Wasser gefallen) */
+  m: boolean;
+  /** in der Looping-Röhre (unsichtbar) */
+  tube?: boolean;
+  /** Zielen: Winkel (rad) und Kraft 0 … 1 */
+  aim: [number, number] | null;
+}
+
+export type GolfFxKind = 'hole' | 'ace' | 'water' | 'bump' | 'tube' | 'lip' | 'cap' | 'out';
+
+export interface GolfFx {
+  seq: number;
+  id: string;
+  k: GolfFxKind;
+  x: number;
+  y: number;
+  /** z. B. Schläge beim Einlochen */
+  n?: number;
+}
+
+export interface GolfState {
+  sub: 'intro' | 'tee' | 'play' | 'card' | 'over';
+  endsIn: number;
+  /** aktuelles Loch (0-basiert) und Anzahl Löcher */
+  hole: number;
+  holes: number;
+  /** Lochzeit in s (bewegliche Hindernisse) */
+  t: number;
+  order: string[];
+  /** Ballfarbe pro Spieler (Hex-Zahl) */
+  colors: Record<string, number>;
+  balls: Record<string, GolfBallPub>;
+  /** Schläge pro Loch (null = noch nicht gespielt) */
+  scores: Record<string, (number | null)[]>;
+  par: number[];
+  fx: GolfFx[];
+}
+
 // ------------------------------------------------------------------ Controller-Spiele: Ententeich
 
 /** duck/gull/flamingo = Vögel (Punkte), float = Badegast/Schwimmring (Strafe!) */
@@ -954,6 +1008,8 @@ export interface KartCar {
   vy: number;
   dc: number;
   bm: number;
+  /** Dieser Spieler sieht seine Verfolger-Ansicht auf dem eigenen Handy (statt im TV-Splitscreen) */
+  phoneView: boolean;
 }
 
 export interface KartEvent {
@@ -972,11 +1028,11 @@ export interface KartState {
   closing: boolean;
   track: number;
   laps: number;
-  /** split = Verfolger-Ansichten auf dem geteilten TV, phone = jedes Handy zeigt seine eigene (TV: Draufsicht) */
+  /** Was der TV zeigt: split = Verfolger-Ansichten (`panes`), phone = niemand fährt auf dem TV → Draufsicht */
   view: import('./kart').KartView;
-  /** Wer im Splitscreen eine Ansicht bekommt (max. 4, in dieser Reihenfolge) */
+  /** Wer im TV-Splitscreen eine Ansicht bekommt (max. 4, in dieser Reihenfolge) – ohne die, die aufs Handy umgeschaltet haben */
   panes: string[];
-  /** Darf der VIP auf Splitscreen umschalten? (≤ 4 Menschen) */
+  /** Gibt es überhaupt TV-Splitscreen? (≤ 4 Menschen) – sonst fahren alle auf dem Handy */
   splitOk: boolean;
   /** Serverzeit des Physik-Schritts zu diesem Stand (für Interpolation/Vorhersage) */
   t: number;
@@ -1386,6 +1442,52 @@ export interface GeistState {
   points: Record<string, number>;
 }
 
+// ------------------------------------------------------------------ Strand-Volleyball
+
+export interface VolleyPlayer {
+  team: Team;
+  /** Gerade im Feld (sonst auf der Bank, wechselt nach dem nächsten Punkt ein) */
+  court: boolean;
+  /** Füße (Weltpixel) */
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  /** In der Luft */
+  air: boolean;
+  /** Schmetterarm ist gerade draußen */
+  spike: boolean;
+  /** Restliche Abklingzeit fürs Schmettern (ms) */
+  cd: number;
+  /** Laufrichtung (−1, 0, 1) für das Sprite */
+  dir: number;
+  touches: number;
+  spikes: number;
+}
+
+export interface VolleyState {
+  sub: 'intro' | 'serve' | 'rally' | 'point' | 'over';
+  /** Restzeit der aktuellen Phase (Intro, Aufschlag, Punkt) */
+  endsIn: number;
+  /** Restliche Spielzeit (ms) */
+  clock: number;
+  score: Record<Team, number>;
+  target: number;
+  cap: number;
+  serving: Team;
+  server: string | null;
+  /** Zeit abgelaufen bei Gleichstand: der nächste Punkt entscheidet */
+  golden: boolean;
+  ball: { x: number; y: number; vx: number; vy: number };
+  players: Record<string, VolleyPlayer>;
+  /** Zählt bei jedem Ballkontakt hoch (für Effekte) */
+  hitSeq: number;
+  lastHit: { id: string; spike: boolean } | null;
+  pointSeq: number;
+  lastPoint: { team: Team; x: number } | null;
+  winner: Team | null;
+}
+
 // ------------------------------------------------------------------ Sumo-Steg
 
 export interface SumoPlayer {
@@ -1535,9 +1637,13 @@ export type MiniSnapshot =
   | { kind: 'grill'; state: GrillState }
   | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
+  | { kind: 'volley'; state: VolleyState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
-  | { kind: 'darts'; state: DartsState };
+  | { kind: 'darts'; state: DartsState }
+  | { kind: 'golf'; state: GolfState }
+  | { kind: 'autoball'; state: AfbState }
+  | { kind: 'werwolf'; state: WolfState };
 
 export interface GameState {
   phase: Phase;
@@ -1584,6 +1690,7 @@ export type PrivateState =
   | { kind: 'geist'; state: GeistPrivate }
   | { kind: 'tourist'; state: TourPrivate }
   | { kind: 'sprueche'; state: SpruechePrivate }
+  | { kind: 'werwolf'; state: WolfPrivate }
   | null;
 
 export interface JoinRequest {
@@ -1592,6 +1699,8 @@ export interface JoinRequest {
   playerId?: string;
   /** Testspieler (Bots) melden sich so an – manche Spiele geben ihnen Hinweise */
   bot?: boolean;
+  /** Kart-Rennen: gespeicherte Ansichts-Wahl des Handys (TV-Splitscreen oder eigene Ansicht am Handy) */
+  kartView?: 'phone' | 'tv';
 }
 
 export interface JoinResponse {
