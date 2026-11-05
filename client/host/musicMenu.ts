@@ -9,6 +9,8 @@ import {
   getAssign, getCurrentSongId, getFxVolume, getMusicVolume, getScene, getSongs, getVolume, isMuted, isPreviewing,
   onMusicChange, previewSong, setFxVolume, setMusicVolume, setMuted, setVolume, stopPreview, unlockMusic,
 } from './music';
+import { isSpeechOn, say, setSpeechOn, speechSupported } from './speech';
+import { sfx } from './sfx';
 
 const CSS = `
 #musik-menu-root { position: fixed; inset: 0; pointer-events: none; z-index: 40; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
@@ -143,12 +145,23 @@ function render() {
   // --- Lautstärke
   const muteBtn = h('button', { id: 'mm-mute', class: `mm-btn ${isMuted() ? 'on' : ''}` }, isMuted() ? 'Stumm: AN' : 'Stumm: AUS');
   muteBtn.addEventListener('click', () => setMuted(!isMuted()));
+  const speechBtn = h('button', { id: 'mm-speech', class: `mm-btn ${isSpeechOn() ? 'on' : ''}` }, isSpeechOn() ? 'Sprecher: AN' : 'Sprecher: AUS');
+  speechBtn.addEventListener('click', () => {
+    setSpeechOn(!isSpeechOn());
+    speechBtn.textContent = isSpeechOn() ? 'Sprecher: AN' : 'Sprecher: AUS';
+    speechBtn.classList.toggle('on', isSpeechOn());
+    if (isSpeechOn()) say('Sprecher ist an!', { interrupt: true });
+  });
   const volBox = h(
     'div', { class: 'mm-box' },
     h('h3', {}, 'Lautstärke'),
     slider('Gesamt', getVolume(), 1, setVolume),
     slider('Musik', getMusicVolume(), 1, setMusicVolume),
-    slider('Effekte', getFxVolume(), 1, setFxVolume),
+    slider('Effekte', getFxVolume(), 1, (v) => {
+      setFxVolume(v);
+      sfx('select');
+    }),
+    h('div', { class: 'mm-row' }, speechBtn, h('span', { class: 'mm-now' }, speechSupported() ? 'Ansagen wie „Drei, zwei, eins, los!“ (Lautstärke = Effekte)' : 'Dieser Browser kann keine Sprachausgabe')),
     h('div', { class: 'mm-row' }, muteBtn, h('span', { class: 'mm-now' }, `Läuft gerade: ${nowTitle}${isPreviewing() ? ' (Vorhören)' : ` – Szene „${sceneName(getScene())}“`}`)),
   );
 

@@ -10,6 +10,7 @@ import { hideProp, hidePropKey } from '../art/hideprops';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
 import { GREEN_INK, INK, RED_INK, background, ensureTex, ink, nameTag, panel, txt } from './ui';
+import { sfx } from './sfx';
 
 // ------------------------------------------------------------------ Haus malen
 
@@ -102,7 +103,6 @@ export class VersteckScene extends Phaser.Scene {
   private hudKey = '';
   private lastCheck = 0;
   private lastWhistle = 0;
-  private audio: AudioContext | null = null;
 
   constructor() {
     super('verstecken');
@@ -139,17 +139,10 @@ export class VersteckScene extends Phaser.Scene {
     this.hud = this.add.container(0, 0).setDepth(2001);
     this.timerText = ink(this, WORLD.W - 8, 7, '', { origin: [1, 0] }).setDepth(2002);
 
-    const unlock = () => void this.sound0();
-    this.input.on('pointerdown', unlock);
-    window.addEventListener('keydown', unlock, { once: true });
-
     const onState = (s: GameState) => this.onState(s);
     bus.on('state', onState);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off('state', onState);
-      window.removeEventListener('keydown', unlock);
-      void this.audio?.close();
-      this.audio = null;
     });
     if (st) this.onState(st);
   }
@@ -288,7 +281,7 @@ export class VersteckScene extends Phaser.Scene {
     }
     this.tweens.add({ targets: c, alpha: 0, delay: 1800, duration: 500, onComplete: () => c.destroy() });
     this.cameras.main.shake(150, 0.004);
-    this.beep([523, 659, 784], 0.09, 'square');
+    sfx('win', { x, vol: 0.8 });
   }
 
   private missFx(x: number, y: number) {
@@ -310,7 +303,7 @@ export class VersteckScene extends Phaser.Scene {
     }
     const t = txt(this, x, y - 30, 'NIX!', { color: '#ff8a7a' }).setDepth(1200);
     this.tweens.add({ targets: t, y: y - 42, alpha: 0, duration: 900, onComplete: () => t.destroy() });
-    this.beep([220, 165], 0.12, 'sawtooth');
+    sfx('error', { x });
   }
 
   private whistleFx(x: number, y: number, forced: boolean) {
@@ -324,58 +317,7 @@ export class VersteckScene extends Phaser.Scene {
       const t = txt(this, x, y - 22, 'PFIFF!', { color: C.gold }).setDepth(1101);
       this.tweens.add({ targets: t, alpha: 0, delay: 600, duration: 800, onComplete: () => t.destroy() });
     }
-    this.whistleSound();
-  }
-
-  // ---------------------------------------------------------------- Ton (WebAudio, kein Asset)
-
-  private sound0(): AudioContext | null {
-    try {
-      this.audio ??= new AudioContext();
-      if (this.audio.state === 'suspended') void this.audio.resume();
-    } catch {
-      this.audio = null;
-    }
-    return this.audio;
-  }
-
-  private whistleSound() {
-    const ctx = this.sound0();
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(1300, t);
-    o.frequency.exponentialRampToValueAtTime(2200, t + 0.18);
-    o.frequency.setValueAtTime(1500, t + 0.26);
-    o.frequency.exponentialRampToValueAtTime(2600, t + 0.5);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.18, t + 0.03);
-    g.gain.setValueAtTime(0.18, t + 0.2);
-    g.gain.exponentialRampToValueAtTime(0.02, t + 0.24);
-    g.gain.exponentialRampToValueAtTime(0.18, t + 0.3);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
-    o.connect(g).connect(ctx.destination);
-    o.start(t);
-    o.stop(t + 0.62);
-  }
-
-  private beep(freqs: number[], step: number, type: OscillatorType) {
-    const ctx = this.sound0();
-    if (!ctx) return;
-    freqs.forEach((f, i) => {
-      const t = ctx.currentTime + i * step;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = type;
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0.06, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + step * 1.6);
-      o.connect(g).connect(ctx.destination);
-      o.start(t);
-      o.stop(t + step * 1.7);
-    });
+    sfx('whistle', { x });
   }
 
   // ---------------------------------------------------------------- HUD & Karten

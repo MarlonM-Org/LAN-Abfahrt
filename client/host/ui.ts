@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
-import { FONT } from './store';
+import type { GameState } from '../../shared/types';
+import { FONT, bus } from './store';
+import { sfx } from './sfx';
+import { say } from './speech';
 import { Pix } from '../art/pix';
 import { panelPix, tagPix } from '../art/objects';
 
@@ -101,3 +104,55 @@ export class Countdown {
 }
 
 export const PLACE_COLORS = ['#c98a10', '#6e6a62', '#a5602a', INK];
+
+// ------------------------------------------------------------------ Start-Countdown (zentral)
+
+/**
+ * Countdown-Piep + „LOS“ für alle Minispiele mit Phase `sub: 'countdown'` (und `endsIn`):
+ * Piep + Sprecher („Drei“, „Zwei“, „Eins“) in den letzten drei Sekunden, beim Wechsel in die
+ * Spielphase Start-Ton + „Los!“. Hängt einmal am Zustands-Bus, die Szenen müssen nichts tun.
+ * Eine eigene lokale Uhr, weil der Server während des Countdowns nicht unbedingt sendet.
+ */
+const CUE_WORDS = ['', 'Eins', 'Zwei', 'Drei'];
+const cue = { kind: '', sub: '', sec: 0, endsAt: 0, timer: 0 };
+
+function cueTick() {
+  if (cue.sub !== 'countdown') {
+    window.clearInterval(cue.timer);
+    cue.timer = 0;
+    return;
+  }
+  const sec = Math.ceil((cue.endsAt - performance.now()) / 1000);
+  if (sec !== cue.sec && sec >= 1 && sec <= 3) {
+    sfx('countdown');
+    say(CUE_WORDS[sec], { interrupt: true, rate: 1.15 });
+  }
+  cue.sec = sec;
+}
+
+function onCueState(s: GameState) {
+  const kind = s.phase === 'mini' && s.mini ? s.mini.kind : '';
+  const st = (s.mini?.state ?? null) as { sub?: unknown; endsIn?: unknown } | null;
+  const sub = kind && typeof st?.sub === 'string' ? st.sub : '';
+  if (kind !== cue.kind) {
+    cue.kind = kind;
+    cue.sub = '';
+    cue.sec = 0;
+  }
+  if (sub === 'countdown' && typeof st?.endsIn === 'number') {
+    cue.endsAt = performance.now() + st.endsIn;
+    cue.sub = sub;
+    if (!cue.timer) cue.timer = window.setInterval(cueTick, 50);
+    cueTick();
+    return;
+  }
+  if (cue.sub === 'countdown' && sub && sub !== 'over') {
+    sfx('go');
+    say('Los!', { interrupt: true, rate: 1.15 });
+  }
+  cue.sub = sub;
+  cue.sec = 0;
+  cueTick();
+}
+
+bus.on('state', onCueState);
