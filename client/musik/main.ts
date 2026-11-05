@@ -4,7 +4,7 @@
  */
 import '@fontsource/press-start-2p/400.css';
 import {
-  ASSIGN_SCENES, CHANNELS, type ChannelId, NOTE_NAMES, STEPS_PER_BAR, STYLES, type Song, type SongInfo, WAVES,
+  ASSIGN_SCENES, CHANNELS, type ChannelId, MAX_BARS, NOTE_NAMES, STEPS_PER_BAR, STYLES, type Song, type SongInfo, WAVES,
   emptySong, slugId, validateSong,
 } from '../../shared/music';
 import { BUILTIN_IDS } from '../../shared/musicBuiltin';
@@ -110,7 +110,7 @@ swing.addEventListener('input', () => {
   $('swingVal').textContent = `${Math.round(Number(swing.value) * 100)} %`;
 });
 swing.addEventListener('change', () => prop((s) => (s.swing = Number(swing.value))));
-bars.addEventListener('change', () => prop((s) => (s.bars = Math.max(1, Math.min(16, Math.round(Number(bars.value) || 4))))));
+bars.addEventListener('change', () => prop((s) => (s.bars = Math.max(1, Math.min(MAX_BARS, Math.round(Number(bars.value) || 4))))));
 snap.addEventListener('change', () => (store.snapScale = snap.checked));
 master.addEventListener('input', () => {
   localStorage.setItem('lan-abfahrt.werkstatt.volume', master.value);

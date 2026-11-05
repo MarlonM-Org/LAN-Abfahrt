@@ -9,7 +9,8 @@
 import { MINI_INFO } from './games';
 
 export const STEPS_PER_BAR = 16;
-export const MAX_BARS = 16;
+/** Höchstens 32 Takte (bei 120 BPM gut eine Minute Loop) */
+export const MAX_BARS = 32;
 export const MAX_NOTES = 4096;
 export const MIDI_MIN = 21;
 export const MIDI_MAX = 108;
@@ -57,7 +58,7 @@ export const CHANNELS: { id: ChannelId; name: string }[] = [
   { id: 'harmony', name: 'Begleitung' },
 ];
 
-export type StyleId = 'party' | 'action' | 'chill' | 'romantisch' | 'grusel' | 'bar' | 'retro' | 'episch';
+export type StyleId = 'party' | 'action' | 'chill' | 'romantisch' | 'grusel' | 'bar' | 'retro' | 'episch' | 'magie' | 'krimi' | 'sport' | 'western';
 export const STYLES: { id: StyleId; name: string; color: string }[] = [
   { id: 'party', name: 'Party', color: '#e8613c' },
   { id: 'action', name: 'Action', color: '#d8a03c' },
@@ -67,6 +68,10 @@ export const STYLES: { id: StyleId; name: string; color: string }[] = [
   { id: 'bar', name: 'Bar', color: '#a0703c' },
   { id: 'retro', name: 'Retro-Arcade', color: '#5fa437' },
   { id: 'episch', name: 'Episch', color: '#4a6fc8' },
+  { id: 'magie', name: 'Magie', color: '#9a5fd0' },
+  { id: 'krimi', name: 'Krimi', color: '#4f5d70' },
+  { id: 'sport', name: 'Sport', color: '#2f9a5a' },
+  { id: 'western', name: 'Western', color: '#b8733a' },
 ];
 export const styleName = (s: string) => STYLES.find((x) => x.id === s)?.name ?? s;
 
@@ -149,26 +154,46 @@ export function slugId(title: string): string {
   return SONG_ID_RE.test(s) ? s : `song-${Date.now().toString(36)}`;
 }
 
-/** Eingebaute Zuordnung Szene → eingebauter Song, wenn nichts anderes eingestellt ist */
+/**
+ * Eingebaute Zuordnung Szene → eingebauter Song, wenn nichts anderes eingestellt ist.
+ * Szenen sind Phasen (lobby, board, …) oder MiniKinds; noch nicht vorhandene Spiele
+ * (z. B. 'zauber', 'wpistole', 'angeln') dürfen schon hier stehen.
+ */
 export function defaultSongForScene(scene: string): string {
   switch (scene) {
-    case 'lobby': case 'board': case 'results': case 'volley':
+    case 'lobby': case 'board': case 'results':
       return 'party';
-    case 'story': case 'stars': case 'rhythm': case 'boule':
+    case 'story': case 'stars': case 'rhythm':
       return 'romantic';
-    case 'golf':
+    case 'flunky': case 'grill':
+      return 'poolparty';
+    case 'pixel':
       return 'strandpromenade';
-    case 'wrap': case 'descent':
-      return 'action';
-    case 'darts':
-      return 'strandpromenade';
-    case 'murder': case 'ttt': case 'verstecken': case 'geist': case 'fangen': case 'werwolf':
-      return 'spooky';
-    case 'stillepost': case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'tourist': case 'sprueche':
+    case 'sprint': case 'tidy': case 'kurve':
+      return 'pixel-arcade';
+    case 'flieger': case 'turm':
+      return 'gipfelsturm';
+    case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'stillepost': case 'sprueche':
       return 'bar';
-    case 'pixel': case 'angeln':
-      return 'strandpromenade';
-    default:
+    case 'geist': case 'fangen': case 'werwolf':
+      return 'spooky';
+    case 'murder': case 'ttt': case 'tourist': case 'verstecken':
+      return 'krimi';
+    case 'zauber':
+      return 'zauber';
+    case 'igel':
+      return 'igelkrieg';
+    case 'kart': case 'autoball':
+      return 'rennen';
+    case 'arena': case 'smash': case 'sumo': case 'bogen':
+      return 'arena';
+    case 'wpistole': case 'enten':
+      return 'western';
+    case 'volley': case 'bowling': case 'darts': case 'golf': case 'boule':
+      return 'sport';
+    case 'wasser': case 'angeln': case 'sup':
+      return 'wasser';
+    default: // descent, wrap, parcours, …
       return 'action';
   }
 }
