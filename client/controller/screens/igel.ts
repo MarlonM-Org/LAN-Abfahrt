@@ -1,6 +1,8 @@
 import type { IgelState, IgelWeapon } from '../../../shared/types';
 import { IGEL, IGEL_COLORS, WEAPONS, WEAPON_ORDER, type Mask, buildTerrain, carve, windArrows } from '../../../shared/igel';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
+import { haptic } from '../haptic';
+import { onInputReset } from '../stick';
 
 const igel = () => (store.state?.mini?.kind === 'igel' ? store.state.mini.state : null);
 const teamColor = (st: IgelState, id: string) => IGEL_COLORS[Math.max(0, st.teams.indexOf(id)) % IGEL_COLORS.length];
@@ -14,7 +16,7 @@ export function pickIgel(s: IgelState): Screen {
       'ig-count',
       message(
         'Igel-Krieg!',
-        `Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der Insel. Wenn du dran bist: laufen, Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft) und loslassen. Wasser = raus!`,
+        `Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der Insel. Wenn du dran bist: laufen, Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER drücken. Wasser = raus!`,
       ),
     ];
   }
@@ -33,22 +35,33 @@ function windText(w: number) {
 // ------------------------------------------------------------------ Aktiver Spieler
 
 function buildActive(turn: number) {
+  // Quer wie bei Worms: links Waffen + laufen/springen, Mitte Minikarte, rechts Ziel-Pad + FEUER
   const root = el(`
-    <div class="top-row"><span class="timer"></span><span class="ig-wind"></span></div>
-    <h2 class="ig-head">Du bist dran!</h2>
-    <div class="ig-weapons"></div>
-    <div class="ig-pad">
-      <canvas></canvas>
-      <p class="pad-text"></p>
+    <div class="lx ig-lx">
+      <div class="lx-head"><span class="timer"></span><b class="ig-head grow"></b><span class="ig-wind"></span><button class="ig-done hidden">Fertig ✓</button></div>
+      <div class="lx-left ig-left-col">
+        <div class="ig-weapons"></div>
+        <div class="ig-move">
+          <button class="ig-left">◀</button>
+          <button class="ig-jump">SPRUNG</button>
+          <button class="ig-right">▶</button>
+        </div>
+      </div>
+      <div class="lx-mid">
+        <canvas class="ig-map" width="480" height="270"></canvas>
+        <p class="ig-sd"></p>
+      </div>
+      <div class="lx-right ig-aim">
+        <div class="ig-pad">
+          <canvas></canvas>
+          <p class="pad-text"></p>
+        </div>
+        <button class="big-btn ig-fire" disabled>FEUER</button>
+      </div>
     </div>
-    <div class="ig-move">
-      <button class="ig-left">◀</button>
-      <button class="ig-jump">SPRUNG</button>
-      <button class="ig-right">▶</button>
-    </div>
-    <button class="ig-done hidden">Fertig – Zug beenden</button>
   `);
   app.append(root);
+  const drawMap = miniMap(q<HTMLCanvasElement>(root, '.ig-map'));
 
   // Waffenmenü
   const wrap = q(root, '.ig-weapons');
@@ -58,7 +71,7 @@ function buildActive(turn: number) {
     tapButton(b, () => {
       if (b.disabled) return;
       send('weapon', { weapon: w });
-      navigator.vibrate?.(8);
+      haptic(8);
     });
     wrap.append(b);
     wBtns.set(w, b);
@@ -82,24 +95,29 @@ function buildActive(turn: number) {
     btn.addEventListener('pointercancel', up);
     btn.addEventListener('lostpointercapture', up);
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
+    onInputReset(btn, up);
   };
   hold(q(root, '.ig-left'), -1);
   hold(q(root, '.ig-right'), 1);
   tapButton(q(root, '.ig-jump'), () => {
     send('jump');
-    navigator.vibrate?.(10);
+    haptic(10);
   });
   tapButton(q(root, '.ig-done'), () => send('done'));
 
-  // Zielfeld: ziehen = Richtung + Kraft, loslassen = Feuer
+  // Zielfeld: ziehen = Richtung + Kraft (Vorschau am TV), loslassen = Vorschau bleibt stehen, FEUER = los
   const pad = q(root, '.ig-pad');
   const canvas = q<HTMLCanvasElement>(root, '.ig-pad canvas');
   const padText = q(root, '.pad-text');
+  const fireBtn = q<HTMLButtonElement>(root, '.ig-fire');
   const g = canvas.getContext('2d')!;
   let drag: { id: number; x0: number; y0: number; x: number; y: number } | null = null;
+  /** Losgelassener Zielvektor, wartet auf FEUER (Pfeil bleibt sichtbar) */
+  let ready: { angle: number; power: number; x0: number; y0: number } | null = null;
   let lastSent = 0;
   let fired = false;
   let firedAt = 0;
+  let wind = 0;
   const maxLen = () => Math.min(pad.clientWidth, pad.clientHeight) * 0.48;
   const vec = () => {
     if (!drag) return null;
@@ -107,6 +125,25 @@ function buildActive(turn: number) {
     const dy = drag.y - drag.y0;
     const len = Math.hypot(dx, dy);
     return { angle: Math.atan2(dy, dx), power: Math.min(1, len / maxLen()), len };
+  };
+  const arrow = (x0: number, y0: number, angle: number, L: number, color: string, width: number) => {
+    const ex = x0 + Math.cos(angle) * L;
+    const ey = y0 + Math.sin(angle) * L;
+    g.strokeStyle = color;
+    g.fillStyle = color;
+    g.lineWidth = width;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(x0, y0);
+    g.lineTo(ex, ey);
+    g.stroke();
+    const head = width + 6;
+    g.beginPath();
+    g.moveTo(ex + Math.cos(angle) * head, ey + Math.sin(angle) * head);
+    g.lineTo(ex + Math.cos(angle + 2.3) * head, ey + Math.sin(angle + 2.3) * head);
+    g.lineTo(ex + Math.cos(angle - 2.3) * head, ey + Math.sin(angle - 2.3) * head);
+    g.closePath();
+    g.fill();
   };
   const draw = () => {
     const dpr = window.devicePixelRatio || 1;
@@ -118,47 +155,40 @@ function buildActive(turn: number) {
     }
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
+    // Wind als Pfeil oben im Pad (Länge = Stärke)
+    if (Math.abs(wind) >= 0.17) {
+      const L = Math.min(1, Math.abs(wind)) * (w * 0.3);
+      g.globalAlpha = 0.7;
+      arrow(w / 2 - (Math.sign(wind) * L) / 2, 18, wind > 0 ? 0 : Math.PI, L, '#2d64a8', 4);
+      g.globalAlpha = 1;
+    }
     const v = vec();
-    if (!drag || !v) return;
-    const L = Math.min(v.len, maxLen());
-    const ex = drag.x0 + Math.cos(v.angle) * L;
-    const ey = drag.y0 + Math.sin(v.angle) * L;
+    const shot = drag && v ? { x0: drag.x0, y0: drag.y0, angle: v.angle, power: v.power, L: Math.min(v.len, maxLen()) } : ready ? { ...ready, L: ready.power * maxLen() } : null;
+    if (!shot) return;
     // Reichweitenkreis
     g.strokeStyle = 'rgba(94,53,24,0.35)';
     g.setLineDash([4, 6]);
     g.lineWidth = 2;
     g.beginPath();
-    g.arc(drag.x0, drag.y0, maxLen(), 0, Math.PI * 2);
+    g.arc(shot.x0, shot.y0, maxLen(), 0, Math.PI * 2);
     g.stroke();
     g.setLineDash([]);
     // Pfeil (Farbe nach Kraft: grün → rot)
-    const hue = 120 - v.power * 120;
-    g.strokeStyle = `hsl(${hue}, 70%, 40%)`;
-    g.fillStyle = g.strokeStyle;
-    g.lineWidth = 8;
-    g.lineCap = 'round';
-    g.beginPath();
-    g.moveTo(drag.x0, drag.y0);
-    g.lineTo(ex, ey);
-    g.stroke();
-    g.beginPath();
-    g.moveTo(ex + Math.cos(v.angle) * 14, ey + Math.sin(v.angle) * 14);
-    g.lineTo(ex + Math.cos(v.angle + 2.3) * 14, ey + Math.sin(v.angle + 2.3) * 14);
-    g.lineTo(ex + Math.cos(v.angle - 2.3) * 14, ey + Math.sin(v.angle - 2.3) * 14);
-    g.closePath();
-    g.fill();
+    arrow(shot.x0, shot.y0, shot.angle, shot.L, `hsl(${120 - shot.power * 120}, 70%, 40%)`, 8);
     g.fillStyle = '#3d2414';
     g.beginPath();
-    g.arc(drag.x0, drag.y0, 7, 0, Math.PI * 2);
+    g.arc(shot.x0, shot.y0, 7, 0, Math.PI * 2);
     g.fill();
   };
   const canAim = () => igel()?.sub === 'aim' && igel()?.active === store.playerId && !fired;
+  const sendAim = (angle: number, power: number) => send('aim', { angle: Math.round(angle * 100) / 100, power: Math.round(power * 100) / 100 });
   pad.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     if (!canAim() || drag) return;
     pad.setPointerCapture(e.pointerId);
     const r = pad.getBoundingClientRect();
     drag = { id: e.pointerId, x0: e.clientX - r.left, y0: e.clientY - r.top, x: e.clientX - r.left, y: e.clientY - r.top };
+    ready = null;
     draw();
   });
   pad.addEventListener('pointermove', (e) => {
@@ -172,33 +202,54 @@ function buildActive(turn: number) {
     const now = performance.now();
     if (now - lastSent > 90 && v.len > 12) {
       lastSent = now;
-      send('aim', { angle: Math.round(v.angle * 100) / 100, power: Math.round(v.power * 100) / 100 });
+      sendAim(v.angle, v.power);
     }
   });
-  const release = (e: PointerEvent, cancel = false) => {
-    if (!drag || e.pointerId !== drag.id) return;
+  const release = (e: PointerEvent | null, cancel = false) => {
+    if (!drag || (e && e.pointerId !== drag.id)) return;
     const v = vec()!;
+    const d = drag;
     drag = null;
-    draw();
     if (cancel || v.len < 18 || !canAim()) {
+      ready = null;
+      draw();
       send('aim', { angle: null });
       return;
     }
-    fired = true;
-    firedAt = performance.now();
-    navigator.vibrate?.(40);
-    send('fire', { angle: v.angle, power: v.power });
+    // Loslassen schießt nicht mehr: die Vorschau bleibt (TV + Pad), erst FEUER löst aus –
+    // so verreißt man den Schuss nicht beim Abheben des Daumens
+    ready = { angle: v.angle, power: v.power, x0: d.x0, y0: d.y0 };
+    sendAim(v.angle, v.power);
+    draw();
+    haptic(8);
   };
   pad.addEventListener('pointerup', (e) => release(e));
   pad.addEventListener('pointercancel', (e) => release(e, true));
+  onInputReset(pad, () => release(null, true));
+  tapButton(fireBtn, () => {
+    if (!ready || !canAim()) return;
+    fired = true;
+    firedAt = performance.now();
+    haptic(40);
+    send('fire', { angle: ready.angle, power: ready.power });
+    ready = null;
+    draw();
+  });
 
+  let windKey = NaN;
   return () => {
     const st = igel();
     if (!st || st.turn !== turn) return;
+    drawMap(st);
     // Schuss wurde abgelehnt (z. B. Teleport-Ziel ungültig) → wieder zielen lassen
     if (fired && st.sub === 'aim' && performance.now() - firedAt > 1200) fired = false;
     q(root, '.timer').textContent = st.sub === 'aim' || st.sub === 'retreat' ? `${Math.ceil(st.endsIn / 1000)}s` : '';
     q(root, '.ig-wind').textContent = windText(st.wind);
+    if (st.wind !== windKey) {
+      windKey = st.wind;
+      wind = st.wind;
+      draw();
+    }
     const hog = st.activeHog !== null ? st.hogs[st.activeHog] : null;
     const ammo = st.ammo[store.playerId!];
     for (const [w, b] of wBtns) {
@@ -208,16 +259,29 @@ function buildActive(turn: number) {
       q(b, 'small').textContent = a < 0 ? '∞' : `${a}x`;
     }
     const aiming = st.sub === 'aim' && !fired;
+    if (!aiming && ready) {
+      ready = null;
+      draw();
+    }
     pad.classList.toggle('off', !aiming);
+    fireBtn.disabled = !aiming || !ready;
+    fireBtn.classList.toggle('armed', aiming && !!ready);
     q(root, '.ig-done').classList.toggle('hidden', st.sub !== 'retreat');
     const head = q(root, '.ig-head');
     if (st.sub === 'aim') head.textContent = `Du bist dran! ${hog ? `(${hog.hp} HP)` : ''}`;
     else if (st.sub === 'flight') head.textContent = 'Flieeeeg ...';
     else if (st.sub === 'retreat') head.textContent = 'Schnell weg hier!';
     else head.textContent = 'Zug vorbei';
+    q(root, '.ig-sd').textContent = st.suddenDeath ? 'SUDDEN DEATH – die Flut steigt!' : `Flut in ${Math.ceil(st.suddenIn / 1000)}s`;
     if (!drag) {
       padText.textContent =
-        st.sub === 'aim' ? `${WEAPONS[st.weapon].hint}\nZiehen = zielen, loslassen = los!` : st.sub === 'retreat' ? 'Rückzug: lauf oder spring in Deckung!' : 'Schau auf den Fernseher!';
+        st.sub === 'aim'
+          ? ready
+            ? `Kraft ${Math.round(ready.power * 100)}% – FEUER drücken!\nNeu ziehen = neu zielen`
+            : `${WEAPONS[st.weapon].hint}\nZiehen = zielen, dann FEUER`
+          : st.sub === 'retreat'
+            ? 'Rückzug: lauf oder spring in Deckung!'
+            : 'Schau auf den Fernseher!';
     }
     const moveOk = st.sub === 'aim' || st.sub === 'retreat';
     for (const sel of ['.ig-left', '.ig-right', '.ig-jump']) q<HTMLButtonElement>(root, sel).disabled = !moveOk;
@@ -228,15 +292,19 @@ function buildActive(turn: number) {
 
 function buildWatch() {
   const root = el(`
-    <div class="top-row"><span class="timer"></span><span class="ig-wind"></span></div>
-    <div class="ig-turn">
-      <h2 class="ig-who"></h2>
-      <p class="ig-what"></p>
+    <div class="ig-watchw">
+      <canvas class="ig-map" width="480" height="270"></canvas>
+      <div class="ig-side">
+        <div class="top-row"><span class="timer"></span><span class="ig-wind"></span></div>
+        <div class="ig-turn">
+          <h2 class="ig-who"></h2>
+          <p class="ig-what"></p>
+        </div>
+        <p class="ig-next"></p>
+        <div class="ig-teams"></div>
+        <p class="ig-sd"></p>
+      </div>
     </div>
-    <p class="ig-next"></p>
-    <canvas class="ig-map" width="480" height="270"></canvas>
-    <div class="ig-teams"></div>
-    <p class="ig-sd"></p>
   `);
   app.append(root);
   let teamsKey = '';

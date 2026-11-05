@@ -1,5 +1,6 @@
 import type { KurveState } from '../../../shared/types';
 import { KURVE, KURVE_POWER_INFO } from '../../../shared/games';
+import { haptic } from '../haptic';
 import { type Screen, app, el, message, nameOf, q, send, store } from '../core';
 
 /**
@@ -48,20 +49,20 @@ export function pickKurve(s: KurveState): Screen {
   // Ein einziger Screen für alle Runden – so bleiben gehaltene Finger beim Phasenwechsel erhalten
   return ['kv-play', () => {
     const color = KURVE.COLORS[me.color] ?? '#fff';
+    // Quer: die Daumen ruhen an den Rändern wie auf Schultertasten – je eine volle Bildhälfte
     const root = el(`
-      <div class="kv-color" style="background:${color}">Du bist <b>${KURVE.COLOR_NAMES[me.color] ?? '?'}</b></div>
-      <div class="top-row"><span class="round"></span><span class="score"></span></div>
-      <p class="kv-status"></p>
-      <div class="kv-btns">
-        <button class="big-btn kv-btn kv-left">◀<br/>LINKS</button>
-        <button class="big-btn kv-btn kv-right">RECHTS<br/>▶</button>
+      <div class="lx kv-lx">
+        <div class="lx-head"><span class="lx-tag kv-color" style="background:${color}">Du bist <b>${KURVE.COLOR_NAMES[me.color] ?? '?'}</b></span><span class="round"></span><span class="score grow"></span></div>
+        <div class="lx-left"><button class="big-btn kv-btn kv-left">◀<br/>LINKS</button></div>
+        <div class="lx-mid"><p class="kv-status"></p></div>
+        <div class="lx-right"><button class="big-btn kv-btn kv-right">RECHTS<br/>▶</button></div>
       </div>
     `);
     let lastDir = 0;
     const emit = (force = false) => {
       const dir = (right.held ? 1 : 0) - (left.held ? 1 : 0);
       if (!force && dir === lastDir) return;
-      if (dir !== lastDir && dir !== 0) navigator.vibrate?.(8);
+      if (dir !== lastDir && dir !== 0) haptic(8);
       lastDir = dir;
       send('turn', { dir });
     };
@@ -75,6 +76,7 @@ export function pickKurve(s: KurveState): Screen {
     const release = () => {
       if (!root.isConnected) {
         window.removeEventListener('blur', release);
+        window.removeEventListener('input-reset', release);
         document.removeEventListener('visibilitychange', release);
         return;
       }
@@ -83,6 +85,8 @@ export function pickKurve(s: KurveState): Screen {
       emit();
     };
     window.addEventListener('blur', release);
+    // Handy gedreht / Ausrichtungs-Overlay: gehaltene Knöpfe loslassen
+    window.addEventListener('input-reset', release);
     document.addEventListener('visibilitychange', release);
     app.append(root);
 
@@ -101,10 +105,10 @@ export function pickKurve(s: KurveState): Screen {
       else if (p.fx.length) status = p.fx.map((f) => (f === 'slow' ? 'Du wirst ausgebremst!' : KURVE_POWER_INFO[f].label)).join(' ');
       else status = st.storm ? 'Sturm! Alle werden schneller ...' : `Noch ${alive} im Rennen – +1 für jeden Crash der anderen`;
       q(root, '.kv-status').textContent = status;
-      root.querySelector('.kv-btns')!.classList.toggle('out', !p.alive && st.sub === 'play');
+      root.querySelector('.kv-lx')!.classList.toggle('out', !p.alive && st.sub === 'play');
       if (!p.alive && st.sub === 'play' && deadRound !== st.round) {
         deadRound = st.round;
-        navigator.vibrate?.([60, 40, 120]);
+        haptic([60, 40, 120]);
       }
     };
   }];

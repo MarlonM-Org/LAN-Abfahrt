@@ -1,7 +1,8 @@
 import type { TttPrivate, TttShopItem, TttState } from '../../../shared/types';
 import { ROOMS, TTT, TTT_ROLES, TTT_SHOP } from '../../../shared/games';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, secondsLeft, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 const ttt = () => (store.state?.mini?.kind === 'ttt' ? store.state.mini.state : null);
 const priv = (): TttPrivate | null => (store.priv?.kind === 'ttt' ? store.priv.state : null);
@@ -55,15 +56,19 @@ function roleHold(container: HTMLElement, label = 'Rolle ansehen (gedrückt halt
 function buildRoles(s: TttState) {
   const det = s.detective ? `<p class="label-left">Detektiv (mit Hut): <b>${escapeHtml(nameOf(s.detective))}</b> – kann an Ausgeknockten Spuren finden.</p>` : '';
   const root = el(`
-    <h1>VERRÄTER IM<br/>FERIENHAUS</h1>
-    <h2>Runde ${s.round} von ${s.rounds}</h2>
-    <p>Halte den Knopf gedrückt, damit niemand mitliest.</p>
-    <div class="slot"></div>
+    <div class="ttt-roles">
+    <div class="ttt-roles-a">
+      <h1>VERRÄTER IM<br/>FERIENHAUS</h1>
+      <h2>Runde ${s.round} von ${s.rounds}</h2>
+      <p>Halte den Knopf gedrückt, damit niemand mitliest.</p>
+      <div class="slot"></div>
+    </div>
     <div class="panel">
       <p class="label-left">Unschuldige: Überlebt, findet die Verräter und knockt sie aus!</p>
       <p class="label-left">Verräter (${s.traitorCount}): Knockt alle anderen aus. Im Geheimfach gibt’s Tricks.</p>
       ${det}
       <p class="label-left">ANGRIFF = Poolnudel (oder Wasserpistole/Kokosnuss). BENUTZEN = aufheben/untersuchen.</p>
+    </div>
     </div>
   `);
   roleHold(q(root, '.slot'));
@@ -73,29 +78,37 @@ function buildRoles(s: TttState) {
 
 function buildPlay() {
   const p0 = priv()!;
+  // Quer: Stick links, ANGRIFF groß rechts unten, BENUTZEN darüber; Rolle/Fach in der Mitte zwischen den Daumen.
+  // Das Geheimfach öffnet als Blatt über der linken Hälfte und schließt, sobald der Stick berührt wird.
   const root = el(`
-    <div class="top-row ttt-top"><span class="timer"></span><span class="hearts"></span><span class="weapon"></span></div>
-    <p class="ttt-info"></p>
-    <div class="stick-area"></div>
-    <div class="ttt-btns">
-      <button class="big-btn ttt-attack">ANGRIFF</button>
-      <button class="big-btn ttt-use">BENUTZEN</button>
+    <div class="lx ttt-lx">
+      <div class="lx-head ttt-top"><span class="timer"></span><span class="hearts"></span><span class="weapon grow"></span></div>
+      <div class="lx-left ttt-stick"><span class="st-label">LAUFEN</span></div>
+      <div class="lx-mid">
+        <p class="ttt-info"></p>
+        <div class="slot"></div>
+        <button class="secondary stash-btn">🔒 Geheimfach</button>
+      </div>
+      <div class="lx-right ttt-btns">
+        <button class="big-btn ttt-use">BENUTZEN</button>
+        <button class="big-btn ttt-attack">ANGRIFF</button>
+      </div>
+      <div class="panel ttt-stash hidden"></div>
     </div>
-    <div class="ttt-row"><div class="slot"></div><button class="secondary stash-btn">Geheimfach</button></div>
-    <div class="panel ttt-stash hidden"></div>
   `);
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.ttt-stick'), (x, y) => send('stick', { x, y }));
+  q(root, '.ttt-stick').addEventListener('pointerdown', () => q(root, '.ttt-stash').classList.add('hidden'));
   const attack = q<HTMLButtonElement>(root, '.ttt-attack');
   const use = q<HTMLButtonElement>(root, '.ttt-use');
   tapButton(attack, () => {
     send('attack');
-    navigator.vibrate?.(15);
+    haptic(15);
   });
   tapButton(use, () => {
     send('use');
-    navigator.vibrate?.(8);
+    haptic(8);
   });
-  roleHold(q(root, '.slot'), 'Rolle (halten)', 'small');
+  roleHold(q(root, '.slot'), '👁 Rolle (halten)', 'small');
 
   // Geheimfach: sieht für alle gleich aus, nur der Inhalt hängt von der Rolle ab
   const stash = q(root, '.ttt-stash');
@@ -150,7 +163,7 @@ function buildPlay() {
     if (p.info && p.info.seq !== lastInfo) {
       lastInfo = p.info.seq;
       infoUntil = performance.now() + 3500;
-      navigator.vibrate?.(30);
+      haptic(30);
     }
     const info = q(root, '.ttt-info');
     if (p.cloakLeft > 0) info.textContent = `Unsichtbar: noch ${Math.ceil(p.cloakLeft / 1000)} s`;

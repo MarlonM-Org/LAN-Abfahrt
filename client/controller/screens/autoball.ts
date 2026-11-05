@@ -1,10 +1,11 @@
 import type { Team } from '../../../shared/types';
 import type { AfbState } from '../../../shared/autoball';
 import { TEAM_INFO } from '../../../shared/flunky';
+import { onInputReset } from '../stick';
 import { type Screen, app, el, message, q, secondsLeft, send, store, toast } from '../core';
 import { motionSupport } from '../motion';
 import { steerFromRoll, tiltLabel } from '../tilt';
-import { leaveFullscreen, startTilt, stopTilt, tilt, tryFullscreen, vibrate } from './kart';
+import { startTilt, stopTilt, tilt, vibrate } from './kart';
 
 /**
  * Auto-Fußball am Handy (quer halten) – gleiches Layout wie das Kart-Rennen:
@@ -27,7 +28,6 @@ export function pickAutoball(s: AfbState): Screen {
   if (!car) return ['spectate', message('Du schaust zu', 'Schau auf den Fernseher!')];
   if (!s.first) introDone = false;
   if (s.sub === 'over') {
-    leaveFullscreen();
     const res = s.winner ? (s.winner === car.t ? 'Gewonnen!' : 'Verloren ...') : 'Unentschieden!';
     return ['afb-over', message(`Abpfiff – ${res}`, `${s.score.A}:${s.score.B} · Schau auf den Fernseher!`)];
   }
@@ -66,7 +66,6 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
         <div class="k3-btn k3-brake" data-b="brake">BREMSE<small>+ lenken<br/>= Drift</small></div>
         <div class="k3-btn k3-gas" data-b="gas">GAS</div>
       </div>
-      <div class="k3-portrait">Dreh dein Handy quer!</div>
       <div class="k3-intro hidden">
         <h2>So spielst du</h2>
         <div class="k3-intro-grid">
@@ -119,7 +118,6 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
       stick.style.top = `${e.clientY - r.top}px`;
       stick.classList.add('on');
       knob.style.transform = '';
-      void tryFullscreen();
     });
     left.addEventListener('pointermove', (e) => {
       if (e.pointerId !== active) return;
@@ -144,7 +142,6 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
       e.preventDefault();
       tilt.center = tilt.roll;
       toast('Mitte gesetzt');
-      void tryFullscreen();
     });
   }
   // Knöpfe in .k3 reagieren auf pointerdown (touchstart ist dort abgeschaltet → kein click)
@@ -212,7 +209,6 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
     right.setPointerCapture(e.pointerId);
     fingers.set(e.pointerId, hit(e.clientX, e.clientY));
     applyButtons();
-    void tryFullscreen();
   });
   right.addEventListener('pointermove', (e) => {
     if (!fingers.has(e.pointerId)) return;
@@ -228,6 +224,15 @@ function buildDrive(team: Team, mode: 'tilt' | 'touch', rerender: () => void) {
   };
   right.addEventListener('pointerup', release);
   right.addEventListener('pointercancel', release);
+  // Handy gedreht / Ausrichtungs-Overlay eingeblendet: gehaltene Knöpfe und Lenkung loslassen
+  onInputReset(right, () => {
+    fingers.clear();
+    applyButtons();
+    if (inp.steer) {
+      inp.steer = 0;
+      push(true);
+    }
+  });
   window.addEventListener('resize', measure);
 
   // Intro „So spielst du“ (einmal pro Spiel, beim ersten Anstoß)

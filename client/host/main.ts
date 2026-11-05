@@ -17,6 +17,7 @@ import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
 import { isMusicMenuOpen, musicMenuScene, setupMusicMenu, toggleMusicMenu } from './musicMenu';
 import { watchServerVersion } from '../version';
+import { MINI_INFO, ORIENT_TEXT } from '../../shared/games';
 import { DATE_SCENES } from './DateScenes';
 import { DRINK_SCENES } from './DrinkScenes';
 import { CONTROLLER_SCENES } from './ControllerScenes';
@@ -133,7 +134,26 @@ async function start() {
       setScene(key);
       musicMenuScene(key);
     }
+    showOrientBanner(s);
   });
+
+  // Beim Start eines Minispiels 6 s „📱↔ Handys QUER halten“ bzw. hochkant – auch ohne Brett-Intro (Arcade, Trinkspiel, Date)
+  const orientTv = document.getElementById('orient-tv');
+  let orientKind = '';
+  let orientTimer: number | undefined;
+  function showOrientBanner(s: GameState) {
+    const kind = s.phase === 'mini' && s.mini ? s.mini.kind : '';
+    if (kind === orientKind) return;
+    orientKind = kind;
+    const info = kind ? MINI_INFO[kind as keyof typeof MINI_INFO] : undefined;
+    if (!orientTv || !info) return;
+    const text = ORIENT_TEXT[info.orientation].replace('Handy ', 'Handys ').replace('Halte das Handy, wie du magst', 'Haltet die Handys, wie ihr mögt');
+    orientTv.textContent = `${info.icon} ${info.title} · ${text}`;
+    orientTv.classList.toggle('landscape', info.orientation === 'landscape');
+    orientTv.classList.remove('off');
+    clearTimeout(orientTimer);
+    orientTimer = window.setTimeout(() => orientTv.classList.add('off'), 6000);
+  }
 }
 
 start();

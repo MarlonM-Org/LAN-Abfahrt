@@ -4,7 +4,8 @@ import { FANGEN, HEAT_LABELS } from '../../../shared/fangen';
 import { animateurHat, footprints, paintResort } from '../../art/resort';
 import type { Pix } from '../../art/pix';
 import { type Screen, app, el, message, nameOf, q, send, store, tapButton } from '../core';
-import { joystick } from './controller';
+import { stickZone } from '../stick';
+import { haptic } from '../haptic';
 
 const HEAT_CSS = ['#5aa0e8', '#f2e05a', '#f0973a', '#e0402f'];
 const HEAT_TEXT = ['Kalt ... hier ist niemand.', 'Lau – irgendwo in der Nähe?', 'Warm! Er ist ganz nah!', 'HEISS! Direkt neben dir!'];
@@ -46,22 +47,21 @@ function avatarImg(look: Look) {
 }
 
 function buildRunner() {
+  // Quer: die private Karte bekommt die ganze Mitte (≈ 2× so groß wie hochkant), Stick links, ABLENKUNG rechts
   const root = el(`
-    <div class="top-row"><span class="timer"></span><span class="fg-round"></span></div>
-    <div class="fg-role runner">Du bist der ANIMATEUR</div>
-    <p class="hint fg-hint"></p>
-    <div class="fg-map"><canvas width="480" height="${FANGEN.ROWS * FANGEN.TILE}"></canvas></div>
-    <div class="fg-controls">
-      <div class="stick-area fg-stick"></div>
-      <button class="big-btn fg-decoy">ABLENKUNG<br/><small>falsche Spur</small></button>
+    <div class="lx fg-lx fg-run">
+      <div class="lx-head"><span class="lx-tag fg-role runner">ANIMATEUR</span><span class="timer"></span><span class="fg-round"></span><span class="hint fg-hint grow"></span></div>
+      <div class="lx-left fg-stick"><span class="st-label">LAUFEN</span></div>
+      <div class="lx-mid"><div class="fg-map"><canvas width="480" height="${FANGEN.ROWS * FANGEN.TILE}"></canvas></div></div>
+      <div class="lx-right"><button class="big-btn fg-decoy">ABLENKUNG<br/><small>falsche Spur</small></button></div>
     </div>
   `);
-  joystick(q(root, '.fg-stick'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.fg-stick'), (x, y) => send('stick', { x, y }));
   const decoy = q<HTMLButtonElement>(root, '.fg-decoy');
   tapButton(decoy, () => {
     if (decoy.disabled) return;
     send('decoy');
-    navigator.vibrate?.(30);
+    haptic(30);
   });
   const canvas = q<HTMLCanvasElement>(root, '.fg-map canvas');
   const ctx = canvas.getContext('2d')!;
@@ -81,7 +81,7 @@ function buildRunner() {
     const heat = Math.max(0, ...Object.values(st.hunters).map((h) => h.heat));
     q(root, '.fg-hint').textContent =
       st.sub === 'intro' ? 'Lauf los! Die Fänger warten noch. Nur DU siehst die Karte.' : heat >= 3 ? 'Achtung – ein Fänger ist ganz nah!' : heat === 2 ? 'Ein Fänger wird warm ...' : 'Bleib in Bewegung – deine Spuren sind kurz zu sehen!';
-    if (heat >= 2 && heat > lastHeat) navigator.vibrate?.(heat === 3 ? [40, 40, 40] : 25);
+    if (heat >= 2 && heat > lastHeat) haptic(heat === 3 ? [40, 40, 40] : 25);
     lastHeat = heat;
     if (priv) {
       const ready = priv.decoyLeft <= 0 && !priv.decoyActive && st.sub === 'chase';
@@ -138,19 +138,22 @@ function buildRunner() {
 
 function buildHunter() {
   const root = el(`
-    <div class="top-row"><span class="timer"></span><span class="fg-round"></span></div>
-    <div class="fg-role hunter">Du bist FÄNGER</div>
-    <div class="fg-heat"><b></b><small></small></div>
-    <p class="hint">Der Animateur ist auf dem TV unsichtbar! Achtet auf Fußspuren – und ruft euch zu, bei wem es warm wird.</p>
-    <div class="stick-area"></div>
-    <button class="big-btn dash fg-sprint">SPRINT</button>
+    <div class="lx fg-lx fg-hunt">
+      <div class="lx-head"><span class="lx-tag fg-role hunter">FÄNGER</span><span class="timer"></span><span class="fg-round grow"></span></div>
+      <div class="lx-left fg-stick"><span class="st-label">LAUFEN</span></div>
+      <div class="lx-mid">
+        <div class="fg-heat"><b></b><small></small></div>
+        <p class="hint">Der Animateur ist auf dem TV unsichtbar! Achtet auf Fußspuren – und ruft euch zu, bei wem es warm wird.</p>
+      </div>
+      <div class="lx-right"><button class="big-btn dash fg-sprint">SPRINT</button></div>
+    </div>
   `);
-  joystick(q(root, '.stick-area'), (x, y) => send('stick', { x, y }));
+  stickZone(q(root, '.fg-stick'), (x, y) => send('stick', { x, y }));
   const sprint = q<HTMLButtonElement>(root, '.fg-sprint');
   tapButton(sprint, () => {
     if (sprint.disabled) return;
     send('sprint');
-    navigator.vibrate?.(20);
+    haptic(20);
   });
   app.append(root);
   let lastHeat = 0;
@@ -171,7 +174,7 @@ function buildHunter() {
       box.style.color = '';
       q(box, 'b').textContent = HEAT_LABELS[me.heat].toUpperCase();
       q(box, 'small').textContent = HEAT_TEXT[me.heat];
-      if (me.heat >= 2 && me.heat > lastHeat) navigator.vibrate?.(me.heat === 3 ? [50, 30, 50] : 30);
+      if (me.heat >= 2 && me.heat > lastHeat) haptic(me.heat === 3 ? [50, 30, 50] : 30);
       lastHeat = me.heat;
     }
     box.classList.toggle('hot', st.sub === 'chase' && me.heat === 3);
