@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T20:26+00:00",
+  "updated": "2026-11-06T20:58+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -8,13 +8,15 @@
   "inProgress": [
     {
       "title": "Strand-Volleyball: ◀ ▶ rüberrutschen (Richtung folgt dem Daumen), größerer Ball, kompakteres Feld mit Zoom, Landepunkt-Ring – PR #103 fertig, wartet auf Marlons OK zum Mergen"
-    },
-    {
-      "title": "Echte Aufwärmphase statt Übungsfeld: vor Action-Spielen mit der richtigen Steuerung üben (Handy + TV, nichts zählt), bis alle bereit sind"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Echte Aufwärmphase: Action-Spiele (Arena, Sumo, Kart, Smash, Auto-Fußball, Kurven-Duell, Bogen, Zauber, Wackel, Aufräumen, Süßigkeiten, Umzug, Grill, Koffer, Turm, Sprint) starten mit Aufwärmrunde – echte Steuerung, nichts zählt, nach 1,5 s wieder drin; alle anderen Spiele mit aufgeräumter Regelkarte ohne Übungsfeld",
+      "pr": 105,
+      "date": "2026-11-06"
+    },
     {
       "title": "Urlaubs-Minigolf: Handy quer (rechts am Handy = rechts am TV), Bälle stoßen zusammen, VIP-Knopf „⏭ Nächstes Loch“, „Bewegungssensor aktivieren“ fragt am iPhone nach Erlaubnis; Computer puttet erst nach 20 s ohne Handy",
       "pr": 104,
@@ -531,8 +533,8 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Übungsfeld auf der Regelkarte passt nicht zur echten Steuerung, zu gequetscht → echte Aufwärmphase mit richtiger Steuerung",
-      "status": "in Arbeit"
+      "title": "Übungsfeld auf der Regelkarte passt nicht zur echten Steuerung, zu gequetscht → echte Aufwärmphase mit richtiger Steuerung (#105)",
+      "status": "umgesetzt"
     }
   ]
 }
