@@ -63,7 +63,7 @@ export function installHostControls(socket: Socket) {
       <button data-cmd="resetSession" tabindex="-1">Leaderboard zurücksetzen</button>
       <button data-local="hd" tabindex="-1" title="Render-Auflösung: ×2 = 960 × 540 (glattere Bewegung, Welt bleibt 480 × 270) – lädt die TV-Seite neu">Auflösung ×${hdFactor()}</button>
     </div>
-    <div class="hc-keys">Esc 2× = abbrechen · Enter = weiter / nochmal · S = überspringen · A = Spiel wählen · L = Leaderboard</div>
+    <div class="hc-keys">Esc 2× = abbrechen · Enter = weiter / jetzt starten / nochmal · S = überspringen · A = Spiel wählen · L = Leaderboard</div>
     <div class="hc-msg"></div>
   `;
   document.body.append(root);
@@ -204,6 +204,8 @@ export function installHostControls(socket: Socket) {
     btn('abort').textContent = armedUntil > Date.now() ? 'Wirklich abbrechen?' : 'Spiel abbrechen';
     btn('abort').classList.toggle('armed', armedUntil > Date.now());
     btn('continue').disabled = !waits;
+    // Regelkarte: Enter startet das Spiel sofort, ohne auf die übrigen „Bereit“ zu warten
+    btn('continue').textContent = phase === 'intro' ? 'Jetzt starten (Enter)' : 'Weiter';
     const skippable = (phase === 'mini' || phase === 'board') && s?.skippable ? s.skippable : null;
     btn('skip').disabled = !skippable;
     btn('skip').textContent = skippable ? `${skippable.label} (S)` : 'Zug überspringen (S)';

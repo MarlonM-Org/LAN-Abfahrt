@@ -309,6 +309,19 @@ export class ZauberScene extends Phaser.Scene {
         a.x = p.x;
         a.y = p.y;
         this.puff(a, id);
+      } else if (!a.alive && p.alive && st.sub === 'play') {
+        // Aufwärmrunde: Respawn mitten in der Runde
+        this.tweens.killTweensOf([a.root, a.img]);
+        a.alive = true;
+        a.x = p.x;
+        a.y = p.y;
+        a.barKey = '';
+        a.root.setVisible(true).setAlpha(1).setScale(1).setPosition(p.x, p.y);
+        a.img.setAngle(0).clearTint();
+        a.ring.setVisible(true).setPosition(p.x, p.y);
+        a.aim.setVisible(true);
+        this.juice.burst(p.x, p.y - 8, 'spark', 10);
+        sfx('pop', { x: p.x, pitch: 1.3 });
       }
       a.hp = p.hp;
     }

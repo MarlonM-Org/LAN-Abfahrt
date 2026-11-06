@@ -1,6 +1,6 @@
 import type { MiniSnapshot, ZauberFx, ZauberPlayer, ZauberState } from '../shared/types';
 import { ZAUBER, ZAUBER_CX, ZAUBER_CY, type ZauberArena, zauberArena, zauberSolidAt, zauberSpawns } from '../shared/zauber';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, PRACTICE_RESPAWN_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -132,8 +132,9 @@ export class ZauberGame implements MiniGame {
     this.timers.later(ZAUBER.COUNTDOWN_MS, () => {
       this.sub = 'play';
       this.playStart = Date.now();
-      this.deadline = this.playStart + ZAUBER.ROUND_MS;
-      this.schedule(this.playStart);
+      // Aufwärmrunde: kein Zeitlimit, die Plattform bröckelt nicht
+      this.deadline = this.ctx.practice ? 0 : this.playStart + ZAUBER.ROUND_MS;
+      if (!this.ctx.practice) this.schedule(this.playStart);
       this.ctx.onChange();
     });
     this.ctx.onChange();
@@ -227,7 +228,7 @@ export class ZauberGame implements MiniGame {
     // Plattform bröckelt
     while (this.cracked < this.crackAt.length && now >= this.crackAt[this.cracked]) this.cracked++;
     while (this.fallen < this.cracked && now >= this.crackAt[this.fallen] + ZAUBER.CRACK_MS) this.fallen++;
-    if (!this.sudden && now >= this.playStart + ZAUBER.ROUND_MS) this.sudden = true;
+    if (!this.sudden && !this.ctx.practice && now >= this.playStart + ZAUBER.ROUND_MS) this.sudden = true;
 
     const live = this.alive();
     for (const p of live) {
@@ -255,8 +256,10 @@ export class ZauberGame implements MiniGame {
     }
     this.updateBolts(now, dt);
 
-    if (!this.endAt && this.alive().length <= 1) this.endAt = now + ZAUBER.END_DELAY_MS;
-    if ((this.endAt && now >= this.endAt) || now >= this.playStart + ZAUBER.HARD_CAP_MS) return this.endRound(now);
+    if (!this.ctx.practice) {
+      if (!this.endAt && this.alive().length <= 1) this.endAt = now + ZAUBER.END_DELAY_MS;
+      if ((this.endAt && now >= this.endAt) || now >= this.playStart + ZAUBER.HARD_CAP_MS) return this.endRound(now);
+    }
     this.ctx.onChange();
   }
 
@@ -398,6 +401,21 @@ export class ZauberGame implements MiniGame {
       }
     }
     this.addFx({ type: 'puff', x: p.x, y: p.y, id: p.id, by }, now);
+    if (this.ctx.practice) this.timers.later(PRACTICE_RESPAWN_MS, () => this.respawn(p));
+  }
+
+  /** Aufwärmrunde: wieder rein – mit vollen Lebenspunkten auf dem Startplatz, der am weitesten von den anderen weg ist */
+  private respawn(p: P) {
+    if (p.alive || this.sub !== 'play' || this.ctx.isGone?.(p.id)) return;
+    if (!this.ctx.isConnected(p.id)) return void this.timers.later(1000, () => this.respawn(p));
+    const others = this.alive();
+    const gap = (sp: { x: number; y: number }) => Math.min(999, ...others.map((o) => Math.hypot(o.x - sp.x, o.y - sp.y)));
+    const sp = zauberSpawns(Math.max(2, this.ids.length)).reduce((a, b) => (gap(b) > gap(a) ? b : a));
+    Object.assign(p, { x: sp.x, y: sp.y, alive: true, hp: ZAUBER.HP, hpExact: ZAUBER.HP, vx: 0, vy: 0, lava: false, stunUntil: 0, sprintUntil: 0, lastHitBy: null, lastHitAt: 0, queued: null });
+    const l = Math.hypot(ZAUBER_CX - p.x, ZAUBER_CY - p.y) || 1;
+    p.lx = (ZAUBER_CX - p.x) / l;
+    p.ly = (ZAUBER_CY - p.y) / l;
+    this.ctx.onChange();
   }
 
   private addFx(f: Omit<ZauberFx, 'seq'>, now: number) {

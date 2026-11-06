@@ -2,6 +2,7 @@
  * Urlaubs-Minigolf: Bot-Verhalten (in sich geschlossen, Schlüssel-Präfix `golf`).
  * Der Bot zielt aufs Loch bzw. auf einen Hilfspunkt (Knick, Brücke, Röhre), passt Leuchtturm/Surfbrett
  * per Probe-Simulation ab und schlägt dann mit Streuung – ab und zu deutlich zu fest oder zu sanft.
+ * Andere Bälle beachtet er beim Planen nicht; wird sein Ball angestoßen, plant er von der neuen Stelle neu.
  */
 import type { GolfState } from '../shared/types';
 import { GOLF_HOLES, golfBotPlan } from '../shared/golf';
@@ -32,7 +33,8 @@ export function golfBot(bot: GolfBotHost, st: GolfState, getState: () => GolfSta
   holeTime(bot, st);
   const me = st.balls[bot.id];
   if (!me || me.d || me.m) return;
-  bot.once(`golf-${st.hole}-${me.s}`, async () => {
+  // Lage im Schlüssel: Wird der Ball angestoßen, plant der Bot neu (gleiche Schlagzahl, andere Stelle)
+  bot.once(`golf-${st.hole}-${me.s}-${Math.round(me.x)}-${Math.round(me.y)}`, async () => {
     // kurz „überlegen“ und den Zielpfeil zeigen
     await sleep(rand(700, 1600));
     let cur = getState();
@@ -49,7 +51,9 @@ export function golfBot(bot: GolfBotHost, st: GolfState, getState: () => GolfSta
     }
     await sleep(Math.max(0, fireAt - Date.now()));
     cur = getState();
-    if (!cur || cur.sub !== 'play' || cur.hole !== st.hole || cur.balls[bot.id]?.s !== me.s) return;
+    const now = cur?.balls[bot.id];
+    // inzwischen angestoßen worden (rollt oder liegt woanders) → nicht mit dem alten Plan schlagen
+    if (!cur || cur.sub !== 'play' || cur.hole !== st.hole || !now || now.s !== me.s || now.m || now.d || Math.hypot(now.x - ball.x, now.y - ball.y) > 1) return;
     // Streuung: meist leicht daneben, manchmal klar zu fest/zu sanft
     let power = plan.power * rand(0.9, 1.1);
     const r = Math.random();

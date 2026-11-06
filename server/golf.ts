@@ -1,5 +1,5 @@
 import type { GolfBallPub, GolfFx, GolfFxKind, GolfState, MiniSnapshot, SkipInfo } from '../shared/types';
-import { GOLF, GOLF_HOLES, type GolfBody, golfIdealPutt, golfPowerToSpeed, golfStep, golfWalls } from '../shared/golf';
+import { GOLF, GOLF_HOLES, type GolfBody, golfFreeSpot, golfIdealPutt, golfOnTee, golfPowerToSpeed, golfSkipScore, golfStep, golfWalls } from '../shared/golf';
 import { playerColor } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, shuffle, waitLabel } from './minigame';
 
@@ -19,10 +19,17 @@ interface Ball extends GolfBody {
   rollS: number;
   restSince: number;
   aim: [number, number] | null;
+  /** rollt gerade, weil ein anderer Ball ihn angestoßen hat (Wasser kostet dann nichts, sx/sy = Lage davor) */
+  knocked: boolean;
+  /** automatische Schläge auf diesem Loch (Handy war lange offline) */
+  auto: number;
 }
 
 /**
- * Urlaubs-Minigolf: alle Löcher (Party-Modus: 5), alle putten GLEICHZEITIG auf demselben Loch (Bälle stoßen nicht zusammen).
+ * Urlaubs-Minigolf: alle Löcher (Party-Modus: 5), alle putten GLEICHZEITIG auf demselben Loch.
+ * Bälle stoßen zusammen (außer auf dem Abschlag): Wer einen liegenden Ball trifft, schubst ihn weiter – der rollt
+ * mit normaler Reibung; fällt er ins Loch, zählt das für seinen Besitzer (ohne Zusatzschlag), fällt er ins Wasser,
+ * kommt er straffrei an seine alte Stelle zurück.
  * Physik läuft in Echtzeit auf dem Server (fester Takt, deterministisch), der TV bekommt nur die Ballpositionen.
  */
 export class GolfGame implements MiniGame {
@@ -42,6 +49,8 @@ export class GolfGame implements MiniGame {
   private playStart = 0;
   private steps = 0;
   private sentAt = 0;
+  /** Loch wurde vorzeitig beendet (VIP „Nächstes Loch“) – Handy/TV erklären die Wertung */
+  private ended = false;
   private timers = new Timers();
   /** Party-Modus: nur 5 Bahnen (Pacing auf dem Spielbrett), sonst alle */
   private holeCount: number;
@@ -89,8 +98,11 @@ export class GolfGame implements MiniGame {
         rollS: 0,
         restSince: Date.now(),
         aim: null,
+        knocked: false,
+        auto: 0,
       };
     }
+    this.ended = false;
     this.sub = 'tee';
     this.deadline = Date.now() + GOLF.TEE_MS;
     this.ctx.onChange();
@@ -153,24 +165,64 @@ export class GolfGame implements MiniGame {
         changed = true;
         continue;
       }
-      if (!b.moving) {
-        // Offline → automatischer Schlag, damit niemand das Loch aufhält
-        if (!this.ctx.isConnected(id) && now - b.restSince > GOLF.AUTO_MS) this.autoPutt(id);
-        continue;
-      }
-      changed = true;
-      b.rollS += GOLF.TICK_S;
-      for (let k = 0; k < GOLF.SUBSTEPS && b.moving; k++) {
-        const ev = golfStep(b, h, this.walls, this.t + k * dt, dt);
+      // Lange offline → automatischer Schlag, damit niemand das Loch aufhält (kurz weg zählt nicht, siehe AUTO_OFFLINE_MS)
+      if (!b.moving && this.longOffline(id) && now - b.restSince > GOLF.AUTO_MS) this.autoPutt(id);
+    }
+    // Alle rollenden Bälle Teilschritt für Teilschritt gemeinsam bewegen, damit sie sich treffen können
+    for (let k = 0; k < GOLF.SUBSTEPS; k++) {
+      for (const id of this.order) {
+        const b = this.balls[id];
+        if (b.done || !b.moving) continue;
+        changed = true;
+        const ev = golfStep(b, h, this.walls, this.t + k * dt, dt, this.obstacles(id), (o, imp) => this.knock(id, o, imp));
         for (const e of ev) this.onEvent(id, b, e);
       }
-      if (b.moving && b.rollS > GOLF.MAX_ROLL_S && b.tube <= 0) {
+    }
+    for (const id of this.order) {
+      const b = this.balls[id];
+      if (b.done || !b.moving) continue;
+      b.rollS += GOLF.TICK_S;
+      if (b.rollS > GOLF.MAX_ROLL_S && b.tube <= 0) {
         b.vx = b.vy = 0;
         this.rest(id, b);
       }
     }
     this.t = this.steps * GOLF.TICK_S;
     return changed;
+  }
+
+  /** Ist der Ball ein Hindernis? Nicht eingelocht/aufgegeben, nicht in Röhre/Wasser, nicht mehr auf dem Abschlag. */
+  private solid(b: Ball) {
+    return !b.done && b.wait <= 0 && b.tube <= 0 && !golfOnTee(GOLF_HOLES[this.hole], b);
+  }
+
+  /** Bälle, die `id` beim Rollen treffen kann */
+  private obstacles(id: string): Ball[] {
+    const out: Ball[] = [];
+    for (const o of this.order) if (o !== id && this.solid(this.balls[o])) out.push(this.balls[o]);
+    return out;
+  }
+
+  /** `by` hat Ball `body` getroffen: der rollt los (falls er lag) – Lage davor merken (Wasser → straffrei zurück) */
+  private knock(by: string, body: GolfBody, imp: number) {
+    const o = body as Ball;
+    const id = this.order.find((k) => this.balls[k] === o);
+    if (!id) return;
+    if (!o.moving) {
+      o.moving = true;
+      o.knocked = true;
+      o.sx = o.x;
+      o.sy = o.y;
+      o.rollS = 0;
+      o.aim = null;
+    }
+    if (imp > 25) this.addFx(id, 'knock', (o.x + this.balls[by].x) / 2, (o.y + this.balls[by].y) / 2, Math.round(imp));
+  }
+
+  /** Offline länger als AUTO_OFFLINE_MS? (Bildschirm kurz aus, App gewechselt: noch kein Auto-Schlag) */
+  private longOffline(id: string) {
+    if (this.ctx.isConnected(id)) return false;
+    return (this.ctx.offlineMs?.(id) ?? Infinity) >= GOLF.AUTO_OFFLINE_MS;
   }
 
   private onEvent(id: string, b: Ball, e: string) {
@@ -181,16 +233,18 @@ export class GolfGame implements MiniGame {
       case 'hole': {
         b.moving = false;
         b.done = 1;
+        // auch angestoßen eingelocht zählt – mit den bisherigen Schlägen (Glück für den Besitzer)
         this.scores[id][this.hole] = b.strokes;
-        this.addFx(id, b.strokes === 1 ? 'ace' : 'hole', b.x, b.y, b.strokes);
+        this.addFx(id, b.knocked ? 'lucky' : b.strokes === 1 ? 'ace' : 'hole', b.x, b.y, b.strokes);
+        b.knocked = false;
         break;
       }
       case 'water':
-        // +1 Strafschlag, Ball zurück an die Stelle vor dem Schlag
-        b.strokes += 1;
+        // +1 Strafschlag (nicht, wenn ein anderer den Ball hineingestoßen hat), Ball zurück an die Stelle vor dem Schlag
+        if (!b.knocked) b.strokes += 1;
         b.moving = false;
         b.wait = 0.9;
-        this.addFx(id, 'water', b.x, b.y);
+        this.addFx(id, 'water', b.x, b.y, b.knocked ? 0 : 1);
         break;
       case 'out':
         b.moving = false;
@@ -209,11 +263,13 @@ export class GolfGame implements MiniGame {
     }
   }
 
-  /** Ball liegt: Schlag-Limit prüfen */
+  /** Ball liegt: nicht auf einem anderen liegen lassen, Schlag-Limit prüfen */
   private rest(id: string, b: Ball) {
     b.moving = false;
+    b.knocked = false;
     b.vx = b.vy = 0;
     b.restSince = Date.now();
+    this.unstack(id, b);
     if (b.strokes >= GOLF.MAX_STROKES && !b.done) {
       b.done = 2;
       this.scores[id][this.hole] = GOLF.MAX_SCORE;
@@ -221,33 +277,63 @@ export class GolfGame implements MiniGame {
     }
   }
 
+  /**
+   * Zurückgelegter (Wasser/aus dem Platz) oder liegen gebliebener Ball überlappt einen anderen → zur nächsten freien
+   * Stelle. Auf dem Abschlag dürfen alle übereinander liegen.
+   */
+  private unstack(id: string, b: Ball) {
+    const h = GOLF_HOLES[this.hole];
+    if (golfOnTee(h, b)) return;
+    const others = this.order.filter((o) => o !== id).map((o) => this.balls[o]).filter((o) => !o.done && o.tube <= 0 && o.wait <= 0);
+    if (!others.some((o) => Math.hypot(o.x - b.x, o.y - b.y) < 2 * GOLF.BALL_R - 0.05)) return;
+    const p = golfFreeSpot(h, b.x, b.y, others, this.walls);
+    b.x = p.x;
+    b.y = p.y;
+  }
+
   private addFx(id: string, k: GolfFxKind, x: number, y: number, n?: number) {
     this.fx.push({ seq: ++this.fxSeq, id, k, x: r1(x), y: r1(y), ...(n !== undefined ? { n } : {}) });
     if (this.fx.length > 16) this.fx.splice(0, this.fx.length - 16);
   }
 
-  /** Zeit um bzw. VIP beendet das Loch: wer noch spielt, bekommt +2 (max. 7) */
+  /**
+   * Zeit um bzw. VIP „Nächstes Loch“: wer noch spielt, wird gewertet (`golfSkipScore`: Schläge + 2,
+   * mind. Par + 1, max. 7). Rollende Bälle werden angehalten.
+   */
   private capRest(now = Date.now()) {
+    const par = GOLF_HOLES[this.hole].par;
     for (const id of this.order) {
       const b = this.balls[id];
       if (b.done) continue;
+      if (b.wait > 0) {
+        // gerade ins Wasser gefallen → zurück an die alte Stelle
+        b.x = b.sx;
+        b.y = b.sy;
+        b.wait = 0;
+      }
       b.done = 2;
       b.moving = false;
+      b.knocked = false;
       b.vx = b.vy = 0;
-      this.scores[id][this.hole] = Math.min(GOLF.MAX_SCORE, b.strokes + 2);
+      this.scores[id][this.hole] = golfSkipScore(b.strokes, par);
       this.addFx(id, 'cap', b.x, b.y, this.scores[id][this.hole]!);
     }
     this.doneAt = now;
     this.timers.later(600, () => this.endHole());
   }
 
-  /** VIP/Laptop: Erklärung/Scorekarte überspringen oder das Loch beenden */
+  private get lastHole() {
+    return this.hole >= this.holeCount - 1;
+  }
+
+  /** VIP/Laptop (Menü „⋯“, Taste S, VIP-Knopf im Spiel): Erklärung/Scorekarte überspringen oder direkt zum nächsten Loch */
   skippable(): SkipInfo | null {
     if (this.sub === 'intro') return { label: 'Los geht’s', info: true };
-    if (this.sub === 'card') return { label: this.hole >= GOLF_HOLES.length - 1 ? 'Zum Ergebnis' : 'Nächstes Loch', info: true };
+    if (this.sub === 'card') return { label: this.lastHole ? 'Zum Endstand' : 'Nächstes Loch', info: true };
     if (this.sub === 'play' && !this.doneAt) {
       const missing = this.order.filter((id) => !this.balls[id]?.done && this.ctx.isConnected(id));
-      return { label: waitLabel(this.ctx, missing, 'Ball', 'Loch beenden') };
+      const next = this.lastHole ? 'Loch beenden → Endstand' : 'Nächstes Loch';
+      return { label: missing.length === 1 ? waitLabel(this.ctx, missing, 'Ball', next) : next };
     }
     return null;
   }
@@ -260,19 +346,26 @@ export class GolfGame implements MiniGame {
     } else if (this.sub === 'card') {
       this.timers.clear();
       this.timers.every(Math.round(GOLF.TICK_S * 1000), () => this.tick());
-      if (this.hole >= GOLF_HOLES.length - 1) this.over();
+      if (this.lastHole) this.over();
       else this.startHole(this.hole + 1);
     } else if (this.sub === 'play' && !this.doneAt) {
+      // „Nächstes Loch“: Rest werten, Scorekarte danach nur kurz
+      this.ended = true;
       this.capRest();
       this.ctx.onChange();
     }
   }
 
+  /** VIP-Knopf am Handy („Nächstes Loch“ im Spiel bzw. auf der Scorekarte) – gleiche Logik wie Menü und Laptop */
+  vipAction(action: string) {
+    if (action === 'next' && this.skippable()) this.skip();
+  }
+
   private endHole() {
     if (this.sub !== 'play') return;
     this.sub = 'card';
-    const last = this.hole >= this.holeCount - 1;
-    const ms = last ? GOLF.LAST_CARD_MS : GOLF.CARD_MS;
+    const last = this.lastHole;
+    const ms = this.ended ? GOLF.SKIP_CARD_MS : last ? GOLF.LAST_CARD_MS : GOLF.CARD_MS;
     this.deadline = Date.now() + ms;
     this.ctx.onChange();
     this.timers.later(ms, () => (last ? this.over() : this.startHole(this.hole + 1)));
@@ -280,6 +373,7 @@ export class GolfGame implements MiniGame {
 
   private autoPutt(id: string) {
     const b = this.balls[id];
+    b.auto += 1;
     const ideal = golfIdealPutt(GOLF_HOLES[this.hole], b);
     this.putt(id, ideal.angle + (Math.random() - 0.5) * 0.2, clamp(ideal.power * (0.8 + Math.random() * 0.4), 0.05, 1));
   }
@@ -294,6 +388,7 @@ export class GolfGame implements MiniGame {
     b.vx = Math.cos(angle) * v;
     b.vy = Math.sin(angle) * v;
     b.moving = true;
+    b.knocked = false;
     b.rollS = 0;
     b.aim = null;
     this.ctx.onChange();
@@ -360,6 +455,8 @@ export class GolfGame implements MiniGame {
         d: b.done,
         m: b.moving || b.wait > 0,
         ...(b.tube > 0 ? { tube: true } : {}),
+        ...(b.knocked && b.moving ? { k: true } : {}),
+        ...(b.auto ? { auto: b.auto } : {}),
         aim: b.aim,
       };
     }
@@ -378,6 +475,7 @@ export class GolfGame implements MiniGame {
         scores: this.scores,
         par: GOLF_HOLES.slice(0, this.holeCount).map((h) => h.par),
         fx: this.fx,
+        ...(this.ended ? { ended: true } : {}),
       },
     };
   }

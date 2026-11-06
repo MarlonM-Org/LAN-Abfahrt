@@ -42,6 +42,15 @@ export const setViaTunnel = (v: boolean) => {
 };
 export const joinUrlOf = (s: GameState) => (viaTunnel ? `${location.origin}/` : s.joinUrl);
 
+/** Läuft diese TV-Seite direkt am Laptop (Laptop-Steuerung aktiv)? Dann zeigen Szenen Tasten-Hinweise (Enter = weiter). */
+let atLaptop = false;
+export const setAtLaptop = (v: boolean) => {
+  if (v === atLaptop) return;
+  atLaptop = v;
+  if (current) bus.emit('state', current, current);
+};
+export const isAtLaptop = () => atLaptop;
+
 /** performance.now() beim letzten `meta` – „offline seit …“ (offlineMs) zählt ab da weiter */
 export const metaReceivedAt = () => metaAt;
 

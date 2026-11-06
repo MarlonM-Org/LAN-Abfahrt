@@ -11,7 +11,7 @@ import {
   wackelSurfaceY,
   wackelTilt,
 } from '../shared/wackel';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, PRACTICE_RESPAWN_MS, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 const { Bodies, Body, Composite, Constraint, Engine } = Matter;
 
@@ -121,6 +121,8 @@ export class WackelGame implements MiniGame {
   private simT = 0;
   private timers = new Timers();
   private prof = { n: 0, sum: 0, max: 0 };
+  /** Aufwärmrunde: eigene Kollisionsgruppe für jede neue Puppe */
+  private respawnSeq = 0;
 
   constructor(
     private ids: string[],
@@ -254,7 +256,8 @@ export class WackelGame implements MiniGame {
     this.timers.later(K.COUNTDOWN_MS, () => {
       this.sub = 'play';
       this.playStart = Date.now();
-      this.deadline = this.playStart + K.ROUND_MS;
+      // Aufwärmrunde: kein Zeitlimit, keine Flut
+      this.deadline = this.ctx.practice ? 0 : this.playStart + K.ROUND_MS;
       this.nextWaveAt = this.playStart + 5000 + Math.random() * 3000;
       this.ctx.onChange();
     });
@@ -334,7 +337,7 @@ export class WackelGame implements MiniGame {
         }
       }
     }
-    if (play) {
+    if (play && !this.ctx.practice) {
       if (!this.sudden && now >= this.playStart + K.ROUND_MS) {
         this.sudden = true;
         this.deadline = this.playStart + K.ROUND_CAP_MS;
@@ -699,6 +702,28 @@ export class WackelGame implements MiniGame {
       if (k) k.outs += 1;
     }
     this.pushFx('platsch', p.deadX, p.deadY, p.id);
+    if (this.ctx.practice) this.timers.later(PRACTICE_RESPAWN_MS, () => this.respawn(p));
+  }
+
+  /** Aufwärmrunde: neue Puppe auf der Startlinie – möglichst weit weg von den anderen */
+  private respawn(p: P) {
+    if (p.alive || this.sub !== 'play' || this.ctx.isGone?.(p.id)) return;
+    if (!this.ctx.isConnected(p.id)) return void this.timers.later(1000, () => this.respawn(p));
+    const [x0, x1] = this.stage.spawnX;
+    const xs = [...this.players.values()].filter((o) => o.alive && o.doll).map((o) => o.doll!.torso.position.x);
+    let x = (x0 + x1) / 2;
+    let best = -1;
+    for (let i = 0; i <= 6; i++) {
+      const cx = x0 + ((x1 - x0) * i) / 6;
+      const d = Math.min(999, ...xs.map((ox) => Math.abs(ox - cx)));
+      if (d > best) [best, x] = [d, cx];
+    }
+    Object.assign(p, { alive: true, holds: [null, null], heldBy: null, punch: null, grabHeld: false, stunUntil: 0, airUntil: 0, grabCdUntil: 0, punchReadyAt: 0, lastHitBy: null, lastHitAt: 0, sx: 0, sy: 0 });
+    p.doll = this.makeDoll(p.id, 100 + ++this.respawnSeq, x, this.stage.spawnY);
+    p.f = x < 240 ? 1 : -1;
+    p.lx = p.f;
+    p.ly = 0;
+    this.ctx.onChange();
   }
 
   private pushFx(type: WackelFx['type'], x: number, y: number, id?: string) {
