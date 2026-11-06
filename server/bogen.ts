@@ -13,7 +13,7 @@ import {
   bogenWrapX,
   bogenWrapY,
 } from '../shared/bogen';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, PRACTICE_RESPAWN_MS, Timers, asRecord, shuffle } from './minigame';
 import { BetBook } from './spectator';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -137,7 +137,8 @@ export class BogenGame implements MiniGame {
     this.timers.later(BOGEN.COUNTDOWN_MS, () => {
       this.sub = 'play';
       this.playStart = Date.now();
-      this.deadline = this.playStart + BOGEN.ROUND_MS;
+      // Aufwärmrunde: kein Zeitlimit
+      this.deadline = this.ctx.practice ? 0 : this.playStart + BOGEN.ROUND_MS;
       this.nextChestAt = this.playStart + BOGEN.CHEST_MIN_MS + Math.random() * (BOGEN.CHEST_MAX_MS - BOGEN.CHEST_MIN_MS);
       this.ctx.onChange();
     });
@@ -226,8 +227,10 @@ export class BogenGame implements MiniGame {
     }
     this.updateChest(now);
 
-    if (!this.endAt && this.alive().length <= 1) this.endAt = now + BOGEN.END_DELAY_MS;
-    if ((this.endAt && now >= this.endAt) || now >= this.deadline) return this.endRound(now);
+    if (!this.ctx.practice) {
+      if (!this.endAt && this.alive().length <= 1) this.endAt = now + BOGEN.END_DELAY_MS;
+      if ((this.endAt && now >= this.endAt) || now >= this.deadline) return this.endRound(now);
+    }
     this.ctx.onChange();
   }
 
@@ -548,7 +551,24 @@ export class BogenGame implements MiniGame {
       });
     }
     p.arrows = 0;
+    if (this.ctx.practice) this.timers.later(PRACTICE_RESPAWN_MS, () => this.respawn(p));
     return true;
+  }
+
+  /** Aufwärmrunde: wieder rein – am Startplatz, der am weitesten von den anderen weg ist, kurz unverwundbar */
+  private respawn(p: P) {
+    if (p.alive || this.sub !== 'play' || this.ctx.isGone?.(p.id)) return;
+    if (!this.ctx.isConnected(p.id)) return void this.timers.later(1000, () => this.respawn(p));
+    const others = this.alive();
+    const gap = (sp: { x: number; y: number }) => Math.min(999, ...others.map((o) => Math.hypot(bogenDx(o.x, sp.x), bogenDy(o.y, sp.y))));
+    const sp = this.stage.spawns.reduce((a, b) => (gap(b) > gap(a) ? b : a));
+    const now = Date.now();
+    Object.assign(p, { x: sp.x, y: sp.y, vx: 0, vy: 0, alive: true, ground: true, wall: 0, arrows: BOGEN.START_ARROWS, jumpBuf: 0, shootBuf: null, dashBuf: null, dashUntil: 0, readyAt: 0, lastGround: 0, dropUntil: 0 });
+    p.f = p.x < BOGEN.AW / 2 ? 1 : -1;
+    p.invUntil = now + 1200;
+    // Herausgeflogene Pfeile sammeln sich sonst endlos an
+    if (this.arrows.length > 40) this.arrows = this.arrows.slice(-40);
+    this.ctx.onChange();
   }
 
   private pickups(p: P) {

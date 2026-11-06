@@ -356,13 +356,23 @@ export class ArenaScene extends Phaser.Scene {
       this.items.set(k, img);
     }
 
-    // Spieler: Platsch!
+    // Spieler: Platsch! – bzw. in der Aufwärmrunde wieder da (Respawn mitten in der Runde)
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
       if (a.alive && !p.alive) {
         a.alive = false;
         this.platsch(a, id);
+      } else if (!a.alive && p.alive && st.sub === 'play') {
+        a.alive = true;
+        a.x = p.x;
+        a.y = p.y;
+        this.tweens.killTweensOf(a.f);
+        a.f.setVisible(true).setAlpha(1).setAngle(0).setPosition(this.px(p.x), this.py(p.y) + 7);
+        a.f.play('idle');
+        a.ring.setVisible(true).setPosition(this.px(p.x), this.py(p.y) + 6);
+        this.juice.burst(this.px(p.x), this.py(p.y), 'spark', 10);
+        sfx('pop', { x: this.px(p.x), pitch: 1.3 });
       }
     }
 

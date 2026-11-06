@@ -73,8 +73,8 @@ export class AutoballGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     const perTeam: Record<Team, number> = { A: 0, B: 0 };
-    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) oder zufällig geteilt
-    const split = splitTeams(ids, ctx.teams);
+    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3), sonst die Aufteilung der Aufwärmrunde bzw. zufällig
+    const split = splitTeams(ids, ctx.teams ?? ctx.warmTeams);
     const teamOf = new Map<string, Team>([...split.A.map((id) => [id, 'A'] as const), ...split.B.map((id) => [id, 'B'] as const)]);
     // Handicap bei ungleichen Brett-Teams: Vorsprung in Toren (dazu lädt der Boost des kleineren Teams schneller, s. u.)
     if (ctx.teams) this.score = teamHandicap(split.A.length, split.B.length);

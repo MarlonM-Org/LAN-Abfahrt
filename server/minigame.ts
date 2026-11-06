@@ -35,6 +35,18 @@ export interface MiniCtx {
   /** Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) – Team-Spiele übernehmen sie über `splitTeams()` */
   teams?: MiniTeams | null;
   /**
+   * Aufteilung aus der Aufwärmrunde (ohne Brett: zufällig, gilt für Übung UND echtes Spiel) – ohne Handicap und
+   * ohne Münz-Bonus wie bei `teams`. Team-Spiele nehmen `splitTeams(ids, ctx.teams ?? ctx.warmTeams)`.
+   */
+  warmTeams?: MiniTeams | null;
+  /**
+   * Aufwärmrunde vor dem echten Spiel (Raum-Phase `intro`, `WARMUP_KINDS`): nichts zählt. `finish()` startet still
+   * eine frische Übungsrunde, `log`/`record` sind No-ops, Wetten gibt es keine. Spiele mit Ausscheiden lassen
+   * Ausgeschiedene nach `PRACTICE_RESPAWN_MS` wieder einsteigen und verzichten auf Rundenende, Zeitlimit und
+   * Schrumpfen (sonst startet der Raum nach `PRACTICE_OUT_MS` ohne Mensch im Spiel eine frische Übungsrunde).
+   */
+  practice?: boolean;
+  /**
    * Markantes Ereignis fürs Protokoll des Abends („Titel des Abends“, server/fx.ts): `p` = Spieler,
    * `n` = Menge (Standard 1), `o` = zweiter Beteiligter. Typen siehe `FxEvent` in shared/types.ts.
    */
@@ -72,6 +84,11 @@ export interface MiniGame {
 
 /** So lange bleibt eine Figur ohne Verbindung eingefroren + unverwundbar im Spiel, dann scheidet sie aus. */
 export const OFFLINE_OUT_MS = 15_000;
+
+/** Aufwärmrunde (`ctx.practice`): so schnell steigt ein Ausgeschiedener wieder ein */
+export const PRACTICE_RESPAWN_MS = 1500;
+/** Aufwärmrunde ohne eigenes Respawn: ist ein Mensch so lange raus, startet der Raum still eine frische Übungsrunde */
+export const PRACTICE_OUT_MS = 3500;
 
 /**
  * Optionaler Phasen-Timer: `ms === null` heißt „kein Zeitlimit“ (der VIP kann überspringen).

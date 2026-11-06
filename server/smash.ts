@@ -200,7 +200,8 @@ export class SmashGame implements MiniGame {
   private start() {
     this.sub = 'fight';
     this.fightStart = Date.now();
-    this.deadline = this.fightStart + SMASH.TIME_MS;
+    // Aufwärmrunde: kein Zeitlimit (und unbegrenzt Leben, siehe checkBlast)
+    this.deadline = this.ctx.practice ? 0 : this.fightStart + SMASH.TIME_MS;
     this.nextItem = this.fightStart + 5000 + Math.random() * 4000;
     this.last = Date.now();
     this.timers.every(SMASH.TICK_MS, () => {
@@ -277,7 +278,7 @@ export class SmashGame implements MiniGame {
     for (const f of live) if (f.state === 'fight') this.checkBlast(f, now);
 
     const alive = [...this.fighters.values()].filter((f) => f.state !== 'out');
-    if ((this.fighters.size > 1 && alive.length <= 1) || alive.length === 0 || now >= this.deadline) this.end();
+    if (!this.ctx.practice && ((this.fighters.size > 1 && alive.length <= 1) || alive.length === 0 || now >= this.deadline)) this.end();
     else this.ctx.onChange();
   }
 
@@ -666,7 +667,8 @@ export class SmashGame implements MiniGame {
   private checkBlast(f: Fighter, now: number) {
     const B = SMASH.BLAST;
     if (f.x > B.left && f.x < B.right && f.y > B.top && f.y < B.bottom) return;
-    f.stocks -= 1;
+    // Aufwärmrunde: Leben gehen nicht verloren – man steigt einfach wieder ein
+    if (!this.ctx.practice) f.stocks -= 1;
     this.pushFx('ko', clamp(f.x, 0, 480), clamp(f.y - SMASH.H / 2, 0, 270), 1, f.id);
     if (f.lastHitBy && now - f.lastHitAt < 8000) {
       const k = this.fighters.get(f.lastHitBy);

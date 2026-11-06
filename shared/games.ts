@@ -100,13 +100,10 @@ export interface HowToControl {
 }
 
 /**
- * Regelkarte vor jedem Minispiel (TV + Handy, Raum-Phase `intro`): ein Satz Ziel und 2–3 Steuer-Piktogramme.
- * Das Übungsfeld am Handy liest die Bedienung direkt aus diesen Zeilen:
- *   - Icon 🕹️ = schwebender Stick (zweimal 🕹️ = zwei Sticks: laufen + zielen)
- *   - Text „KNOPF: …“ (vor dem Doppelpunkt nur Großbuchstaben/Symbole) = echter Knopf, „A / B: …“ = zwei Knöpfe;
- *     ◀ ▶ LINKS RECHTS bewegen die Mini-Figur, solange man sie hält
- *   - sonst (Sensor, Listen, Text) zeigt das Handy nur einen Hinweis
- * Pflicht für jedes neue Minispiel – Texte kurz halten (TV-Kachel ≈ 2 × 17 Zeichen).
+ * Regelkarte vor jedem Minispiel (TV + Handy, Raum-Phase `intro`): ein Satz Ziel und 2–3 Steuer-Zeilen
+ * (Emoji + kurzer Text, z. B. „BOMBE: Kokosnuss legen“). Spiele aus `WARMUP_KINDS` zeigen statt der Karte eine
+ * Aufwärmrunde mit der echten Steuerung – dort steht nur der Ziel-Satz in der Leiste.
+ * Pflicht für jedes neue Minispiel – Texte kurz halten (eine Zeile ≈ 34 Zeichen, höchstens 3 Steuer-Zeilen).
  */
 export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl[] }> = {
   flunky: { goal: 'Trefft die Flasche – dann trinkt, bis die anderen sie wieder aufgestellt haben.', controls: [{ icon: '🎯', text: 'Wischen: Ball werfen (Wind!)' }, { icon: '🍺', text: 'TRINKEN!: schnell tippen' }, { icon: '🏃', text: 'LAUFEN!: Flasche aufstellen' }] },
@@ -163,24 +160,22 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   schaetz: { goal: 'Schätzt die Zahl – dann setzt Chips auf die Karte, die am nächsten dran ist, ohne drüber.', controls: [{ icon: '🔢', text: 'Zahl am Handy eintippen' }, { icon: '🪙', text: '2 Chips setzen (außen = ×3/×4)' }, { icon: '👑', text: 'Beste Karte: Autor +3' }] },
   lieder: { goal: 'Ein Song läuft auf dem TV – tippt so schnell wie möglich den richtigen Titel an.', controls: [{ icon: '🎛️', text: 'Vorher: eure Genres wählen' }, { icon: '👆', text: 'Titel antippen – nur ein Versuch' }, { icon: '⚡', text: 'Schneller = mehr Punkte (bis 6)' }] },
   maexchen: { goal: 'Würfelt geheim, sagt einen höheren Wert an – ehrlich oder geblufft. Wer erwischt wird, verliert!', controls: [{ icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
-  werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }, { icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
+  werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }] },
   skisprung: { goal: 'Auf dem Balance Board: im Anlauf ruhig in der Mitte stehen, bei „JETZT ABSPRINGEN!“ einmal kräftig hochdrücken, im Flug leicht nach vorn lehnen – und weit fliegen!', controls: [{ icon: '⚖️', text: '1 Anlauf: ruhig mittig, nicht lehnen' }, { icon: '⤴️', text: '2 Am Tisch: einmal abspringen' }, { icon: '🛫', text: '3 Flug: leicht nach vorn lehnen' }] },
   teppich: { goal: 'Auf dem Balance Board durch die Wüstenstadt fliegen: Juwelen holen, Türmen und Geiern ausweichen.', controls: [{ icon: '⬆️', text: 'Nach hinten lehnen = steigen' }, { icon: '⬇️', text: 'Nach vorn lehnen = sinken' }, { icon: '➡️', text: 'Rechts = schneller, links = bremsen' }] },
   kugel: { goal: 'Auf dem Balance Board die Kugel über den schmalen, moosigen Tempelpfad ins Ziel lehnen – ohne in den Abgrund zu rollen.', controls: [{ icon: '⬆️', text: 'Vorn lehnen = Gas' }, { icon: '↪️', text: 'Seitlich = drehen (Hoverboard)' }, { icon: '🛑', text: 'Hinten lehnen = bremsen' }] },
 };
 
-/** Übungsfeld-Bedienung aus der Regelkarte (siehe `MINI_HOWTO`): Anzahl Sticks und Knopf-Beschriftungen */
-export function howToPractice(kind: MiniKind): { sticks: number; buttons: string[] } {
-  const controls = MINI_HOWTO[kind]?.controls ?? [];
-  const sticks = Math.min(2, controls.filter((c) => c.icon === '🕹️').length);
-  const buttons: string[] = [];
-  for (const c of controls) {
-    const m = /^([^:]+):\s/.exec(c.text);
-    if (!m || /[a-zäöüß]/.test(m[1])) continue;
-    for (const b of m[1].split('/').map((x) => x.trim())) if (b && !buttons.includes(b)) buttons.push(b);
-  }
-  return { sticks, buttons };
-}
+/**
+ * Aufwärmrunde statt Regelkarte (Raum-Phase `intro`): Für diese Echtzeit-Spiele startet der Raum schon während der
+ * Karte eine echte Instanz des Spiels im Übungsmodus (`MiniCtx.practice`) – TV zeigt die echte Szene mit
+ * AUFWÄRMEN-Leiste, die Handys den echten Controller mit schmaler BEREIT-Leiste. Nichts zählt; Ausgeschiedene sind
+ * gleich wieder dabei (eigenes Respawn oder der Raum startet still eine frische Übungsrunde). Sobald alle bereit sind
+ * (oder VIP/Laptop starten), beginnt das echte Spiel frisch mit Countdown.
+ * Nicht hier: rundenbasierte, Quiz-, Abstimmungs-, Geheimrollen- und Balance-Board-Spiele.
+ */
+export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint'];
+export const isWarmupKind = (kind: MiniKind) => WARMUP_KINDS.includes(kind);
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'maexchen'];

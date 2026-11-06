@@ -177,7 +177,8 @@ export function pickArena(s: ArenaState): Screen {
       if (st.sub === 'countdown') hint = `Gleich geht’s los … ${secondsLeft()}`;
       else if (st.sub === 'roundOver') hint = st.roundWinner === id ? 'Rundensieg! Du bist trocken geblieben!' : st.roundWinner ? `${nameOf(st.roundWinner)} gewinnt die Runde.` : 'Alle nass – Unentschieden!';
       else if (st.floodActive) hint = 'FLUT! Weg vom Rand!';
-      else hint = `Flut in ${secondsLeft()}s`;
+      // Aufwärmrunde: keine Flut, kein Zeitlimit
+      else hint = store.noTimer ? 'Bomben legen, ausprobieren – nichts zählt!' : `Flut in ${secondsLeft()}s`;
       q(root, '.arena-hint').textContent = hint;
       bomb.disabled = st.sub !== 'play' || !p.alive;
     };

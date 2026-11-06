@@ -1,6 +1,6 @@
 import type { ArenaPlayer, ArenaState, MiniSnapshot } from '../shared/types';
 import { ARENA, type ArenaCell, type ArenaGeo, type ArenaItem, arenaGeo, arenaSize, blastCells } from '../shared/arena';
-import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, PRACTICE_RESPAWN_MS, Timers, asRecord, shuffle } from './minigame';
 import { SPECTATOR } from '../shared/spectator';
 import { BetBook } from './spectator';
 
@@ -72,6 +72,8 @@ interface Ghost {
  * Bomben-Arena (Bomberman am Strand): Kokosnüsse/Wasserbomben legen, Sandburgen &
  * Liegestühle sprengen, Power-ups sammeln. Wer getroffen wird, ist nass und für die
  * Runde raus. Nach 60 s kommt die Flut. Wer zuerst 2 Runden gewinnt, ist Champion.
+ * Aufwärmrunde (`ctx.practice`): keine Flut, kein Rundenende – wer nass wird, steht nach PRACTICE_RESPAWN_MS wieder
+ * an einem freien Startplatz.
  */
 export class ArenaGame implements MiniGame {
   readonly kind = 'arena' as const;
@@ -169,9 +171,10 @@ export class ArenaGame implements MiniGame {
     this.deadline = Date.now() + ARENA.COUNTDOWN_MS;
     this.timers.later(ARENA.COUNTDOWN_MS, () => {
       this.sub = 'play';
-      this.floodAt = Date.now() + ARENA.ROUND_MS;
+      // Aufwärmrunde: keine Flut, kein Zeitlimit
+      this.floodAt = this.ctx.practice ? Infinity : Date.now() + ARENA.ROUND_MS;
       this.nextFloodAt = this.floodAt;
-      this.deadline = this.floodAt;
+      this.deadline = this.ctx.practice ? 0 : this.floodAt;
       this.ctx.onChange();
     });
     this.ctx.onChange();
@@ -272,7 +275,7 @@ export class ArenaGame implements MiniGame {
       }
     }
 
-    if (!this.endAt && this.alive().length <= 1) this.endAt = now + ARENA.END_DELAY_MS;
+    if (!this.endAt && !this.ctx.practice && this.alive().length <= 1) this.endAt = now + ARENA.END_DELAY_MS;
     if (this.endAt && now >= this.endAt) return this.endRound(now);
     this.ctx.onChange();
   }
@@ -297,6 +300,27 @@ export class ArenaGame implements MiniGame {
       if (k) k.kills += 1;
       this.ctx.log?.('hit', { p: by, o: id });
     }
+    if (this.ctx.practice) this.timers.later(PRACTICE_RESPAWN_MS, () => this.respawn(id));
+  }
+
+  /** Aufwärmrunde: wieder rein – an den Startplatz, der am weitesten von den anderen weg und gerade frei ist */
+  private respawn(id: string) {
+    const p = this.players.get(id);
+    if (!p || p.alive || this.sub !== 'play' || this.ctx.isGone?.(id)) return;
+    if (!this.ctx.isConnected(id)) return void this.timers.later(1000, () => this.respawn(id));
+    const others = [...this.players.values()].filter((o) => o.alive);
+    const free = (x: number, y: number) => this.cellAt(x, y) === '.' && !this.bombAt(x, y) && !this.flames.has(this.geo.idx(x, y));
+    let spots: [number, number][] = this.geo.spawns.filter(([x, y]) => free(x, y));
+    if (!spots.length) {
+      spots = [];
+      for (let y = 1; y < this.geo.rows - 1; y++) for (let x = 1; x < this.geo.cols - 1; x++) if (free(x, y)) spots.push([x, y]);
+    }
+    if (!spots.length) return void this.timers.later(500, () => this.respawn(id));
+    const dist = ([x, y]: [number, number]) => Math.min(99, ...others.map((o) => Math.abs(o.x - x) + Math.abs(o.y - y)));
+    const [x, y] = spots.reduce((a, b) => (dist(b) > dist(a) ? b : a));
+    Object.assign(p, { x, y, alive: true, away: false, moving: false, dir: 'd', lastAxis: null, turnedAt: -1, bombs: ARENA.START_BOMBS, range: ARENA.START_RANGE, speed: 0 });
+    this.ghosts.delete(id);
+    this.ctx.onChange();
   }
 
   private cellAt = (x: number, y: number): ArenaCell =>

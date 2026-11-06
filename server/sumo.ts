@@ -1,6 +1,6 @@
 import type { MiniSnapshot, SumoPlayer, SumoState } from '../shared/types';
 import { SUMO, SUMO_CX, SUMO_CY, type SumoTile, sumoIdx, sumoRadii, sumoShape, sumoSolidAt, sumoSpawns } from '../shared/sumo';
-import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, PRACTICE_RESPAWN_MS, Timers, asRecord, shuffle } from './minigame';
 import { SPECTATOR } from '../shared/spectator';
 import { BetBook } from './spectator';
 
@@ -44,6 +44,8 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
  * der Sprint selbst trägt (beim Frontal-Rempler noch weiter); wer danebenrempelt, bremst am Ende ab,
  * schießt aber trotzdem ein Stück übers Ziel hinaus. Wer zuletzt auf dem Steg steht, gewinnt die Runde;
  * wer zuerst 2 Runden gewinnt (max. 3), ist Steg-Champion.
+ * Aufwärmrunde (`ctx.practice`): Der Steg bricht nicht, kein Rundenende – wer reinfällt, steht nach
+ * PRACTICE_RESPAWN_MS wieder auf einem Startplatz.
  */
 export class SumoGame implements MiniGame {
   readonly kind = 'sumo' as const;
@@ -135,7 +137,7 @@ export class SumoGame implements MiniGame {
       this.sub = 'play';
       this.playStart = Date.now();
       this.nextBreakAt = this.playStart + SUMO.GRACE_MS;
-      this.deadline = this.playStart + SUMO.ROUND_MS;
+      this.deadline = this.ctx.practice ? 0 : this.playStart + SUMO.ROUND_MS;
       this.ctx.onChange();
     });
     this.ctx.onChange();
@@ -229,7 +231,8 @@ export class SumoGame implements MiniGame {
       return;
     }
 
-    this.shrink(now);
+    // Aufwärmrunde: der Steg bleibt ganz
+    if (!this.ctx.practice) this.shrink(now);
 
     // Verbindung weg (nach der 3-s-Gnadenfrist): eingefroren, keine Rempler, fällt nicht – nach 15 s raus
     for (const [id, p] of this.players) {
@@ -253,7 +256,7 @@ export class SumoGame implements MiniGame {
       if (!sumoSolidAt(tiles, p.x, p.y)) this.fall(id, now);
     }
 
-    if (!this.endAt && this.alive().length <= 1) this.endAt = now + SUMO.END_DELAY_MS;
+    if (!this.endAt && !this.ctx.practice && this.alive().length <= 1) this.endAt = now + SUMO.END_DELAY_MS;
     if (this.endAt && now >= this.endAt) return this.endRound(now);
     this.ctx.onChange();
   }
@@ -405,6 +408,27 @@ export class SumoGame implements MiniGame {
       if (k) k.pushes += 1;
       this.ctx.log?.('out', { p: p.lastHitBy, o: id });
     }
+    if (this.ctx.practice) this.timers.later(PRACTICE_RESPAWN_MS, () => this.respawn(id));
+  }
+
+  /** Aufwärmrunde: wieder auf den Steg – auf den Startplatz, der am weitesten von den anderen weg ist */
+  private respawn(id: string) {
+    const p = this.players.get(id);
+    if (!p || p.alive || this.sub !== 'play' || this.ctx.isGone?.(id)) return;
+    if (!this.ctx.isConnected(id)) return void this.timers.later(1000, () => this.respawn(id));
+    const others = [...this.players.values()].filter((o) => o.alive);
+    const tiles = this.tiles.join('');
+    const spots = sumoSpawns(Math.max(2, this.ids.length)).filter((sp) => sumoSolidAt(tiles, sp.x, sp.y));
+    const sp = spots.length ? spots.reduce((a, b) => (this.gap(b, others) > this.gap(a, others) ? b : a)) : { x: SUMO_CX, y: SUMO_CY };
+    Object.assign(p, { x: sp.x, y: sp.y, alive: true, away: false, vx: 0, vy: 0, dashUntil: 0, readyAt: 0, stunUntil: 0, dash: false, stun: false, lastHitBy: null, lastHitAt: 0 });
+    p.f = p.x > SUMO_CX ? -1 : 1;
+    this.ghostReady.delete(id);
+    this.ctx.onChange();
+  }
+
+  /** Abstand zum nächsten Spieler (für den Respawn-Platz) */
+  private gap(sp: { x: number; y: number }, others: P[]) {
+    return Math.min(999, ...others.map((o) => Math.hypot(o.x - sp.x, o.y - sp.y)));
   }
 
   // ---------------------------------------------------------------- Geister-Wellen

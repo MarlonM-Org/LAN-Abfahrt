@@ -2207,12 +2207,14 @@ export interface ResultsState {
 
 // ------------------------------------------------------------------ Gesamtzustand
 
-/** `intro` = Regelkarte vor einem Minispiel (Ziel, Steuerung, Übungsfeld, „Bereit!“) */
+/** `intro` = Regelkarte vor einem Minispiel (Ziel, Steuerung, „Bereit!“) – bei `WARMUP_KINDS` als Aufwärmrunde */
 export type Phase = 'lobby' | 'board' | 'intro' | 'mini' | 'results' | 'story';
 
 /**
  * Regelkarte vor dem Minispiel: Start erst, wenn alle verbundenen Mitspieler bereit sind – oder wenn der VIP
  * („▶ Jetzt starten“) bzw. der Laptop (Enter) ihn erzwingt. Kein Timer.
+ * Aufwärmrunde (`warm`, Spiele aus `WARMUP_KINDS`): statt der Karte läuft das echte Spiel im Übungsmodus –
+ * `GameLive.mini` ist dann dessen Snapshot, `inGame` die Übenden; TV und Handys zeigen Szene bzw. Controller des Spiels.
  */
 export interface IntroState {
   kind: MiniKind;
@@ -2226,6 +2228,8 @@ export interface IntroState {
   short: boolean;
   /** Team-Minispiel vom Spielbrett (2 gegen 2, 1 gegen 3) */
   teams?: MiniTeams | null;
+  /** Aufwärmrunde läuft: `mini` ist das Übungsspiel (nichts zählt), sonst die Regelkarte */
+  warm?: boolean;
 }
 
 export type MiniSnapshot =
@@ -2336,9 +2340,15 @@ export interface GameLive {
   drinkActive: boolean;
   arcadeActive: boolean;
   board: BoardState | null;
+  /** Laufendes Minispiel – in Phase `intro` mit `intro.warm` das Übungsspiel der Aufwärmrunde */
   mini: MiniSnapshot | null;
+  /**
+   * Laufende Nummer der Minispiel-Instanz (Aufwärmrunde, frische Übungsrunde, echtes Spiel): Wechselt sie, startet
+   * der TV die Szene neu (`create()` setzt alles zurück) und das Handy baut den Screen neu.
+   */
+  miniSeq?: number;
   results: ResultsState | null;
-  /** Wer im laufenden Minispiel mitspielt (wer später zurückkommt, schaut zu) */
+  /** Wer im laufenden Minispiel (bzw. in der Aufwärmrunde) mitspielt (wer später zurückkommt, schaut zu) */
   inGame?: string[] | null;
   /** Arcade: „Alle dürfen wählen“ – Stimmen der Spieler für das nächste Spiel (null = aus) */
   arcadeVote?: ArcadeVoteState | null;

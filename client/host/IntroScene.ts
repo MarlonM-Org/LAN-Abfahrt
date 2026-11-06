@@ -13,8 +13,10 @@ import { say, spokenName } from './speech';
 import { setScene } from './music';
 
 /**
- * Regelkarte vor jedem Minispiel (Raum-Phase `intro`): Icon, Titel, „à la …“, Ziel-Satz, bis zu 3 Steuer-Kacheln
- * aus `MINI_HOWTO`, Haltung des Handys, darunter alle Mitspieler mit Häkchen „bereit“ (wer noch fehlt: „...“).
+ * Regelkarte vor einem Minispiel ohne Aufwärmrunde (Raum-Phase `intro`; Spiele aus `WARMUP_KINDS` zeigen statt dessen
+ * ihre echte Szene + WarmupScene): Icon, Titel, „à la …“, Ziel-Satz, bis zu 3 Steuer-Zeilen aus `MINI_HOWTO`
+ * (eine Zeile pro Bedienung, passt sich der Länge an), Haltung des Handys, darunter alle Mitspieler mit Häkchen
+ * „bereit“ (wer noch fehlt: „...“).
  * Kein Countdown: Das Spiel startet erst, wenn alle bereit sind – oder der VIP („▶ Jetzt starten“) bzw. der Laptop
  * (Enter) es erzwingt. Oben rechts „BEREIT x/y“, unter der Karte „Warte auf …“ mit Namen.
  */
@@ -46,7 +48,7 @@ export class IntroScene extends Phaser.Scene {
     this.card = this.add.container(0, 0);
     this.crowd = this.add.container(0, 0);
     this.count = ink(this, 452, 14, '', { origin: [1, 0] }).setDepth(10);
-    this.hint = ink(this, WORLD.W / 2, 168, '', { color: '#7a5a3a' }).setDepth(10);
+    this.hint = ink(this, WORLD.W / 2, 166, '', { color: '#7a5a3a' }).setDepth(10);
     this.status = txt(this, WORLD.W / 2, 186, '', { color: '#ffd25e' }).setDepth(10);
 
     const onState = (s: GameState) => this.render(s);
@@ -69,7 +71,7 @@ export class IntroScene extends Phaser.Scene {
     this.renderCrowd(it);
   }
 
-  /** Statische Regelkarte: Titel, Ziel, Steuer-Kacheln, Haltung */
+  /** Statische Regelkarte: Titel, Ziel, Steuer-Zeilen, Haltung */
   private buildCard(kind: MiniKind, short: boolean, teams: MiniTeams | null) {
     this.card.removeAll(true);
     const info = MINI_INFO[kind];
@@ -88,35 +90,44 @@ export class IntroScene extends Phaser.Scene {
     const c = this.card;
     c.add(panel(this, 12, 6, 456, 176));
     c.add(ink(this, 28, 14, teams ? `~ Regelkarte · ${teams.label.toUpperCase()} ~` : '~ Regelkarte ~', { color: RED_INK, origin: [0, 0] }));
-    const title = ink(this, WORLD.W / 2, 24, `${info.icon} ${info.title}`, { size: 16, wrap: 380 });
+    const title = ink(this, WORLD.W / 2, 26, `${info.icon} ${info.title}`, { size: 16 });
+    fitText(title, 420, 0.6);
     c.add(title);
-    let y = title.y + title.height + 3;
+    let y = 46;
     const insp = miniInspired(kind);
     if (insp) {
       c.add(ink(this, WORLD.W / 2, y, insp, { color: '#7a5a3a' }));
       y += 12;
     }
-    const goal = ink(this, WORLD.W / 2, y + 4, how.goal, { wrap: 420 });
+    const goal = ink(this, WORLD.W / 2, y + 2, how.goal, { wrap: 420 });
+    // Sehr lange Ziel-Sätze (Balance Board, Verräter) kleiner statt über die Steuer-Zeilen hinaus
+    if (goal.height > 40) goal.setScale(Math.max(0.75, 40 / goal.height));
     c.add(goal);
-    y = Math.max(goal.y + goal.height + 8, 84);
+    y = goal.y + goal.displayHeight + 6;
 
-    // Steuer-Kacheln (2–3 nebeneinander)
-    const tiles = how.controls.slice(0, 3);
-    const tw = 138;
-    const gap = 9;
-    const x0 = WORLD.W / 2 - (tiles.length * tw + (tiles.length - 1) * gap) / 2;
-    const th = Math.min(60, 150 - y);
-    tiles.forEach((ctl, i) => {
-      const x = x0 + i * (tw + gap);
-      c.add(panel(this, x, y, tw, th, 'dark'));
-      c.add(txt(this, x + tw / 2, y + 6, ctl.icon, { size: 16 }));
-      c.add(txt(this, x + tw / 2, y + 26, ctl.text, { wrap: tw - 14 }));
-      const tile = c.list[c.list.length - 1] as Phaser.GameObjects.Text;
-      tile.setAlpha(0);
-      this.tweens.add({ targets: tile, alpha: 1, duration: 250, delay: 150 + i * 120 });
+    // Steuer-Zeilen: Icon + Text in einer dunklen Leiste, volle Breite – nichts läuft mehr über
+    const rows = how.controls.slice(0, 3);
+    const rh = rows.length > 2 && y > 100 ? 14 : y < 90 ? 18 : 16;
+    const rw = 380;
+    const rx = WORLD.W / 2 - rw / 2;
+    rows.forEach((ctl, i) => {
+      const ry = y + i * (rh + 3);
+      const bg = this.add.rectangle(rx, ry, rw, rh, 0x3b2a22).setOrigin(0, 0).setStrokeStyle(1, 0x8d5629);
+      const icon = txt(this, rx + 13, ry + rh / 2 + 1, ctl.icon, { size: 16, origin: [0.5, 0.5] }).setScale(rh > 14 ? 0.7 : 0.6);
+      const label = txt(this, rx + 28, ry + rh / 2 - 4, ctl.text, { origin: [0, 0] });
+      fitText(label, rw - 36, 0.7);
+      label.setY(ry + (rh - label.displayHeight) / 2 + 1);
+      for (const [j, o] of [bg, icon, label].entries()) {
+        o.setAlpha(0);
+        this.tweens.add({ targets: o, alpha: 1, duration: 250, delay: 150 + i * 120 + j * 10 });
+      }
+      c.add([bg, icon, label]);
     });
+    // Haltung des Handys (Quer-Spiele grün), darunter der Start-Hinweis (this.hint, außerhalb des Containers)
+    y += rows.length * (rh + 3) + 1;
     const orient = info.orientation;
-    c.add(ink(this, WORLD.W / 2, y + th + 6, ORIENT_TEXT[orient], { color: orient === 'landscape' ? GREEN_INK : INK }));
+    c.add(ink(this, WORLD.W / 2, y, ORIENT_TEXT[orient], { color: orient === 'landscape' ? GREEN_INK : INK }));
+    this.hint.setY(Math.min(170, y + 12));
 
     c.setScale(0.6).setAlpha(0);
     c.setPosition(WORLD.W * 0.2, 270 * 0.2);
