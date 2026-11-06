@@ -1,11 +1,15 @@
 {
-  "updated": "2026-11-06T21:29+00:00",
+  "updated": "2026-11-06T21:34+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Wasserbomben-Schlacht UX: klar zeigen, was trocknet, wo man auffüllt und dass Hecken/Liegen Deckung sind (Symbole, Hinweise, Einführung)"
+    }
+  ],
   "queue": [],
   "done": [
     {
@@ -448,8 +452,8 @@
       "notes": "Hängenbleiben an Ecken/Kreuzungen behoben (Ursache: Abbiege-Regel ab 22° Stick-Schräge ließ die Figur zittern); Feld 17×9 (2) · 19×11 (3–4) · 23×11 (5–6) · 23×13 (7–8) · 25×13 (9–12) (#101)"
     },
     "wasser": {
-      "status": "umgesetzt",
-      "notes": "Zielweite 6 + 154 × Stick² (kürzester Wurf ≈ 6 statt 32 px); Klatschnasse werden nach 5 s zum Handtuch getragen statt ewig zu stehen; Seite weg → sofort Ende (#100) – offen: lieber „klatschnass = verloren“ im 1 gegen 1?"
+      "status": "in Arbeit",
+      "notes": "Modus unklar: nicht sichtbar, was trocknet und wo man auffüllt; Deckung wirkt wie reines Lauf-Hindernis → Symbole/Hinweise, Fokus auf Klarheit · vorher: feineres Zielen, Hintragen zum Handtuch (#100)"
     },
     "volley": {
       "status": "umgesetzt",
