@@ -30,6 +30,8 @@ export interface StickOpts {
   radius?: number;
   /** Ring folgt dem Daumen, wenn er über den Radius hinauszieht (Standard: an) */
   trailing?: boolean;
+  /** Kleinste Änderung, die (gedrosselt) gesendet wird – kleiner = feinere Vorschau auf dem TV (Standard 0,08) */
+  step?: number;
   /** Statt automatisch (0, 0) zu senden: Loslassen selbst behandeln (z. B. Wurf beim Loslassen). `ok` = echtes pointerup */
   onRelease?: (x: number, y: number, ok: boolean) => void;
 }
@@ -40,6 +42,7 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
   const R = opts.radius ?? 46;
   const axis = opts.axis ?? 'xy';
   const trailing = opts.trailing ?? true;
+  const step = opts.step ?? 0.08;
   zone.classList.add('st-zone');
   const ring = document.createElement('div');
   ring.className = `st-ring${axis === 'x' ? ' st-x' : ''}`;
@@ -59,7 +62,7 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
   const emit = (force = false) => {
     const now = performance.now();
     const changed = Math.hypot(cur.x - sent.x, cur.y - sent.y);
-    if (!force && changed < 0.08) return;
+    if (!force && changed < step) return;
     if (!force && changed < 0.45 && now - sent.t < 50) return;
     sent = { ...cur, t: now };
     onMove(cur.x, cur.y);
