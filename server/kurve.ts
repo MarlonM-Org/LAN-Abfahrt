@@ -1,7 +1,7 @@
 import type { KurveHead, KurvePower, KurveState, MiniSnapshot } from '../shared/types';
 import { KURVE } from '../shared/games';
 import { PLAYER_COLORS } from '../shared/players';
-import { type MiniCtx, type MiniGame, Timers, asRecord, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, PRACTICE_RESPAWN_MS, Timers, asRecord, shuffle } from './minigame';
 import { BetBook } from './spectator';
 
 const TICK_MS = 50;
@@ -191,7 +191,8 @@ export class KurveGame implements MiniGame {
     if (this.sub !== 'play') return;
 
     const elapsed = now - this.roundStart;
-    const stormF = elapsed > KURVE.STORM_MS ? 1 + ((elapsed - KURVE.STORM_MS) / 1000) * KURVE.STORM_ACCEL : 1;
+    // Aufwärmrunde: kein Sturm
+    const stormF = elapsed > KURVE.STORM_MS && !this.ctx.practice ? 1 + ((elapsed - KURVE.STORM_MS) / 1000) * KURVE.STORM_ACCEL : 1;
     this.storm = stormF > 1;
 
     const died: Racer[] = [];
@@ -207,7 +208,9 @@ export class KurveGame implements MiniGame {
     this.updatePowerups(now);
 
     const alive = [...this.racers.values()].filter((r) => r.alive);
-    const needed = this.racers.size >= 2 ? 1 : 0;
+    // Aufwärmrunde: weiter, solange noch jemand fährt (Menschen steigen nach dem Crash wieder ein) – die Runde endet
+    // erst, wenn alle raus sind oder nach ROUND_MAX_MS (dann ist das Feld wieder leer)
+    const needed = this.ctx.practice ? 0 : this.racers.size >= 2 ? 1 : 0;
     if (alive.length <= needed || now >= this.deadline) this.endRound(alive);
     this.ctx.onChange();
   }
@@ -315,6 +318,34 @@ export class KurveGame implements MiniGame {
     r.alive = false;
     this.push(r, r.gapLeft > 0 ? 0 : 1);
     this.deaths.push({ id: r.id, x: r1(r.x), y: r1(r.y), seq: ++this.deathSeq });
+    // Aufwärmrunde: Menschen steigen an einer freien Stelle wieder ein (Bots stehen in der Übung ohnehin still)
+    if (this.ctx.practice && !this.ctx.isBot?.(r.id)) {
+      const round = this.round;
+      this.timers.later(PRACTICE_RESPAWN_MS, () => this.respawn(r, round));
+    }
+  }
+
+  /** Aufwärmrunde: Kopf an eine freie Stelle setzen (Sprung ohne Strich), die alte Spur bleibt liegen */
+  private respawn(r: Racer, round: number) {
+    if (r.alive || this.sub !== 'play' || this.round !== round || this.ctx.isGone?.(r.id)) return;
+    if (!this.ctx.isConnected(r.id)) return void this.timers.later(1000, () => this.respawn(r, round));
+    const heads = [...this.racers.values()].filter((o) => o.alive);
+    for (let t = 0; t < 80; t++) {
+      const x = Math.round(rand(A.x + 30, A.x + A.w - 30));
+      const y = Math.round(rand(A.y + 30, A.y + A.h - 30));
+      if (this.areaUsed(x, y, t < 60 ? 14 : 8) || heads.some((o) => Math.hypot(o.x - x, o.y - y) < 40)) continue;
+      r.x = x;
+      r.y = y;
+      r.a = this.spawnAngle(x, y);
+      r.alive = true;
+      r.gapLeft = 0;
+      r.nextGap = this.gapDistance();
+      r.turboUntil = r.slowUntil = 0;
+      this.push(r, 0);
+      this.ctx.onChange();
+      return;
+    }
+    // Kein Platz mehr – die Runde endet bald von selbst (ROUND_MAX_MS bzw. alle raus)
   }
 
   // ---------------------------------------------------------------- Power-ups

@@ -1,6 +1,6 @@
 import type { MiniSnapshot, SupBoard, SupState, Team, TidyPlayer, TidyState } from '../shared/types';
 import { SUP, TEAM_INFO_SAFE, TIDY } from './cgconst';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle, splitTeams } from './minigame';
 
 const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -222,8 +222,11 @@ export class TidyGame implements MiniGame {
     // Ab 5 Spielern pro Team (bis 12 Spieler) enger stapeln, damit niemand auf demselben Startplatz steht
     const perTeam = Math.ceil(ids.length / 2);
     const gap = perTeam > 4 ? (A.h - 40) / (perTeam - 1) : 45;
-    shuffle(ids).forEach((id, i) => {
-      const team: Team = solo || i % 2 === 0 ? 'A' : 'B';
+    // Teams wie in der Aufwärmrunde (sonst zufällig abwechselnd) – Reihenfolge A, B, A, B … für die Startplätze
+    const split = splitTeams(ids, ctx.warmTeams);
+    const order = Array.from({ length: Math.max(split.A.length, split.B.length) }, (_, k) => [split.A[k], split.B[k]]).flat().filter((id): id is string => !!id);
+    order.forEach((id, i) => {
+      const team: Team = solo || split.A.includes(id) ? 'A' : 'B';
       this.players.set(id, {
         x: team === 'A' ? A.x + 60 : A.x + A.w - 60,
         y: A.y + (perTeam > 4 ? 20 : 30) + ((i >> 1) % Math.max(4, perTeam)) * gap,

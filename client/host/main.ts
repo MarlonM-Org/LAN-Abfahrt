@@ -60,6 +60,7 @@ import { UmzugScene } from './UmzugScene';
 import { WackelScene } from './WackelScene';
 import { FunkScene } from './FunkScene';
 import { IntroScene } from './IntroScene';
+import { WarmupScene, isWarmup } from './WarmupScene';
 import { SchaetzScene } from './SchaetzScene';
 import { LiederScene } from './LiederScene';
 import { WerwarsScene } from './WerwarsScene';
@@ -75,8 +76,8 @@ const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'spri
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
   if (s.phase === 'mini' && s.mini) return s.mini.kind;
-  // Regelkarte vor dem Minispiel (IntroScene)
-  if (s.phase === 'intro') return s.intro ? 'intro' : 'lobby';
+  // Aufwärmrunde: die echte Szene des Spiels (darüber die WarmupScene), sonst die Regelkarte (IntroScene)
+  if (s.phase === 'intro') return isWarmup(s) ? s.mini!.kind : s.intro ? 'intro' : 'lobby';
   return s.phase === 'mini' ? 'lobby' : s.phase;
 }
 
@@ -98,10 +99,12 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, WerwarsScene, MaexScene, SchaetzScene, LiederScene, FunkScene, SkisprungScene, TeppichScene, KugelScene],
+    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, WerwarsScene, MaexScene, SchaetzScene, LiederScene, FunkScene, SkisprungScene, TeppichScene, KugelScene, WarmupScene],
   });
 
   let currentKey = '';
+  /** Instanz des Minispiels, für die die laufende Szene gestartet wurde (Aufwärmrunde → echtes Spiel = Neustart) */
+  let currentInst = -1;
   // Gleich per WebSocket (schneller, kein Polling-Umweg); nur wenn das scheitert, Polling als Notlösung
   const socket = io({ transports: ['websocket', 'polling'], tryAllTransports: true });
   startTimeSync(socket);
@@ -155,14 +158,25 @@ async function start() {
   function show(s: GameState | null) {
     if (!s) return;
     const key = sceneKey(s);
+    const inst = s.mini && key === s.mini.kind ? (s.miniSeq ?? 0) : -1;
     setState(s);
-    if (key !== currentKey) {
+    if (key !== currentKey || inst !== currentInst) {
+      // Neue Instanz desselben Spiels (Aufwärmrunde → echtes Spiel, frische Übungsrunde): Szene neu starten, create() setzt zurück
+      const music = key !== currentKey;
       currentKey = key;
+      currentInst = inst;
       for (const k of SCENE_KEYS) if (k !== key) game.scene.stop(k);
       game.scene.start(key);
-      setScene(key);
-      musicMenuScene(key);
+      if (music) {
+        setScene(key);
+        musicMenuScene(key);
+      }
     }
+    // Aufwärm-Leiste über der Spielszene
+    if (isWarmup(s)) {
+      if (!game.scene.isActive('warmup')) game.scene.run('warmup');
+      game.scene.bringToTop('warmup');
+    } else if (game.scene.isActive('warmup') || game.scene.isPaused('warmup')) game.scene.stop('warmup');
     showOrientBanner(s);
   }
 

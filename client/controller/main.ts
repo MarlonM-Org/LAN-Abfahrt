@@ -1,5 +1,5 @@
 import '@fontsource/press-start-2p/400.css';
-import type { GameLive, GameMeta, GameState, JoinResponse, PrivateState } from '../../shared/types';
+import type { GameLive, GameMeta, GameState, JoinResponse, MiniSnapshot, PrivateState } from '../../shared/types';
 import { type Screen, LS, app, el, kartViewPref, me, message, socket, store, toast } from './core';
 import { startTimeSync } from '../timesync';
 import { knownKind, watchServerVersion } from '../version';
@@ -54,6 +54,7 @@ import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { pickWerwars } from './screens/werwars';
 import { pickIntro } from './screens/intro';
+import { WARM_PREFIX, pickWarmup, syncWarmup } from './warmup';
 import { buildKicked, initVipPlayersButton } from './players';
 import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
@@ -195,11 +196,11 @@ function onState(s: GameState) {
   render();
 }
 
-/** Countdown nur neu setzen, wenn sich die Spielphase ändert */
+/** Countdown nur neu setzen, wenn sich die Spielphase ändert (oder eine neue Instanz startet: Aufwärmrunde → Spiel) */
 function timerKey(s: GameState | null) {
   if (!s?.mini) return '';
   const st = s.mini.state as unknown as Record<string, unknown>;
-  return `${s.mini.kind}-${st.sub}-${st.round ?? ''}-${st.phaseNo ?? ''}`;
+  return `${s.miniSeq ?? 0}-${s.mini.kind}-${st.sub}-${st.round ?? ''}-${st.phaseNo ?? ''}`;
 }
 
 // ---------------------------------------------------------------- Rendering
@@ -227,6 +228,8 @@ function renderNow() {
   }
   const [key, build] = screen;
   if (key !== screenKey) {
+    // Aufwärmrunde vorbei (echtes Spiel startet frisch): gehaltene Eingaben loslassen, bevor der Controller neu gebaut wird
+    if (screenKey.startsWith(WARM_PREFIX) && !key.startsWith(WARM_PREFIX)) window.dispatchEvent(new Event('input-reset'));
     screenKey = key;
     app.innerHTML = '';
     try {
@@ -240,6 +243,7 @@ function renderNow() {
     }
   }
   syncVipAbort();
+  syncWarmup(key);
   syncOrientation(screen);
   try {
     updater?.();
@@ -271,8 +275,16 @@ function pickScreen(): Screen {
       return s.results ? pickResults(s.results, vip || inCouple()) : ['wait', message('Warte ...')];
     case 'story':
       return s.date ? pickStory(s.date, vip || inCouple()) : ['wait', message('Warte ...')];
-    case 'intro':
-      return s.intro ? pickIntro(s.intro, vip) : ['wait', message('Warte ...')];
+    case 'intro': {
+      const it = s.intro;
+      if (!it) return ['wait', message('Warte ...')];
+      // Aufwärmrunde: echter Controller des Übungsspiels + BEREIT-Leiste (wer nicht mitübt, bekommt die Regelkarte)
+      const m = s.mini;
+      if (it.warm && m && m.kind === it.kind && knownKind(m.kind) && store.playerId && s.inGame?.includes(store.playerId)) {
+        return pickWarmup(it, pickMini(m, vip), s.miniSeq ?? 0);
+      }
+      return pickIntro(it, vip);
+    }
     case 'mini': {
       const m = s.mini;
       if (!m) return ['wait', message('Warte ...')];
@@ -280,126 +292,131 @@ function pickScreen(): Screen {
       if (!(store.playerId && s.players.some((p) => p.id === store.playerId))) return ['wait', message('Warte ...')];
       // Erst nach Spielstart zurückgekommen → diese Runde zuschauen
       if (s.inGame && !s.inGame.includes(store.playerId)) return ['watch', message('Du schaust zu', 'Diese Runde läuft ohne dich – beim nächsten Spiel bist du dabei!')];
-      switch (m.kind) {
-        case 'flunky':
-          return pickFlunky(m.state);
-        case 'wwe':
-          return pickWwe(m.state);
-        case 'sprint':
-          return pickSprint(m.state);
-        case 'murder':
-          return pickMurder(m.state, vip);
-        case 'descent':
-          return pickDescent(m.state);
-        case 'rhythm':
-          return pickRhythm(m.state);
-        case 'wrap':
-          return pickWrap(m.state);
-        case 'stars':
-          return pickStars(m.state);
-        case 'nhie':
-          return pickNhie(m.state);
-        case 'hilo':
-          return pickHilo(m.state);
-        case 'bomb':
-          return pickBomb(m.state);
-        case 'kingscup':
-          return pickKingsCup(m.state, vip);
-        case 'sup':
-          return pickSup(m.state);
-        case 'tidy':
-          return pickTidy(m.state);
-        case 'flieger':
-          return pickFlieger(m.state);
-        case 'kurve':
-          return pickKurve(m.state);
-        case 'arena':
-          return pickArena(m.state);
-        case 'bowling':
-          return pickBowling(m.state);
-        case 'enten':
-          return pickEnten(m.state);
-        case 'ttt':
-          return pickTtt(m.state);
-        case 'verstecken':
-          return pickVerstecken(m.state);
-        case 'parcours':
-          return pickParcours(m.state);
-        case 'kart':
-          return pickKart(m.state);
-        case 'turm':
-          return pickTurm(m.state);
-        case 'igel':
-          return pickIgel(m.state);
-        case 'smash':
-          return pickSmash(m.state);
-        case 'wasser':
-          return pickWasser(m.state);
-        case 'stillepost':
-          return pickStillepost(m.state, vip);
-        case 'fangen':
-          return pickFangen(m.state);
-        case 'geist':
-          return pickGeist(m.state);
-        case 'grill':
-          return pickGrill(m.state);
-        case 'boule':
-          return pickBoule(m.state);
-        case 'sumo':
-          return pickSumo(m.state);
-        case 'volley':
-          return pickVolley(m.state);
-        case 'tourist':
-          return pickTourist(m.state);
-        case 'sprueche':
-          return pickSprueche(m.state, vip);
-        case 'bogen':
-          return pickBogen(m.state);
-        case 'darts':
-          return pickDarts(m.state);
-        case 'golf':
-          return pickGolf(m.state);
-        case 'autoball':
-          return pickAutoball(m.state);
-        case 'werwolf':
-          return pickWerwolf(m.state);
-        case 'pixel':
-          return pickPixel(m.state, vip);
-        case 'wpistole':
-          return pickWpistole(m.state);
-        case 'zauber':
-          return pickZauber(m.state);
-        case 'angeln':
-          return pickAngeln(m.state);
-        case 'koffer':
-          return pickKoffer(m.state);
-        case 'suess':
-          return pickSuess(m.state);
-        case 'spion':
-          return pickSpion(m.state);
-        case 'umzug':
-          return pickUmzug(m.state);
-        case 'wackel':
-          return pickWackel(m.state);
-        case 'funk':
-          return pickFunk(m.state);
-        case 'skisprung':
-          return pickSkisprung(m.state);
-        case 'teppich':
-          return pickTeppich(m.state);
-        case 'kugel':
-          return pickKugel(m.state);
-        case 'schaetz':
-          return pickSchaetz(m.state, vip);
-        case 'lieder':
-          return pickLieder(m.state, vip);
-        case 'maexchen':
-          return pickMaexchen(m.state);
-        case 'werwars':
-          return pickWerwars(m.state, vip);
-      }
-      return outdatedScreen();
+      return pickMini(m, vip);
     }
+  }
+  return outdatedScreen();
+}
+
+/** Screen des laufenden Minispiels (auch für das Übungsspiel der Aufwärmrunde) */
+function pickMini(m: MiniSnapshot, vip: boolean): Screen {
+  switch (m.kind) {
+    case 'flunky':
+      return pickFlunky(m.state);
+    case 'wwe':
+      return pickWwe(m.state);
+    case 'sprint':
+      return pickSprint(m.state);
+    case 'murder':
+      return pickMurder(m.state, vip);
+    case 'descent':
+      return pickDescent(m.state);
+    case 'rhythm':
+      return pickRhythm(m.state);
+    case 'wrap':
+      return pickWrap(m.state);
+    case 'stars':
+      return pickStars(m.state);
+    case 'nhie':
+      return pickNhie(m.state);
+    case 'hilo':
+      return pickHilo(m.state);
+    case 'bomb':
+      return pickBomb(m.state);
+    case 'kingscup':
+      return pickKingsCup(m.state, vip);
+    case 'sup':
+      return pickSup(m.state);
+    case 'tidy':
+      return pickTidy(m.state);
+    case 'flieger':
+      return pickFlieger(m.state);
+    case 'kurve':
+      return pickKurve(m.state);
+    case 'arena':
+      return pickArena(m.state);
+    case 'bowling':
+      return pickBowling(m.state);
+    case 'enten':
+      return pickEnten(m.state);
+    case 'ttt':
+      return pickTtt(m.state);
+    case 'verstecken':
+      return pickVerstecken(m.state);
+    case 'parcours':
+      return pickParcours(m.state);
+    case 'kart':
+      return pickKart(m.state);
+    case 'turm':
+      return pickTurm(m.state);
+    case 'igel':
+      return pickIgel(m.state);
+    case 'smash':
+      return pickSmash(m.state);
+    case 'wasser':
+      return pickWasser(m.state);
+    case 'stillepost':
+      return pickStillepost(m.state, vip);
+    case 'fangen':
+      return pickFangen(m.state);
+    case 'geist':
+      return pickGeist(m.state);
+    case 'grill':
+      return pickGrill(m.state);
+    case 'boule':
+      return pickBoule(m.state);
+    case 'sumo':
+      return pickSumo(m.state);
+    case 'volley':
+      return pickVolley(m.state);
+    case 'tourist':
+      return pickTourist(m.state);
+    case 'sprueche':
+      return pickSprueche(m.state, vip);
+    case 'bogen':
+      return pickBogen(m.state);
+    case 'darts':
+      return pickDarts(m.state);
+    case 'golf':
+      return pickGolf(m.state);
+    case 'autoball':
+      return pickAutoball(m.state);
+    case 'werwolf':
+      return pickWerwolf(m.state);
+    case 'pixel':
+      return pickPixel(m.state, vip);
+    case 'wpistole':
+      return pickWpistole(m.state);
+    case 'zauber':
+      return pickZauber(m.state);
+    case 'angeln':
+      return pickAngeln(m.state);
+    case 'koffer':
+      return pickKoffer(m.state);
+    case 'suess':
+      return pickSuess(m.state);
+    case 'spion':
+      return pickSpion(m.state);
+    case 'umzug':
+      return pickUmzug(m.state);
+    case 'wackel':
+      return pickWackel(m.state);
+    case 'funk':
+      return pickFunk(m.state);
+    case 'skisprung':
+      return pickSkisprung(m.state);
+    case 'teppich':
+      return pickTeppich(m.state);
+    case 'kugel':
+      return pickKugel(m.state);
+    case 'schaetz':
+      return pickSchaetz(m.state, vip);
+    case 'lieder':
+      return pickLieder(m.state, vip);
+    case 'maexchen':
+      return pickMaexchen(m.state);
+    case 'werwars':
+      return pickWerwars(m.state, vip);
   }
   return outdatedScreen();
 }

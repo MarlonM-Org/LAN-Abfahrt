@@ -264,6 +264,18 @@ export class SumoScene extends Phaser.Scene {
         sfx('bonk', { x: a.x });
         this.juice.burst(a.x, a.y - 12, 'spark', 6);
       }
+      if (!a.alive && p.alive && st.sub === 'play') {
+        // Aufwärmrunde: wieder auf dem Steg (Respawn mitten in der Runde)
+        a.alive = true;
+        a.x = p.x;
+        a.y = p.y;
+        this.tweens.killTweensOf([a.f, a.swim]);
+        a.swim.setVisible(false);
+        a.f.setVisible(true).setAlpha(1).setAngle(0).setScale(1).setPosition(p.x, p.y + 3);
+        a.ring.setVisible(true).setPosition(p.x, p.y + 2);
+        this.juice.burst(p.x, p.y - 6, 'spark', 10);
+        sfx('pop', { x: p.x, pitch: 1.3 });
+      }
       if (a.alive && !p.alive) {
         a.alive = false;
         a.x = p.x;

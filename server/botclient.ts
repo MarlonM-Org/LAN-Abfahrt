@@ -846,14 +846,16 @@ export class Bot {
       });
     }
 
-    // Regelkarte vor dem Spiel: Bots sind sofort bereit
+    // Regelkarte bzw. Aufwärmrunde vor dem Spiel: Bots sind sofort bereit – und stehen in der Aufwärmrunde still
+    // (sie reagieren nur in Phase `mini`), damit Menschen in Ruhe die Steuerung ausprobieren können
     if (s.phase === 'intro' && s.intro && !s.intro.ready.includes(this.id)) {
       const it = s.intro;
       this.once(`intro-${it.seq}`, async () => {
         if (this.leader) {
           const teams = it.teams ? ` · ${it.teams.label} (Sonne ${it.teams.A.length} / Meer ${it.teams.B.length})` : '';
           const humans = it.ids.filter((id) => !s.players.find((p) => p.id === id)?.bot).length;
-          this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (bekannt)' : ''}${teams}${humans ? ` – wartet auf ${humans} Mensch(en)` : ''}`);
+          const what = it.warm ? 'Aufwärmrunde' : 'Regelkarte';
+          this.opts.log?.(`[${new Date().toLocaleTimeString()}] ${what}: ${it.kind}${it.short ? ' (bekannt)' : ''}${teams}${humans ? ` – wartet auf ${humans} Mensch(en)` : ''}`);
         }
         await sleep(rand(150, 500));
         this.socket.emit('intro:ready');

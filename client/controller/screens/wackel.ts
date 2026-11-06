@@ -75,7 +75,8 @@ export function pickWackel(s: WackelState): Screen {
         q(root, '.wk-wins').innerHTML = `R${st.round} ${Array.from({ length: st.winRounds }, (_, i) => `<i class="bg-pip${i < p.wins ? ' on' : ''}"></i>`).join('')} <span class="wk-outs">${p.outs}× raus</span>`;
       }
       const secs = Math.ceil(st.endsIn / 1000);
-      q(root, '.wk-timer').textContent = st.sub === 'countdown' ? `Start in ${Math.max(1, secondsLeft())}` : st.sudden ? `FLUT ${secs}` : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+      // endsIn 0 im Spiel = Aufwärmrunde ohne Zeitlimit
+      q(root, '.wk-timer').textContent = st.sub === 'countdown' ? `Start in ${Math.max(1, secondsLeft())}` : st.sudden ? `FLUT ${secs}` : st.sub === 'play' && st.endsIn <= 0 ? '' : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
       (q(root, '.wk-punch .cd') as HTMLElement).style.height = `${Math.min(100, (p.cd / 520) * 100)}%`;
       q(root, '.wk-punch').classList.toggle('cooling', p.cd > 0);
       grabBtn.classList.toggle('holding', p.grab === 1);

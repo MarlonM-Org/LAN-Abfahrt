@@ -285,7 +285,8 @@ export class SmashScene extends Phaser.Scene {
     } else if (st.sub === 'fight') this.subline.setText('');
 
     const secs = Math.ceil(st.endsIn / 1000);
-    this.timer.setText(st.sub === 'countdown' ? '' : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
+    // endsIn 0 im Kampf = Aufwärmrunde ohne Zeitlimit → keine Uhr
+    this.timer.setText(st.sub === 'countdown' || (st.sub === 'fight' && st.endsIn <= 0) ? '' : `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`);
     this.timer.setColor(secs <= 10 && st.sub === 'fight' ? '#e04a3f' : '#fff4d6');
 
     // Anzeigetafeln

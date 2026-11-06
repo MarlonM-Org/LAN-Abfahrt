@@ -125,7 +125,8 @@ export class GrillGame implements MiniGame {
     } else {
       this.kitchens.push(this.makeKitchen('wide', false, 6, null));
     }
-    const split = this.teams ? splitTeams(ids, ctx.teams) : null;
+    // Brett-Teams, sonst die Aufteilung aus der Aufwärmrunde (gleiche Küche in Übung und Spiel)
+    const split = this.teams ? splitTeams(ids, ctx.teams ?? ctx.warmTeams) : null;
     const order = split ? [...split.A, ...split.B] : shuffle(ids);
     order.forEach((id, i) => {
       const k = split ? (split.A.includes(id) ? 0 : 1) : 0;

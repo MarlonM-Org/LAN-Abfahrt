@@ -10,6 +10,7 @@ import type {
   JoinResponse,
   KickResponse,
   MiniKind,
+  MiniSnapshot,
   MiniTeams,
   Phase,
   PlayerPublic,
@@ -22,7 +23,7 @@ import type {
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
 import { freePlayerColor } from '../shared/players';
-import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, placeCoins } from '../shared/games';
+import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, isWarmupKind, placeCoins, teamLabel } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
 import { Bot } from './botclient';
@@ -61,7 +62,7 @@ import { ZauberGame } from './zauber';
 import { DartsGame } from './darts';
 import { AutoballGame } from './autoball';
 import { VolleyGame } from './volley';
-import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './minigame';
+import { type MiniCtx, type MiniGame, type MiniResult, PRACTICE_OUT_MS, asRecord, splitTeams } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
@@ -139,6 +140,24 @@ function holdRelease(kind: MiniKind, action: string, payload: unknown): { active
 /** Nur Bots da und ein Spiel wartet auf eine Eingabe, die nie kommt (z. B. Werwölfe uneinig) → so lange warten, dann überspringen */
 const AUTO_SKIP_MS = 60_000;
 
+/** Aufwärmrunde: in diesen Spielphasen wird geprüft, ob ein Mensch ausgeschieden ist (Countdown, Rundenende … regelt das Spiel selbst) */
+const PRACTICE_LIVE_SUBS = new Set(['play', 'fight', 'race']);
+
+/**
+ * Aufwärmrunde, Rückfall-Lösung für Spiele ohne eigenes Respawn: Ist einer der `humans` gerade raus?
+ * Liest `players[id].alive === false` bzw. Smash `fighters[id].state === 'out'` aus dem Snapshot.
+ */
+function practiceOut(snap: MiniSnapshot, humans: string[]): boolean {
+  const st = snap.state as unknown as Record<string, unknown>;
+  if (typeof st.sub !== 'string' || !PRACTICE_LIVE_SUBS.has(st.sub)) return false;
+  const list = (st.players ?? st.fighters) as Record<string, { alive?: unknown; state?: unknown } | undefined> | undefined;
+  if (!list || typeof list !== 'object') return false;
+  return humans.some((id) => {
+    const p = list[id];
+    return !!p && typeof p === 'object' && (p.alive === false || p.state === 'out');
+  });
+}
+
 export type HostCommand = 'abort' | 'continue' | 'removeBots' | 'again' | 'menu' | 'resetSession' | 'board' | 'skip';
 
 interface Player extends PlayerPublic {
@@ -153,8 +172,11 @@ interface Player extends PlayerPublic {
   kartView?: 'phone' | 'tv';
 }
 
-/** Start-Optionen eines Minispiels: Kart-Strecke („Nochmal“ fährt die nächste), feste Teams vom Spielbrett */
-type MiniOpts = { track?: number; teams?: MiniTeams | null };
+/**
+ * Start-Optionen eines Minispiels: Kart-Strecke („Nochmal“ fährt die nächste), feste Teams vom Spielbrett,
+ * Teams der Aufwärmrunde (gelten auch fürs echte Spiel)
+ */
+type MiniOpts = { track?: number; teams?: MiniTeams | null; warmTeams?: MiniTeams | null };
 
 /** Ein einziger Raum pro Server – das reicht für den Abend mit der Freundesgruppe. */
 export class Room {
@@ -203,6 +225,8 @@ export class Room {
   private lastKind: MiniKind | null = null;
   /** Wer im laufenden Minispiel mitspielt */
   private miniIds: string[] | null = null;
+  /** Laufende Nummer der Minispiel-Instanz (Übungsrunden + echte Spiele) → `GameLive.miniSeq` */
+  private miniSeq = 0;
   /** Vorgegebene Teams des laufenden Minispiels (Spielbrett: nach Feldfarbe), sonst null */
   private miniTeams: MiniTeams | null = null;
   /** Gekickte Spieler-IDs (Handy mit alter ID bekommt „Du wurdest entfernt“) */
@@ -488,7 +512,8 @@ export class Room {
       const p = playerId ? this.players.get(playerId) : undefined;
       if (!p) return;
       p.kartView = view === 'phone' ? 'phone' : 'tv';
-      if (this.phase === 'mini' && this.mini instanceof KartGame) this.mini.setPhoneView(p.id, p.kartView === 'phone');
+      const game = this.liveGame();
+      if (game instanceof KartGame) game.setPhoneView(p.id, p.kartView === 'phone');
     });
 
     socket.on('board:roll', () => {
@@ -505,12 +530,15 @@ export class Room {
       if (playerId && this.phase === 'board') this.board?.duelPick(playerId, Number(asRecord(msg).seq), asRecord(msg).pick);
     });
 
+    // Eingaben ans laufende Minispiel – in der Aufwärmrunde (Phase `intro`) ans Übungsspiel, dort ohne Wetten
     socket.on('mini:input', (msg: { action: string; payload?: unknown }) => {
-      if (!playerId || this.phase !== 'mini' || !this.mini) return;
+      const game = this.liveGame();
+      if (!playerId || !game) return;
       const action = String(asRecord(msg).action);
       const payload = asRecord(msg).payload;
-      this.trackHold(playerId, this.mini.kind, action, payload);
-      this.mini.input(playerId, action, payload);
+      if (this.phase === 'intro' && action === 'bet') return;
+      this.trackHold(playerId, game.kind, action, payload);
+      game.input(playerId, action, payload);
     });
 
     // Zuschauer-Emotes: generisch für alle Spiele (das Minispiel merkt davon nichts), 2 s Abklingzeit pro Spieler
@@ -554,7 +582,7 @@ export class Room {
         // Alle Handys endgültig weg → sonst hängt das Spiel fest und niemand kann neu beitreten.
         // (Sind Menschen nur kurz weg, z. B. App gewechselt, wartet der Raum – siehe tick().)
         return this.backToLobby();
-      } else if (this.phase === 'mini' || this.phase === 'board') {
+      } else if (this.phase === 'mini' || this.phase === 'board' || this.phase === 'intro') {
         // Gnadenfrist: Kommt das Handy innerhalb von 3 s zurück (WLAN-Wackler), merkt das Spiel nichts
         this.startGrace(playerId);
       }
@@ -696,17 +724,33 @@ export class Room {
     return out;
   }
 
-  // ---------------------------------------------------------------- Regelkarte (Phase `intro`)
+  // ---------------------------------------------------------------- Regelkarte / Aufwärmrunde (Phase `intro`)
 
-  /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, laufende Nummer */
-  private intro: { kind: MiniKind; opts?: MiniOpts; ready: Set<string>; seq: number; short: boolean; timer: NodeJS.Timeout } | null = null;
+  /**
+   * Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, laufende Nummer. Bei `warm` (Spiele aus
+   * `WARMUP_KINDS`) läuft statt der Karte eine Aufwärmrunde: `game` ist das Übungsspiel mit den Übenden `ids`,
+   * `outSince` merkt sich, seit wann ein Mensch darin ausgeschieden ist (Rückfall-Lösung ohne eigenes Respawn).
+   */
+  private intro: {
+    kind: MiniKind;
+    opts?: MiniOpts;
+    ready: Set<string>;
+    seq: number;
+    short: boolean;
+    timer: NodeJS.Timeout;
+    warm: boolean;
+    game: MiniGame | null;
+    ids: string[];
+    outSince: number;
+  } | null = null;
   private introSeq = 0;
   /** Spiele, die heute (seit Serverstart) schon liefen → kürzere Ansage auf der Regelkarte */
   private introSeen = new Set<MiniKind>();
 
   /**
-   * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, Übungsfeld, „Bereit!“). Ohne Karte:
-   * Date-Night-Kapitel, Trinkspiele und „Nochmal“ desselben Spiels.
+   * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, „Bereit!“) bzw. bei Echtzeit-Spielen
+   * (`WARMUP_KINDS`) die Aufwärmrunde mit der echten Steuerung. Ohne Karte: Date-Night-Kapitel, Trinkspiele und
+   * „Nochmal“ desselben Spiels.
    * Kein Timer: Los geht's erst, wenn alle verbundenen Mitspieler bereit sind oder VIP/Laptop starten (`introGo()`).
    */
   private startMini(kind: MiniKind, opts?: MiniOpts) {
@@ -716,9 +760,20 @@ export class Room {
       this.introSeen.add(kind);
       return this.launchMini(kind, opts);
     }
-    if (!this.gameIds().length) return this.backToLobby();
+    const ids = this.gameIds();
+    if (!ids.length) return this.backToLobby();
     this.showBoard = false;
     this.results = null;
+    const warm = isWarmupKind(kind);
+    if (warm) {
+      // Aufwärmrunde und echtes Spiel: gleiche Strecke, gleiche Teams (Brett-Teams bleiben `teams`, sonst einmal zufällig)
+      opts = { ...opts };
+      if (kind === 'kart' && opts.track === undefined) opts.track = Math.floor(Math.random() * KART_TRACKS.length);
+      if (!opts.teams) {
+        const t = splitTeams(ids);
+        opts.warmTeams = { A: t.A, B: t.B, label: teamLabel(t.A.length, t.B.length) };
+      }
+    }
     this.intro = {
       kind,
       opts,
@@ -727,8 +782,13 @@ export class Room {
       short: this.introSeen.has(kind),
       // Schaut regelmäßig, ob die Letzten inzwischen offline/entfernt sind – auf die wird dann nicht mehr gewartet
       timer: setInterval(() => this.introCheck(), 250),
+      warm,
+      game: null,
+      ids: [],
+      outSince: 0,
     };
     this.phase = 'intro';
+    if (warm) this.startPractice();
     this.changed();
   }
 
@@ -743,21 +803,28 @@ export class Room {
     if (!it) return;
     if (this.phase !== 'intro') return this.endIntro();
     const online = this.introIds();
-    if (online.length > 0 && online.every((id) => it.ready.has(id))) this.introGo();
+    if (online.length > 0 && online.every((id) => it.ready.has(id))) return this.introGo();
+    if (it.warm) this.practiceCheck();
   }
 
   /** Regelkarte beenden und das Spiel wirklich starten (alle bereit, VIP „Jetzt starten“ bzw. Laptop Enter/Weiter) */
   private introGo() {
     const it = this.intro;
     if (!it || this.phase !== 'intro') return;
+    // Übungsspiel weg, gehaltene Eingaben vergessen – das echte Spiel startet frisch mit Countdown
     this.endIntro();
+    this.holds.clear();
     this.introSeen.add(it.kind);
     this.launchMini(it.kind, it.opts);
   }
 
   private endIntro() {
-    if (this.intro) clearInterval(this.intro.timer);
+    const it = this.intro;
     this.intro = null;
+    if (!it) return;
+    clearInterval(it.timer);
+    it.game?.dispose();
+    it.game = null;
   }
 
   private introReady(id: string) {
@@ -772,11 +839,109 @@ export class Room {
     const it = this.intro;
     if (this.phase !== 'intro' || !it) return null;
     const ids = this.introIds();
-    return { kind: it.kind, ids, ready: ids.filter((id) => it.ready.has(id)), seq: it.seq, short: it.short, teams: it.opts?.teams ?? null };
+    return {
+      kind: it.kind,
+      ids,
+      ready: ids.filter((id) => it.ready.has(id)),
+      seq: it.seq,
+      short: it.short,
+      teams: it.opts?.teams ?? null,
+      ...(it.warm && it.game ? { warm: true } : {}),
+    };
+  }
+
+  /**
+   * Aufwärmrunde: frische Übungsinstanz des Spiels (beim Start der Karte und still, wenn die Übung endet oder ein
+   * Mensch zu lange raus ist). Gleicher Weg wie das echte Spiel (`createMini`), nur mit `ctx.practice`.
+   */
+  private startPractice() {
+    const it = this.intro;
+    if (!it?.warm || this.phase !== 'intro') return;
+    it.game?.dispose();
+    it.game = null;
+    const ids = this.gameIds();
+    it.ids = ids;
+    it.outSince = 0;
+    this.holds.clear();
+    if (!ids.length) return;
+    const holder: { game: MiniGame | null } = { game: null };
+    holder.game = this.createMini(it.kind, ids, this.miniCtx(it.kind, it.opts, holder), it.opts);
+    it.game = holder.game;
+    this.miniSeq += 1;
+  }
+
+  /** Rückfall-Lösung der Aufwärmrunde: Übungsspiel fehlt oder ein Mensch ist zu lange raus → frische Übungsrunde */
+  private practiceCheck() {
+    const it = this.intro;
+    if (!it?.warm) return;
+    if (!it.game) {
+      if (this.gameIds().length) {
+        this.startPractice();
+        this.changed();
+      }
+      return;
+    }
+    const humans = it.ids.filter((id) => this.isOnline(id) && !this.players.get(id)?.isBot);
+    if (!practiceOut(it.game.snapshot(), humans)) {
+      it.outSince = 0;
+      return;
+    }
+    const now = Date.now();
+    if (!it.outSince) it.outSince = now;
+    else if (now - it.outSince >= PRACTICE_OUT_MS) {
+      this.startPractice();
+      this.changed();
+    }
+  }
+
+  /** Spiel, das gerade Eingaben bekommt: das laufende Minispiel bzw. das Übungsspiel der Aufwärmrunde */
+  private liveGame(): MiniGame | null {
+    if (this.phase === 'mini') return this.mini;
+    if (this.phase === 'intro') return this.intro?.game ?? null;
+    return null;
+  }
+
+  /**
+   * Kontext für ein Minispiel. Mit `practice` (Aufwärmrunde) zählt nichts: `finish` startet still eine frische
+   * Übungsrunde, Protokoll des Abends und Bestleistungen bleiben unberührt.
+   */
+  private miniCtx(kind: MiniKind, opts: MiniOpts | undefined, practice: { game: MiniGame | null } | null): MiniCtx {
+    return {
+      onChange: () => this.changed(),
+      finish: practice
+        ? () => {
+            // Erst nach dem laufenden Tick des Übungsspiels austauschen – und nur, wenn es noch das aktuelle ist
+            setTimeout(() => {
+              if (this.phase !== 'intro' || !practice.game || this.intro?.game !== practice.game) return;
+              this.startPractice();
+              this.changed();
+            }, 0);
+          }
+        : (r) => this.finishMini(kind, r),
+      isConnected: (id) => this.inPlay(id),
+      offlineMs: (id) => this.offlineMs(id),
+      isGone: (id) => !!this.players.get(id)?.removed,
+      nameOf: (id) => this.nameOf(id),
+      isBot: (id) => !!this.players.get(id)?.isBot,
+      lookOf: (id) => this.players.get(id)?.look,
+      colorOf: (id) => this.players.get(id)?.color,
+      mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
+      teams: opts?.teams ?? null,
+      warmTeams: opts?.warmTeams ?? null,
+      ...(practice ? { practice: true } : {}),
+      log: practice ? () => undefined : (type, data) => this.fx.push(type, data, kind),
+      record: (k: BalanceKind, id, value, detail) => {
+        if (practice || !isBalanceKind(k) || (this.players.get(id)?.isBot && !process.env.RECORDS_INCLUDE_BOTS)) return null;
+        return this.records.submit(k, this.nameOf(id), value, detail);
+      },
+      records: (k: BalanceKind) => this.records.top(k, 5),
+      hosts: () => this.io.sockets.adapter.rooms.get('hosts')?.size ?? 0,
+    };
   }
 
   private launchMini(kind: MiniKind, opts?: MiniOpts) {
     this.mini?.dispose();
+    this.mini = null;
     this.showBoard = false;
     this.miniTeams = opts?.teams ?? null;
     // Neues Spiel → neue Abstimmung fürs nächste (an/aus bleibt)
@@ -786,205 +951,133 @@ export class Room {
     this.miniIds = ids;
     // Gerade niemand verbunden (alle Handys kurz weg) → kein Minispiel ohne Spieler starten
     if (!ids.length) return this.backToLobby();
-    const ctx: MiniCtx = {
-      onChange: () => this.changed(),
-      finish: (r) => this.finishMini(kind, r),
-      isConnected: (id) => this.inPlay(id),
-      offlineMs: (id) => this.offlineMs(id),
-      isGone: (id) => !!this.players.get(id)?.removed,
-      nameOf: (id) => this.nameOf(id),
-      isBot: (id) => !!this.players.get(id)?.isBot,
-      lookOf: (id) => this.players.get(id)?.look,
-      colorOf: (id) => this.players.get(id)?.color,
-      mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
-      teams: this.miniTeams,
-      log: (type, data) => this.fx.push(type, data, kind),
-      record: (k: BalanceKind, id, value, detail) => {
-        if (!isBalanceKind(k) || (this.players.get(id)?.isBot && !process.env.RECORDS_INCLUDE_BOTS)) return null;
-        return this.records.submit(k, this.nameOf(id), value, detail);
-      },
-      records: (k: BalanceKind) => this.records.top(k, 5),
-      hosts: () => this.io.sockets.adapter.rooms.get('hosts')?.size ?? 0,
-    };
-    switch (kind) {
-      case 'flunky':
-        this.mini = new FlunkyGame(ids, ctx);
-        break;
-      case 'wwe':
-        this.mini = new WweGame(ids, ctx, this.questions.all, DEFAULT_QUESTIONS);
-        break;
-      case 'sprint':
-        this.mini = new SprintGame(ids, ctx);
-        break;
-      case 'murder':
-        this.mini = new MurderGame(ids, ctx);
-        break;
-      case 'descent':
-        this.mini = new DescentGame(ids, ctx);
-        break;
-      case 'rhythm':
-        this.mini = new RhythmGame(ids, ctx);
-        break;
-      case 'wrap':
-        this.mini = new WrapGame(ids, ctx);
-        break;
-      case 'stars':
-        this.mini = new StarsGame(ids, ctx);
-        break;
-      case 'nhie':
-        this.mini = new NhieGame(ids, ctx, this.nhie.all, DEFAULT_NHIE);
-        break;
-      case 'hilo':
-        this.mini = new HiloGame(ids, ctx);
-        break;
-      case 'bomb':
-        this.mini = new BombGame(ids, ctx);
-        break;
-      case 'kingscup':
-        this.mini = new KingsCupGame(ids, ctx);
-        break;
-      case 'sup':
-        this.mini = new SupGame(ids, ctx);
-        break;
-      case 'tidy':
-        this.mini = new TidyGame(ids, ctx);
-        break;
-      case 'flieger':
-        this.mini = new FliegerGame(ids, ctx);
-        break;
-      case 'kurve':
-        this.mini = new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.color));
-        break;
-      case 'arena':
-        this.mini = new ArenaGame(ids, ctx);
-        break;
-      case 'bowling':
-        this.mini = new BowlingGame(ids, ctx);
-        break;
-      case 'enten':
-        this.mini = new EntenGame(ids, ctx);
-        break;
-      case 'ttt':
-        this.mini = new TttGame(ids, ctx);
-        break;
-      case 'verstecken':
-        this.mini = new VersteckGame(ids, ctx);
-        break;
-      case 'parcours':
-        this.mini = new ParcoursGame(ids, ctx);
-        break;
-      case 'kart':
-        this.mini = new KartGame(ids, ctx, opts?.track, (id) => this.players.get(id)?.kartView === 'phone');
-        break;
-      case 'turm':
-        this.mini = new TurmGame(ids, ctx);
-        break;
-      case 'igel':
-        this.mini = new IgelGame(ids, ctx);
-        break;
-      case 'smash':
-        this.mini = new SmashGame(ids, ctx);
-        break;
-      case 'wasser':
-        this.mini = new WasserGame(ids, ctx);
-        break;
-      case 'stillepost':
-        this.mini = new StillepostGame(ids, ctx, this.posts.all);
-        break;
-      case 'fangen':
-        this.mini = new FangenGame(ids, ctx);
-        break;
-      case 'spion':
-        this.mini = new SpionGame(ids, ctx);
-        break;
-      case 'wackel':
-        this.mini = new WackelGame(ids, ctx);
-        break;
-      case 'skisprung':
-        this.mini = new SkisprungGame(ids, ctx);
-        break;
-      case 'teppich':
-        this.mini = new TeppichGame(ids, ctx);
-        break;
-      case 'kugel':
-        this.mini = new KugelGame(ids, ctx);
-        break;
-      case 'geist':
-        this.mini = new GeistGame(ids, ctx);
-        break;
-      case 'grill':
-        this.mini = new GrillGame(ids, ctx);
-        break;
-      case 'boule':
-        this.mini = new BouleGame(ids, ctx);
-        break;
-      case 'sumo':
-        this.mini = new SumoGame(ids, ctx);
-        break;
-      case 'bogen':
-        this.mini = new BogenGame(ids, ctx);
-        break;
-      case 'darts':
-        this.mini = new DartsGame(ids, ctx);
-        break;
-      case 'volley':
-        this.mini = new VolleyGame(ids, ctx);
-        break;
-      case 'tourist':
-        this.mini = new TouristGame(ids, ctx);
-        break;
-      case 'sprueche':
-        this.mini = new SpruecheGame(ids, ctx, this.quips.all);
-        break;
-      case 'golf':
-        this.mini = new GolfGame(ids, ctx);
-        break;
-      case 'autoball':
-        this.mini = new AutoballGame(ids, ctx);
-        break;
-      case 'werwolf':
-        this.mini = new WerwolfGame(ids, ctx);
-        break;
-      case 'pixel':
-        this.mini = new PixelGame(ids, ctx);
-        break;
-      case 'wpistole':
-        this.mini = new WpistoleGame(ids, ctx);
-        break;
-      case 'zauber':
-        this.mini = new ZauberGame(ids, ctx);
-        break;
-      case 'angeln':
-        this.mini = new AngelnGame(ids, ctx);
-        break;
-      case 'koffer':
-        this.mini = new KofferGame(ids, ctx);
-        break;
-      case 'suess':
-        this.mini = new SuessGame(ids, ctx);
-        break;
-      case 'umzug':
-        this.mini = new UmzugGame(ids, ctx);
-        break;
-      case 'funk':
-        this.mini = new FunkGame(ids, ctx);
-        break;
-      case 'schaetz':
-        this.mini = new SchaetzGame(ids, ctx);
-        break;
-      case 'lieder':
-        this.mini = new LiederGame(ids, ctx, liederTon);
-        break;
-      case 'maexchen':
-        this.mini = new MaexGame(ids, ctx);
-        break;
-      case 'werwars':
-        this.mini = new WerwarsGame(ids, ctx, this.werwarsQ.all);
-        break;
-    }
+    this.mini = this.createMini(kind, ids, this.miniCtx(kind, opts, null), opts);
+    this.miniSeq += 1;
     this.results = null;
     this.phase = 'mini';
     this.changed();
+  }
+
+  /** Neue Instanz des Minispiels – für das echte Spiel (`launchMini`) und die Aufwärmrunde (`startPractice`) */
+  private createMini(kind: MiniKind, ids: string[], ctx: MiniCtx, opts?: MiniOpts): MiniGame {
+    switch (kind) {
+      case 'flunky':
+        return new FlunkyGame(ids, ctx);
+      case 'wwe':
+        return new WweGame(ids, ctx, this.questions.all, DEFAULT_QUESTIONS);
+      case 'sprint':
+        return new SprintGame(ids, ctx);
+      case 'murder':
+        return new MurderGame(ids, ctx);
+      case 'descent':
+        return new DescentGame(ids, ctx);
+      case 'rhythm':
+        return new RhythmGame(ids, ctx);
+      case 'wrap':
+        return new WrapGame(ids, ctx);
+      case 'stars':
+        return new StarsGame(ids, ctx);
+      case 'nhie':
+        return new NhieGame(ids, ctx, this.nhie.all, DEFAULT_NHIE);
+      case 'hilo':
+        return new HiloGame(ids, ctx);
+      case 'bomb':
+        return new BombGame(ids, ctx);
+      case 'kingscup':
+        return new KingsCupGame(ids, ctx);
+      case 'sup':
+        return new SupGame(ids, ctx);
+      case 'tidy':
+        return new TidyGame(ids, ctx);
+      case 'flieger':
+        return new FliegerGame(ids, ctx);
+      case 'kurve':
+        return new KurveGame(ids, ctx, ids.map((id) => this.players.get(id)?.color));
+      case 'arena':
+        return new ArenaGame(ids, ctx);
+      case 'bowling':
+        return new BowlingGame(ids, ctx);
+      case 'enten':
+        return new EntenGame(ids, ctx);
+      case 'ttt':
+        return new TttGame(ids, ctx);
+      case 'verstecken':
+        return new VersteckGame(ids, ctx);
+      case 'parcours':
+        return new ParcoursGame(ids, ctx);
+      case 'kart':
+        return new KartGame(ids, ctx, opts?.track, (id) => this.players.get(id)?.kartView === 'phone');
+      case 'turm':
+        return new TurmGame(ids, ctx);
+      case 'igel':
+        return new IgelGame(ids, ctx);
+      case 'smash':
+        return new SmashGame(ids, ctx);
+      case 'wasser':
+        return new WasserGame(ids, ctx);
+      case 'stillepost':
+        return new StillepostGame(ids, ctx, this.posts.all);
+      case 'fangen':
+        return new FangenGame(ids, ctx);
+      case 'spion':
+        return new SpionGame(ids, ctx);
+      case 'wackel':
+        return new WackelGame(ids, ctx);
+      case 'skisprung':
+        return new SkisprungGame(ids, ctx);
+      case 'teppich':
+        return new TeppichGame(ids, ctx);
+      case 'kugel':
+        return new KugelGame(ids, ctx);
+      case 'geist':
+        return new GeistGame(ids, ctx);
+      case 'grill':
+        return new GrillGame(ids, ctx);
+      case 'boule':
+        return new BouleGame(ids, ctx);
+      case 'sumo':
+        return new SumoGame(ids, ctx);
+      case 'bogen':
+        return new BogenGame(ids, ctx);
+      case 'darts':
+        return new DartsGame(ids, ctx);
+      case 'volley':
+        return new VolleyGame(ids, ctx);
+      case 'tourist':
+        return new TouristGame(ids, ctx);
+      case 'sprueche':
+        return new SpruecheGame(ids, ctx, this.quips.all);
+      case 'golf':
+        return new GolfGame(ids, ctx);
+      case 'autoball':
+        return new AutoballGame(ids, ctx);
+      case 'werwolf':
+        return new WerwolfGame(ids, ctx);
+      case 'pixel':
+        return new PixelGame(ids, ctx);
+      case 'wpistole':
+        return new WpistoleGame(ids, ctx);
+      case 'zauber':
+        return new ZauberGame(ids, ctx);
+      case 'angeln':
+        return new AngelnGame(ids, ctx);
+      case 'koffer':
+        return new KofferGame(ids, ctx);
+      case 'suess':
+        return new SuessGame(ids, ctx);
+      case 'umzug':
+        return new UmzugGame(ids, ctx);
+      case 'funk':
+        return new FunkGame(ids, ctx);
+      case 'schaetz':
+        return new SchaetzGame(ids, ctx);
+      case 'lieder':
+        return new LiederGame(ids, ctx, liederTon);
+      case 'maexchen':
+        return new MaexGame(ids, ctx);
+      case 'werwars':
+        return new WerwarsGame(ids, ctx, this.werwarsQ.all);
+    }
   }
 
   private finishMini(kind: MiniKind, r: MiniResult) {
@@ -1115,6 +1208,7 @@ export class Room {
   }
 
   private backToLobby() {
+    this.endIntro();
     this.mini?.dispose();
     this.mini = null;
     this.miniIds = null;
@@ -1449,7 +1543,8 @@ export class Room {
 
   /** Spieler wurde entfernt: laufendes Spiel/Brett soll nicht auf ihn warten (Brett überspringt ihn sofort). */
   private playerGone(id: string) {
-    if (this.phase === 'mini') this.mini?.playerDisconnected(id);
+    const game = this.liveGame();
+    if (game) game.playerDisconnected(id);
     else if (this.phase === 'board') this.board?.playerGone(id);
   }
 
@@ -1652,8 +1747,9 @@ export class Room {
         this.graceTimers.delete(id);
         const p = this.players.get(id);
         if (!p || p.connected || p.removed) return;
-        // Erst jetzt erfährt das laufende Spiel bzw. Brett vom Verbindungsverlust
-        if (this.phase === 'mini') this.mini?.playerDisconnected(id);
+        // Erst jetzt erfährt das laufende Spiel (bzw. Übungsspiel) oder Brett vom Verbindungsverlust
+        const game = this.liveGame();
+        if (game) game.playerDisconnected(id);
         else if (this.phase === 'board') this.board?.playerDisconnected(id);
         this.changed();
       }, DISCONNECT_GRACE_MS),
@@ -1683,7 +1779,7 @@ export class Room {
     for (const [key, h] of this.holds) {
       if (now - h.at < HOLD_TIMEOUT_MS) continue;
       this.holds.delete(key);
-      if (this.phase === 'mini') this.mini?.input(h.id, h.action, h.neutral);
+      this.liveGame()?.input(h.id, h.action, h.neutral);
     }
   }
 
@@ -1745,9 +1841,10 @@ export class Room {
       drinkActive: !!this.drinkRun,
       arcadeActive: this.arcadeActive,
       board: this.board?.state ?? null,
-      mini: this.mini?.snapshot() ?? null,
+      mini: this.liveGame()?.snapshot() ?? null,
+      miniSeq: this.miniSeq,
       results: this.results,
-      inGame: this.phase === 'mini' ? this.miniIds : null,
+      inGame: this.phase === 'mini' ? this.miniIds : this.phase === 'intro' && this.intro?.game ? this.intro.ids : null,
       arcadeVote: this.arcadeVotes ? { votes: Object.fromEntries(this.currentVotes()) } : null,
       skippable: this.skippable(),
       nochmal: this.nochmalState(),
@@ -1785,7 +1882,7 @@ export class Room {
       if (!p.socketId) continue;
       seen.add(p.socketId);
       const boardPriv = this.phase === 'board' ? this.board?.privateFor(p.id) : null;
-      const priv: PrivateState = boardPriv ? { kind: 'board', state: boardPriv } : (this.mini?.privateFor?.(p.id) ?? null);
+      const priv: PrivateState = boardPriv ? { kind: 'board', state: boardPriv } : (this.liveGame()?.privateFor?.(p.id) ?? null);
       const json = JSON.stringify(priv);
       if (this.privKeys.get(p.socketId) === json) continue;
       this.privKeys.set(p.socketId, json);
