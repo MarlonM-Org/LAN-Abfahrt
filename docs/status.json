@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T19:35+00:00",
+  "updated": "2026-11-06T19:37+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -22,7 +22,9 @@
       "title": "Auto-Fußball: Joystick lenkt absolut (Stick links = Auto fährt nach links, mit Kurve), Hüpfer entfernt, größere Knöpfe rechts (iPhone 12 Pro)"
     }
   ],
-  "queue": [],
+  "queue": [
+    "Echte Aufwärmphase statt Übungsfeld: vor dem Spiel mit der richtigen Steuerung üben (Handy + TV, nichts zählt) – startet, sobald die laufenden PRs gemergt sind"
+  ],
   "done": [
     {
       "title": "Kurven-Duell: offene Ränder (rechts raus → links rein, oben/unten genauso) + Lücken alle 1–2 s statt 1,5–3 s; Power-up „Durch Wände“ entfällt",
@@ -500,6 +502,10 @@
     {
       "title": "Regelkarte/Lobby: Start erst, wenn alle bereit sind oder der VIP erzwingt – nicht nach Timer",
       "status": "in Arbeit"
+    },
+    {
+      "title": "Übungsfeld auf der Regelkarte passt nicht zur echten Steuerung, zu gequetscht → echte Aufwärmphase mit richtiger Steuerung",
+      "status": "offen"
     }
   ]
 }
