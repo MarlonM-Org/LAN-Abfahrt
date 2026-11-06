@@ -85,7 +85,8 @@ export class KartGame implements MiniGame {
     const humans = ids.filter((id) => !ctx.isBot?.(id));
     this.splitOk = humans.length <= KART.SPLIT_MAX;
     this.paneOrder = (humans.length ? humans : ids).slice(0, KART.SPLIT_MAX);
-    for (const id of humans) if (phonePref(id)) this.phoneWant.add(id);
+    // Ohne Menschen (Test, `--kartview=phone`) zählt die Wahl der Bots – so lässt sich die TV-Regie in der Draufsicht prüfen
+    for (const id of humans.length ? humans : ids) if (phonePref(id)) this.phoneWant.add(id);
     shuffle(ids).forEach((id, i) => {
       const g = this.track.grid[i % this.track.grid.length];
       this.cars.set(id, {

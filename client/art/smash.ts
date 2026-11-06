@@ -1,29 +1,36 @@
 import { C } from './palette';
-import { Pix, rng, shade } from './pix';
+import { type BgLayer, Pix, bgLayers, rng, shade } from './pix';
 import { paintSky, paintWater } from './ground';
 import { palm } from './objects';
 
 // ================================================================== Strandbar
 
-export function beachBackdrop(): Pix {
+/** Kulisse der Strandbar – `layer` = Parallax-Ebene (far: Himmel/Horizont, mid: Meer/Hütte/Palmen) oder alles */
+export function beachBackdrop(layer: BgLayer = 'all'): Pix {
   const p = new Pix(480, 270);
   const r = rng(901);
-  paintSky(p, 0, 0, 480, 156, ['#4fa8e3', '#7cc5ef', '#b5e1f6', '#f4e6c0']);
-  // Sonne
-  p.disc(398, 46, 22, 'rgba(255,240,170,0.35)');
-  p.disc(398, 46, 15, '#ffe58a');
-  p.disc(395, 43, 10, '#fff3c0');
-  // Wolken
-  for (const [cx, cy, s] of [[70, 40, 1], [180, 26, 0.8], [300, 58, 0.7], [455, 90, 0.6]]) {
-    p.ellipse(cx, cy, 22 * s, 7 * s, '#ffffff');
-    p.ellipse(cx - 10 * s, cy - 4 * s, 10 * s, 7 * s, '#ffffff');
-    p.ellipse(cx + 9 * s, cy - 5 * s, 12 * s, 8 * s, '#ffffff');
-    p.hline(cx - 20 * s, cy + 5 * s, 40 * s, '#d8eef9');
+  const L = bgLayers(layer);
+  if (L.far) {
+    paintSky(p, 0, 0, 480, 156, ['#4fa8e3', '#7cc5ef', '#b5e1f6', '#f4e6c0']);
+    // Unter dem Horizont ein flaches Meer, damit die mittlere Ebene beim Verschieben keine Lücke lässt
+    if (!L.mid) p.rect(0, 156, 480, 114, '#4a9ad6');
+    // Sonne
+    p.disc(398, 46, 22, 'rgba(255,240,170,0.35)');
+    p.disc(398, 46, 15, '#ffe58a');
+    p.disc(395, 43, 10, '#fff3c0');
+    // Wolken
+    for (const [cx, cy, s] of [[70, 40, 1], [180, 26, 0.8], [300, 58, 0.7], [455, 90, 0.6]]) {
+      p.ellipse(cx, cy, 22 * s, 7 * s, '#ffffff');
+      p.ellipse(cx - 10 * s, cy - 4 * s, 10 * s, 7 * s, '#ffffff');
+      p.ellipse(cx + 9 * s, cy - 5 * s, 12 * s, 8 * s, '#ffffff');
+      p.hline(cx - 20 * s, cy + 5 * s, 40 * s, '#d8eef9');
+    }
+    // Insel am Horizont
+    p.ellipse(60, 156, 46, 9, '#6f9a6a');
+    p.ellipse(52, 152, 20, 7, '#5f8a5a');
+    p.ellipse(430, 157, 30, 5, '#7da77a');
   }
-  // Insel am Horizont
-  p.ellipse(60, 156, 46, 9, '#6f9a6a');
-  p.ellipse(52, 152, 20, 7, '#5f8a5a');
-  p.ellipse(430, 157, 30, 5, '#7da77a');
+  if (!L.mid) return p;
   // Meer
   paintWater(p, 0, 156, 480, 114, 902);
   for (let i = 0; i < 40; i++) p.hline(Math.floor(r() * 470), 158 + Math.floor(r() * 12), 6 + Math.floor(r() * 10), '#bfe6f7');
@@ -117,15 +124,35 @@ export function surfPix(w: number): Pix {
 
 // ================================================================== Pool-Party
 
-export function poolBackdrop(): Pix {
+/** Kulisse der Pool-Party – `layer`: far (Himmel, Sterne, Mond), mid (Villa, Palmen, Hecke, Lichter), near (Pool) */
+export function poolBackdrop(layer: BgLayer = 'all'): Pix {
   const p = new Pix(480, 270);
   const r = rng(911);
-  paintSky(p, 0, 0, 480, 170, ['#2d2a5e', '#6a3d7d', '#c25f7a', '#f29a5a']);
-  // Sterne
-  for (let i = 0; i < 40; i++) p.px(Math.floor(r() * 480), Math.floor(r() * 60), r() < 0.5 ? '#ffffff' : '#ffe9b0');
-  // Mond
-  p.disc(72, 36, 11, '#fff3c0');
-  p.disc(77, 32, 10, '#3e3268');
+  const L = bgLayers(layer);
+  if (L.far) {
+    paintSky(p, 0, 0, 480, 170, ['#2d2a5e', '#6a3d7d', '#c25f7a', '#f29a5a']);
+    if (!L.mid) p.rect(0, 170, 480, 100, '#f29a5a');
+    // Sterne
+    for (let i = 0; i < 40; i++) p.px(Math.floor(r() * 480), Math.floor(r() * 60), r() < 0.5 ? '#ffffff' : '#ffe9b0');
+    // Mond
+    p.disc(72, 36, 11, '#fff3c0');
+    p.disc(77, 32, 10, '#3e3268');
+  }
+  if (L.mid) poolScenery(p);
+  if (!L.near) return p;
+  // Pool unten
+  const r2 = rng(912);
+  p.rect(0, 198, 480, 72, '#2fb5c9');
+  for (let i = 0; i < 160; i++) {
+    const x = Math.floor(r2() * 480);
+    const y = 204 + Math.floor(r2() * 64);
+    p.hline(x, y, 3 + Math.floor(r2() * 7), r2() < 0.5 ? '#7ae0ee' : '#4cc7dc');
+  }
+  for (let y = 206; y < 270; y += 12) for (let x = (y / 12) % 2 ? 0 : 12; x < 480; x += 24) p.px(x, y, '#a8f0f8');
+  return p;
+}
+
+function poolScenery(p: Pix) {
   // Villa
   p.rect(300, 92, 168, 106, '#f4efe2');
   p.rect(292, 84, 184, 10, '#c25f52');
@@ -155,15 +182,6 @@ export function poolBackdrop(): Pix {
     p.px(x, y, '#2d1b12');
     if (x % 14 === 0) p.disc(x, y + 2, 1.8, ['#ffd25e', '#f07aa8', '#7fd4ff', '#9ad65a', '#f0973a'][(x / 14) % 5]);
   }
-  // Pool unten
-  p.rect(0, 198, 480, 72, '#2fb5c9');
-  for (let i = 0; i < 160; i++) {
-    const x = Math.floor(r() * 480);
-    const y = 204 + Math.floor(r() * 64);
-    p.hline(x, y, 3 + Math.floor(r() * 7), r() < 0.5 ? '#7ae0ee' : '#4cc7dc');
-  }
-  for (let y = 206; y < 270; y += 12) for (let x = (y / 12) % 2 ? 0 : 12; x < 480; x += 24) p.px(x, y, '#a8f0f8');
-  return p;
 }
 
 export function poolDeckPix(w: number, h: number): Pix {

@@ -9,7 +9,7 @@ import { ensureBall, ensureBottle, figure } from './textures';
 import { BLUE_INK, INK, background, ink, panel, prop, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
-import { crowd, foam, gulls } from './ambient';
+import { crowd, daylight, foam, gulls, sway } from './ambient';
 
 interface Actor {
   root: Phaser.GameObjects.Container;
@@ -70,8 +70,9 @@ export class FlunkyScene extends Phaser.Scene {
     this.juice = new Juice(this, { depth: 4000 });
     this.fans = crowd(this, [[150, 266], [168, 268], [312, 268], [330, 266]], { depth: 262 });
 
-    prop(this, 'palm', () => O.palm(6), 18, 150);
-    prop(this, 'palm2', () => O.palm(9), 464, 160).setFlipX(true);
+    // Palmen wehen leicht, Tageszeit färbt den Strand (Figuren und HUD nicht)
+    sway(this, [prop(this, 'palm', () => O.palm(6), 18, 150), prop(this, 'palm2', () => O.palm(9), 464, 160).setFlipX(true)]);
+    daylight(this, { depth: -950 });
     prop(this, 'umbrella', () => O.umbrella(), 240, 262).setDepth(262);
     prop(this, 'towelR', () => O.towel(C.red), 214, 268);
     prop(this, 'towelB', () => O.towel(C.blue), 266, 268);

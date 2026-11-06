@@ -3,13 +3,16 @@ import type { GameState, Team, VolleyState } from '../../shared/types';
 import { WORLD, TEAM_INFO } from '../../shared/flunky';
 import { VOLLEY as V, type VollBall, vollWon } from '../../shared/volley';
 import { paintVolleyBeach, volleyArrow, volleyBall, volleyNet } from '../art/volley';
+import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
 import { avatarSprite, ensurePortrait, playAvatar } from './textures';
 import { pcol } from './playerColor';
-import { Countdown, background, ensureTex, ink, panel, txt } from './ui';
+import { Countdown, ensureTex, ink, panel, txt } from './ui';
 import { Juice } from './juice';
 import { SnapBuffer, lerp, lerpJump } from './interp';
 import { sfx } from './sfx';
+import { Parallax } from './parallax';
+import { clouds, daylight, foam, gulls, waves } from './ambient';
 
 interface Fig {
   img: Phaser.GameObjects.Sprite;
@@ -60,14 +63,23 @@ export class VolleyScene extends Phaser.Scene {
     this.trailAt = 0;
     this.juice = new Juice(this, { depth: 1700, clock: this.buf });
 
-    background(this, 'volley', WORLD.W, WORLD.H, (p) => paintVolleyBeach(p, WORLD.W, WORLD.H));
-    // Wellen am Horizont glitzern
-    for (let i = 0; i < 12; i++) {
-      const x = 12 + ((i * 89) % 456);
-      const y = 154 + ((i * 7) % 20);
-      const w = this.add.rectangle(x, y, 5 + (i % 3) * 2, 1, 0xffe7b0, 0.7).setDepth(-900);
-      this.tweens.add({ targets: w, x: x + 5, alpha: 0.1, duration: 1300 + (i % 4) * 280, yoyo: true, repeat: -1, ease: 'Sine.inOut', delay: i * 140 });
-    }
+    // Parallax: Abendhimmel (fern), Meer + ferne Palmen (mittel), Sand + Feld (nah) – die Kamera steht,
+    // die fernen Ebenen wandern leicht mit dem Ball
+    const px = new Parallax(this, { mode: 'manual', strength: 0.14, focus: () => this.shown });
+    const layer = (l: 'far' | 'mid' | 'near') => ensureTex(this, `bg_volley_${l}`, () => {
+      const p = new Pix(WORLD.W, WORLD.H);
+      paintVolleyBeach(p, WORLD.W, WORLD.H, l);
+      return p;
+    });
+    px.tile(layer('far'), 0.15, -1000);
+    clouds(this, { n: 3, y: [30, 80], depth: -995, alpha: 0.55, tint: 0xf6a07a });
+    px.tile(layer('mid'), 0.45, -990);
+    this.add.image(0, 0, layer('near')).setOrigin(0, 0).setDepth(-980);
+    daylight(this, { depth: -960, strength: 0.6 });
+    // Wellen am Horizont glitzern, Schaum am Ufer, Möwen im Abendlicht
+    waves(this, { y: [154, 174], n: 12, depth: -900, color: 0xffe7b0 });
+    foam(this, { y: 178, n: 14, depth: -900, spread: 1 });
+    gulls(this, { n: 2, y: [26, 90], depth: -900 });
     this.add.image(V.NET_X, V.NET_TOP - 1, ensureTex(this, 'vb_net', volleyNet)).setOrigin(0.5, 0).setDepth(50);
     this.ballShadow = this.add.ellipse(V.NET_X, V.GROUND + 1, 10, 3, 0x000000, 0.25).setDepth(40);
     this.ball = this.add.image(V.NET_X, 110, ensureTex(this, 'vb_ball', volleyBall)).setDepth(300);

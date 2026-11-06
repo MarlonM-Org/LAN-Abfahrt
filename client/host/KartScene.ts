@@ -12,6 +12,7 @@ import { pcol } from './playerColor';
 import { Countdown, GOLD, background, ensureTex, panel, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { CameraRig } from './camera';
 
 interface KartView {
   root: Phaser.GameObjects.Container;
@@ -85,6 +86,10 @@ export class KartScene extends Phaser.Scene {
   private evSeen = -1;
   private boxOn: boolean[] = [];
   private carFx = new Map<string, { boost: boolean; charged: boolean }>();
+  /** Regie-Kamera (Draufsicht): folgt dem Führenden bzw. dem engsten Zweikampf, Zielfoto beim Zieleinlauf */
+  private rig!: CameraRig;
+  private shot: { ids: string[]; until: number } = { ids: [], until: 0 };
+  private photoDone = false;
 
   constructor() {
     super('kart');
@@ -110,15 +115,21 @@ export class KartScene extends Phaser.Scene {
     this.evSeen = -1;
     this.boxOn = [];
     this.carFx.clear();
+    this.shot = { ids: [], until: 0 };
+    this.photoDone = false;
     this.topdown = this.add.container(0, 0);
     this.juice = new Juice(this, { layer: this.topdown });
-    this.paneLayer = this.add.container(0, 0).setDepth(500);
-    this.hud = this.add.container(0, 0).setDepth(1000);
-    this.bannerBg = panel(this, 80, 90, 320, 66, 'dark').setDepth(1001).setVisible(false);
-    this.banner = txt(this, WORLD.W / 2, 100, '', { size: 24, color: GOLD }).setDepth(1002);
-    this.sub = txt(this, WORLD.W / 2, 128, '', { size: 8 }).setDepth(1002);
-    this.ticker = txt(this, WORLD.W / 2, WORLD.H - 14, '', { size: 8 }).setDepth(1002);
-    this.clock = txt(this, WORLD.W - 4, 24, '', { size: 8, color: GOLD, origin: [1, 0] }).setDepth(1002);
+    // Regie-Kamera für die Draufsicht; Splitscreen-Ansichten, Rangliste und Banner liegen auf der festen HUD-Kamera
+    this.rig = new CameraRig(this, { w: WORLD.W, h: WORLD.H, lerp: 0.1 });
+    this.rig.hud(() => {
+      this.paneLayer = this.add.container(0, 0).setDepth(500);
+      this.hud = this.add.container(0, 0).setDepth(1000);
+      this.bannerBg = panel(this, 80, 90, 320, 66, 'dark').setDepth(1001).setVisible(false);
+      this.banner = txt(this, WORLD.W / 2, 100, '', { size: 24, color: GOLD }).setDepth(1002);
+      this.sub = txt(this, WORLD.W / 2, 128, '', { size: 8 }).setDepth(1002);
+      this.ticker = txt(this, WORLD.W / 2, WORLD.H - 14, '', { size: 8 }).setDepth(1002);
+      this.clock = txt(this, WORLD.W - 4, 24, '', { size: 8, color: GOLD, origin: [1, 0] }).setDepth(1002);
+    });
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));
@@ -172,6 +183,10 @@ export class KartScene extends Phaser.Scene {
     this.panes = [];
     this.minimap = null;
     if (st.view !== 'split' || !ids.length) return;
+    this.rig.hud(() => this.buildPanes(st, ids));
+  }
+
+  private buildPanes(st: KartState, ids: string[]) {
     const n = ids.length;
     const AH = WORLD.H - HUD_H;
     const cells: { x: number; y: number; w: number; h: number }[] =
@@ -350,17 +365,27 @@ export class KartScene extends Phaser.Scene {
           sfx('bonk', { x, delay: 0.06 });
           if (top && car) this.juice.burst(car.x, car.y, 'spark', 10);
           this.juice.shake(1);
+          this.eventShot(ev.who, top);
           break;
         case 'gull':
           sfx('whoosh', { x, pitch: 1.2 });
           sfx('error', { x, pitch: 1.8, vol: 0.6, delay: 0.1 });
           if (top && car) this.juice.burst(car.x, car.y - 6, 'puff', 6);
+          this.eventShot(ev.who, top);
           break;
         case 'finish':
           if (car?.place === 1) {
             sfx('fanfare');
             if (top) this.juice.burst(car.x, car.y, 'confetti', 40);
             this.juice.flash(0xffffff, 200);
+            // Zielfoto: kurz auf der Ziellinie einfrieren, Zoom-Stoß, dann wieder Regie
+            if (top && !this.photoDone) {
+              this.photoDone = true;
+              this.rig.follow({ x: car.x, y: car.y }, 1.8);
+              this.rig.punch(0.1, 300);
+              this.rig.hold(1800);
+              this.juice.hitStop(160);
+            }
           } else sfx('coin', { x, pitch: car && car.place <= 3 ? 1.2 : 1 });
           break;
         case 'turbo':
@@ -414,6 +439,7 @@ export class KartScene extends Phaser.Scene {
     this.layoutPanes(st);
     this.setView(st.view);
     const top = st.view === 'phone';
+    this.direct(st);
 
     // Boxen, Hindernisse, Möwen (Draufsicht)
     st.boxes.forEach((b, i) => this.boxes[i]?.setVisible(b.on && top));
@@ -503,16 +529,73 @@ export class KartScene extends Phaser.Scene {
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
-    this.hud.add(panel(this, 0, 0, WORLD.W, HUD_H, 'dark'));
-    this.hud.add(txt(this, 6, 6, `RUNDE ${Math.min(leaderLap, st.laps)}/${st.laps}`, { origin: [0, 0], color: GOLD }));
-    const slot = Math.min(30, Math.floor((WORLD.W - 104) / Math.max(1, order.length)));
-    order.forEach(([id, car], i) => {
-      const pl = playerById(id);
-      const x = 104 + i * slot;
-      this.hud.add(txt(this, x + 7, 6, String(i + 1), { size: 8, color: i === 0 ? GOLD : car.finished ? '#b9e39a' : '#fff4d6', origin: [1, 0] }));
-      if (pl) this.hud.add(this.add.rectangle(x + 8, 2, 16, 15, pcol(id).num).setOrigin(0, 0));
-      if (pl) this.hud.add(this.add.image(x + 9, 3, ensurePortrait(this, pl.look)).setOrigin(0, 0).setScale(0.9));
+    this.rig.hud(() => {
+      this.hud.add(panel(this, 0, 0, WORLD.W, HUD_H, 'dark'));
+      this.hud.add(txt(this, 6, 6, `RUNDE ${Math.min(leaderLap, st.laps)}/${st.laps}`, { origin: [0, 0], color: GOLD }));
+      const slot = Math.min(30, Math.floor((WORLD.W - 104) / Math.max(1, order.length)));
+      order.forEach(([id, car], i) => {
+        const pl = playerById(id);
+        const x = 104 + i * slot;
+        this.hud.add(txt(this, x + 7, 6, String(i + 1), { size: 8, color: i === 0 ? GOLD : car.finished ? '#b9e39a' : '#fff4d6', origin: [1, 0] }));
+        if (pl) this.hud.add(this.add.rectangle(x + 8, 2, 16, 15, pcol(id).num).setOrigin(0, 0));
+        if (pl) this.hud.add(this.add.image(x + 9, 3, ensurePortrait(this, pl.look)).setOrigin(0, 0).setScale(0.9));
+      });
     });
+  }
+
+  // ---------------------------------------------------------------- Regie-Kamera (Draufsicht)
+
+  /** Treffer/Möwe: kurz zum Opfer schwenken, die Regie wartet so lange */
+  private eventShot(id: string, top: boolean) {
+    const v = this.karts.get(id);
+    if (!top || !v || this.rig.holding) return;
+    this.rig.follow(v, 1.7);
+    this.rig.hold(1200);
+    this.shot = { ids: [], until: 0 };
+  }
+
+  /**
+   * Wohin schaut der TV? Während des Rennens auf den engsten Zweikampf in der Spitzengruppe, sonst auf den
+   * Führenden; in der letzten Runde kurz vor dem Ziel auf die Ziellinie (Zielfoto). Einstellungen halten
+   * mindestens 2,5 s, damit es nicht hektisch wird; Treffer und Zieleinlauf (siehe soundFx) haben Vorrang.
+   */
+  private direct(st: KartState) {
+    if (st.view !== 'phone' || st.sub !== 'race' || this.rig.holding) {
+      if (st.sub !== 'race') this.rig.overview();
+      return;
+    }
+    const now = this.time.now;
+    const racing = Object.entries(st.karts)
+      .filter(([, c]) => !c.finished && !c.ghost)
+      .sort((a, b) => a[1].place - b[1].place);
+    if (!racing.length) return this.rig.overview();
+    const finish = getTrack(st.track).samples[0];
+    const [leadId, lead] = racing[0];
+    // Letzte Runde, kurz vor dem Ziel: Ziellinie ins Bild (gilt sofort)
+    if (lead.lap >= st.laps && Math.hypot(lead.x - finish.x, lead.y - finish.y) < 120) {
+      this.shot = { ids: [], until: now + 1500 };
+      this.rig.follow({ x: finish.x, y: finish.y }, 1.6);
+      return;
+    }
+    let ids = this.shot.ids.filter((id) => racing.some(([r]) => r === id));
+    if (now >= this.shot.until || !ids.length) {
+      // Engster Zweikampf unter den ersten vier – sonst der Führende
+      let best: [string, string] | null = null;
+      let bestD = 70;
+      for (let i = 0; i + 1 < Math.min(4, racing.length); i++) {
+        const [a, ca] = racing[i];
+        const [b, cb] = racing[i + 1];
+        const d = Math.hypot(ca.x - cb.x, ca.y - cb.y);
+        if (d < bestD) (bestD = d), (best = [a, b]);
+      }
+      ids = best ?? [leadId];
+      this.shot = { ids, until: now + 2500 };
+    }
+    const views = ids.map((id) => this.karts.get(id)).filter((v): v is KartView => !!v);
+    if (!views.length) return;
+    const d = views.length > 1 ? Math.hypot(views[0].x - views[1].x, views[0].y - views[1].y) : 0;
+    const zoom = views.length > 1 ? Phaser.Math.Clamp(380 / (d + 170), 1.3, 1.7) : 1.5;
+    this.rig.follow(() => ({ x: views.reduce((s, v) => s + v.x, 0) / views.length, y: views.reduce((s, v) => s + v.y, 0) / views.length }), zoom);
   }
 }
 

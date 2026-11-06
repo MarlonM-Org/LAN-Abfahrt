@@ -1,5 +1,5 @@
 import { C } from './palette';
-import { Pix, rng, shade } from './pix';
+import { type BgLayer, Pix, bgLayers, rng, shade } from './pix';
 import { paintSand, paintShore, paintSky, paintWater } from './ground';
 import { palm, towel, umbrella } from './objects';
 import { VOLLEY } from '../../shared/volley';
@@ -18,34 +18,42 @@ function scaled(src: Pix, s: number) {
   return c;
 }
 
-export function paintVolleyBeach(p: Pix, w: number, h: number) {
+/** Strand von der Seite – `layer`: far (Abendhimmel, Sonne), mid (Meer, Glitzerbahn, ferne Palmen), near (Sand, Schirme, Feld) */
+export function paintVolleyBeach(p: Pix, w: number, h: number, layer: BgLayer = 'all') {
   const V = VOLLEY;
-  paintSky(p, 0, 0, w, HORIZON, ['#2f3478', '#6e4a8e', '#c85a6a', '#f08a5a', '#ffc36e', '#ffe0a0']);
-  // ein paar Wolkenstreifen im Abendlicht
+  const L = bgLayers(layer);
   const r = rng(901);
-  for (let i = 0; i < 7; i++) {
-    const cx = r() * w;
-    const cy = 46 + r() * 70;
-    const len = 20 + r() * 40;
-    p.rect(cx, cy, len, 2, i % 2 ? '#f6a07a' : '#e47f78');
-    p.rect(cx + 4, cy + 2, len - 10, 1, '#b65a72');
+  if (L.far) {
+    paintSky(p, 0, 0, w, HORIZON, ['#2f3478', '#6e4a8e', '#c85a6a', '#f08a5a', '#ffc36e', '#ffe0a0']);
+    if (!L.mid) p.rect(0, HORIZON, w, h - HORIZON, '#f08a5a');
+    // ein paar Wolkenstreifen im Abendlicht
+    for (let i = 0; i < 7; i++) {
+      const cx = r() * w;
+      const cy = 46 + r() * 70;
+      const len = 20 + r() * 40;
+      p.rect(cx, cy, len, 2, i % 2 ? '#f6a07a' : '#e47f78');
+      p.rect(cx + 4, cy + 2, len - 10, 1, '#b65a72');
+    }
+    // Sonne halb im Meer
+    p.disc(372, HORIZON - 6, 17, '#ffd37a');
+    p.disc(372, HORIZON - 6, 14, '#fff0b8');
   }
-  // Sonne halb im Meer
-  p.disc(372, HORIZON - 6, 17, '#ffd37a');
-  p.disc(372, HORIZON - 6, 14, '#fff0b8');
-  paintWater(p, 0, HORIZON, w, 26, 902);
-  // Glitzerbahn der Sonne
-  for (let y = HORIZON + 1; y < HORIZON + 26; y += 2) {
-    const half = 6 + (y - HORIZON) * 0.7;
-    for (let x = 372 - half; x < 372 + half; x += 4) if (r() < 0.55) p.hline(x, y, 2 + Math.floor(r() * 3), '#ffd27a');
+  if (L.mid) {
+    paintWater(p, 0, HORIZON, w, 26, 902);
+    // Glitzerbahn der Sonne
+    for (let y = HORIZON + 1; y < HORIZON + 26; y += 2) {
+      const half = 6 + (y - HORIZON) * 0.7;
+      for (let x = 372 - half; x < 372 + half; x += 4) if (r() < 0.55) p.hline(x, y, 2 + Math.floor(r() * 3), '#ffd27a');
+    }
+    // ferne Palmen am Ufer (stehen im Sand der nahen Ebene)
+    for (const [x, s, seed] of [[30, 0.6, 3], [70, 0.45, 5], [150, 0.4, 7], [300, 0.42, 2], [430, 0.58, 8]] as [number, number, number][]) {
+      const c = scaled(palm(seed), s);
+      p.g.drawImage(c, x - c.width / 2, HORIZON + 30 - c.height);
+    }
   }
+  if (!L.near) return;
   paintSand(p, 0, HORIZON + 26, w, h - HORIZON - 26, 903);
   paintShore(p, 0, HORIZON + 27, w, 904);
-  // ferne Palmen am Ufer
-  for (const [x, s, seed] of [[30, 0.6, 3], [70, 0.45, 5], [150, 0.4, 7], [300, 0.42, 2], [430, 0.58, 8]] as [number, number, number][]) {
-    const c = scaled(palm(seed), s);
-    p.g.drawImage(c, x - c.width / 2, HORIZON + 30 - c.height);
-  }
   // Sonnenschirme und Handtücher hinter dem Feld
   const u1 = scaled(umbrella(C.red, C.white), 0.9);
   p.g.drawImage(u1, 96, V.GROUND - 30 - u1.height);

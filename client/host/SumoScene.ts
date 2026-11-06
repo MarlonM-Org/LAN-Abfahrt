@@ -10,6 +10,8 @@ import { Countdown, backPlate, background, ensureTex, ink, panel, txt } from './
 import { Juice } from './juice';
 import { SnapBuffer, lerpJump } from './interp';
 import { sfx } from './sfx';
+import { CameraRig } from './camera';
+import { cloudShadows, daylight, gulls } from './ambient';
 
 const T = SUMO.TILE;
 const hexNum = (h: string) => parseInt(h.slice(1), 16);
@@ -46,6 +48,9 @@ export class SumoScene extends Phaser.Scene {
   private clock = new Countdown();
   private juice!: Juice;
   private cheerRound = 0;
+  private rig!: CameraRig;
+  /** Finale: die beiden letzten Spieler, auf die die Kamera zoomt */
+  private duel: string[] = [];
 
   constructor() {
     super('sumo');
@@ -89,11 +94,21 @@ export class SumoScene extends Phaser.Scene {
       this.tweens.add({ targets: img, y: y - 1.5, angle: i % 2 ? 3 : -3, duration: 1100 + i * 170, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     });
 
-    this.hud = this.add.container(0, 0).setDepth(2000);
-    this.banner = txt(this, WORLD.W / 2, 118, '', { size: 16, color: '#ffd25e' }).setDepth(2001);
-    this.sub = txt(this, WORLD.W / 2, 142, '', { size: 8 }).setDepth(2001);
-    // Dunkle Plakette, damit die Texte über den Figuren lesbar bleiben
-    backPlate(this, [this.banner, this.sub], 2000);
+    // Ambient: Möwen, Wolkenschatten auf dem Wasser, Tageszeit (nur das Meer wird eingefärbt)
+    gulls(this, { n: 2, y: [40, 230], depth: 1640 });
+    cloudShadows(this, { n: 3, y: [40, 240], depth: -890, alpha: 0.06 });
+    daylight(this, { depth: -950, strength: 0.7 });
+
+    // Kamera-Regie: im Finale (zwei übrig) auf die beiden zoomen – HUD und Banner bleiben auf der festen HUD-Kamera
+    this.rig = new CameraRig(this, { w: WORLD.W, h: WORLD.H, lerp: 0.05 });
+    this.duel = [];
+    this.rig.hud(() => {
+      this.hud = this.add.container(0, 0).setDepth(2000);
+      this.banner = txt(this, WORLD.W / 2, 118, '', { size: 16, color: '#ffd25e' }).setDepth(2001);
+      this.sub = txt(this, WORLD.W / 2, 142, '', { size: 8 }).setDepth(2001);
+      // Dunkle Plakette, damit die Texte über den Figuren lesbar bleiben
+      backPlate(this, [this.banner, this.sub], 2000);
+    });
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));
@@ -253,8 +268,17 @@ export class SumoScene extends Phaser.Scene {
         a.x = p.x;
         a.y = p.y;
         this.platsch(a, id);
+        if (this.duel.includes(id)) {
+          // Letzter Rauswurf im Finale: Zeitlupe, Zoom-Stoß, kurz auf dem Platscher bleiben, dann Übersicht
+          this.juice.slowMo(0.35, 900);
+          this.rig.punch(0.12, 320);
+          this.rig.hold(1400);
+          this.rig.overview();
+          this.duel = [];
+        }
       }
     }
+    this.direct(st);
 
     if (st.sudden && !this.suddenShown) {
       this.suddenShown = true;
@@ -264,6 +288,21 @@ export class SumoScene extends Phaser.Scene {
       this.cameras.main.shake(300, 0.004);
     }
     this.drawHud(st);
+  }
+
+  /** Kamera-Regie: sind nur noch zwei auf dem Steg, fährt die Kamera auf die beiden (Zoom nach Abstand) */
+  private direct(st: SumoState) {
+    const alive = Object.keys(st.players).filter((id) => st.players[id].alive);
+    if (st.sub === 'play' && alive.length === 2) {
+      this.duel = alive;
+      const [a, b] = alive.map((id) => this.figs.get(id));
+      if (!a || !b) return;
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      this.rig.follow(() => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }), Phaser.Math.Clamp(380 / (d + 170), 1.1, 1.6));
+    } else if (this.duel.length) {
+      this.duel = [];
+      this.rig.overview();
+    }
   }
 
   private onPhase(st: SumoState) {
@@ -380,6 +419,10 @@ export class SumoScene extends Phaser.Scene {
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
+    this.rig.hud(() => this.buildHud(st, ids, secs));
+  }
+
+  private buildHud(st: SumoState, ids: string[], secs: number) {
     this.hud.add(panel(this, 2, 1, 476, 32));
     const clock = st.sudden ? 'BRUCH!' : secs >= 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '--';
     this.hud.add(ink(this, 10, 6, `Runde ${st.round}`, { origin: [0, 0] }));

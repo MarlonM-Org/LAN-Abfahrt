@@ -1,5 +1,5 @@
 import { C } from './palette';
-import { Pix, rng, shade } from './pix';
+import { type BgLayer, Pix, bgLayers, rng, shade } from './pix';
 import { paintSky, paintWater } from './ground';
 import { palm } from './objects';
 import { BOGEN, BOGEN_STAGES, bogenTile } from '../../shared/bogen';
@@ -8,30 +8,40 @@ const T = BOGEN.TILE;
 
 // ================================================================== Hintergrund + Kacheln
 
-/** Komplettes Bild einer Arena (480 × 270, Arena ab y = AY) */
-export function bogenBackdrop(stage: number): Pix {
+/**
+ * Bild einer Arena (480 × 270, Arena ab y = AY) – `layer` = Parallax-Ebene:
+ * far (Himmel, Sonne, Wolken), mid (Meer bzw. Villa, Palmen, Lichter), near (Mauern/Plattformen) oder alles
+ */
+export function bogenBackdrop(stage: number, layer: BgLayer = 'all'): Pix {
   const p = new Pix(480, 270);
   const st = BOGEN_STAGES[stage];
-  if (st.id === 'dach') paintSunset(p);
-  else paintPoolDay(p);
-  paintTiles(p, st.tiles, st.id);
+  const L = bgLayers(layer);
+  if (st.id === 'dach') paintSunset(p, L);
+  else paintPoolDay(p, L);
+  if (L.near) paintTiles(p, st.tiles, st.id);
   return p;
 }
 
-function paintSunset(p: Pix) {
+type Layers = ReturnType<typeof bgLayers>;
+
+function paintSunset(p: Pix, L: Layers) {
   const r = rng(4101);
-  paintSky(p, 0, 0, 480, 190, ['#3b2d6b', '#7a3f7d', '#d0586a', '#f0975a', '#ffd38a']);
-  // Sonne knapp über dem Meer
-  p.disc(300, 186, 30, 'rgba(255,220,140,0.25)');
-  p.disc(300, 186, 21, '#ffc76a');
-  p.disc(298, 183, 15, '#ffe3a0');
-  // Sterne oben
-  for (let i = 0; i < 26; i++) p.px(Math.floor(r() * 480), 20 + Math.floor(r() * 50), r() < 0.5 ? '#fff4d6' : '#c9b8f0');
-  // Wolkenstreifen
-  for (const [cx, cy, w] of [[80, 112, 70], [210, 92, 50], [400, 124, 80], [330, 70, 40]]) {
-    p.ellipse(cx, cy, w / 2, 3, '#f7a37a');
-    p.hline(cx - w / 2 + 6, cy + 2, w - 12, '#c9606a');
+  if (L.far) {
+    paintSky(p, 0, 0, 480, 190, ['#3b2d6b', '#7a3f7d', '#d0586a', '#f0975a', '#ffd38a']);
+    if (!L.mid) p.rect(0, 190, 480, 80, '#f0975a');
+    // Sonne knapp über dem Meer
+    p.disc(300, 186, 30, 'rgba(255,220,140,0.25)');
+    p.disc(300, 186, 21, '#ffc76a');
+    p.disc(298, 183, 15, '#ffe3a0');
+    // Sterne oben
+    for (let i = 0; i < 26; i++) p.px(Math.floor(r() * 480), 20 + Math.floor(r() * 50), r() < 0.5 ? '#fff4d6' : '#c9b8f0');
+    // Wolkenstreifen
+    for (const [cx, cy, w] of [[80, 112, 70], [210, 92, 50], [400, 124, 80], [330, 70, 40]]) {
+      p.ellipse(cx, cy, w / 2, 3, '#f7a37a');
+      p.hline(cx - w / 2 + 6, cy + 2, w - 12, '#c9606a');
+    }
   }
+  if (!L.mid) return;
   // Meer
   paintWater(p, 0, 192, 480, 78, 4102);
   for (let y = 192; y < 270; y++) {
@@ -59,16 +69,20 @@ function paintSunset(p: Pix) {
   }
 }
 
-function paintPoolDay(p: Pix) {
+function paintPoolDay(p: Pix, L: Layers) {
   const r = rng(4201);
-  paintSky(p, 0, 0, 480, 150, ['#4fa8e3', '#7cc5ef', '#b5e1f6', '#e8f4f0']);
-  p.disc(70, 50, 16, '#ffe58a');
-  p.disc(68, 48, 10, '#fff3c0');
-  for (const [cx, cy, s] of [[200, 46, 1], [360, 34, 0.8], [440, 80, 0.6]]) {
-    p.ellipse(cx, cy, 22 * s, 7 * s, '#ffffff');
-    p.ellipse(cx - 10 * s, cy - 4 * s, 10 * s, 7 * s, '#ffffff');
-    p.ellipse(cx + 9 * s, cy - 5 * s, 12 * s, 8 * s, '#ffffff');
+  if (L.far) {
+    paintSky(p, 0, 0, 480, 150, ['#4fa8e3', '#7cc5ef', '#b5e1f6', '#e8f4f0']);
+    if (!L.mid) p.rect(0, 150, 480, 120, '#e8f4f0');
+    p.disc(70, 50, 16, '#ffe58a');
+    p.disc(68, 48, 10, '#fff3c0');
+    for (const [cx, cy, s] of [[200, 46, 1], [360, 34, 0.8], [440, 80, 0.6]]) {
+      p.ellipse(cx, cy, 22 * s, 7 * s, '#ffffff');
+      p.ellipse(cx - 10 * s, cy - 4 * s, 10 * s, 7 * s, '#ffffff');
+      p.ellipse(cx + 9 * s, cy - 5 * s, 12 * s, 8 * s, '#ffffff');
+    }
   }
+  if (!L.mid) return;
   // Villa-Fassade im Hintergrund
   p.rect(24, 110, 432, 160, '#f2e6cf');
   for (let y = 112; y < 270; y += 6) p.hline(24, y, 432, '#e8d9bd');

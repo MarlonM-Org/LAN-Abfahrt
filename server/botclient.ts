@@ -70,6 +70,8 @@ export interface BotOptions {
   rounds?: number;
   /** Party: gespeicherten Brettstand fortsetzen (data/party.json) statt neu zu starten */
   resume?: boolean;
+  /** Kart: Ansicht am Handy statt auf dem TV (`--kartview=phone` – zeigt die TV-Regie in der Draufsicht) */
+  kartView?: 'phone' | 'tv';
   /** Turnier: Playlist-ID (sport, arena, kopf) oder eigene Liste „sumo,sprint,maexchen“ */
   turnier?: string;
   /** Ausgaben (z. B. Phasenwechsel) */
@@ -155,7 +157,7 @@ export class Bot {
     // Regelmäßig "nachdenken" – der Zustand kommt nicht immer, wenn der Bot dran ist
     this.timer = setInterval(() => this.state && this.react(this.state), 200);
     this.socket.on('connect', () => {
-      this.socket.emit('player:join', { name, look: randomLook(), bot: true }, (r: { ok: boolean; playerId?: string; error?: string }) => {
+      this.socket.emit('player:join', { name, look: randomLook(), bot: true, ...(opts.kartView ? { kartView: opts.kartView } : {}) }, (r: { ok: boolean; playerId?: string; error?: string }) => {
         if (r.ok) this.id = r.playerId!;
         else opts.log?.(`${name}: ${r.error}`);
       });

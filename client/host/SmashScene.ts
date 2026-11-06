@@ -11,6 +11,7 @@ import { Juice } from './juice';
 import { SnapBuffer, lerp, lerpJump } from './interp';
 import { sfx } from './sfx';
 import { say, spokenName } from './speech';
+import { clouds, daylight, gulls } from './ambient';
 
 type C = Phaser.GameObjects.Container;
 
@@ -124,9 +125,16 @@ export class SmashScene extends Phaser.Scene {
     if (this.built === st.stage) return;
     this.built = st.stage;
     const stage = SMASH_STAGES.find((x) => x.id === st.stage)!;
-    const bgKey = ensureTex(this, `smash_bg_${st.stage}`, st.stage === 'beach' ? A.beachBackdrop : A.poolBackdrop);
-    this.bgL.add(this.add.image(0, 0, bgKey).setOrigin(0, 0));
-    if (st.stage === 'beach') this.bgL.add(txt(this, 240, 131, 'BAR', { color: '#a8342a', shadow: false }));
+    // Parallax: Himmel (fern) und Kulisse (mittel) laufen der Kamera (Zoom/Schwenk) langsamer hinterher
+    const paint = st.stage === 'beach' ? A.beachBackdrop : A.poolBackdrop;
+    const layer = (l: 'far' | 'mid' | 'near', f: number) =>
+      this.bgL.add(this.add.image(0, 0, ensureTex(this, `smash_bg_${st.stage}_${l}`, () => paint(l))).setOrigin(0, 0).setScrollFactor(f));
+    layer('far', 0.25);
+    clouds(this, { n: 3, y: [20, 70], alpha: st.stage === 'beach' ? 0.9 : 0.35, scroll: 0.3, layer: this.bgL, tint: st.stage === 'beach' ? undefined : 0xd0a0b0 });
+    layer('mid', 0.5);
+    if (st.stage === 'beach') this.bgL.add(txt(this, 240, 131, 'BAR', { color: '#a8342a', shadow: false }).setScrollFactor(0.5));
+    if (st.stage === 'pool') layer('near', 1);
+    gulls(this, { n: st.stage === 'beach' ? 2 : 0, y: [24, 80], scroll: 0.4, layer: this.bgL });
     for (const p of stage.platforms) {
       let key: string;
       let ox = 0;
@@ -160,6 +168,8 @@ export class SmashScene extends Phaser.Scene {
       this.bgL.add(img);
       this.plats.push({ p, img, ox, oy });
     }
+    // Tageszeit über Kulisse und Bühne (Kämpfer und HUD bleiben unberührt)
+    daylight(this, { layer: this.bgL, strength: 0.6 });
   }
 
   private ensureFig(id: string, idx: number) {

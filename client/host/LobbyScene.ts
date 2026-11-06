@@ -10,6 +10,7 @@ import { bus, getState, joinUrlOf } from './store';
 import { ensurePortrait, figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 import { drawSessionBoard } from './sessionBoard';
+import { daylight, gulls, sway } from './ambient';
 
 /** Bis 8 Spieler: 2 Reihen à 4; ab 9 Spielern: 2 Reihen à 6 im Zickzack (Platz für 12) */
 const SLOTS = 8;
@@ -54,11 +55,14 @@ export class LobbyScene extends Phaser.Scene {
       paintPath(p, [{ x: 150, y: 244 }, { x: 60, y: 270 }], 14, 9);
     });
 
+    // Tageszeit (echte Uhrzeit bzw. Brett) färbt den Garten; Möwen ziehen vorbei, Bäume wiegen sich leicht
+    daylight(this, { depth: -950, strength: 0.7 });
+    gulls(this, { n: 2, y: [40, 120], depth: 800 });
+
     // Deko
     prop(this, 'cottage', O.cottage, 64, 92);
     for (let x = 130; x < WORLD.W; x += 32) prop(this, 'fence32', () => O.fence(32), x + 16, 30);
-    prop(this, 'tree1', () => O.tree(1), 462, 74);
-    prop(this, 'tree7', () => O.tree(7), 22, 268);
+    sway(this, [prop(this, 'tree1', () => O.tree(1), 462, 74), prop(this, 'tree7', () => O.tree(7), 22, 268)], { angle: 1, ms: 2600 });
     prop(this, 'fruitTree', () => O.fruitTree(3), 452, 214);
     prop(this, 'bush3', () => O.bush(3), 140, 106);
     prop(this, 'bush4', () => O.bush(4, true), 430, 248);
