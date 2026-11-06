@@ -5,7 +5,7 @@ import { INK, RED_INK, ink, panel, tagName, txt } from './ui';
 
 /**
  * Board-Anzeige für die Balance-Board-Spiele: Draufsicht aufs Board mit dem Schwerpunkt als Punkt und der
- * Zielzone als Ring, darunter das Gewicht. Dazu die „Steig aufs Board“-Karte in Phase `ready`.
+ * Zielzone als Ring, darunter nur „erkannt“ (nie das Gewicht – das geht niemanden was an). Dazu die „Steig aufs Board“-Karte in Phase `ready`.
  * Liegt fest auf dem Bildschirm (scrollFactor 0).
  */
 export class BalanceHud {
@@ -66,7 +66,7 @@ export class BalanceHud {
       g.fillStyle(0xe2574c, 1).fillCircle(sx(this.dot.x), sy(this.dot.y), 3.5);
       g.lineStyle(1, 0x7a1e18, 1).strokeCircle(sx(this.dot.x), sy(this.dot.y), 3.5);
     }
-    const lbl = !st.board ? 'kein Board' : b ? `${b.w} kg` : '';
+    const lbl = !st.board ? 'kein Board' : b && b.w >= 15 ? 'erkannt!' : 'frei';
     if (this.label.text !== lbl) this.label.setText(lbl).setColor(st.board ? '#fff4d6' : '#ff8a7a');
 
     const ready = st.sub === 'ready' && !!st.active;
@@ -79,7 +79,7 @@ export class BalanceHud {
       const sub = !st.board
         ? 'Kein Balance Board verbunden – am Laptop B drücken.\nErsatz: Pfeiltasten + J'
         : standing
-          ? 'Ruhig stehen … Gewicht wird eingemessen'
+          ? 'Erkannt! Kurz ruhig stehen bleiben …'
           : `Stell dich aufs Balance Board!  (${Math.ceil(st.endsIn / 1000)} s)`;
       if (this.cardSub.text !== sub) this.cardSub.setText(sub);
       if (this.cardRec.text !== recLine) this.cardRec.setText(recLine);

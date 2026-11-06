@@ -5,9 +5,10 @@
  * Ablauf eines Sprungs:
  *   ready  – Springer stellt sich aufs Board, ruhig stehen = Körpergewicht einmessen
  *   countdown – 3-2-1 auf dem Balken, „In die Hocke!“
- *   inrun  – Anlauf: Schwerpunkt ruhig in der Mitte halten = wenig Luftwiderstand = schneller
- *   flight – am Schanzentisch schnell hochdrücken (Gewichtsspitze) = Absprung; in der Luft leicht nach vorn lehnen
- *   landed – Weite + Punkte (K-Punkt-System wie im Weltcup), dann der Nächste
+ *   inrun  – Anlauf: in die Hocke, Schwerpunkt ruhig in der Mitte halten = wenig Luftwiderstand = schneller
+ *   flight – am Schanzentisch einmal kräftig hochdrücken (Gewichtsspitze) = Absprung; in der Luft leicht nach vorn lehnen
+ *   landed – Landung (Fahne an der Weite), dann fährt der Springer den Auslauf hinunter und bremst ab (`stopped`);
+ *            Weite + Punkte (K-Punkt-System wie im Weltcup), danach der Nächste
  */
 import type { BalanceTurn } from './balance';
 
@@ -28,7 +29,12 @@ export const SKI = {
   /** Zielhaltung in der Luft: leicht nach vorn */
   FLIGHT_Y: 0.3,
   GATE_MS: 3000,
-  LANDED_MS: 4200,
+  /** Pause, nachdem der Springer im Auslauf zum Stehen gekommen ist */
+  STOPPED_MS: 2600,
+  /** Ab hier (m) bremst der Springer im Auslauf ab */
+  BRAKE_X: 150,
+  /** Spätestens hier steht er (vor den Zuschauern) */
+  STOP_X: 214,
   /** Bei mehr Springern nur ein Durchgang */
   TWO_ROUNDS_MAX: 6,
   /** Anzeige: Pixel pro Meter */
@@ -159,6 +165,10 @@ export interface SkiState extends BalanceTurn {
   takeoff: number | null;
   /** Live-Weite (m, während des Flugs) */
   dist: number;
+  /** Landepunkt (x in m) für die Fahne, null = noch nicht gelandet */
+  landX: number | null;
+  /** Im Auslauf zum Stehen gekommen */
+  stopped: boolean;
   /** Sprünge pro Spieler und Durchgang */
   jumps: Record<string, SkiJump[]>;
   /** Gesamtpunkte (für Zuschauer-Leiste und Tabelle) */

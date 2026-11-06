@@ -1,5 +1,5 @@
 import type { MiniSnapshot } from '../shared/types';
-import { KUG, type KugelCourse, type KugelRun, type KugelState, cellX, cellY, distToPath, kugelAccel, kugelCourse, kugelHeading, routeHeading, routePoint } from '../shared/kugel';
+import { KUG, type KugelCourse, type KugelRun, type KugelState, cellX, cellY, distToPath, kugelCourse, kugelDrive, routeHeading, routePoint } from '../shared/kugel';
 import { BalanceTurnGame } from './balance';
 import { type MiniCtx, groupByScore, shuffle } from './minigame';
 
@@ -93,17 +93,9 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
       return;
     }
 
-    const [ax, ay] = kugelAccel(b.x, b.y, s.ang);
-    s.vx = (s.vx + ax * dt) * Math.exp(-KUG.DAMP * dt);
-    s.vy = (s.vy + ay * dt) * Math.exp(-KUG.DAMP * dt);
-    const sp = Math.hypot(s.vx, s.vy);
-    if (sp > KUG.VMAX) {
-      s.vx *= KUG.VMAX / sp;
-      s.vy *= KUG.VMAX / sp;
-    }
+    kugelDrive(s, b.x, b.y, dt);
     s.x += s.vx * dt;
     s.y += s.vy * dt;
-    s.ang = kugelHeading(s.ang, s.vx, s.vy, dt);
 
     if (distToPath(this.course, s.x, s.y) > KUG.R) {
       s.falls += 1;
