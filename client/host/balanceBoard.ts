@@ -62,6 +62,10 @@ class WiiBoard {
   at = 0;
   battery = -1;
   button = false;
+  /** Messwerte pro Sekunde (gleitend) – zeigt, ob die Funkverbindung wackelt */
+  hz = 0;
+  private hzN = 0;
+  private hzAt = 0;
 
   constructor(readonly dev: HIDDevice) {}
 
@@ -156,6 +160,12 @@ class WiiBoard {
         }
         this.kg = kg.map((k, s) => k - this.tare[s]);
         this.at = performance.now();
+        this.hzN++;
+        if (this.at - this.hzAt >= 1000) {
+          this.hz = Math.round((this.hzN * 1000) / (this.at - this.hzAt));
+          this.hzN = 0;
+          this.hzAt = this.at;
+        }
         break;
       }
     }
@@ -280,8 +290,11 @@ function render() {
   if (mini) {
     html = `⚖️ ${status === 'ok' ? (standing ? '✓ erkannt' : '✓') : status === 'connecting' ? '…' : '✕'}`;
   } else if (status === 'ok' && board) {
-    const bat = board.battery >= 0 ? ` · 🔋 ${Math.round((board.battery / 0xc8) * 100)} %` : '';
+    const live = performance.now() - board.at < 1500;
+    const hz = live ? board.hz : 0;
+    const bat = (board.battery >= 0 ? ` · 🔋 ${Math.round((board.battery / 0xc8) * 100)} %` : '') + ` · 📶 ${hz} Hz${hz < 25 ? ' ⚠️' : ''}`;
     html = `<button class="bb-x" data-a="mini" title="Ausblenden">✕</button>` + (s ? `⚖️ Balance Board: ${standing ? 'Spieler erkannt ✓' : 'bereit – niemand drauf'}${bat}` : `⚖️ Balance Board verbunden – warte auf Messwerte …${bat}`);
+    if (hz < 25) html += `<div class="bb-sub">⚠️ Wenige Messwerte – Funk wackelt: Board näher an den Laptop, frische Batterien</div>`;
     html += `<div class="bb-sub">Leer lassen zum Tarieren · vorn/hinten vertauscht? → umdrehen</div><button data-a="tare">Tarieren</button><button data-a="flip">Vorn ↔ hinten${flipY ? ' (getauscht)' : ''}</button>`;
   } else if (status === 'connecting') {
     html = '⚖️ Verbinde Balance Board …';

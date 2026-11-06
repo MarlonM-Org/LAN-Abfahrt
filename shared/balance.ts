@@ -36,6 +36,8 @@ export const BB = {
   MIN_KG: 15,
   /** So lange ruhig stehen = eingemessen (Körpergewicht = Basis für Sprung-Erkennung) */
   CALIB_MS: 1400,
+  /** Spätestens nach so langem Draufstehen gilt man als eingemessen (auch wenn es wackelt) */
+  CALIB_MAX_MS: 5000,
   /** Höchstens so lange warten, bis der Spieler auf dem Board steht – dann ist der Nächste dran */
   READY_MS: 30_000,
   /** Sendetakt der TV-Seite */
