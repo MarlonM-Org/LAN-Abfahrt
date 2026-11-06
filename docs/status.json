@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T11:32+00:00",
+  "updated": "2026-11-06T13:03+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -7,22 +7,20 @@
   },
   "inProgress": [
     {
-      "title": "Wii Balance Board: Schanzen-Springen",
-      "kind": "skisprung",
+      "title": "Wii Balance Board: Tempel-Kugel",
+      "kind": "kugel",
       "type": "Balance Board",
-      "branch": "feat/balance-board",
-      "detail": "Hocke im Anlauf, am Tisch hochdrücken, Flughaltung – K 120 / HS 140, Weltcup-Wertung. Wartet auf Test mit echtem Board (Windows + Chrome)."
-    },
-    {
-      "title": "Wii Balance Board: Teppich-Parcours",
-      "kind": "teppich",
-      "type": "Balance Board",
-      "branch": "feat/balance-board",
-      "detail": "Fliegender Teppich durch die Wüstenstadt: lehnen = steigen/sinken/Tempo, Juwelen, Geier. Wartet auf Test mit echtem Board."
+      "branch": "feat/balance-kugel",
+      "detail": "Kugel über einen schmalen Moos-Steinpfad (Labyrinth) lehnen, Absturz = zurück zur Fackel. Wartet auf Test mit echtem Board."
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Wii Balance Board: Schanzen-Springen + Teppich-Parcours (WebHID am Laptop, Anzeige nur am TV)",
+      "pr": 86,
+      "date": "2026-11-06"
+    },
     {
       "title": "Review: Kamera-Regie (Kart, Sumo-Finale, Brett-Schwenk), Parallax, Ambient, Tageszeit raumweit",
       "pr": 84,

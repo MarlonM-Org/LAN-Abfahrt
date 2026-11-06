@@ -61,7 +61,7 @@ Aktueller Stand (v0.3):
 ## Alle Spiele auf einen Blick
 
 <!-- games:start -->
-_Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) – 56 Spiele. Handy: ↔ = quer halten (Stick + Knöpfe), ↕ = hochkant (Sensor, Listen, Text). Dauer bei 8–12 Spielern: kurz ≤ 2 min, mittel ≤ 4 min, lang > 4 min (`MINI_LENGTH`). Brett: ✓ = kommt im Party-Modus nach einer Brett-Runde dran (lange nur mit „Lange Spiele“), Finale = Finalspiel, – = nur einzeln/Arcade._
+_Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) – 57 Spiele. Handy: ↔ = quer halten (Stick + Knöpfe), ↕ = hochkant (Sensor, Listen, Text). Dauer bei 8–12 Spielern: kurz ≤ 2 min, mittel ≤ 4 min, lang > 4 min (`MINI_LENGTH`). Brett: ✓ = kommt im Party-Modus nach einer Brett-Runde dran (lange nur mit „Lange Spiele“), Finale = Finalspiel, – = nur einzeln/Arcade._
 
 | Spiel | Vorbild | Spieler | Handy | Dauer | Brett |
 |---|---|---|---|---|---|
@@ -108,8 +108,9 @@ _Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) –
 | 🧳 Wer ist der Tourist? | à la Spyfall | ab 4 | ↕ hochkant | lang | – |
 | 🐺 Werwölfe im Ferienhaus |  | ab 6 | ↕ hochkant | lang | – |
 | **Balance Board** | | | | | |
-| 🎿 Schanzen-Springen | à la Wii Fit | ab 1 | ↕ hochkant | mittel | – |
-| 🧞 Teppich-Parcours |  | ab 1 | ↕ hochkant | lang | – |
+| 🎿 Schanzen-Springen | à la Wii Fit | ab 1 | egal | mittel | – |
+| 🧞 Teppich-Parcours |  | ab 1 | egal | lang | – |
+| 🔮 Tempel-Kugel | à la Marble Madness | ab 1 | egal | lang | – |
 | **Partyklassiker** | | | | | |
 | 🗳️ Wer würde eher ...? |  | ab 2 | ↕ hochkant | mittel | – |
 | 🙊 Ich hab noch nie ... |  | ab 2 | ↕ hochkant | mittel | – |
@@ -361,7 +362,7 @@ Bots machen beim Testen mit (gelegentliche Emotes, Wetten, Geister-Aktionen): `n
 
 ## Balance-Board-Spiele (Wii Balance Board)
 
-Zwei Spiele werden **auf einem Wii Balance Board** gespielt – reihum, immer einer steht drauf, die anderen schauen zu. **Alles läuft am großen Bildschirm:** der TV ruft den Spieler auf (Name + Ansage), zeigt Balance-Punkt, Gewicht und Einmessen – wer dran ist, braucht sein Handy nicht (es sagt nur „Geh zum Board“); die anderen haben am Handy die Zuschauer-Leiste mit Emotes. Sie stehen in der Arcade unter **„Balance Board“** und kommen nie zufällig, auf dem Spielbrett oder im Turnier dran.
+Drei Spiele werden **auf einem Wii Balance Board** gespielt – reihum, immer einer steht drauf, die anderen schauen zu. **Alles läuft am großen Bildschirm:** der TV ruft den Spieler auf (Name + Ansage), zeigt Balance-Punkt, Gewicht und Einmessen – wer dran ist, braucht sein Handy nicht (es sagt nur „Geh zum Board“); die anderen haben am Handy die Zuschauer-Leiste mit Emotes. Sie stehen in der Arcade unter **„Balance Board“** und kommen nie zufällig, auf dem Spielbrett oder im Turnier dran.
 
 **Einrichten (Windows, einmalig):** Einstellungen → Bluetooth & Geräte → Gerät hinzufügen → Bluetooth, dann am Board im Batteriefach den roten **SYNC**-Knopf drücken. Es erscheint als „Nintendo RVL-WBC-01“ – fragt Windows nach einer PIN, leer lassen und „Weiter“. Danach die TV-Seite **am Laptop in Chrome oder Edge** öffnen (`http://localhost:3000/tv.html`), **B** drücken (oder auf die Board-Anzeige oben links klicken) und das Board auswählen. Die Seite liest das Board per **WebHID** aus (`client/host/balanceBoard.ts`: Erweiterung freischalten, Kalibrierung lesen, Berichtsmodus 0x32) und schickt Gewicht + Schwerpunkt mit 30 Hz an den Server (`bb:sample`, nur vom Laptop angenommen). Beim Neuladen verbindet sie sich von selbst. In der Board-Anzeige: **Tarieren** (Board leer) und **Vorn ↔ hinten** (falls das Board andersherum liegt – Power-Knopf zum Spieler). Board liegt quer vor dem TV, Füße links und rechts.
 
@@ -371,6 +372,7 @@ Vor jedem Versuch stellt sich der Spieler aufs Board und steht kurz ruhig – da
 
 - 🎿 **Schanzen-Springen** (ab 1 Spieler, à la Wii Fit) – Seitenansicht einer Großschanze (K 120, HS 140), die Kamera fährt mit. **Anlauf:** in die Hocke, Schwerpunkt ruhig in der Mitte halten (grüner Ring) = weniger Luftwiderstand, mehr Tempo. **Absprung:** am Schanzentisch schnell aufrichten – das Board misst die Gewichtsspitze; je näher an der Kante (±0,4 s), desto kräftiger. **Flug:** leicht nach vorn lehnen, nicht seitlich kippen = mehr Auftrieb. Wer in der letzten halben Sekunde vor der Landung wackelt, stürzt. Wertung wie im Weltcup: 60 Punkte am K-Punkt, ±1,8 pro Meter, dazu Haltungsnote (0–20). Bis 6 Springer zwei Durchgänge (im zweiten springt der Führende zuletzt). Testen: `npm run bots -- 4 --game=skisprung`.
 - 🧞 **Teppich-Parcours** (ab 1 Spieler) – auf einem fliegenden Teppich durch eine Wüstenstadt bei Nacht: Minarette von unten, Gewitterwolken von oben, Geier dazwischen. **Nach hinten lehnen = steigen, nach vorn = sinken, rechts = schneller, links = bremsen.** Treffer machen kurz benommen (langsam), jedes Juwel zieht 1 s von der Zeit ab. Alle fliegen dieselbe Strecke (pro Spiel neu ausgewürfelt), Bestzeit gewinnt. Testen: `npm run bots -- 4 --game=teppich`.
+- 🔮 **Tempel-Kugel** (ab 1 Spieler, à la Marble Madness) – Draufsicht auf einen schmalen, moosbewachsenen Steinpfad hoch über einem Abgrund; der Pfad ist ein kleines Labyrinth mit Sackgassen und ein paar Schleifen (pro Spiel neu ausgewürfelt, alle rollen dasselbe). Die Kugel rollt dorthin, wohin man sich lehnt (**vorn = nach oben im Bild**, wie bei einem Kipp-Labyrinth) und hat Schwung – zum Bremsen gegenlehnen. Rollt ihre Mitte vom Pfad, **stürzt sie ab** und startet an der letzten **Fackel** (Kontrollpunkt) neu, jeder Absturz kostet 4 s. Wertung: Zeit + Strafen, Bestzeit gewinnt; nach 100 s ist Schluss (dann zählt, wie weit man kam). Werte zum Feinabstimmen stehen in `KUG` (`shared/kugel.ts`: Beschleunigung, Dämpfung, Pfadbreite). Testen: `npm run bots -- 4 --game=kugel`.
 
 ## Trinkspiel
 
