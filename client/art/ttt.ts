@@ -74,3 +74,16 @@ export function dizzy(): Pix {
 }
 
 export const NOODLE_COLORS = [0xf07aa8, 0x7cc04a, 0xffd25e, 0x4aa2dc, 0xf0973a];
+
+/** Stromausfall: namenloser Umriss mit leuchtenden Augen (schaut nach rechts) – für alle gleich */
+export function silhouette(): Pix {
+  const p = new Pix(14, 30);
+  const body = '#262d48';
+  p.disc(7, 6, 5, body);
+  p.rect(2, 12, 10, 12, body);
+  p.rect(1, 13, 2, 8, body).rect(11, 13, 2, 8, body);
+  p.rect(3, 24, 3, 6, body).rect(8, 24, 3, 6, body);
+  p.outline('#4b5684');
+  p.px(8, 5, '#fff4c2').px(10, 5, '#fff4c2');
+  return p;
+}
