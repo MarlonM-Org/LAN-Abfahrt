@@ -239,7 +239,7 @@ const balanceActive = () => {
 // ---------------------------------------------------------------- Anzeige (oben links, nur bei Board-Spielen)
 
 const CSS = `
-#bb-pill { position: fixed; left: 1.5vh; top: 11vh; z-index: 11; max-width: 60vh; padding: 1vh 1.3vh; font: 1.2vh/1.6 'Press Start 2P', monospace; color: #fff4d6; background: rgba(20, 28, 48, 0.82); border: 0.3vh solid rgba(160, 200, 255, 0.55); cursor: pointer; display: none; }
+#bb-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: 1.5vh; text-align: center; z-index: 11; max-width: 60vh; padding: 1vh 1.3vh; font: 1.2vh/1.6 'Press Start 2P', monospace; color: #fff4d6; background: rgba(20, 28, 48, 0.82); border: 0.3vh solid rgba(160, 200, 255, 0.55); cursor: pointer; display: none; }
 #bb-pill.show { display: block; }
 #bb-pill.ok { border-color: rgba(120, 220, 140, 0.8); }
 #bb-pill .bb-sub { opacity: 0.75; font-size: 1vh; }

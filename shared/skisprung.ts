@@ -135,6 +135,8 @@ export interface SkiJump {
   kmh: number;
   /** Nicht angetreten (nicht aufs Board gekommen) */
   dns?: boolean;
+  /** Neuer Gesamtrekord / persönliche Bestleistung (weiteste Weite ohne Sturz) */
+  rec?: import('./balance').RecordResult;
 }
 
 export interface SkiState extends BalanceTurn {

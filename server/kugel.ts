@@ -26,7 +26,7 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
     for (const id of ids) points[id] = 0;
     this.state = {
       sub: 'ready', t: Date.now(), seed,
-      order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
+      records: [], order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
       x: cellX(this.course.start.c), y: cellY(this.course.start.r), vx: 0, vy: 0, ang: routeHeading(this.course, 0), ft: 0, fall: 0, falls: 0, cp: 0,
       runs: {}, points, last: null,
     };
@@ -151,6 +151,12 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
       score: Math.round((time + pen + (finished ? 0 : (1 - prog) * 40)) * 100) / 100,
       finished,
     };
+    // Bestleistung = beste Wertung (Zeit + Strafen); nur wer im Ziel ist
+    const rec = finished ? this.ctx.record?.('kugel', id, run.score, run.falls ? `${run.falls}× abgestürzt` : 'ohne Absturz') : null;
+    if (rec) {
+      run.rec = rec;
+      this.refreshRecords();
+    }
     s.runs[id] = run;
     s.last = { ...run, id };
     s.sub = 'done';

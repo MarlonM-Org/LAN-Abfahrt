@@ -77,7 +77,7 @@ export class SkisprungGame extends BalanceTurnGame<SkiState> {
     }
     this.state = {
       sub: 'ready', round: 1, rounds: ids.length <= SKI.TWO_ROUNDS_MAX ? 2 : 1, t: Date.now(),
-      order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
+      records: [], order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
       px: SKI.START_X, py: hillY(SKI.START_X), vx: 0, vy: 0, ang: 0, kmh: 0, q: 0, takeoff: null, dist: 0,
       jumps, points, last: null, best: null,
     };
@@ -223,6 +223,12 @@ export class SkisprungGame extends BalanceTurnGame<SkiState> {
     const style = styleNote(qFlight, qLand, tq, fall);
     const points = Math.round((distPoints(dist) + style) * 10) / 10;
     const jump: SkiJump = { dist, style, points, fall, takeoff: s.takeoff, kmh: Math.round(this.v * 3.6 * 10) / 10 };
+    // Bestleistung = weiteste Weite; wer stürzt, hat keinen Rekord
+    const rec = fall ? null : this.ctx.record?.('skisprung', id, dist, `${points.toFixed(1)} P`);
+    if (rec) {
+      jump.rec = rec;
+      this.refreshRecords();
+    }
     this.state.jumps[id].push(jump);
     s.points[id] = Math.round((s.points[id] + points) * 10) / 10;
     s.last = { ...jump, id };

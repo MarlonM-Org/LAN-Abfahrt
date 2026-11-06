@@ -24,7 +24,7 @@ export class TeppichGame extends BalanceTurnGame<TepState> {
     for (const id of ids) points[id] = 0;
     this.state = {
       sub: 'ready', t: Date.now(), seed,
-      order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
+      records: [], order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
       x: TEP.START_X, y: TEP.START_Y, vy: 0, speed: 0, ft: 0, stunMs: 0, safeMs: 0, got: [], hits: 0,
       runs: {}, points, last: null,
     };
@@ -136,6 +136,12 @@ export class TeppichGame extends BalanceTurnGame<TepState> {
       score: Math.round((time - s.got.length * TEP.GEM_BONUS) * 100) / 100,
       finished,
     };
+    // Bestleistung = beste Wertung (Zeit − Juwelen); nur wer im Ziel ist
+    const rec = finished ? this.ctx.record?.('teppich', id, run.score, `${run.gems} Juwelen`) : null;
+    if (rec) {
+      run.rec = rec;
+      this.refreshRecords();
+    }
     s.runs[id] = run;
     s.last = { ...run, id };
     s.sub = 'done';
