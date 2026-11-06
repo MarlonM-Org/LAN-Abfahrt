@@ -721,32 +721,43 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 :where(html:not(.land)) .k3-viewsw { top: calc(100px + var(--st)); }
 :where(html:not(.land)) .k3-viewnote { top: calc(100px + var(--st)); }
 
-/* ---------------------------------------------------------------- Auto-Fußball (gleiches Querformat wie das Kart-Rennen) */
-.afb { background: linear-gradient(180deg, var(--paper) 0%, #f1d49a 100%); }
-.afb-A { box-shadow: inset 0 6px 0 #f4c542; }
-.afb-B { box-shadow: inset 0 6px 0 #3fa7e0; }
-.afb .k3-hud { top: calc(30px + var(--st)); }
-.afb-score { font-size: 34px; line-height: 1; color: var(--ink); }
+/* ---------------------------------------------------------------- Auto-Fußball (Querlayout .lx: Stick links, BREMSE/BOOST/GAS rechts)
+   Ausgelegt auf iPhone 12 Pro quer (844 × 390, mit Safari-Leisten ≈ 300–340 px hoch): rechts ≈ 330 px breit,
+   BREMSE als hohe Säule links, BOOST oben und GAS (größter Knopf) unten rechts – Daumen rutscht zwischen allen dreien. */
+.lx.afb-lx { --lx-l: 34%; --lx-r: 42%; }
+.lx.afb-A { box-shadow: inset 0 5px 0 #f4c542, inset 0 0 0 2px var(--wood); }
+.lx.afb-B { box-shadow: inset 0 5px 0 #3fa7e0, inset 0 0 0 2px var(--wood); }
+.afb-dir { font-size: 7px; color: var(--ink-soft); }
+.afb-lx .st-label { font-size: 7px; }
+.afb-mid { gap: 10px; }
+.afb-score { font-size: 28px; line-height: 1; color: var(--ink); white-space: nowrap; }
 .afb-score .sa { color: #c8961c; }
 .afb-score .sb { color: #2a86c0; }
-.afb-score i { font-style: normal; margin: 0 8px; color: var(--ink-soft); }
-.afb-clock { margin-top: 8px; font-size: 11px; color: var(--ink); }
-.afb-team { margin-top: 8px; font-size: 7px; color: var(--ink-soft); }
-.afb-A .afb-team b { color: #c8961c; }
-.afb-B .afb-team b { color: #2a86c0; }
-.afb .k3-center { top: auto; bottom: calc(30% + var(--sb)); }
-.afb .k3-center.count { color: #c8961c; }
-.afb .k3-center.go { color: var(--green-ink, #2f7d32); }
-.afb .k3-center.hit { color: var(--red); }
-.afb .k3-btn small { text-align: center; line-height: 1.5; }
-.afb-boost { background: #f0973a; box-shadow: inset 0 4px 0 #f7bd7a, inset 0 -6px 0 #b8661c, 0 3px 0 var(--outline); }
+.afb-score i { font-style: normal; margin: 0 6px; color: var(--ink-soft); }
+.afb-center { min-height: 36px; display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1.4; color: var(--ink); }
+.afb-center.count { font-size: 34px; color: #c8961c; }
+.afb-center.go { font-size: 24px; color: #2f7d32; }
+.afb-center.hit { font-size: 16px; color: var(--red); }
+.afb-center.small { font-size: 8px; }
+.afb-msg { min-height: 4.8em; font-size: 7px; line-height: 1.6; color: var(--red); }
+.afb-pad {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); grid-template-rows: minmax(0, 0.8fr) minmax(0, 1.2fr); grid-auto-rows: auto;
+  gap: 10px; touch-action: none;
+}
+.afb-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-width: 0; min-height: 0;
+  color: #fff4d6; text-shadow: 2px 2px 0 var(--outline); font-size: 14px; line-height: 1.2; text-align: center;
+  border: 3px solid var(--outline); border-radius: 12px; pointer-events: none; box-sizing: border-box;
+}
+.afb-btn small { font-size: 7px; line-height: 1.5; opacity: 0.9; }
+.afb-brake { grid-column: 1; grid-row: 1 / 3; font-size: 12px; background: #d8473c; box-shadow: inset 0 4px 0 #f07a6e, inset 0 -6px 0 #9a2c22, 0 3px 0 var(--outline); }
+.afb-boost { grid-column: 2; grid-row: 1; background: #f0973a; box-shadow: inset 0 4px 0 #f7bd7a, inset 0 -6px 0 #b8661c, 0 3px 0 var(--outline); }
+.afb-gas { grid-column: 2; grid-row: 2; font-size: 22px; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.afb-btn.down { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 2px 0 rgba(0,0,0,0.25), 0 0 0 var(--outline); }
 .afb-boost.empty { filter: grayscale(0.8) brightness(0.9); }
-.afb-bar { width: 76%; height: 9px; border: 2px solid var(--outline); background: rgba(0,0,0,0.35); box-sizing: border-box; }
+.afb-bar { width: 76%; height: 10px; border: 2px solid var(--outline); background: rgba(0,0,0,0.35); box-sizing: border-box; }
 .afb-bar i { display: block; height: 100%; width: 0; background: #ffd25e; transition: width 120ms linear; }
-.afb-hop { right: calc(12px + var(--sr) + var(--bw) + var(--gap)); bottom: calc(12px + var(--sb) + var(--bh) + var(--gap)); width: calc(var(--bw) * 0.72); height: calc(var(--bh) * 0.78);
-  background: #9b5fc0; box-shadow: inset 0 4px 0 #c08fe0, inset 0 -6px 0 #6e3f8f, 0 3px 0 var(--outline); font-size: 9px; }
-.afb-hop.cool { filter: grayscale(0.7) brightness(0.85); }
-.afb .k3-brake.afb-charged { box-shadow: inset 0 2px 0 rgba(0,0,0,0.25), 0 0 0 4px #ffd25e; }
+.afb-brake.charged { box-shadow: inset 0 2px 0 rgba(0,0,0,0.25), 0 0 0 4px #ffd25e; }
 
 /* ---------------------------------------------------------------- Wackelturm (quer: links ◀ ▶, rechts DREHEN/FALLEN) – auch Kofferpacken */
 .lx.turm-lx { --lx-l: 38%; --lx-r: 30%; }
@@ -1218,25 +1229,60 @@ button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .sq-answer.active:disabled { opacity: 1; }
 .sq-next { min-height: 26vh; background: #e46e98; box-shadow: inset 0 4px 0 #f59ab9, inset 0 -6px 0 #b0306a, 0 3px 0 var(--outline); }
 
-/* ---------------------------------------------------------------- Urlaubs-Minigolf */
-.gf-status { display: flex; align-items: center; gap: 8px; min-height: 24px; }
-.gf-status .gf-msg { flex: 1; color: var(--red); font-size: 11px; }
-.gf-status b { font-weight: normal; font-size: 10px; color: var(--ink); }
+/* ---------------------------------------------------------------- Urlaubs-Minigolf
+   Quer im Querlayout .lx: links die Bahn (= Zugfeld, ganze Fläche), rechts Status, Feedback, Sensor, VIP-Knopf. */
+.lx.gf-lx { --lx-r: 31%; grid-template-areas: "head head" "left right"; grid-template-columns: minmax(0, 1fr) var(--lx-r); }
+.gf-lx .lx-head .gf-sw { width: 12px; height: 12px; border-width: 2px; }
+.gf-lx .gf-strokes { color: var(--red); font-weight: normal; }
+.gf-lx .gf-hole { font-weight: normal; }
+.gf-total { color: var(--ink-soft); }
 .gf-sw { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--outline); display: inline-block; }
 .gf-pad {
-  flex: 1; min-height: 46vh; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 3px 10px;
-  touch-action: none; position: relative;
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 4px;
+  touch-action: none; overflow: hidden;
   background: repeating-linear-gradient(90deg, #4fa63c 0 14px, #58b043 14px 28px);
   border: 4px solid var(--wood-dark); box-shadow: inset 0 0 0 2px var(--wood-light), 0 3px 0 var(--outline);
 }
 .gf-pad.locked { filter: saturate(0.6); }
-.gf-pad.motion { min-height: 30vh; }
-.gf-map { display: block; image-rendering: auto; border: 2px solid var(--outline); background: #f1d49a; pointer-events: none; }
-.gf-power { width: 80%; height: 10px; border: 2px solid var(--outline); background: var(--paper-dark); pointer-events: none; }
+.gf-map { display: block; flex: none; image-rendering: auto; border: 2px solid var(--outline); background: #f1d49a; pointer-events: none; }
+.gf-under { display: flex; align-items: center; gap: 6px; width: min(100%, 300px); pointer-events: none; font-size: 7px; color: var(--paper-light); text-shadow: 1px 1px 0 var(--outline); }
+.gf-pct { min-width: 38px; text-align: right; font-weight: normal; font-size: 8px; }
+.gf-power { flex: 1; height: 10px; border: 2px solid var(--outline); background: var(--paper-dark); }
 .gf-power > div { height: 100%; width: 0; background: linear-gradient(90deg, #46b04a, #f2c33a 60%, #e0503f); }
-.gf-hint { color: var(--paper-light); text-shadow: 1px 1px 0 var(--outline); font-size: 9px; pointer-events: none; padding: 0 6px; }
-.gf-note { font-size: 8px; }
-.big-btn.gf-swing { min-height: 22vh; font-size: 16px; flex: none; }
+.gf-hint { margin: 0; min-height: 3em; color: var(--paper-light); text-shadow: 1px 1px 0 var(--outline); font-size: 7px; line-height: 1.5; text-align: center; pointer-events: none; padding: 0 6px; }
+/* Finger-Anker und Finger beim Zurückziehen */
+.gf-touch { position: absolute; left: 0; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; pointer-events: none; border: 2px solid #fff6dc; background: rgba(255, 246, 220, 0.25); }
+.gf-touch.gf-t1 { width: 26px; height: 26px; margin: -13px 0 0 -13px; background: rgba(45, 27, 18, 0.25); border-color: var(--outline); }
+.lx-right.gf-side { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+.gf-status { flex: none; display: flex; flex-direction: column; gap: 3px; padding: 5px 6px; background: var(--paper-light); border: 3px solid var(--wood-dark); }
+.gf-msg { font-weight: normal; font-size: 10px; color: var(--red); }
+.gf-sub { font-size: 7px; line-height: 1.5; color: var(--ink); }
+.gf-side .mf { flex: 0 1 auto; min-height: 0; overflow: hidden; padding: 4px 6px; gap: 3px; }
+/* Feedback-Karte in der schmalen Spalte: Kraft-Balken + Tipp reichen (Details per Antippen) */
+.gf-side .mf-title { font-size: 8px; }
+.gf-side .mf-barlbl { display: none; }
+.gf-side .mf-barrow { grid-template-columns: 1fr; }
+.gf-side .mf-bartxt, .gf-side .mf-tip { font-size: 7px; }
+.gf-side .big-btn.gf-swing { flex: 1 1 auto; min-height: 64px; font-size: 12px; }
+.gf-side .big-btn.gf-swing small { font-size: 7px; }
+.gf-sensor { flex: none; display: flex; flex-direction: column; gap: 3px; }
+.gf-sensor .gf-mode { margin: 0; padding: 6px 4px; font-size: 8px; }
+.gf-sstat { display: block; font-size: 7px; line-height: 1.5; color: var(--ink-soft); text-align: center; }
+.gf-sstat.ok { color: #2f7d32; }
+.gf-sstat.bad { color: var(--red); }
+/* VIP: „Nächstes Loch“ (zwei Tipps) */
+button.gf-vip { flex: none; margin: 0; padding: 7px 4px; font-size: 9px; line-height: 1.4; background: #2d64a8; box-shadow: inset 0 3px 0 #7fbcf0, inset 0 -4px 0 #1f4a80, 0 3px 0 var(--outline); }
+.gf-side button.gf-vip { margin-top: auto; }
+button.gf-vip.armed { background: var(--red); box-shadow: inset 0 3px 0 #e86a5c, inset 0 -4px 0 #8a2419, 0 3px 0 var(--outline); animation: pulse-soft 0.5s infinite alternate; }
+.gf-intro .gf-ask { margin-top: 8px; }
+.gf-intro .gf-sstat { margin-top: 4px; font-size: 8px; }
+.gf-ended { font-size: 8px; color: var(--red); }
+/* Sehr flach (Chrome Android mit Adressleiste, ~300 px): neutrale Sensor-Zeile weg, damit die Feedback-Karte passt */
+@media (max-height: 330px) {
+  .gf-side .gf-sstat:not(.ok):not(.bad) { display: none; }
+}
+/* Tablet/Laptop hochkant (kein Dreh-Overlay): Bahn oben, Rest darunter */
+:where(html:not(.land)) .lx.gf-lx { grid-template-areas: "head" "left" "right"; grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); overflow: auto; }
 .gf-card { gap: 4px; padding: 8px; }
 .gf-row { display: grid; grid-template-columns: 26px 18px 1fr 30px 36px; gap: 6px; align-items: center; font-size: 9px; padding: 3px 4px; }
 .gf-row.me { background: #fff0c4; }

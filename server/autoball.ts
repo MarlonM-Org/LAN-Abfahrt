@@ -1,6 +1,6 @@
 import type { MiniSnapshot, Team } from '../shared/types';
 import { AFB, AFB_CX, AFB_CY, type AfbCar, type AfbGoal, type AfbState, afbCollideWalls, afbGoalHalf, afbKickoff } from '../shared/autoball';
-import { KART, type KartInput, type KartPhys, stepKart } from '../shared/kart';
+import { KART, type KartPhys, stepKart, wrapAngle } from '../shared/kart';
 import { TEAM_INFO } from '../shared/flunky';
 import { teamHandicap } from '../shared/games';
 import { type MiniCtx, type MiniGame, Timers, asRecord, splitTeams } from './minigame';
@@ -12,11 +12,14 @@ const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');
 const MATCH_MS = Number(process.env.AFB_MATCH_MS) || AFB.MATCH_MS;
 
 interface Inp {
-  steer: number;
+  /** Stick-Richtung in TV-Koordinaten (rad), null = Stick losgelassen → Richtung halten */
+  aim: number | null;
   gas: boolean;
   brake: boolean;
   boost: boolean;
 }
+
+const NO_INP = (): Inp => ({ aim: null, gas: false, brake: false, boost: false });
 
 interface Car extends KartPhys {
   id: string;
@@ -26,8 +29,8 @@ interface Car extends KartPhys {
   inp: Inp;
   tank: number;
   boosting: boolean;
-  hopUntil: number;
-  hopReadyAt: number;
+  /** Gewählte Drehrichtung zur Stick-Richtung (±1, 0 = keine) – hält eine Wende hinter dem Auto stabil */
+  turnDir: number;
   goals: number;
   touches: number;
   /** Ballkontakt im letzten / aktuellen Teilschritt (Kontakte zählen nur beim Anfang einer Berührung) */
@@ -39,9 +42,11 @@ interface Car extends KartPhys {
 /**
  * Auto-Fußball (à la Rocket League, aber von oben): kleine Karts schieben einen großen Wasserball
  * ins gegnerische Tor. Fahrphysik = Kart-Rennen (`stepKart` ohne Strecke), dazu BOOST (Tank lädt
- * sich auf) und HÜPFER (kurz über andere Autos springen, Ball härter treffen). BREMSE in voller
- * Fahrt + lenken = Drift (mit Mini-Turbo wie im Kart). Ball- und Bandenphysik laufen hier.
- * 3 Minuten, bei Gleichstand Golden Goal (max. 1 Minute), danach Unentschieden.
+ * sich auf). Gelenkt wird absolut: der Stick zeigt die gewünschte Richtung auf dem TV, das Auto
+ * dreht mit der normalen Kart-Lenkung dorthin (also im Bogen, auch bei einer Wende) – siehe `steerFor()`.
+ * GAS fährt, BREMSE bremst bzw. fährt im Stand rückwärts (die Schnauze dreht dabei weiter zur
+ * Stick-Richtung); BREMSE in voller Fahrt + Stick in eine neue Richtung = Drift-Wende mit Mini-Turbo.
+ * Ball- und Bandenphysik laufen hier. 3 Minuten, bei Gleichstand Golden Goal (max. 1 Minute), danach Unentschieden.
  */
 export class AutoballGame implements MiniGame {
   readonly kind = 'autoball' as const;
@@ -68,8 +73,8 @@ export class AutoballGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     const perTeam: Record<Team, number> = { A: 0, B: 0 };
-    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) oder zufällig geteilt
-    const split = splitTeams(ids, ctx.teams);
+    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3), sonst die Aufteilung der Aufwärmrunde bzw. zufällig
+    const split = splitTeams(ids, ctx.teams ?? ctx.warmTeams);
     const teamOf = new Map<string, Team>([...split.A.map((id) => [id, 'A'] as const), ...split.B.map((id) => [id, 'B'] as const)]);
     // Handicap bei ungleichen Brett-Teams: Vorsprung in Toren (dazu lädt der Boost des kleineren Teams schneller, s. u.)
     if (ctx.teams) this.score = teamHandicap(split.A.length, split.B.length);
@@ -91,11 +96,10 @@ export class AutoballGame implements MiniGame {
         boostMs: 0,
         spinMs: 0,
         offroad: false,
-        inp: { steer: 0, gas: false, brake: false, boost: false },
+        inp: NO_INP(),
         tank: AFB.BOOST_KICKOFF,
         boosting: false,
-        hopUntil: 0,
-        hopReadyAt: 0,
+        turnDir: 0,
         goals: 0,
         touches: 0,
         contactPrev: false,
@@ -125,7 +129,7 @@ export class AutoballGame implements MiniGame {
     this.teamTouch = { A: null, B: null };
     for (const c of this.cars.values()) {
       const k = afbKickoff(c.team, c.slot);
-      Object.assign(c, { x: k.x, y: k.y, angle: k.a, vx: 0, vy: 0, driftDir: 0, driftCharge: 0, boostMs: 0, hopUntil: 0, boosting: false });
+      Object.assign(c, { x: k.x, y: k.y, angle: k.a, vx: 0, vy: 0, driftDir: 0, driftCharge: 0, boostMs: 0, boosting: false, turnDir: 0 });
       c.tank = Math.max(c.tank, AFB.BOOST_KICKOFF);
     }
   }
@@ -192,10 +196,39 @@ export class AutoballGame implements MiniGame {
 
   // ---------------------------------------------------------------- Physik
 
+  /**
+   * Absolute Lenkung: aus der Stick-Richtung den Lenkeinschlag (−1…1) für `stepKart` machen und entscheiden,
+   * ob gedriftet wird. Liegt das Ziel hinter dem Auto, bleibt die einmal gewählte Drehrichtung (frisch: zur
+   * Feldmitte hin) – so fährt es eine Wende im Bogen statt hin und her zu zucken. Rückwärts lenkt `stepKart`
+   * andersherum, deshalb wird der Einschlag dann gespiegelt: die Schnauze dreht immer zur Stick-Richtung.
+   */
+  private steerFor(c: Car): { steer: number; drift: boolean } {
+    const aim = c.inp.aim;
+    // Stick losgelassen: Richtung halten (eine Drift endet – mit Mini-Turbo, falls geladen)
+    if (aim === null) {
+      c.turnDir = 0;
+      return { steer: 0, drift: false };
+    }
+    let diff = wrapAngle(aim - c.angle);
+    if (Math.abs(diff) > AFB.AIM_BEHIND) {
+      if (!c.turnDir) {
+        const cross = Math.cos(c.angle) * (AFB_CY - c.y) - Math.sin(c.angle) * (AFB_CX - c.x);
+        c.turnDir = cross >= 0 ? 1 : -1;
+      }
+      diff = c.turnDir * Math.abs(diff);
+    } else c.turnDir = Math.abs(diff) > 0.15 ? Math.sign(diff) : 0;
+    const vf = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+    // BREMSE in voller Fahrt + Stick deutlich neben der Fahrtrichtung = Drift-Wende; endet, sobald die Richtung erreicht ist
+    const drift =
+      c.inp.brake &&
+      (c.driftDir !== 0 ? Math.sign(diff) === c.driftDir && Math.abs(diff) > 0.12 : vf > KART.DRIFT_MIN_SPEED && Math.abs(diff) > AFB.DRIFT_AIM);
+    const steer = clamp(diff / AFB.STEER_SOFT, -1, 1);
+    return { steer: vf < -2 && !drift ? -steer : steer, drift };
+  }
+
   private physics(now: number, dt: number) {
     const live = this.sub === 'play' || this.sub === 'goal';
     const list = [...this.cars.values()];
-    const kin = new Map<string, KartInput>();
     for (const c of list) {
       const inp = c.inp;
       const connected = this.ctx.isConnected(c.id);
@@ -207,10 +240,6 @@ export class AutoballGame implements MiniGame {
       } else {
         c.tank = Math.min(AFB.BOOST_MAX, c.tank + AFB.BOOST_FILL * this.fill[c.team] * dt);
       }
-      // BREMSE in voller Fahrt + lenken = Drift (wie DRIFT im Kart), sonst bremsen bzw. rückwärts
-      const vf = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
-      const drift = inp.brake && (c.driftDir !== 0 || (vf > KART.DRIFT_MIN_SPEED && Math.abs(inp.steer) > 0.35));
-      kin.set(c.id, { steer: inp.steer, gas: inp.gas, brake: inp.brake && !drift, drift });
     }
     const N = AFB.SUBSTEPS;
     const h = dt / N;
@@ -219,16 +248,17 @@ export class AutoballGame implements MiniGame {
       for (const c of list) {
         c.contactPrev = c.contactNow;
         c.contactNow = false;
-        stepKart(c, kin.get(c.id)!, h, null, { frozen: !this.ctx.isConnected(c.id) });
+        // Lenkung in jedem Teilschritt neu (die Richtung ändert sich dabei)
+        const { steer, drift } = this.steerFor(c);
+        stepKart(c, { steer, gas: c.inp.gas, brake: c.inp.brake && !drift, drift }, h, null, { frozen: !this.ctx.isConnected(c.id) });
         afbCollideWalls(c, AFB.CAR_R, this.goalHalf, AFB.CAR_WALL_E);
       }
-      // Autos schubsen sich (wer hüpft, fliegt drüber)
+      // Autos schubsen sich
       const R2 = AFB.CAR_R * 2;
       for (let i = 0; i < list.length; i++) {
         for (let j = i + 1; j < list.length; j++) {
           const p = list[i];
           const q = list[j];
-          if (p.hopUntil > now || q.hopUntil > now) continue;
           const dx = q.x - p.x;
           const dy = q.y - p.y;
           const d = Math.hypot(dx, dy);
@@ -303,12 +333,11 @@ export class AutoballGame implements MiniGame {
     b.vy += ny * j * wb;
     c.vx -= nx * j * wc;
     c.vy -= ny * j * wc;
-    // Schuss: Fahrt in Richtung Ball gibt extra Wumms (beim Hüpfer mehr)
+    // Schuss: Fahrt in Richtung Ball gibt extra Wumms
     const push = c.vx * nx + c.vy * ny;
     if (push > 15) {
-      const k = c.hopUntil > now ? AFB.HOP_KICK : AFB.KICK;
-      b.vx += nx * push * k;
-      b.vy += ny * push * k;
+      b.vx += nx * push * AFB.KICK;
+      b.vy += ny * push * AFB.KICK;
     }
     if (this.sub !== 'play') return;
     // Ballkontakt zählen: neue Berührung, nicht öfter als alle 300 ms (Dauerschieben = 1 Kontakt)
@@ -325,16 +354,13 @@ export class AutoballGame implements MiniGame {
     if (!c) return;
     const pl = asRecord(payload);
     if (action === 'steer') {
-      // { x: Lenkung, gas, brake, boost } – fehlende Felder bleiben, wie sie sind
-      c.inp.steer = clamp(Number(pl.x) || 0, -1, 1);
+      // { x, y: Stick in TV-Richtung (rechts/unten positiv), gas, brake, boost } – fehlende Knöpfe bleiben, wie sie sind
+      const x = clamp(Number(pl.x) || 0, -1, 1);
+      const y = clamp(Number(pl.y) || 0, -1, 1);
+      c.inp.aim = Math.hypot(x, y) >= AFB.STICK_DEAD ? Math.atan2(y, x) : null;
       if (typeof pl.gas === 'boolean') c.inp.gas = pl.gas;
       if (typeof pl.brake === 'boolean') c.inp.brake = pl.brake;
       if (typeof pl.boost === 'boolean') c.inp.boost = pl.boost;
-    } else if (action === 'hop') {
-      const now = Date.now();
-      if ((this.sub !== 'play' && this.sub !== 'goal') || now < c.hopReadyAt) return;
-      c.hopUntil = now + AFB.HOP_MS;
-      c.hopReadyAt = now + AFB.HOP_COOLDOWN_MS;
     }
   }
 
@@ -345,7 +371,7 @@ export class AutoballGame implements MiniGame {
     this.sub = 'over';
     this.winner = winner;
     this.deadline = Date.now() + AFB.END_MS;
-    for (const c of this.cars.values()) c.inp = { steer: 0, gas: false, brake: false, boost: false };
+    for (const c of this.cars.values()) c.inp = NO_INP();
     this.ctx.onChange();
     const ids = this.ids.filter((id) => this.cars.has(id));
     const teamOf = (id: string) => this.cars.get(id)!.team;
@@ -385,8 +411,7 @@ export class AutoballGame implements MiniGame {
         bo: c.boostMs > 0,
         d: c.driftDir,
         ch: c.driftDir !== 0 && c.driftCharge >= KART.DRIFT_CHARGE_S,
-        hop: Math.max(0, c.hopUntil - now),
-        hc: Math.max(0, c.hopReadyAt - now),
+        s: c.inp.aim === null ? null : Math.round(c.inp.aim * 100) / 100,
         g: c.goals,
         k: c.touches,
       };
@@ -414,7 +439,7 @@ export class AutoballGame implements MiniGame {
 
   playerDisconnected(id: string) {
     const c = this.cars.get(id);
-    if (c) c.inp = { steer: 0, gas: false, brake: false, boost: false };
+    if (c) c.inp = NO_INP();
   }
 
   dispose() {

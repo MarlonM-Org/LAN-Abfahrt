@@ -15,9 +15,10 @@ import {
   coverBetween,
   flightMs,
   segHitsRect,
+  throwTarget,
 } from '../shared/wasser';
 import { playerColor } from '../shared/players';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, splitTeams } from './minigame';
+import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByScore, splitTeams } from './minigame';
 
 const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -40,7 +41,11 @@ interface P {
   ax: number;
   ay: number;
   pistolUntil: number;
+  /** wann klatschnass geworden (für das automatische Hintragen zum Handtuch) */
+  soakedAt: number;
   dryStart: number;
+  /** Verbindung weg (nach der Gnadenfrist des Raums): eingefroren + unverwundbar */
+  away: boolean;
   shieldUntil: number;
   lastHitAt: number;
   lastHitBy: string | null;
@@ -67,7 +72,10 @@ interface Balloon {
 
 /**
  * Wasserbomben-Schlacht im Garten vom Ferienhaus: Zwei Teams (bei 3 Spielern Jeder gegen jeden)
- * werfen Wasserbomben per Zwei-Stick-Steuerung. Wer klatschnass ist, muss zum Handtuch.
+ * werfen Wasserbomben per Zwei-Stick-Steuerung. Wer klatschnass ist, muss zum Handtuch – wer es nach
+ * SOAKED_AUTO_MS nicht selbst schafft, wird hingetragen. Klatschnass ist also nie ein Dauer-Aus.
+ * Endet nach Ablauf der Zeit – oder sofort, wenn eine Seite gar nicht mehr mitspielen kann
+ * (alle ihre Handys seit OFFLINE_OUT_MS weg bzw. vom VIP entfernt).
  */
 export class WasserGame implements MiniGame {
   readonly kind = 'wasser' as const;
@@ -80,6 +88,7 @@ export class WasserGame implements MiniGame {
   private lastSoak: WasserState['lastSoak'] = null;
   private seq = 0;
   private sub: WasserState['sub'] = 'countdown';
+  private endReason: WasserState['endReason'] = null;
   private deadline = Date.now() + W.COUNTDOWN_MS;
   private timers = new Timers();
   private readonly ffa: boolean;
@@ -118,7 +127,9 @@ export class WasserGame implements MiniGame {
         ax: 0,
         ay: 0,
         pistolUntil: 0,
+        soakedAt: 0,
         dryStart: 0,
+        away: false,
         shieldUntil: 0,
         lastHitAt: 0,
         lastHitBy: null,
@@ -169,6 +180,9 @@ export class WasserGame implements MiniGame {
   private tick(now: number, dt: number) {
     const A = W.AREA;
     for (const p of this.players.values()) {
+      // Verbindung weg (nach der 3-s-Gnadenfrist): eingefroren und unverwundbar, bis das Handy zurück ist
+      p.away = !this.ctx.isConnected(p.id);
+      if (p.away) p.sx = p.sy = p.ax = p.ay = 0;
       // Bewegung
       const canMove = p.status !== 'drying';
       const len = Math.hypot(p.sx, p.sy);
@@ -206,11 +220,16 @@ export class WasserGame implements MiniGame {
         }
         if (p.pistolUntil > now) this.spray(p, now, dt);
       } else if (p.status === 'soaked') {
-        const towel = this.bases(p).find((b) => Math.hypot(p.x - b.towel.x, p.y - b.towel.y) < W.TOWEL_R);
-        if (towel) {
-          p.status = 'drying';
-          p.dryStart = now;
-          p.sx = p.sy = 0;
+        const atTowel = this.bases(p).some((b) => Math.hypot(p.x - b.towel.x, p.y - b.towel.y) < W.TOWEL_R);
+        if (atTowel) this.startDrying(p, now);
+        else if (now - p.soakedAt >= W.SOAKED_AUTO_MS) {
+          // Nicht selbst hingeschafft (oder Weg versperrt): ab aufs nächste eigene Handtuch – niemand wartet ewig
+          const towel = this.bases(p)
+            .map((b) => b.towel)
+            .reduce((a, b) => (Math.hypot(p.x - a.x, p.y - a.y) <= Math.hypot(p.x - b.x, p.y - b.y) ? a : b));
+          p.x = towel.x;
+          p.y = towel.y;
+          this.startDrying(p, now);
         }
       } else if (p.status === 'drying' && now - p.dryStart >= W.TOWEL_DRY_MS) {
         p.status = 'ok';
@@ -236,8 +255,36 @@ export class WasserGame implements MiniGame {
       else this.nextPistol = now + 1000;
     }
 
-    if (now >= this.deadline) this.end();
+    if (now >= this.deadline) this.end('time');
+    else if (this.oneSideLeft()) this.end('away');
     else this.ctx.onChange();
+  }
+
+  private startDrying(p: P, now: number) {
+    p.status = 'drying';
+    p.dryStart = now;
+    p.sx = p.sy = 0;
+  }
+
+  /** Kann gar nicht mehr mitspielen: vom VIP entfernt oder Handy länger als OFFLINE_OUT_MS weg */
+  private out(id: string) {
+    return !!this.ctx.isGone?.(id) || (this.ctx.offlineMs?.(id) ?? 0) >= OFFLINE_OUT_MS;
+  }
+
+  /**
+   * Seiten = Teams bzw. bei Jeder-gegen-jeden die einzelnen Spieler. Kann nur noch eine Seite (oder keine)
+   * mitspielen, ist das Spiel sofort vorbei – statt bis zum Ablauf der Zeit zu warten.
+   * Eine Seite, die von Anfang an leer war (Solo-Test), zählt nicht.
+   */
+  private sides(): string[][] {
+    const ps = [...this.players.values()];
+    if (this.ffa) return ps.map((p) => [p.id]);
+    return (['A', 'B'] as Team[]).map((t) => ps.filter((p) => p.team === t).map((p) => p.id)).filter((ids) => ids.length);
+  }
+
+  private oneSideLeft() {
+    const sides = this.sides();
+    return sides.length >= 2 && sides.filter((ids) => ids.some((id) => !this.out(id))).length <= 1;
   }
 
   /** Spieler aus Hecken, Liegen und Pool herausschieben */
@@ -268,7 +315,7 @@ export class WasserGame implements MiniGame {
   }
 
   private vulnerable(p: P, now: number) {
-    return p.status === 'ok' && now >= p.shieldUntil;
+    return p.status === 'ok' && !p.away && now >= p.shieldUntil;
   }
 
   private wetten(victim: P, by: P, amount: number, now: number) {
@@ -277,6 +324,7 @@ export class WasserGame implements MiniGame {
     victim.lastHitBy = by.id;
     if (victim.wet >= 100) {
       victim.status = 'soaked';
+      victim.soakedAt = now;
       victim.wet = 100;
       victim.ammo = 0;
       victim.pistolUntil = 0;
@@ -385,8 +433,9 @@ export class WasserGame implements MiniGame {
       p.sy = v.y;
     } else if (action === 'aim') {
       const v = vec();
-      p.ax = p.status === 'ok' ? v.x : 0;
-      p.ay = p.status === 'ok' ? v.y : 0;
+      const ok = p.status === 'ok' && !p.away;
+      p.ax = ok ? v.x : 0;
+      p.ay = ok ? v.y : 0;
     } else if (action === 'throw') {
       const v = vec();
       p.ax = p.ay = 0;
@@ -396,11 +445,10 @@ export class WasserGame implements MiniGame {
 
   private throwBalloon(p: P, vx: number, vy: number) {
     const now = Date.now();
-    if (this.sub !== 'play' || p.status !== 'ok' || p.ammo <= 0 || p.pistolUntil > now) return;
-    if (now - p.lastThrow < W.THROW_COOLDOWN_MS || Math.hypot(vx, vy) < 0.15) return;
-    const A = W.AREA;
-    const tx = clamp(p.x + vx * W.RANGE, A.x + 2, A.x + A.w - 2);
-    const ty = clamp(p.y + vy * W.RANGE, A.y + 2, A.y + A.h - 2);
+    if (this.sub !== 'play' || p.status !== 'ok' || p.away || p.ammo <= 0 || p.pistolUntil > now) return;
+    if (now - p.lastThrow < W.THROW_COOLDOWN_MS || Math.hypot(vx, vy) < W.AIM_MIN) return;
+    // Gleiche Kurve wie die TV-Vorschau (shared/wasser.ts): wenig ziehen = kurz, voll ziehen = RANGE
+    const { x: tx, y: ty } = throwTarget(p.x, p.y, vx, vy);
     p.ammo--;
     p.lastThrow = now;
     if (Math.abs(vx) > 0.1) p.dir = vx > 0 ? 1 : -1;
@@ -409,14 +457,18 @@ export class WasserGame implements MiniGame {
 
   // ---------------------------------------------------------------- Ende
 
-  private end() {
+  private end(reason: 'time' | 'away') {
     if (this.sub === 'over') return;
     this.sub = 'over';
+    this.endReason = reason;
     this.timers.clear();
     this.balloons = [];
     for (const p of this.players.values()) p.sx = p.sy = p.ax = p.ay = 0;
     this.ctx.onChange();
     const ps = [...this.players.values()];
+    // Vorzeitiges Ende, weil eine Seite nicht mehr mitspielen kann: die verbliebene Seite gewinnt
+    const left = reason === 'away' ? this.sides().filter((ids) => ids.some((id) => !this.out(id))) : [];
+    const stay = left.length === 1 ? left[0] : null;
     // Ergebnis-Screen zeigt max. 16 Zeichen
     const detail = (p: P) => `${p.hits} Tr. · ${p.soaked}× nass`;
     const details = Object.fromEntries(ps.map((p) => [p.id, detail(p)]));
@@ -424,28 +476,41 @@ export class WasserGame implements MiniGame {
     if (this.ffa) {
       const score = (id: string) => {
         const p = this.players.get(id)!;
-        return p.soaks * 1000 + p.hits * 10 - p.soaked;
+        return (stay?.includes(id) ? 1e6 : 0) + p.soaks * 1000 + p.hits * 10 - p.soaked;
       };
       const groups = groupByScore(this.ids, score);
       const best = this.players.get(groups[0][0])!;
       result = {
         groups,
         details: Object.fromEntries(ps.map((p) => [p.id, `${p.soaks}× nass gemacht`])),
-        subtitle: groups[0].length > 1 ? 'Unentschieden – alle gleich nass!' : `${this.ctx.nameOf(best.id)} ist der Wasserbomben-Profi!`,
+        subtitle: stay
+          ? `Nur noch ${this.ctx.nameOf(best.id)} ist dabei – Sieg!`
+          : groups[0].length > 1
+            ? 'Unentschieden – alle gleich nass!'
+            : `${this.ctx.nameOf(best.id)} ist der Wasserbomben-Profi!`,
       };
     } else {
       // Gleichstand bei Klatschnass → mehr Treffer entscheiden
       const hits: Record<Team, number> = { A: 0, B: 0 };
       for (const p of ps) if (p.team) hits[p.team] += p.hits;
       const val = (t: Team) => this.score[t] * 10000 + hits[t];
-      const win: Team | null = val('A') === val('B') ? null : val('A') > val('B') ? 'A' : 'B';
       const teamOf = (id: string) => this.players.get(id)!.team!;
+      const forfeit: Team | null = stay ? teamOf(stay[0]) : null;
+      const win: Team | null = forfeit ?? (val('A') === val('B') ? null : val('A') > val('B') ? 'A' : 'B');
+      const other = (t: Team): Team => (t === 'A' ? 'B' : 'A');
+      // 1 gegen 1: Namen statt Teamnamen
+      const label = (t: Team) => {
+        const ids = ps.filter((p) => p.team === t);
+        return ids.length === 1 ? this.ctx.nameOf(ids[0].id) : TEAM_INFO[t].name;
+      };
       result = {
         groups: win ? groupByScore(this.ids, (id) => (teamOf(id) === win ? 1 : 0)) : [this.ids],
         details,
-        subtitle: win
-          ? `${TEAM_INFO[win].name} gewinnt ${this.score[win]}:${this.score[win === 'A' ? 'B' : 'A']}${this.score.A === this.score.B ? ' (mehr Treffer)' : ''}!`
-          : 'Unentschieden – alle gleich nass!',
+        subtitle: forfeit
+          ? `${label(other(forfeit))} ist nicht mehr dabei – ${label(forfeit)} gewinnt!`
+          : win
+            ? `${TEAM_INFO[win].name} gewinnt ${this.score[win]}:${this.score[other(win)]}${this.score.A === this.score.B ? ' (mehr Treffer)' : ''}!`
+            : 'Unentschieden – alle gleich nass!',
         coins: win ? [10, 3] : [6],
       };
     }
@@ -470,6 +535,8 @@ export class WasserGame implements MiniGame {
         ay: r2(p.ay),
         pi: Math.max(0, p.pistolUntil - now),
         dp: p.status === 'drying' ? r2(Math.min(1, (now - p.dryStart) / W.TOWEL_DRY_MS)) : 0,
+        sk: p.status === 'soaked' && this.sub === 'play' ? Math.max(0, p.soakedAt + W.SOAKED_AUTO_MS - now) : 0,
+        ...(p.away ? { away: true } : {}),
         h: p.hits,
         n: p.soaked,
         k: p.soaks,
@@ -489,6 +556,7 @@ export class WasserGame implements MiniGame {
       kind: 'wasser',
       state: {
         sub: this.sub,
+        endReason: this.endReason,
         endsIn: Math.max(0, this.deadline - now),
         ffa: this.ffa,
         players,

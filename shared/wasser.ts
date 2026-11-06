@@ -14,6 +14,12 @@ export const WASSER = {
   SOAKED_SPEED: 62,
   /** Maximale Wurfweite (volle Auslenkung des Ziel-Sticks) */
   RANGE: 160,
+  /** Kürzester Wurf (Stick knapp über der Totzone) – so trifft man auch Gegner direkt neben sich */
+  MIN_THROW: 6,
+  /** Kurve Stick-Auslenkung → Weite (Exponent): kleine Ausschläge bleiben fein und nah, voller Ausschlag = RANGE */
+  AIM_CURVE: 2,
+  /** Ab dieser Auslenkung (0–1, nach der Totzone) wird beim Loslassen geworfen, darunter abgebrochen */
+  AIM_MIN: 0.05,
   MIN_FLIGHT_MS: 260,
   FLIGHT_MS_PER_PX: 3.4,
   THROW_COOLDOWN_MS: 380,
@@ -34,6 +40,8 @@ export const WASSER = {
   /** Am Handtuch abtrocknen */
   TOWEL_R: 14,
   TOWEL_DRY_MS: 2500,
+  /** Klatschnass: so lange darf man selbst zum Handtuch laufen, danach wird man hingetragen (nie Dauer-Pause) */
+  SOAKED_AUTO_MS: 5000,
   SPAWN_SHIELD_MS: 1500,
   /** Wasserpistole */
   PISTOL_MS: 6000,
@@ -124,6 +132,29 @@ export function flightMs(dist: number) {
   return WASSER.MIN_FLIGHT_MS + dist * WASSER.FLIGHT_MS_PER_PX;
 }
 
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+/** Wurfweite für eine Stick-Auslenkung 0–1: quadratisch – fein in der Nähe, voller Ausschlag reicht trotzdem bis RANGE */
+export function throwDist(stick: number) {
+  return WASSER.MIN_THROW + (WASSER.RANGE - WASSER.MIN_THROW) * clamp(stick, 0, 1) ** WASSER.AIM_CURVE;
+}
+
+/** Aufschlagpunkt eines Wurfs von (x, y) mit Ziel-Stick (ax, ay) – Server (Wurf) und TV (Vorschau) rechnen identisch */
+export function throwTarget(x: number, y: number, ax: number, ay: number): Point {
+  const len = Math.hypot(ax, ay);
+  const k = len > 1e-6 ? throwDist(len) / len : 0;
+  const A = WASSER.AREA;
+  return { x: clamp(x + ax * k, A.x + 2, A.x + A.w - 2), y: clamp(y + ay * k, A.y + 2, A.y + A.h - 2) };
+}
+
+/** Umkehrung (Bots): Ziel-Stick, mit dem ein Wurf (dx, dy) vom Werfer entfernt landet */
+export function aimFor(dx: number, dy: number): Point {
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-6) return { x: 0, y: 0 };
+  const s = Math.max(WASSER.AIM_MIN, clamp((d - WASSER.MIN_THROW) / (WASSER.RANGE - WASSER.MIN_THROW), 0, 1) ** (1 / WASSER.AIM_CURVE));
+  return { x: (dx / d) * s, y: (dy / d) * s };
+}
+
 // ------------------------------------------------------------------ Zustand (kompakt)
 
 export type WasserStatus = 'ok' | 'soaked' | 'drying';
@@ -151,6 +182,10 @@ export interface WasserPlayer {
   pi: number;
   /** Abtrocknen-Fortschritt 0–1 (nur bei "drying") */
   dp: number;
+  /** Klatschnass: ms, bis man automatisch zum Handtuch getragen wird (sonst 0) */
+  sk: number;
+  /** Verbindung weg: eingefroren und unverwundbar */
+  away?: boolean;
   /** Treffer gelandet */
   h: number;
   /** selbst klatschnass geworden */
@@ -184,6 +219,8 @@ export interface WasserSplash {
 
 export interface WasserState {
   sub: 'countdown' | 'play' | 'over';
+  /** Warum vorbei: Zeit um oder eine Seite kann nicht mehr mitspielen (Handy weg / entfernt) */
+  endReason: 'time' | 'away' | null;
   endsIn: number;
   ffa: boolean;
   players: Record<string, WasserPlayer>;

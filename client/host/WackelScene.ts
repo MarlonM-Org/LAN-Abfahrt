@@ -263,6 +263,17 @@ export class WackelScene extends Phaser.Scene {
       if (d.alive && !p.alive) {
         d.alive = false;
         this.platsch(d, p);
+      } else if (!d.alive && p.alive && st.sub === 'play') {
+        // Aufwärmrunde: neue Puppe mitten in der Runde
+        this.tweens.killTweensOf([...d.imgs, d.swim]);
+        d.alive = true;
+        d.stun = false;
+        d.pose = p.parts.length === 18 ? [...p.parts] : [];
+        for (const img of d.imgs) img.setVisible(true).setAlpha(1);
+        d.dizzy.setVisible(false);
+        d.swim.setVisible(false);
+        this.juice.burst(p.x, p.y - 10, 'spark', 10);
+        sfx('pop', { x: p.x, pitch: 1.3 });
       }
     }
     for (const f of st.fx) {

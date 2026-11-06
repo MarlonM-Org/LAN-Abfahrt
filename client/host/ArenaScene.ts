@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { ArenaState, GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { ARENA, cellIdx } from '../../shared/arena';
+import { ARENA } from '../../shared/arena';
 import { C } from '../art/palette';
 import { paintGrass, paintSand } from '../art/ground';
 import { arenaPalm, arenaRock, coconut, cooler, floodTile, hedge, itemIcon, lounger, sandcastle, splash, waterBalloon } from '../art/arena';
@@ -15,8 +15,12 @@ import { SnapBuffer, lerpJump } from './interp';
 import { sfx } from './sfx';
 
 const T = ARENA.TILE;
-const px = (x: number) => ARENA.OX + x * T + T / 2;
-const py = (y: number) => ARENA.OY + y * T + T / 2;
+/**
+ * Platz fürs Feld unter dem HUD (Mitte + Größe in Bildschirm-Pixeln). Das größte Feld (25 × 13) passt genau hinein;
+ * kleinere liegen in der Welt mittig um denselben Punkt und werden per Kamera-Zoom größer gezeigt (HUD-Kamera bleibt fix).
+ */
+const VIEW = { cx: WORLD.W / 2, cy: 152, w: 468, h: 234 };
+const MAX_ZOOM = 1.6;
 
 interface Fig {
   f: Figure;
@@ -47,10 +51,25 @@ export class ArenaScene extends Phaser.Scene {
   private clock = new Countdown();
   private juice!: Juice;
   private cheerRound = 0;
+  /** Feldgröße (kommt mit dem Snapshot, hängt von der Spielerzahl ab) und linke obere Ecke in Welt-Pixeln */
+  private cols = 0;
+  private rows = 0;
+  private ox = 0;
+  private oy = 0;
+  /** Hintergrund, Säulen, Deko des aktuellen Felds (bei anderer Größe neu bauen) */
+  private board: Phaser.GameObjects.GameObject[] = [];
+  /** HUD-Kamera ohne Zoom; alles andere sieht nur die Hauptkamera (außer während des HUD-Aufbaus) */
+  private hudCam!: Phaser.Cameras.Scene2D.Camera;
+  private hudBuilding = false;
 
   constructor() {
     super('arena');
   }
+
+  /** Kachelmitte → Welt-Pixel */
+  private px = (x: number) => this.ox + x * T + T / 2;
+  private py = (y: number) => this.oy + y * T + T / 2;
+  private idx = (x: number, y: number) => y * this.cols + x;
 
   create() {
     this.boxes.clear();
@@ -59,57 +78,95 @@ export class ArenaScene extends Phaser.Scene {
     this.flames.clear();
     this.items.clear();
     this.figs.clear();
+    this.board = [];
+    this.cols = 0;
+    this.rows = 0;
     this.latest = null;
     this.hudKey = '';
     this.phaseKey = '';
     this.round = 0;
     this.floodShown = false;
     this.cheerRound = 0;
+    this.hudBuilding = false;
     this.buf = new SnapBuffer();
+
+    // Kameras: Hauptkamera zoomt kleine Felder groß, HUD-Kamera bleibt fix darüber (Muster wie im Igel-Krieg)
+    this.cameras.main.setZoom(1).centerOn(WORLD.W / 2, WORLD.H / 2);
+    this.hudCam = this.cameras.add(0, 0, WORLD.W, WORLD.H);
+    const onAdded = (go: Phaser.GameObjects.GameObject) => {
+      if (!this.hudBuilding) this.hudCam.ignore(go);
+    };
+    this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
     this.juice = new Juice(this, { depth: 1650, clock: this.buf });
 
-    const aw = ARENA.COLS * T;
-    const ah = ARENA.ROWS * T;
-    background(this, 'arena', WORLD.W, WORLD.H, (p) => {
-      paintGrass(p, 0, 0, WORLD.W, WORLD.H, 711);
-      paintSand(p, ARENA.OX, ARENA.OY, aw, ah, 712);
-      // dezentes Kachelraster im Sand
-      for (let y = 1; y < ARENA.ROWS - 1; y++) {
-        for (let x = 1; x < ARENA.COLS - 1; x++) {
-          if ((x + y) % 2 === 0) p.rect(ARENA.OX + x * T, ARENA.OY + y * T, T, T, 'rgba(223,184,120,0.25)');
-        }
-      }
-      // Hecke als Rand
-      for (let y = 0; y < ARENA.ROWS; y++) {
-        for (let x = 0; x < ARENA.COLS; x++) {
-          if (x === 0 || y === 0 || x === ARENA.COLS - 1 || y === ARENA.ROWS - 1) p.draw(hedge(x * 31 + y * 7), ARENA.OX + x * T, ARENA.OY + y * T);
-        }
-      }
-      // Schatten der Hecke auf dem Sand
-      p.rect(ARENA.OX + T, ARENA.OY + T, aw - 2 * T, 2, 'rgba(0,0,0,0.15)');
-      // Ferienhaus-Garten: ein paar Blumen außen
-      for (let i = 0; i < 6; i++) p.draw(flower([C.pink, C.gold, C.white][i % 3]), 2 + (i % 2) * 465, 60 + i * 34);
-    });
-    // Feste Säulen: Palmen und Felsen
-    for (let y = 2; y < ARENA.ROWS - 1; y += 2) {
-      for (let x = 2; x < ARENA.COLS - 1; x += 2) {
-        const palm = ((x + y) / 2) % 3 !== 0;
-        const img = palm
-          ? prop(this, `apalm${(x * y) % 3}`, () => arenaPalm((x * y) % 3), px(x), py(y) + 9)
-          : prop(this, `arock${x % 2}`, () => arenaRock(x % 4), px(x), py(y) + 9);
-        img.setDepth(py(y) + 9);
-      }
-    }
-    prop(this, 'umbrellaR', () => umbrella(C.red), 8, ARENA.OY + 6).setDepth(1).setScale(0.5);
-
+    this.hudBuilding = true;
     this.hud = this.add.container(0, 0).setDepth(2000);
     this.banner = txt(this, WORLD.W / 2, 112, '', { size: 16, color: C.gold }).setDepth(2001);
     this.sub = txt(this, WORLD.W / 2, 136, '', { size: 8 }).setDepth(2001);
+    this.hudBuilding = false;
+    this.cameras.main.ignore([this.hud, this.banner, this.sub]);
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      bus.off('state', fn);
+      this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
+    });
     const s = getState();
     if (s) this.onState(s);
+  }
+
+  /** Feld für cols × rows aufbauen: mittig um VIEW, Kamera-Zoom so, dass es den Platz unter dem HUD füllt */
+  private buildBoard(cols: number, rows: number) {
+    for (const o of this.board) o.destroy();
+    this.board = [];
+    this.cols = cols;
+    this.rows = rows;
+    const aw = cols * T;
+    const ah = rows * T;
+    this.ox = Math.round(VIEW.cx - aw / 2);
+    this.oy = Math.round(VIEW.cy - ah / 2);
+    const zoom = Phaser.Math.Clamp(Math.min(VIEW.w / aw, VIEW.h / ah), 1, MAX_ZOOM);
+    // Welt-Punkt VIEW.cy soll auch auf dem Bildschirm bei VIEW.cy liegen (die Kamera zoomt um die Bildschirmmitte)
+    this.cameras.main.setZoom(zoom).centerOn(VIEW.cx, VIEW.cy - (VIEW.cy - WORLD.H / 2) / zoom);
+    const { ox, oy } = this;
+    const bg = background(this, `arena_${cols}x${rows}`, WORLD.W, WORLD.H, (p) => {
+      paintGrass(p, 0, 0, WORLD.W, WORLD.H, 711);
+      paintSand(p, ox, oy, aw, ah, 712);
+      // dezentes Kachelraster im Sand
+      for (let y = 1; y < rows - 1; y++) {
+        for (let x = 1; x < cols - 1; x++) {
+          if ((x + y) % 2 === 0) p.rect(ox + x * T, oy + y * T, T, T, 'rgba(223,184,120,0.25)');
+        }
+      }
+      // Hecke als Rand
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          if (x === 0 || y === 0 || x === cols - 1 || y === rows - 1) p.draw(hedge(x * 31 + y * 7), ox + x * T, oy + y * T);
+        }
+      }
+      // Schatten der Hecke auf dem Sand
+      p.rect(ox + T, oy + T, aw - 2 * T, 2, 'rgba(0,0,0,0.15)');
+      // Ferienhaus-Garten: ein paar Blumen links und rechts neben der Hecke
+      const n = Math.max(2, Math.floor(ah / 34));
+      for (let i = 0; i < n; i++) {
+        const fy = oy + 8 + Math.round(((ah - 26) * (i + 0.5)) / n);
+        p.draw(flower([C.pink, C.gold, C.white][i % 3]), i % 2 ? ox + aw + 3 : ox - 10, fy);
+      }
+    });
+    this.board.push(bg);
+    // Feste Säulen: Palmen und Felsen
+    for (let y = 2; y < rows - 1; y += 2) {
+      for (let x = 2; x < cols - 1; x += 2) {
+        const palm = ((x + y) / 2) % 3 !== 0;
+        const img = palm
+          ? prop(this, `apalm${(x * y) % 3}`, () => arenaPalm((x * y) % 3), this.px(x), this.py(y) + 9)
+          : prop(this, `arock${x % 2}`, () => arenaRock(x % 4), this.px(x), this.py(y) + 9);
+        img.setDepth(this.py(y) + 9);
+        this.board.push(img);
+      }
+    }
+    // Sonnenschirm rechts neben der Hecke (unter dem HUD, zwischen den Blumen)
+    this.board.push(prop(this, 'umbrellaR', () => umbrella(C.red), ox + aw + 7, oy + 40).setDepth(1).setScale(0.5));
   }
 
   update() {
@@ -126,8 +183,8 @@ export class ArenaScene extends Phaser.Scene {
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       if (p.dir === 'l' || p.dir === 'r') img.setFlipX(p.dir === 'l');
       a.f.play(p.moving ? 'walk' : 'idle');
-      a.f.setPosition(px(a.x), py(a.y) + 7).setDepth(py(a.y) + 7).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
-      a.ring.setPosition(px(a.x), py(a.y) + 6);
+      a.f.setPosition(this.px(a.x), this.py(a.y) + 7).setDepth(this.py(a.y) + 7).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
+      a.ring.setPosition(this.px(a.x), this.py(a.y) + 6);
     }
     for (const b of st.bombs) {
       const img = this.bombs.get(b.id);
@@ -155,8 +212,8 @@ export class ArenaScene extends Phaser.Scene {
         const pl = playerById(id);
         if (!pl) continue;
         const color = pcol(id).num;
-        const ring = this.add.ellipse(px(p.x), py(p.y) + 6, 14, 6).setStrokeStyle(1, color).setDepth(2);
-        const f = figure(this, pl.look, px(p.x), py(p.y) + 7);
+        const ring = this.add.ellipse(this.px(p.x), this.py(p.y) + 6, 14, 6).setStrokeStyle(1, color).setDepth(2);
+        const f = figure(this, pl.look, this.px(p.x), this.py(p.y) + 7);
         a = { f, ring, x: p.x, y: p.y, alive: true };
         this.figs.set(id, a);
       }
@@ -164,8 +221,8 @@ export class ArenaScene extends Phaser.Scene {
       a.y = p.y;
       a.alive = p.alive;
       this.tweens.killTweensOf(a.f);
-      a.f.setVisible(p.alive).setAlpha(1).setAngle(0).setPosition(px(p.x), py(p.y) + 7);
-      a.ring.setVisible(p.alive).setPosition(px(p.x), py(p.y) + 6);
+      a.f.setVisible(p.alive).setAlpha(1).setAngle(0).setPosition(this.px(p.x), this.py(p.y) + 7);
+      a.ring.setVisible(p.alive).setPosition(this.px(p.x), this.py(p.y) + 6);
     }
   }
 
@@ -174,6 +231,10 @@ export class ArenaScene extends Phaser.Scene {
     const st = s.mini.state;
     this.latest = st;
     this.buf.push(st.t, st);
+    if (st.cols !== this.cols || st.rows !== this.rows) {
+      this.buildBoard(st.cols, st.rows);
+      this.round = 0;
+    }
     if (st.round !== this.round) {
       this.round = st.round;
       this.resetRound(st);
@@ -188,30 +249,30 @@ export class ArenaScene extends Phaser.Scene {
     // Kisten & Flut
     for (let i = 0; i < st.grid.length; i++) {
       const c = st.grid[i];
-      const x = i % ARENA.COLS;
-      const y = Math.floor(i / ARENA.COLS);
+      const x = i % this.cols;
+      const y = Math.floor(i / this.cols);
       const box = this.boxes.get(i);
       if (c === 'b' && !box) {
         const v = (x * 7 + y * 13) % 5;
         const img =
           v < 2
-            ? prop(this, 'sandcastle', sandcastle, px(x), py(y) + 9)
+            ? prop(this, 'sandcastle', sandcastle, this.px(x), this.py(y) + 9)
             : v < 4
-              ? prop(this, `lounger${v}`, () => lounger(v === 2 ? C.blue : C.red), px(x), py(y) + 9)
-              : prop(this, 'cooler', () => cooler('#2fb5a5'), px(x), py(y) + 9);
+              ? prop(this, `lounger${v}`, () => lounger(v === 2 ? C.blue : C.red), this.px(x), this.py(y) + 9)
+              : prop(this, 'cooler', () => cooler('#2fb5a5'), this.px(x), this.py(y) + 9);
         this.boxes.set(i, img);
       } else if (c !== 'b' && box) {
         this.boxes.delete(i);
         this.tweens.add({ targets: box, scaleX: 1.4, scaleY: 0.2, alpha: 0, duration: 260, onComplete: () => box.destroy() });
-        this.puff(px(x), py(y), 0xf1d49a);
-        this.juice.burst(px(x), py(y), (x * 7 + y * 13) % 5 < 2 ? 'sand' : 'wood', 8);
+        this.puff(this.px(x), this.py(y), 0xf1d49a);
+        this.juice.burst(this.px(x), this.py(y), (x * 7 + y * 13) % 5 < 2 ? 'sand' : 'wood', 8);
       }
       if (c === '~' && !this.flooded.has(i)) {
-        const img = this.add.image(px(x), py(y), ensureTex(this, `flood${(x + y) % 3}`, () => floodTile((x + y) % 3))).setDepth(py(y) - 9).setAlpha(0);
+        const img = this.add.image(this.px(x), this.py(y), ensureTex(this, `flood${(x + y) % 3}`, () => floodTile((x + y) % 3))).setDepth(this.py(y) - 9).setAlpha(0);
         this.tweens.add({ targets: img, alpha: 0.95, duration: 200 });
         this.flooded.set(i, img);
         // Flut: leises Plätschern je Zelle (gedrosselt in sfx)
-        if (st.floodActive) sfx('splash', { x: px(x), vol: 0.25, pitch: 1.3 });
+        if (st.floodActive) sfx('splash', { x: this.px(x), vol: 0.25, pitch: 1.3 });
       }
     }
 
@@ -229,19 +290,19 @@ export class ArenaScene extends Phaser.Scene {
       const shirt = pcol(b.owner).hex;
       const balloon = (pl?.look.shirt ?? 0) % 2 === 1;
       const key = balloon ? ensureTex(this, `wb_${shirt}`, () => waterBalloon(shirt)) : ensureTex(this, 'coconut', coconut);
-      const img = this.add.image(px(b.x), py(b.y) + 1, key).setDepth(py(b.y) + 1);
+      const img = this.add.image(this.px(b.x), this.py(b.y) + 1, key).setDepth(this.py(b.y) + 1);
       img.setData('born', this.time.now - (ARENA.FUSE_MS - b.fuse));
       this.bombs.set(b.id, img);
       // Bombe legen: kurzes „Plopp“ (nur frisch gelegte, nicht beim Aufbau)
       if (b.fuse > ARENA.FUSE_MS - 400) {
-        sfx('pop', { x: px(b.x), pitch: balloon ? 0.9 : 0.6 });
+        sfx('pop', { x: this.px(b.x), pitch: balloon ? 0.9 : 0.6 });
         img.setScale(0.4);
         this.tweens.add({ targets: img, scale: 1, duration: 160, ease: 'Back.Out' });
       }
     }
 
     // Explosionen
-    const fl = new Set(st.flames.map((f) => `${cellIdx(f.x, f.y)}-${f.k}`));
+    const fl = new Set(st.flames.map((f) => `${this.idx(f.x, f.y)}-${f.k}`));
     for (const [k, img] of this.flames) {
       if (!fl.has(k)) {
         this.tweens.add({ targets: img, alpha: 0, duration: 120, onComplete: () => img.destroy() });
@@ -251,16 +312,16 @@ export class ArenaScene extends Phaser.Scene {
     let boom = false;
     let boomX = 0;
     for (const f of st.flames) {
-      const k = `${cellIdx(f.x, f.y)}-${f.k}`;
+      const k = `${this.idx(f.x, f.y)}-${f.k}`;
       if (this.flames.has(k)) continue;
       boom = true;
       if (f.k === 'c') {
-        boomX = px(f.x);
-        this.juice.burst(px(f.x), py(f.y), 'splash', 16);
+        boomX = this.px(f.x);
+        this.juice.burst(this.px(f.x), this.py(f.y), 'splash', 16);
         sfx('boom', { x: boomX, vol: 0.7 });
         sfx('splash', { x: boomX, delay: 0.04 });
-      } else if ((f.x + f.y) % 2 === 0) this.juice.burst(px(f.x), py(f.y), 'splash', 3);
-      const img = this.add.image(px(f.x), py(f.y), ensureTex(this, `splash_${f.k}`, () => splash(f.k))).setDepth(1500).setAlpha(0.92);
+      } else if ((f.x + f.y) % 2 === 0) this.juice.burst(this.px(f.x), this.py(f.y), 'splash', 3);
+      const img = this.add.image(this.px(f.x), this.py(f.y), ensureTex(this, `splash_${f.k}`, () => splash(f.k))).setDepth(1500).setAlpha(0.92);
       img.setScale(0.6);
       this.tweens.add({ targets: img, scale: 1, duration: 90 });
       this.flames.set(k, img);
@@ -268,19 +329,19 @@ export class ArenaScene extends Phaser.Scene {
     if (boom) this.juice.shake(1);
 
     // Power-ups
-    const its = new Set(st.items.map((it) => `${cellIdx(it.x, it.y)}-${it.t}`));
+    const its = new Set(st.items.map((it) => `${this.idx(it.x, it.y)}-${it.t}`));
     for (const [k, img] of this.items) {
       if (!its.has(k)) {
         // Eingesammelt (ein Spieler steht drauf) oder von der Explosion weggespült?
         const [ci] = k.split('-');
-        const cx = Number(ci) % ARENA.COLS;
-        const cy = Math.floor(Number(ci) / ARENA.COLS);
+        const cx = Number(ci) % this.cols;
+        const cy = Math.floor(Number(ci) / this.cols);
         const taker = Object.values(st.players).find((p) => p.alive && Math.round(p.x) === cx && Math.round(p.y) === cy);
         if (taker) {
-          sfx('powerup', { x: px(cx) });
-          this.juice.burst(px(cx), py(cy), 'spark', 8);
+          sfx('powerup', { x: this.px(cx) });
+          this.juice.burst(this.px(cx), this.py(cy), 'spark', 8);
           const label = k.endsWith('bomb') ? '+1 BOMBE' : k.endsWith('range') ? '+REICHWEITE' : '+TEMPO';
-          this.juice.float(px(cx), py(cy) - 24, label, 'gold');
+          this.juice.float(this.px(cx), this.py(cy) - 24, label, 'gold');
         }
         this.tweens.killTweensOf(img);
         this.tweens.add({ targets: img, scale: 0, duration: 150, onComplete: () => img.destroy() });
@@ -288,20 +349,30 @@ export class ArenaScene extends Phaser.Scene {
       }
     }
     for (const it of st.items) {
-      const k = `${cellIdx(it.x, it.y)}-${it.t}`;
+      const k = `${this.idx(it.x, it.y)}-${it.t}`;
       if (this.items.has(k)) continue;
-      const img = this.add.image(px(it.x), py(it.y), ensureTex(this, `aitem_${it.t}`, () => itemIcon(it.t))).setDepth(py(it.y) - 2);
-      this.tweens.add({ targets: img, y: py(it.y) - 2, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      const img = this.add.image(this.px(it.x), this.py(it.y), ensureTex(this, `aitem_${it.t}`, () => itemIcon(it.t))).setDepth(this.py(it.y) - 2);
+      this.tweens.add({ targets: img, y: this.py(it.y) - 2, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       this.items.set(k, img);
     }
 
-    // Spieler: Platsch!
+    // Spieler: Platsch! – bzw. in der Aufwärmrunde wieder da (Respawn mitten in der Runde)
     for (const [id, p] of Object.entries(st.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
       if (a.alive && !p.alive) {
         a.alive = false;
         this.platsch(a, id);
+      } else if (!a.alive && p.alive && st.sub === 'play') {
+        a.alive = true;
+        a.x = p.x;
+        a.y = p.y;
+        this.tweens.killTweensOf(a.f);
+        a.f.setVisible(true).setAlpha(1).setAngle(0).setPosition(this.px(p.x), this.py(p.y) + 7);
+        a.f.play('idle');
+        a.ring.setVisible(true).setPosition(this.px(p.x), this.py(p.y) + 6);
+        this.juice.burst(this.px(p.x), this.py(p.y), 'spark', 10);
+        sfx('pop', { x: this.px(p.x), pitch: 1.3 });
       }
     }
 
@@ -331,7 +402,7 @@ export class ArenaScene extends Phaser.Scene {
         this.cheerRound = st.round;
         sfx(w ? 'win' : 'lose');
         const wf = st.roundWinner ? this.figs.get(st.roundWinner) : undefined;
-        if (wf) this.juice.burst(px(wf.x), py(wf.y) - 10, 'confetti', 30);
+        if (wf) this.juice.burst(this.px(wf.x), this.py(wf.y) - 10, 'confetti', 30);
       }
       this.sub.setText(st.sub === 'over' ? 'Arena vorbei!' : w ? 'Rundensieg – trocken geblieben!' : 'Unentschieden – diese Runde zählt nicht.');
     }
@@ -361,8 +432,8 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   private platsch(a: Fig, id: string) {
-    const x = px(a.x);
-    const y = py(a.y);
+    const x = this.px(a.x);
+    const y = this.py(a.y);
     a.ring.setVisible(false);
     this.juice.burst(x, y, 'splash', 14);
     sfx('splash', { x, pitch: 0.9 });
@@ -386,6 +457,16 @@ export class ArenaScene extends Phaser.Scene {
     const key = JSON.stringify([secs, st.sub, st.round, st.floodActive, ids.map((id) => [st.players[id].alive, st.players[id].wins])]);
     if (key === this.hudKey) return;
     this.hudKey = key;
+    // Nur die HUD-Kamera (ohne Zoom) zeigt das HUD
+    this.hudBuilding = true;
+    try {
+      this.fillHud(st, ids, secs);
+    } finally {
+      this.hudBuilding = false;
+    }
+  }
+
+  private fillHud(st: ArenaState, ids: string[], secs: number) {
     this.hud.removeAll(true);
     this.hud.add(panel(this, 2, 1, 476, 32));
     const clock = st.floodActive ? 'FLUT!' : secs >= 0 ? `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : '--';

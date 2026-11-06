@@ -1,35 +1,124 @@
-import type { GolfState } from '../../../shared/types';
-import { GOLF, type GolfHole, golfBounds, golfHole, golfIdealPutt, moverSeg, spinnerBlades } from '../../../shared/golf';
-import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, timerText, toast } from '../core';
+import type { GolfBallPub, GolfState } from '../../../shared/types';
+import { GOLF, type GolfHole, golfAimHit, golfBounds, golfHole, golfIdealPutt, golfOnTee, moverSeg, spinnerBlades } from '../../../shared/golf';
+import { type Screen, app, el, escapeHtml, me, message, nameOf, q, send, socket, store, timerText, toast } from '../core';
 import { type MotionSample, enableMotion, motionSupport, onMotion } from '../motion';
 import { PUTT_SCALE, dragToPutt, swingToPutt } from '../golfPutt';
 import { failFeedback, feedbackCard, forgetFeedback, lastFeedback, motionInfo, rememberFeedback } from '../motionFeedback';
 import { golfFeedback } from '../throwFeedback';
+import { haptic } from '../haptic';
+import { localPoint } from '../stick';
+
+/**
+ * Urlaubs-Minigolf am Handy – quer wie die Bahn auf dem TV (Welt-x = Bildschirm-x), damit Ziehen und Schlag
+ * dieselbe Richtung haben: links die Bahn als Zugfeld (Schleuder: vom Ziel weg zurückziehen, loslassen),
+ * rechts Status, Feedback, Bewegungssensor (Erlaubnis per Tipp) und für den VIP „Nächstes Loch“.
+ */
 
 const golf = () => (store.state?.mini?.kind === 'golf' ? store.state.mini.state : null);
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 const MODE_KEY = 'lanabfahrt.golfMode';
 const strokesTxt = (n: number) => `${n} ${n === 1 ? 'Schlag' : 'Schläge'}`;
+const shortName = (id: string) => nameOf(id).replace(/^Bot\s+/, '');
+const total = (s: GolfState, id: string) => (s.scores[id] ?? []).reduce<number>((a, x) => a + (x ?? 0), 0);
+/** Wer auf dem aktuellen Loch noch spielt (ohne mich) */
+const stillPlaying = (s: GolfState, id: string) => s.order.filter((o) => o !== id && s.balls[o] && !s.balls[o].d);
+const namesList = (ids: string[]) => (ids.length > 3 ? `${ids.slice(0, 3).map(shortName).join(', ')} +${ids.length - 3}` : ids.map(shortName).join(', '));
+/** Liegt als Hindernis auf der Bahn (gleiche Regel wie der Server: nicht auf dem Abschlag, nicht fertig, nicht unterwegs) */
+const solidBall = (h: GolfHole, b: GolfBallPub | undefined): b is GolfBallPub => !!b && !b.d && !b.m && !b.tube && !golfOnTee(h, b);
+
+/** Sensor-Wahl bleibt bis zum Neuladen (die Erlaubnis gilt auch so lange) */
+type SensorState = 'off' | 'on' | 'denied' | 'nodata';
+let sensor: SensorState = 'off';
+function wantMotion() {
+  if (sensor === 'on') return motionSupport() === 'ok';
+  try {
+    return sensor === 'off' && localStorage.getItem(MODE_KEY) === 'motion' && motionSupport() === 'ok';
+  } catch {
+    return false;
+  }
+}
+function saveMode(m: 'drag' | 'motion') {
+  try {
+    localStorage.setItem(MODE_KEY, m);
+  } catch {
+    /* privater Modus */
+  }
+}
+
+/**
+ * Erlaubnis für den Bewegungssensor – muss direkt aus einem Tipp (click) kommen, sonst fragt das iPhone gar nicht.
+ * Liefert den neuen Zustand und meldet ihn per Toast.
+ */
+async function askSensor(): Promise<SensorState> {
+  const ok = motionSupport() === 'ok' ? true : await enableMotion();
+  sensor = ok ? 'on' : 'denied';
+  saveMode(ok ? 'motion' : 'drag');
+  if (ok) haptic('win');
+  else toast('Sensor nicht erlaubt – du puttest mit dem Finger.');
+  return sensor;
+}
+
+/** Text + Ton für die Sensor-Zeile (aktiv / verweigert → so geht’s / nicht verfügbar) */
+function sensorStatus(): { text: string; tone: '' | 'ok' | 'bad' } {
+  const sup = motionSupport();
+  if (sup === 'unsupported') return { text: 'Kein Bewegungssensor – du puttest mit dem Finger.', tone: '' };
+  if (sup === 'insecure') return { text: 'Sensor geht nur über https:// (QR-Code am TV) – hier wird gezogen.', tone: '' };
+  if (sensor === 'denied') return { text: 'Verweigert. Tab schließen, Seite neu öffnen, „Erlauben“ tippen.', tone: 'bad' };
+  if (sensor === 'nodata') return { text: 'Keine Sensordaten – du puttest mit dem Finger.', tone: 'bad' };
+  if (sensor === 'on') return { text: 'Sensor aktiv ✓', tone: 'ok' };
+  return { text: sup === 'needs-permission' ? 'Bewegungssensor: dein Handy fragt einmal nach der Erlaubnis.' : 'Bewegungssensor (optional): putten mit Schwung.', tone: '' };
+}
+const sensorPossible = () => {
+  const sup = motionSupport();
+  return sup === 'ok' || sup === 'needs-permission';
+};
 
 export function pickGolf(s: GolfState): Screen {
   const id = store.playerId!;
   if (!s.order.includes(id)) return ['spectate', message('Du schaust zu', 'Nächstes Spiel bist du dabei!')];
   if (s.sub === 'intro') {
     forgetFeedback('golf');
-    return [
-      'golf-intro',
-      message(
-        'Urlaubs-Minigolf!',
-        `${s.holes} Löcher, alle putten gleichzeitig. Zieh am Handy vom Ball zurück wie eine Schleuder und lass los – je weiter, desto fester. Wasser kostet einen Schlag, max. ${GOLF.MAX_STROKES} Schläge pro Loch.`,
-      ),
-    ];
+    return ['golf-intro', () => buildIntro(s)];
   }
   if (s.sub === 'tee') {
     const h = golfHole(s.hole);
-    return [`golf-tee-${s.hole}`, message(`Loch ${s.hole + 1}: ${h.name}`, `Par ${h.par} · Gleich geht's los – schau auf den Fernseher!`)];
+    return [`golf-tee-${s.hole}`, message(`Loch ${s.hole + 1}: ${h.name}`, `Par ${h.par} · Gleich geht's los – Handy quer halten und auf den Fernseher schauen!`)];
   }
   if (s.sub === 'play') return [`golf-play-${s.hole}`, () => buildPlay(s.hole)];
-  return [`golf-card-${s.hole}-${s.sub}`, () => buildCard(s)];
+  // Scorekarte: „wait“ im Key → kein Dreh-Overlay (zwischen den Löchern darf das Handy liegen, wie es will)
+  return [s.sub === 'over' ? 'golf-final-wait' : `golf-card-${s.hole}-wait`, () => buildCard(s)];
+}
+
+// ------------------------------------------------------------------ Erklärung (+ Sensor vorab erlauben)
+
+function buildIntro(s: GolfState) {
+  const possible = sensorPossible();
+  const root = el(`
+    <div class="center gf-intro">
+      <h2>Urlaubs-Minigolf!</h2>
+      <p>${s.holes} Löcher, alle putten gleichzeitig. Halte das Handy quer: Finger aufs grüne Feld, vom Ziel weg zurückziehen wie eine Schleuder, loslassen – je weiter, desto fester. Bälle stoßen sich an! Wasser kostet einen Schlag, max. ${GOLF.MAX_STROKES} Schläge pro Loch.</p>
+      ${possible ? '<button class="gf-ask">📱 Bewegungssensor aktivieren</button><small class="gf-sstat"></small>' : `<small class="gf-sstat">${escapeHtml(sensorStatus().text)}</small>`}
+    </div>
+  `);
+  app.append(root);
+  const btn = root.querySelector<HTMLButtonElement>('.gf-ask');
+  const stat = q(root, '.gf-sstat');
+  const sync = () => {
+    const st = sensorStatus();
+    stat.textContent = st.text;
+    stat.className = `gf-sstat ${st.tone}`;
+    if (btn) {
+      btn.classList.toggle('hidden', sensor === 'on');
+      btn.textContent = sensor === 'denied' ? '📱 Nochmal fragen' : '📱 Bewegungssensor aktivieren';
+    }
+  };
+  // „click“ statt pointerdown: nur so zählt der Tipp fürs iPhone als Erlaubnis-Geste
+  btn?.addEventListener('click', async () => {
+    await askSensor();
+    sync();
+  });
+  sync();
+  return null;
 }
 
 // ------------------------------------------------------------------ Mini-Karte
@@ -158,21 +247,34 @@ function drawHole(c: HTMLCanvasElement, v: View, h: GolfHole, s: GolfState, t: n
   g.lineTo(h.cup.x + 10, h.cup.y - 13);
   g.lineTo(h.cup.x + 0.75, h.cup.y - 10);
   g.fill();
-  // andere Bälle (blass), dann der eigene (groß, mit Ring)
+  // andere Bälle: echte Hindernisse kräftig mit Rand, Bälle auf dem Abschlag / aufgegebene blass
   const me = store.playerId!;
   for (const id of s.order) {
     const b = s.balls[id];
     if (!b || id === me || b.d === 1 || b.tube) continue;
-    g.globalAlpha = 0.55;
+    const solid = !b.d && !golfOnTee(h, b);
+    g.globalAlpha = solid ? 1 : 0.45;
     g.fillStyle = hex(s.colors[id] ?? 0xffffff);
     g.beginPath();
-    g.arc(b.x, b.y, GOLF.BALL_R, 0, Math.PI * 2);
+    g.arc(b.x, b.y, GOLF.BALL_R + 0.4, 0, Math.PI * 2);
     g.fill();
+    if (solid) {
+      g.lineWidth = 0.9;
+      g.strokeStyle = '#2d1b12';
+      g.stroke();
+    }
     g.globalAlpha = 1;
   }
 }
 
-function drawMine(c: HTMLCanvasElement, v: View, s: GolfState, aim: { a: number; p: number; pull: number } | null) {
+interface Aim {
+  a: number;
+  p: number;
+  /** Länge der Zugleine hinter dem Ball (Welt-px), 0 = keine */
+  pull: number;
+}
+
+function drawMine(c: HTMLCanvasElement, v: View, h: GolfHole, s: GolfState, aim: Aim | null) {
   const g = c.getContext('2d')!;
   const b = s.balls[store.playerId!];
   if (!b || b.d === 1 || b.tube) return;
@@ -180,37 +282,72 @@ function drawMine(c: HTMLCanvasElement, v: View, s: GolfState, aim: { a: number;
   const k = v.sc * v.dpr;
   g.setTransform(k, 0, 0, k, -v.bx * k, -v.by * k);
   if (aim) {
-    // Zugleine nach hinten (Schleuder), gestrichelte Schlaglinie nach vorn
-    g.strokeStyle = 'rgba(45,27,18,0.6)';
-    g.lineWidth = 1.5;
-    g.beginPath();
-    g.moveTo(b.x, b.y);
-    g.lineTo(b.x - Math.cos(aim.a) * aim.pull, b.y - Math.sin(aim.a) * aim.pull);
-    g.stroke();
+    const ux = Math.cos(aim.a);
+    const uy = Math.sin(aim.a);
+    // Zugleine nach hinten (Schleuder)
+    if (aim.pull > 0) {
+      g.strokeStyle = 'rgba(45,27,18,0.6)';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(b.x, b.y);
+      g.lineTo(b.x - ux * aim.pull, b.y - uy * aim.pull);
+      g.stroke();
+    }
+    // gestrichelte Schlaglinie nach vorn – Länge = Kraft; endet am ersten Ball, der im Weg liegt
     const len = 12 + aim.p * 90;
+    const others = s.order.filter((o) => o !== store.playerId).map((o) => s.balls[o]).filter((o) => solidBall(h, o));
+    const hit = golfAimHit(b, aim.a, len, others);
+    const end = hit ? hit.d : len;
     g.setLineDash([3, 3]);
     g.lineWidth = 2.5;
     g.strokeStyle = '#2d1b12';
     g.beginPath();
     g.moveTo(b.x, b.y);
-    g.lineTo(b.x + Math.cos(aim.a) * len, b.y + Math.sin(aim.a) * len);
+    g.lineTo(b.x + ux * end, b.y + uy * end);
     g.stroke();
     g.lineWidth = 1.5;
     g.strokeStyle = col;
     g.stroke();
     g.setLineDash([]);
-    const ex = b.x + Math.cos(aim.a) * len;
-    const ey = b.y + Math.sin(aim.a) * len;
-    g.beginPath();
-    g.moveTo(ex + Math.cos(aim.a) * 5, ey + Math.sin(aim.a) * 5);
-    g.lineTo(ex + Math.cos(aim.a + 2.5) * 5, ey + Math.sin(aim.a + 2.5) * 5);
-    g.lineTo(ex + Math.cos(aim.a - 2.5) * 5, ey + Math.sin(aim.a - 2.5) * 5);
-    g.closePath();
-    g.fillStyle = col;
-    g.fill();
-    g.strokeStyle = '#2d1b12';
-    g.lineWidth = 1;
-    g.stroke();
+    if (hit) {
+      // eigener Ball an der Kontaktstelle (Ring) + Pfeil, wohin der getroffene Ball rollt
+      g.lineWidth = 1.2;
+      g.strokeStyle = col;
+      g.beginPath();
+      g.arc(hit.x, hit.y, GOLF.BALL_R, 0, Math.PI * 2);
+      g.stroke();
+      const sx = hit.ball.x + hit.nx * (GOLF.BALL_R + 1);
+      const sy = hit.ball.y + hit.ny * (GOLF.BALL_R + 1);
+      const ex = sx + hit.nx * 12;
+      const ey = sy + hit.ny * 12;
+      g.strokeStyle = '#fff6dc';
+      g.lineWidth = 1.5;
+      g.beginPath();
+      g.moveTo(sx, sy);
+      g.lineTo(ex, ey);
+      g.stroke();
+      const na = Math.atan2(hit.ny, hit.nx);
+      g.fillStyle = '#fff6dc';
+      g.beginPath();
+      g.moveTo(ex + Math.cos(na) * 3, ey + Math.sin(na) * 3);
+      g.lineTo(ex + Math.cos(na + 2.4) * 3, ey + Math.sin(na + 2.4) * 3);
+      g.lineTo(ex + Math.cos(na - 2.4) * 3, ey + Math.sin(na - 2.4) * 3);
+      g.closePath();
+      g.fill();
+    } else {
+      const ex = b.x + ux * len;
+      const ey = b.y + uy * len;
+      g.beginPath();
+      g.moveTo(ex + ux * 5, ey + uy * 5);
+      g.lineTo(ex + Math.cos(aim.a + 2.5) * 5, ey + Math.sin(aim.a + 2.5) * 5);
+      g.lineTo(ex + Math.cos(aim.a - 2.5) * 5, ey + Math.sin(aim.a - 2.5) * 5);
+      g.closePath();
+      g.fillStyle = col;
+      g.fill();
+      g.strokeStyle = '#2d1b12';
+      g.lineWidth = 1;
+      g.stroke();
+    }
   }
   g.fillStyle = col;
   g.beginPath();
@@ -226,36 +363,80 @@ function drawMine(c: HTMLCanvasElement, v: View, s: GolfState, aim: { a: number;
   g.stroke();
 }
 
+// ------------------------------------------------------------------ VIP: „Nächstes Loch“
+
+/**
+ * VIP-Knopf (Server prüft den VIP über `vip:mini`). Mit `armText` braucht er zwei Tipps (im Spiel: Schutz vor
+ * Versehen, das Loch endet für alle), sonst einen. Liefert den Updater (Sichtbarkeit/Text).
+ */
+function vipNextButton(btn: HTMLButtonElement, armText: (() => string) | null) {
+  let armedUntil = 0;
+  btn.addEventListener('click', () => {
+    if (armText && performance.now() > armedUntil) {
+      armedUntil = performance.now() + 3000;
+      haptic('tap');
+      sync();
+      window.setTimeout(sync, 3050);
+      return;
+    }
+    armedUntil = 0;
+    socket.emit('vip:mini', 'next');
+    haptic('hit');
+    sync();
+  });
+  const sync = () => {
+    const s = golf();
+    const show = !!s && !!me()?.isVip && (s.sub === 'card' || (s.sub === 'play' && s.order.some((o) => !s.balls[o]?.d)));
+    btn.classList.toggle('hidden', !show);
+    if (!s || !show) return;
+    const last = s.hole >= s.holes - 1;
+    const armed = performance.now() < armedUntil;
+    btn.classList.toggle('armed', armed);
+    btn.textContent = armed && armText ? armText() : s.sub === 'card' ? (last ? '⏭ Zum Endstand' : `⏭ Weiter zu Loch ${s.hole + 2}`) : last ? '⏭ Loch beenden → Endstand' : '⏭ Nächstes Loch';
+  };
+  return sync;
+}
+
 // ------------------------------------------------------------------ Putten
 
 function buildPlay(hole: number) {
   const id = store.playerId!;
   const h = golfHole(hole);
-  const sup = motionSupport();
-  const motionOk = sup === 'ok' || sup === 'needs-permission';
-  let mode: 'drag' | 'motion' = localStorage.getItem(MODE_KEY) === 'motion' && sup === 'ok' ? 'motion' : 'drag';
   const root = el(`
-    <div class="top-row"><span class="gf-hole">Loch ${hole + 1}/${GOLF_HOLE_COUNT()} · Par ${h.par}</span><span class="gf-time"></span></div>
-    <div class="gf-status"><i class="gf-sw"></i><span class="gf-msg"></span><b class="gf-strokes"></b></div>
-    <div class="gf-pad">
-      <canvas class="gf-map"></canvas>
-      <div class="gf-power"><div></div></div>
-      <p class="gf-hint"></p>
+    <div class="lx gf-lx">
+      <div class="lx-head"><i class="gf-sw"></i><b class="gf-hole">Loch ${hole + 1}/${golf()?.holes ?? 6}</b><span class="grow">${escapeHtml(h.name)} · Par ${h.par}</span><b class="gf-strokes"></b><span class="gf-total"></span><span class="timer gf-time"></span></div>
+      <div class="lx-left gf-pad">
+        <canvas class="gf-map"></canvas>
+        <div class="gf-under"><span>Kraft</span><div class="gf-power"><div></div></div><b class="gf-pct">–</b></div>
+        <p class="gf-hint"></p>
+        <i class="gf-touch gf-t0 hidden"></i><i class="gf-touch gf-t1 hidden"></i>
+      </div>
+      <div class="lx-right gf-side">
+        <div class="gf-status"><b class="gf-msg"></b><small class="gf-sub"></small></div>
+        <button class="big-btn bw-swing gf-swing hidden">HALTEN &amp;<br/>SCHWINGEN</button>
+        <div class="gf-sensor"><button class="secondary small gf-mode"></button><small class="gf-sstat"></small></div>
+        <button class="gf-vip hidden"></button>
+      </div>
     </div>
-    <button class="big-btn bw-swing gf-swing hidden">HALTEN &amp;<br/>SCHWINGEN</button>
-    <button class="secondary small gf-mode ${motionOk ? '' : 'hidden'}"></button>
-    ${sup === 'insecure' ? '<p class="gf-note">Schwung-Putten mit Bewegungssensor geht nur über HTTPS.</p>' : ''}
   `);
   app.append(root);
   const pad = q(root, '.gf-pad');
   const canvas = q<HTMLCanvasElement>(root, '.gf-map');
+  const under = q(root, '.gf-under');
   const hint = q(root, '.gf-hint');
   const msg = q(root, '.gf-msg');
+  const sub = q(root, '.gf-sub');
   const strokesEl = q(root, '.gf-strokes');
+  const totalEl = q(root, '.gf-total');
   const timeEl = q(root, '.gf-time');
   const powerBar = q(root, '.gf-power > div');
+  const pctEl = q(root, '.gf-pct');
   const swingBtn = q<HTMLButtonElement>(root, '.gf-swing');
+  const sensorBox = q(root, '.gf-sensor');
   const modeBtn = q<HTMLButtonElement>(root, '.gf-mode');
+  const sensorStat = q(root, '.gf-sstat');
+  const t0 = q(root, '.gf-t0');
+  const t1 = q(root, '.gf-t1');
   q(root, '.gf-sw').style.background = hex(golf()?.colors[id] ?? 0xffffff);
   // Feedback zum letzten Putt (bleibt stehen, bis der nächste beginnt)
   const card = feedbackCard(true);
@@ -265,16 +446,19 @@ function buildPlay(hole: number) {
     rememberFeedback('golf', fb);
     card.set(fb);
   };
+  const vipSync = vipNextButton(q<HTMLButtonElement>(root, '.gf-vip'), () => `Nochmal tippen! Wer noch spielt: +2, mind. ${h.par + 1}`);
 
-  // Karte einpassen (Welt → Bildschirm, nicht gedreht)
+  // Karte einpassen (Welt → Bildschirm, nicht gedreht: rechts auf dem Handy = rechts auf dem TV)
   const bounds = golfBounds(h);
   const M = 12;
   const view: View = { sc: 1, bx: bounds.x - M, by: bounds.y - M - 8, dpr: Math.min(3, window.devicePixelRatio || 1) };
   const bw = bounds.w + 2 * M;
   const bh = bounds.h + 2 * M + 8;
   const fit = () => {
-    const cssW = Math.max(200, pad.clientWidth - 6);
-    const cssH = Math.min(cssW * (bh / bw), window.innerHeight * 0.42);
+    const land = document.documentElement.classList.contains('land');
+    const cssW = Math.max(160, pad.clientWidth - 10);
+    const free = pad.clientHeight - under.offsetHeight - hint.offsetHeight - 20;
+    const cssH = land ? Math.max(80, free) : Math.min(cssW * (bh / bw), window.innerHeight * 0.4);
     view.sc = Math.min(cssW / bw, cssH / bh);
     const w = bw * view.sc;
     const hh = bh * view.sc;
@@ -284,6 +468,14 @@ function buildPlay(hole: number) {
     canvas.height = Math.round(hh * view.dpr);
   };
   fit();
+  // Adressleiste blendet aus/ein → neu einpassen (Drehen baut den Screen ohnehin neu, siehe main.ts)
+  let fitQueued = 0;
+  const onResize = () => {
+    if (!root.isConnected) return window.removeEventListener('resize', onResize);
+    cancelAnimationFrame(fitQueued);
+    fitQueued = requestAnimationFrame(fit);
+  };
+  window.addEventListener('resize', onResize);
 
   // Lochzeit lokal weiterzählen (für Leuchtturm/Surfbrett)
   let lastT = -1;
@@ -296,16 +488,19 @@ function buildPlay(hole: number) {
     return s.t + (s.sub === 'play' ? Math.min(GOLF.HOLE_S ?? Infinity, (performance.now() - recvAt) / 1000) : 0);
   };
 
-  let aim: { a: number; p: number; pull: number } | null = null;
+  let mode: 'drag' | 'motion' = wantMotion() ? 'motion' : 'drag';
+  let aim: Aim | null = null;
   let motionAim: number | null = null;
   let aimStroke = -1;
-  let sentStroke = -1;
+  /** zuletzt gesendeter Schlag – lehnt der Server ab (Ball wurde gerade angestoßen), gibt es nach 2,5 s frei */
+  let sent: { s: number; x: number; y: number; at: number } | null = null;
   let lastAimSend = 0;
   const myBall = () => golf()?.balls[id];
+  const pending = (b: GolfBallPub) => !!sent && sent.s === b.s && Math.abs(sent.x - b.x) < 0.5 && Math.abs(sent.y - b.y) < 0.5 && performance.now() - sent.at < 2500;
   const canPutt = () => {
     const s = golf();
     const b = s?.balls[id];
-    return !!s && s.sub === 'play' && s.hole === hole && !!b && !b.d && !b.m && sentStroke !== b.s;
+    return !!s && s.sub === 'play' && s.hole === hole && !!b && !b.d && !b.m && !pending(b);
   };
   const sendAim = (a: number | null, p: number, force = false) => {
     const now = performance.now();
@@ -316,14 +511,14 @@ function buildPlay(hole: number) {
   const putt = (a: number, p: number) => {
     const b = myBall();
     if (!b || !canPutt()) return;
-    sentStroke = b.s;
-    navigator.vibrate?.(35);
+    sent = { s: b.s, x: b.x, y: b.y, at: performance.now() };
+    haptic('hit');
     send('putt', { seq: b.s, a, p });
     aim = null;
   };
-  const toWorld = (cx: number, cy: number) => {
-    const r = canvas.getBoundingClientRect();
-    return { x: view.bx + (cx - r.left) / view.sc, y: view.by + (cy - r.top) / view.sc };
+  const toWorld = (e: PointerEvent) => {
+    const p = localPoint(canvas, e);
+    return { x: view.bx + p.x / view.sc, y: view.by + p.y / view.sc };
   };
   const defaultAim = () => {
     const b = myBall();
@@ -334,24 +529,34 @@ function buildPlay(hole: number) {
     const b = myBall();
     return b ? golfIdealPutt(h, b).power : 0.5;
   };
+  const touchDots = (a: { x: number; y: number } | null, b: { x: number; y: number } | null) => {
+    t0.classList.toggle('hidden', !a);
+    t1.classList.toggle('hidden', !b);
+    if (a) t0.style.transform = `translate(${a.x}px, ${a.y}px)`;
+    if (b) t1.style.transform = `translate(${b.x}px, ${b.y}px)`;
+  };
 
-  // ---- Zurückziehen (Schleuder) bzw. Zielen (Sensor-Modus)
+  // ---- Zurückziehen (Schleuder) bzw. Zielen (Sensor-Modus). Pseudo-Quer: localPoint dreht die Finger-Koordinaten mit.
   let pid: number | null = null;
   let start = { x: 0, y: 0 };
-  const maxLen = () => Math.max(110, Math.min(230, pad.clientWidth * 0.55));
+  /** Ziehweg für 100 % – auf ~300 px Höhe gut mit dem Daumen erreichbar */
+  const maxLen = () => Math.max(110, Math.min(210, Math.min(pad.clientWidth, pad.clientHeight) * 0.72));
   pad.addEventListener('pointerdown', (e) => {
     if (!canPutt()) return;
     e.preventDefault();
     pad.setPointerCapture(e.pointerId);
     pid = e.pointerId;
-    start = { x: e.clientX, y: e.clientY };
+    start = localPoint(pad, e);
     if (mode === 'motion') aimAt(e);
-    else card.dim();
+    else {
+      card.dim();
+      touchDots(start, null);
+    }
   });
   const aimAt = (e: PointerEvent) => {
     const b = myBall();
     if (!b) return;
-    const w = toWorld(e.clientX, e.clientY);
+    const w = toWorld(e);
     if (Math.hypot(w.x - b.x, w.y - b.y) < 4) return;
     motionAim = Math.atan2(w.y - b.y, w.x - b.x);
     sendAim(motionAim, 0.5);
@@ -359,8 +564,10 @@ function buildPlay(hole: number) {
   pad.addEventListener('pointermove', (e) => {
     if (e.pointerId !== pid) return;
     if (mode === 'motion') return aimAt(e);
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
+    const p = localPoint(pad, e);
+    const dx = p.x - start.x;
+    const dy = p.y - start.y;
+    touchDots(start, p);
     const r = dragToPutt(dx, dy, maxLen());
     if (r.ok) {
       aim = { a: r.putt.angle, p: r.putt.power, pull: Math.min(Math.hypot(dx, dy), maxLen()) / view.sc / 2 };
@@ -371,12 +578,14 @@ function buildPlay(hole: number) {
   const up = (e: PointerEvent) => {
     if (e.pointerId !== pid) return;
     pid = null;
+    touchDots(null, null);
     if (mode === 'motion') {
       sendAim(motionAim, 0.5, true);
       return;
     }
-    const r = dragToPutt(e.clientX - start.x, e.clientY - start.y, maxLen());
-    if (r.ok && canPutt()) {
+    const p = localPoint(pad, e);
+    const r = dragToPutt(p.x - start.x, p.y - start.y, maxLen());
+    if (r.ok && canPutt() && e.type === 'pointerup') {
       const fb = golfFeedback(r.putt.power, idealPower(), null, null);
       putt(r.putt.angle, r.putt.power);
       showFb(fb);
@@ -388,6 +597,14 @@ function buildPlay(hole: number) {
   };
   pad.addEventListener('pointerup', up);
   pad.addEventListener('pointercancel', up);
+  // Overlay/Drehen: gehaltenen Zug abbrechen statt zu schlagen
+  const onReset = () => {
+    if (!root.isConnected) return window.removeEventListener('input-reset', onReset);
+    pid = null;
+    aim = null;
+    touchDots(null, null);
+  };
+  window.addEventListener('input-reset', onReset);
 
   // ---- Putter-Schwung (Bewegungssensor)
   let unsub: (() => void) | null = null;
@@ -408,6 +625,7 @@ function buildPlay(hole: number) {
     });
     window.setTimeout(() => {
       if (root.isConnected && mode === 'motion' && !gotSample) {
+        sensor = 'nodata';
         toast('Kein Bewegungssensor gefunden – zieh stattdessen zurück!');
         setMode('drag');
       }
@@ -422,7 +640,7 @@ function buildPlay(hole: number) {
     swingBtn.classList.add('holding');
     card.dim();
     swingBtn.innerHTML = 'PENDELN …<br/><small>und loslassen!</small>';
-    navigator.vibrate?.(15);
+    haptic('tick');
   });
   const release = () => {
     if (!recording) return;
@@ -445,23 +663,34 @@ function buildPlay(hole: number) {
   swingBtn.addEventListener('pointercancel', release);
   swingBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
+  const syncSensor = () => {
+    const st = sensorStatus();
+    sensorStat.textContent = mode === 'motion' ? 'Sensor aktiv ✓ – Ziel antippen, Knopf halten, pendeln.' : st.text;
+    sensorStat.className = `gf-sstat ${mode === 'motion' ? 'ok' : st.tone}`;
+    modeBtn.classList.toggle('hidden', !sensorPossible());
+    modeBtn.textContent = mode === 'motion' ? '✋ Lieber ziehen' : sensor === 'denied' ? '📱 Nochmal fragen' : '📱 Sensor aktivieren';
+  };
   const setMode = (m: 'drag' | 'motion') => {
     mode = m;
-    localStorage.setItem(MODE_KEY, m);
     swingBtn.classList.toggle('hidden', m !== 'motion');
-    modeBtn.textContent = m === 'motion' ? 'Lieber zurückziehen' : 'Mit Schwung putten (Sensor)';
-    pad.classList.toggle('motion', m === 'motion');
+    root.classList.toggle('gf-motion', m === 'motion');
     if (m === 'motion') startMotion();
     else stopMotion();
     aim = null;
+    syncSensor();
   };
+  // „click“ statt pointerdown: nur so fragt das iPhone nach der Erlaubnis (DeviceMotionEvent.requestPermission)
   modeBtn.addEventListener('click', async () => {
-    if (mode === 'motion') return setMode('drag');
-    const ok = motionSupport() === 'ok' ? true : await enableMotion();
-    if (!ok) return toast('Kein Zugriff auf den Bewegungssensor.');
-    setMode('motion');
+    if (mode === 'motion') {
+      saveMode('drag');
+      sensor = 'off';
+      return setMode('drag');
+    }
+    const st = await askSensor();
+    setMode(st === 'on' ? 'motion' : 'drag');
   });
   setMode(mode);
+  sensorBox.classList.toggle('gf-nosensor', !sensorPossible());
 
   // ---- Zeichnen (eigene Schleife, damit Flügel/Surfbrett flüssig laufen)
   const frame = () => {
@@ -470,58 +699,81 @@ function buildPlay(hole: number) {
     if (s && s.hole === hole) {
       drawHole(canvas, view, h, s, holeT(s));
       const b = s.balls[id];
-      // Zielpfeil im Sensor-Modus, Schleuder beim Ziehen
+      // Schleuder beim Ziehen, Zielpfeil im Sensor-Modus
       let show = aim && b && aimStroke === b.s && canPutt() ? aim : null;
       if (!show && mode === 'motion' && canPutt()) show = { a: motionAim ?? defaultAim(), p: 0.5, pull: 0 };
-      drawMine(canvas, view, s, show);
-      powerBar.style.width = `${Math.round((aim && pid !== null ? aim.p : 0) * 100)}%`;
+      drawMine(canvas, view, h, s, show);
+      const p = aim && pid !== null ? aim.p : 0;
+      powerBar.style.width = `${Math.round(p * 100)}%`;
+      pctEl.textContent = p ? `${Math.round(p * 100)} %` : '–';
     }
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
 
   let lastStroke = -1;
+  let lastPos = '';
   return () => {
     const s = golf();
     if (!s) return;
     const b = s.balls[id];
+    vipSync();
     timeEl.textContent = s.sub === 'play' ? timerText((sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`) : '';
+    const done = s.scores[id]?.slice(0, hole).reduce<number>((a, x) => a + (x ?? 0), 0) ?? 0;
+    const parSoFar = s.par.slice(0, hole).reduce((a, x) => a + x, 0);
+    totalEl.textContent = hole > 0 ? `Ges. ${done}${done === parSoFar ? ' (Par)' : done > parSoFar ? ` (+${done - parSoFar})` : ` (${done - parSoFar})`}` : '';
     if (!b) return;
-    if (b.s !== lastStroke) {
+    // neuer Schlag oder angestoßen (andere Stelle) → Sensor-Ziel zurücksetzen
+    const pos = `${b.s}|${b.x}|${b.y}`;
+    if (b.s !== lastStroke || (!b.m && pos !== lastPos)) {
       lastStroke = b.s;
       motionAim = null;
     }
+    if (!b.m) lastPos = pos;
     strokesEl.textContent = b.d ? strokesTxt(s.scores[id]?.[hole] ?? b.s) : `Schlag ${b.s + 1}`;
+    const others = stillPlaying(s, id);
+    const waitTxt = others.length ? `Noch dran: ${namesList(others)}` : 'Alle fertig – gleich kommt die Scorekarte.';
     let m = '';
+    let st = '';
     let ht = '';
     if (b.d === 1) {
-      m = b.s === 1 ? 'HOLE-IN-ONE!' : 'Eingelocht!';
-      ht = 'Warte auf die anderen …';
+      const n = s.scores[id]?.[hole] ?? b.s;
+      m = n === 1 ? 'HOLE-IN-ONE!' : 'Eingelocht!';
+      st = `${strokesTxt(n)} auf der Karte. ${waitTxt}`;
+      ht = 'Du bist fertig mit diesem Loch – schau den anderen zu.';
     } else if (b.d === 2) {
       m = 'Schluss für dieses Loch';
-      ht = `${s.scores[id]?.[hole] ?? GOLF.MAX_SCORE} auf der Karte`;
-    } else if (b.m || sentStroke === b.s) {
-      m = b.tube ? 'Wusch – durchs Looping!' : 'Ball rollt …';
-      ht = 'Schau auf den Fernseher!';
+      st = `${s.scores[id]?.[hole] ?? GOLF.MAX_SCORE} auf der Karte. ${waitTxt}`;
+      ht = 'Nächstes Loch geht gleich los.';
+    } else if (b.m) {
+      m = b.k ? 'Angestoßen!' : b.tube ? 'Wusch – durchs Looping!' : 'Ball rollt …';
+      st = b.k ? 'Ein anderer Ball hat deinen getroffen – kostet dich nichts.' : 'Schau auf den Fernseher!';
+      ht = b.k ? 'Gleich kannst du von der neuen Stelle aus putten.' : 'Gleich bist du wieder dran.';
+    } else if (pending(b)) {
+      m = 'Schlag unterwegs …';
+      st = 'Schau auf den Fernseher!';
     } else {
-      m = 'Du bist dran!';
-      ht = mode === 'motion' ? 'Ziel auf der Karte antippen, dann Knopf halten, wie ein Putter pendeln, loslassen.' : 'Finger aufs grüne Feld, vom Ziel weg zurückziehen (wie eine Schleuder), loslassen. Weiter ziehen = fester.';
+      m = 'Dein Schlag!';
+      st = others.length ? `Alle putten gleichzeitig – ${namesList(others)} auch.` : 'Nur noch du auf diesem Loch.';
+      ht =
+        mode === 'motion'
+          ? 'Ziel auf der Karte antippen, rechts den Knopf halten, wie ein Putter pendeln, loslassen.'
+          : 'Finger aufs Feld, vom Ziel weg zurückziehen (Schleuder) und loslassen. Weiter ziehen = fester.';
     }
+    if (b.auto && !b.d) st = `🤖 Dein Handy war weg – ${b.auto}× hat der Computer für dich geputtet. ${st}`;
     msg.textContent = m;
+    sub.textContent = st;
     if (pid === null && !recording) hint.textContent = ht;
     pad.classList.toggle('locked', !canPutt());
     swingBtn.disabled = !canPutt();
   };
 }
 
-const GOLF_HOLE_COUNT = () => golf()?.holes ?? 6;
-
 // ------------------------------------------------------------------ Scorecard
 
 function buildCard(s: GolfState) {
   const id = store.playerId!;
-  const total = (p: string) => (s.scores[p] ?? []).reduce<number>((a, x) => a + (x ?? 0), 0);
-  const rows = [...s.order].sort((a, b) => total(a) - total(b));
+  const rows = [...s.order].sort((a, b) => total(s, a) - total(s, b));
   const over = s.sub === 'over';
   const mine = s.scores[id]?.[s.hole];
   const parSum = s.par.slice(0, over ? s.holes : s.hole + 1).reduce((a, p) => a + p, 0);
@@ -535,18 +787,23 @@ function buildCard(s: GolfState) {
       : mine !== null && mine !== undefined
         ? `Loch ${s.hole + 1}: ${strokesTxt(mine)} (Par ${s.par[s.hole]})`
         : `Loch ${s.hole + 1}`;
+  const note = s.ended && !over ? `<p class="gf-ended">Loch vorzeitig beendet: Wer noch spielte, bekommt Schläge + 2, mindestens ${s.par[s.hole] + 1}.</p>` : '';
   const root = el(`
-    <div class="center gf-cardhead"><h2>${escapeHtml(head)}</h2><p>${over ? `Du: ${strokesTxt(total(id))} (${rel(total(id))})` : 'Schau auf den Fernseher – gleich geht es weiter!'}</p></div>
+    <div class="center gf-cardhead"><h2>${escapeHtml(head)}</h2><p>${over ? `Du: ${strokesTxt(total(s, id))} (${rel(total(s, id))})` : `Gesamt: ${strokesTxt(total(s, id))} (${rel(total(s, id))}) · Schau auf den Fernseher – gleich geht es weiter!`}</p>${note}</div>
+    <button class="gf-vip hidden"></button>
     <div class="panel gf-card">
       <div class="gf-row gf-head"><span></span><i></i><span>Spieler</span><span class="gf-this">L${s.hole + 1}</span><b>Ges.</b></div>
       ${rows
         .map(
           (p, i) =>
-            `<div class="gf-row ${p === id ? 'me' : ''}"><span>${i + 1}.</span><i class="gf-sw" style="background:${hex(s.colors[p] ?? 0xffffff)}"></i><span class="bw-name">${escapeHtml(nameOf(p).replace(/^Bot\s+/, ''))}</span><span class="gf-this">${s.scores[p]?.[s.hole] ?? '–'}</span><b>${total(p)}</b></div>`,
+            `<div class="gf-row ${p === id ? 'me' : ''}"><span>${i + 1}.</span><i class="gf-sw" style="background:${hex(s.colors[p] ?? 0xffffff)}"></i><span class="bw-name">${escapeHtml(shortName(p))}</span><span class="gf-this">${s.scores[p]?.[s.hole] ?? '–'}</span><b>${total(s, p)}</b></div>`,
         )
         .join('')}
     </div>
   `);
   app.append(root);
-  return null;
+  const vip = root.querySelector<HTMLButtonElement>('.gf-vip');
+  if (!vip || over) return null;
+  // Scorekarte: ein Tipp genügt (es wird nur die Wartezeit verkürzt)
+  return vipNextButton(vip, null);
 }

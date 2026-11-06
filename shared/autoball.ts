@@ -44,9 +44,7 @@ export const AFB = {
   BALL_WALL_E: 0.72,
   BALL_CAR_E: 0.5,
   /** Anteil der Autogeschwindigkeit (Richtung Ball), der zusätzlich als Schuss übertragen wird */
-  KICK: 0.32,
-  /** … beim HÜPFER mehr */
-  HOP_KICK: 0.75,
+  KICK: 0.5,
   CAR_WALL_E: 0.3,
 
   BOOST_MAX: 100,
@@ -57,8 +55,17 @@ export const AFB = {
   /** Kleineres Team (z. B. 2 gegen 3) lädt schneller */
   BOOST_UNDERDOG: 1.6,
 
-  HOP_MS: 450,
-  HOP_COOLDOWN_MS: 1300,
+  /**
+   * Lenkung wie ein normaler Joystick (Richtung auf dem TV): Stick-Ausschlag unter STICK_DEAD = losgelassen
+   * (Auto hält seine Richtung). Das Auto dreht mit der Kart-Lenkung zur Stick-Richtung; ab STEER_SOFT (rad)
+   * Abweichung wird voll eingeschlagen, darunter weich ausgelenkt (kein Pendeln).
+   */
+  STICK_DEAD: 0.15,
+  STEER_SOFT: 0.4,
+  /** Liegt die Stick-Richtung (fast) hinter dem Auto, bleibt die einmal gewählte Drehrichtung → Wende im Bogen */
+  AIM_BEHIND: 2.6,
+  /** BREMSE in voller Fahrt + Stick so weit (rad) neben der Fahrtrichtung = Drift-Wende */
+  DRIFT_AIM: 0.5,
 
   /** Torschütze: letzter Kontakt des eigenen Teams innerhalb dieser Zeit (sonst Eigentor) */
   SCORER_MS: 5000,
@@ -192,10 +199,8 @@ export interface AfbCar {
   d: number;
   /** Mini-Turbo geladen */
   ch: boolean;
-  /** Rest-Hüpfer (ms), 0 = am Boden */
-  hop: number;
-  /** Rest-Abklingzeit Hüpfer (ms) */
-  hc: number;
+  /** Stick-Richtung (rad, TV-Koordinaten) – null = Stick losgelassen */
+  s: number | null;
   /** Tore / Ballkontakte */
   g: number;
   k: number;

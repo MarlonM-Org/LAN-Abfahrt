@@ -65,8 +65,8 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   pixel: { title: 'Pixel-Galerie', icon: '🖼️', tagline: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage entscheidet!', minPlayers: 3 , orientation: 'portrait' },
   bogen: { title: 'Bogen-Arena', icon: '🏹', inspiredBy: 'TowerFall', tagline: 'Saugnapfpfeile, ein Treffer – und du bist raus!', minPlayers: 2, maxPlayers: 8 , orientation: 'landscape' },
   darts: { title: 'Darts an der Strandbar', icon: '🎯', tagline: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', minPlayers: 2 , orientation: 'portrait' },
-  golf: { title: 'Urlaubs-Minigolf', icon: '⛳', tagline: 'Alle putten gleichzeitig – Leuchtturm, Looping, Lagune!', minPlayers: 2 , orientation: 'portrait' },
-  autoball: { title: 'Auto-Fußball', icon: '⚽', inspiredBy: 'Rocket League', tagline: 'Gas, Boost, Hüpfer – schiebt den Wasserball ins Tor!', minPlayers: 2 , orientation: 'landscape' },
+  golf: { title: 'Urlaubs-Minigolf', icon: '⛳', tagline: 'Alle putten gleichzeitig – Leuchtturm, Looping, Lagune!', minPlayers: 2 , orientation: 'landscape' },
+  autoball: { title: 'Auto-Fußball', icon: '⚽', inspiredBy: 'Rocket League', tagline: 'Stick, Gas, Boost – schiebt den Wasserball ins Tor!', minPlayers: 2 , orientation: 'landscape' },
   wpistole: { title: 'Wasserpistolen-Duell', icon: '🔫', inspiredBy: 'Wild Gunman', tagline: 'Hand ans Holster ... ZIEHT! Wer zuerst spritzt, bleibt trocken.', minPlayers: 2 , orientation: 'portrait' },
   zauber: { title: 'Zauber-Arena', icon: '🧙', inspiredBy: 'Spellsworn', tagline: 'Feuerbälle, Eilzauber, Lava – wer bleibt auf der Plattform?', minPlayers: 2 , orientation: 'landscape' },
   angeln: { title: 'Angeln', icon: '🎣', tagline: 'Auswerfen, anschlagen, drillen – wer zieht den dicksten Hecht aus dem See?', minPlayers: 2 , orientation: 'portrait' },
@@ -100,13 +100,10 @@ export interface HowToControl {
 }
 
 /**
- * Regelkarte vor jedem Minispiel (TV + Handy, Raum-Phase `intro`): ein Satz Ziel und 2–3 Steuer-Piktogramme.
- * Das Übungsfeld am Handy liest die Bedienung direkt aus diesen Zeilen:
- *   - Icon 🕹️ = schwebender Stick (zweimal 🕹️ = zwei Sticks: laufen + zielen)
- *   - Text „KNOPF: …“ (vor dem Doppelpunkt nur Großbuchstaben/Symbole) = echter Knopf, „A / B: …“ = zwei Knöpfe;
- *     ◀ ▶ LINKS RECHTS bewegen die Mini-Figur, solange man sie hält
- *   - sonst (Sensor, Listen, Text) zeigt das Handy nur einen Hinweis
- * Pflicht für jedes neue Minispiel – Texte kurz halten (TV-Kachel ≈ 2 × 17 Zeichen).
+ * Regelkarte vor jedem Minispiel (TV + Handy, Raum-Phase `intro`): ein Satz Ziel und 2–3 Steuer-Zeilen
+ * (Emoji + kurzer Text, z. B. „BOMBE: Kokosnuss legen“). Spiele aus `WARMUP_KINDS` zeigen statt der Karte eine
+ * Aufwärmrunde mit der echten Steuerung – dort steht nur der Ziel-Satz in der Leiste.
+ * Pflicht für jedes neue Minispiel – Texte kurz halten (eine Zeile ≈ 34 Zeichen, höchstens 3 Steuer-Zeilen).
  */
 export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl[] }> = {
   flunky: { goal: 'Trefft die Flasche – dann trinkt, bis die anderen sie wieder aufgestellt haben.', controls: [{ icon: '🎯', text: 'Wischen: Ball werfen (Wind!)' }, { icon: '🍺', text: 'TRINKEN!: schnell tippen' }, { icon: '🏃', text: 'LAUFEN!: Flasche aufstellen' }] },
@@ -135,7 +132,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   turm: { goal: 'Stapelt euer Gepäck bis zum Gipfelkreuz und haltet den Turm 2 s.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = schneller fallen' }] },
   igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦔', text: '◀ / ▶ / SPRUNG: laufen' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '🪢', text: 'Liane, Schirm, Schaufel: Zug geht weiter' }] },
   smash: { goal: 'Haut die anderen von der Bühne – je höher die Prozente, desto weiter fliegen sie.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Richtung = Schlag' }, { icon: '🥊', text: 'SCHLAG / SPEZIAL: hauen' }, { icon: '🛡️', text: 'SPRUNG / SCHILD: springen, blocken' }] },
-  wasser: { goal: 'Werft Wasserbomben auf die anderen – wer am trockensten bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Linker Stick: laufen' }, { icon: '🕹️', text: 'Rechter Stick: zielen, loslassen = Wurf' }, { icon: '💦', text: 'Treffer machen nass' }] },
+  wasser: { goal: 'Macht die anderen klatschnass – wer das öfter schafft, gewinnt.', controls: [{ icon: '🕹️', text: 'Linker Stick: laufen' }, { icon: '🕹️', text: 'Rechter Stick: zielen, loslassen = Wurf' }, { icon: '💦', text: 'Klatschnass? Ab zum Handtuch!' }] },
   stillepost: { goal: 'Schreiben, malen, raten – reihum wandert alles weiter. Am Ende wird gelacht.', controls: [{ icon: '✍️', text: 'Satz schreiben' }, { icon: '🖍️', text: 'Das Bild dazu malen' }, { icon: '🤔', text: 'Bild beschreiben' }] },
   fangen: { goal: 'Der Animateur ist unsichtbar – fangt ihn gemeinsam (oder entkommt als Animateur)!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💨', text: 'SPRINT / ABLENKUNG: Spezialknopf' }, { icon: '👣', text: 'Auf Fußspuren achten, rufen!' }] },
   geist: { goal: 'Ein unsichtbarer Geist spukt – leuchtet ihn an, bevor er euch erschreckt.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Lampe zeigt nach vorn' }, { icon: '🔦', text: 'LICHT AN: Geist anleuchten' }, { icon: '👻', text: 'Als Geist: unsichtbar schweben' }] },
@@ -148,8 +145,8 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   pixel: { goal: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage stimmt ab.', controls: [{ icon: '🎨', text: 'Farbe wählen, tippen oder wischen' }, { icon: '🪣', text: 'Eimer, Radierer, Zurück' }, { icon: '🗳️', text: 'Lieblingsbild wählen' }] },
   bogen: { goal: 'Ein Treffer und du bist raus – verschossene Pfeile wieder einsammeln!', controls: [{ icon: '🕹️', text: 'Stick: laufen und zielen' }, { icon: '🏹', text: 'SCHUSS: Pfeil abfeuern' }, { icon: '⤴️', text: 'SPRUNG / DASH: springen, ausweichen' }] },
   darts: { goal: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', controls: [{ icon: '🎯', text: 'Ziehen: Fadenkreuz setzen' }, { icon: '✋', text: 'Ruhig halten = ruhiger' }, { icon: '👆', text: 'Wischen oder schnippen: werfen' }] },
-  golf: { goal: 'Alle putten gleichzeitig – wer braucht die wenigsten Schläge?', controls: [{ icon: '⛳', text: 'Zurückziehen wie eine Schleuder' }, { icon: '📏', text: 'Ziehweg = Kraft' }, { icon: '📱', text: 'Mit Sensor: Handy pendeln' }] },
-  autoball: { goal: 'Team Sonne gegen Team Meer: schiebt den Wasserball ins gegnerische Tor!', controls: [{ icon: '🕹️', text: 'Stick: lenken' }, { icon: '🏎️', text: 'GAS / BREMSE: fahren' }, { icon: '🚀', text: 'BOOST / HÜPFER: Turbo, Sprung' }] },
+  golf: { goal: 'Alle putten gleichzeitig, Bälle stoßen sich an – wer braucht die wenigsten Schläge?', controls: [{ icon: '⛳', text: 'Zurückziehen wie Schleuder' }, { icon: '📏', text: 'Ziehweg = Kraft' }, { icon: '📱', text: 'Mit Sensor: Handy pendeln' }] },
+  autoball: { goal: 'Team Sonne gegen Team Meer: schiebt den Wasserball ins gegnerische Tor!', controls: [{ icon: '🕹️', text: 'Stick: Richtung wie am TV' }, { icon: '🏎️', text: 'GAS / BREMSE: fahren' }, { icon: '🚀', text: 'BOOST: Turbo (lädt nach)' }] },
   wpistole: { goal: 'Wer nach „ZIEHT!“ zuerst trifft, bleibt trocken – wer zuckt, kriegt den Eimer.', controls: [{ icon: '✋', text: 'Hand ans Holster, warten' }, { icon: '📣', text: 'Erst bei „ZIEHT!“ ziehen' }, { icon: '💦', text: 'Zielen und spritzen' }] },
   zauber: { goal: 'Schleudert die anderen in die Lava – wer zuletzt steht, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🔥', text: 'ANGRIFF: Feuerball' }, { icon: '💨', text: 'EILE: kurzer Sprint' }] },
   angeln: { goal: 'Wer zieht den dicksten Fisch aus dem See?', controls: [{ icon: '🎣', text: 'Auswerfen: halten und schwingen' }, { icon: '❗', text: 'ANSCHLAGEN: beim Biss sofort' }, { icon: '🌀', text: 'Drill: halten = kurbeln' }] },
@@ -163,24 +160,22 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   schaetz: { goal: 'Schätzt die Zahl – dann setzt Chips auf die Karte, die am nächsten dran ist, ohne drüber.', controls: [{ icon: '🔢', text: 'Zahl am Handy eintippen' }, { icon: '🪙', text: '2 Chips setzen (außen = ×3/×4)' }, { icon: '👑', text: 'Beste Karte: Autor +3' }] },
   lieder: { goal: 'Ein Song läuft auf dem TV – tippt so schnell wie möglich den richtigen Titel an.', controls: [{ icon: '🎛️', text: 'Vorher: eure Genres wählen' }, { icon: '👆', text: 'Titel antippen – nur ein Versuch' }, { icon: '⚡', text: 'Schneller = mehr Punkte (bis 6)' }] },
   maexchen: { goal: 'Würfelt geheim, sagt einen höheren Wert an – ehrlich oder geblufft. Wer erwischt wird, verliert!', controls: [{ icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
-  werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }, { icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
+  werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }] },
   skisprung: { goal: 'Auf dem Balance Board: im Anlauf ruhig in der Mitte stehen, bei „JETZT ABSPRINGEN!“ einmal kräftig hochdrücken, im Flug leicht nach vorn lehnen – und weit fliegen!', controls: [{ icon: '⚖️', text: '1 Anlauf: ruhig mittig, nicht lehnen' }, { icon: '⤴️', text: '2 Am Tisch: einmal abspringen' }, { icon: '🛫', text: '3 Flug: leicht nach vorn lehnen' }] },
   teppich: { goal: 'Auf dem Balance Board durch die Wüstenstadt fliegen: Juwelen holen, Türmen und Geiern ausweichen.', controls: [{ icon: '⬆️', text: 'Nach hinten lehnen = steigen' }, { icon: '⬇️', text: 'Nach vorn lehnen = sinken' }, { icon: '➡️', text: 'Rechts = schneller, links = bremsen' }] },
   kugel: { goal: 'Auf dem Balance Board die Kugel über den schmalen, moosigen Tempelpfad ins Ziel lehnen – ohne in den Abgrund zu rollen.', controls: [{ icon: '⬆️', text: 'Vorn lehnen = Gas' }, { icon: '↪️', text: 'Seitlich = drehen (Hoverboard)' }, { icon: '🛑', text: 'Hinten lehnen = bremsen' }] },
 };
 
-/** Übungsfeld-Bedienung aus der Regelkarte (siehe `MINI_HOWTO`): Anzahl Sticks und Knopf-Beschriftungen */
-export function howToPractice(kind: MiniKind): { sticks: number; buttons: string[] } {
-  const controls = MINI_HOWTO[kind]?.controls ?? [];
-  const sticks = Math.min(2, controls.filter((c) => c.icon === '🕹️').length);
-  const buttons: string[] = [];
-  for (const c of controls) {
-    const m = /^([^:]+):\s/.exec(c.text);
-    if (!m || /[a-zäöüß]/.test(m[1])) continue;
-    for (const b of m[1].split('/').map((x) => x.trim())) if (b && !buttons.includes(b)) buttons.push(b);
-  }
-  return { sticks, buttons };
-}
+/**
+ * Aufwärmrunde statt Regelkarte (Raum-Phase `intro`): Für diese Echtzeit-Spiele startet der Raum schon während der
+ * Karte eine echte Instanz des Spiels im Übungsmodus (`MiniCtx.practice`) – TV zeigt die echte Szene mit
+ * AUFWÄRMEN-Leiste, die Handys den echten Controller mit schmaler BEREIT-Leiste. Nichts zählt; Ausgeschiedene sind
+ * gleich wieder dabei (eigenes Respawn oder der Raum startet still eine frische Übungsrunde). Sobald alle bereit sind
+ * (oder VIP/Laptop starten), beginnt das echte Spiel frisch mit Countdown.
+ * Nicht hier: rundenbasierte, Quiz-, Abstimmungs-, Geheimrollen- und Balance-Board-Spiele.
+ */
+export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint'];
+export const isWarmupKind = (kind: MiniKind) => WARMUP_KINDS.includes(kind);
 
 /** Minispiele im Trinkspiel-Modus */
 export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'maexchen'];

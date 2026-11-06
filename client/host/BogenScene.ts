@@ -227,6 +227,11 @@ export class BogenScene extends Phaser.Scene {
       if (p.alive && !g.alive) {
         g.x = p.x;
         g.y = p.y;
+        // Aufwärmrunde: Respawn mitten in der Runde
+        if (st.sub === 'play') {
+          this.juice.burst(p.x, AY + p.y - 10, 'spark', 10);
+          sfx('pop', { x: p.x, pitch: 1.3 });
+        }
       }
       g.alive = p.alive;
       g.root.setVisible(p.alive);
