@@ -124,7 +124,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   sup: { goal: 'Paddelt zu zweit ins Ziel – gleichmäßig, sonst kippt das Board!', controls: [{ icon: '🚣', text: 'LINKS / RECHTS: paddeln' }, { icon: '⚖️', text: 'Gleichmäßig – sonst PLATSCH' }, { icon: '🪨', text: 'Felsen und Quallen ausweichen' }] },
   tidy: { goal: 'Schiebt das Chaos in den Korb eures Teams!', controls: [{ icon: '🕹️', text: 'Stick: laufen und schieben' }, { icon: '💨', text: 'SPRINT: kurz schneller' }, { icon: '🧺', text: 'Alles in euren Korb' }] },
   flieger: { goal: 'Ruft euch die Anweisungen zu – sie betreffen meist ein anderes Handy!', controls: [{ icon: '📣', text: 'Anweisung oben laut vorlesen' }, { icon: '🎛️', text: 'Eigene Knöpfe und Schalter' }, { icon: '⛽', text: 'Verpasst = weniger Sprit' }] },
-  kurve: { goal: 'Zieht eure Spur und rammt weder Rand noch fremde Spuren!', controls: [{ icon: '↩️', text: 'LINKS / RECHTS: halten = lenken' }, { icon: '⭐', text: 'Power-ups einsammeln' }, { icon: '🏆', text: 'Wer überlebt, punktet' }] },
+  kurve: { goal: 'Zieht eure Spur und rammt keine Spur! Am Rand geht’s auf der anderen Seite weiter.', controls: [{ icon: '↩️', text: 'LINKS / RECHTS: halten = lenken' }, { icon: '⭐', text: 'Power-ups einsammeln' }, { icon: '🏆', text: 'Wer überlebt, punktet' }] },
   arena: { goal: 'Sprengt euch den Weg frei und erwischt die anderen – wer trocken bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💣', text: 'BOMBE: Kokosnuss legen' }, { icon: '🌊', text: 'Nach 60 s kommt die Flut' }] },
   bowling: { goal: 'Räumt alle Pins ab – Strike!', controls: [{ icon: '📱', text: 'Knopf halten, Handy schwingen, loslassen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }, { icon: '🎳', text: 'Reihum – zwei Würfe pro Frame' }] },
   enten: { goal: 'Schießt Enten, Möwen und Flamingos – aber keine Badegäste!', controls: [{ icon: '📱', text: 'Handy auf den TV richten' }, { icon: '👆', text: 'Tippen = schießen' }, { icon: '🔄', text: 'Nach unten wischen = laden' }] },
@@ -648,16 +648,16 @@ export const FLIEGER_SWITCHES = [
 // ------------------------------------------------------------------ Kurven-Duell
 
 export const KURVE = {
-  /** Spielfläche (darüber: Punktetafel) */
+  /** Spielfläche (darüber: Punktetafel) – offene Ränder: rechts raus = links wieder rein, oben raus = unten rein */
   ARENA: { x: 6, y: 30, w: 468, h: 234 },
   /** Grundtempo in px/s und Drehgeschwindigkeit in rad/s (→ Wenderadius ≈ 16 px) */
   SPEED: 46,
   TURN: 2.9,
   /** Linienstärke (TV, Kollision) */
   LINE: 3,
-  /** Lücken: alle 1,5–3 s, so lang (px), dass man durchpasst */
-  GAP_MIN_MS: 1500,
-  GAP_MAX_MS: 3000,
+  /** Lücken: alle 1–2 s, so lang (px), dass man durchpasst */
+  GAP_MIN_MS: 1000,
+  GAP_MAX_MS: 2000,
   GAP_PX: 12,
   /** Die letzten n px der eigenen Spur zählen nicht als Hindernis */
   SELF_GRACE: 8,
@@ -678,7 +678,6 @@ export const KURVE = {
   TURBO_F: 1.6,
   SLOW_MS: 4000,
   SLOW_F: 0.55,
-  WRAP_MS: 6000,
   /** So viele Spurpunkte pro Spieler stehen im Snapshot */
   TAIL: 32,
 };
@@ -686,7 +685,6 @@ export const KURVE = {
 export const KURVE_POWER_INFO: Record<KurvePower, { label: string; desc: string; color: string }> = {
   turbo: { label: 'TURBO!', desc: 'Du bist kurz schneller', color: '#f0973a' },
   slow: { label: 'SCHNECKE!', desc: 'Alle anderen werden langsam', color: '#46b04a' },
-  wrap: { label: 'DURCH WÄNDE!', desc: 'Du fährst kurz durch den Rand', color: '#b07ae0' },
 };
 
 // ------------------------------------------------------------------ Ententeich
