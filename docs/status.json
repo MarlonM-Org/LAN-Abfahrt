@@ -1,21 +1,28 @@
 {
-  "updated": "2026-11-06T13:55+00:00",
+  "updated": "2026-11-06T15:01+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Board-Spiele: ewige Bestenliste pro Spieler (Highscore)",
-      "kind": "skisprung",
-      "type": "Balance Board",
-      "branch": "feat/board-rekorde",
-      "detail": "Weiteste Sprungweite, Bestzeiten Teppich/Kugel – pro Spieler gespeichert (data/records.json), Rekord-Tafel am TV, „NEUER REKORD!“-Ansage."
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Board-Spiele: ewige Bestenliste pro Spieler (Highscore)",
+      "pr": 91,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Verräter-Redesign „Stromausfall“ (Licht pro Raum, Silhouetten im Dunkeln, Verräter-Shop „Licht aus“)",
+      "pr": 90,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Igel-Krieg Stufe L (Lianen-Seil, Sonnenschirm, Schaufel, Themenkarten, Schuss des Abends, Igel-Sprüche)",
+      "pr": 89,
+      "date": "2026-11-06"
+    },
     {
       "title": "Wii Balance Board: Tempel-Kugel in 3D (Verfolgerkamera, Minikarte) + Rückansicht der Figuren (Haare statt Gesicht, auch im Kart)",
       "pr": 87,
@@ -329,7 +336,7 @@
     },
     "igel": {
       "status": "umgesetzt",
-      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68)"
+      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) – größere Insel offen"
     },
     "ttt": {
       "status": "umgesetzt",
@@ -418,7 +425,7 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Spiel-Review umgesetzt: Phase 0–3 komplett, Phase 4 bis Stufe M, Phase 5 erste vier Spiele – offen: Igel Stufe L, weitere neue Spiele, Verräter „Stromausfall“",
+      "title": "Spiel-Review umgesetzt: Phase 0–4 (Igel bis Stufe L), Verräter „Stromausfall“ – offen: größere Igel-Insel, weitere neue Spiele (Phase 5)",
       "status": "umgesetzt"
     },
     {
