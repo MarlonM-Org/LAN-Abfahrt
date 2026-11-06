@@ -43,6 +43,7 @@ const NINTENDO = 0x057e;
 const PIDS = [0x0306, 0x0330];
 const FILTERS = PIDS.map((productId) => ({ vendorId: NINTENDO, productId }));
 const LS_FLIP = 'lanabfahrt.bbFlip';
+const LS_MINI = 'lanabfahrt.bbMini';
 
 const hid = (): HID | null => (navigator as Navigator & { hid?: HID }).hid ?? null;
 
@@ -243,9 +244,28 @@ const CSS = `
 #bb-pill.show { display: block; }
 #bb-pill.ok { border-color: rgba(120, 220, 140, 0.8); }
 #bb-pill .bb-sub { opacity: 0.75; font-size: 1vh; }
+#bb-pill .bb-x { float: right; margin: -0.4vh -0.4vh 0 1vh; padding: 0 0.6vh; }
+#bb-pill.mini { padding: 0.6vh 0.9vh; }
 #bb-pill button { font: inherit; font-size: 1vh; margin-top: 0.6vh; margin-right: 0.6vh; color: #3d2414; background: #f7e4b5; border: 0.25vh solid #8d5629; padding: 0.4vh 0.7vh; cursor: pointer; }
 `;
 let pill: HTMLDivElement | null = null;
+/** Eingeklappt: nur ein kleines ⚖️ mit Status-Häkchen (Klick klappt wieder auf) */
+let mini = (() => {
+  try {
+    return localStorage.getItem(LS_MINI) === '1';
+  } catch {
+    return false;
+  }
+})();
+function setMini(v: boolean) {
+  mini = v;
+  try {
+    localStorage.setItem(LS_MINI, v ? '1' : '0');
+  } catch {
+    /* egal */
+  }
+  render();
+}
 
 function render() {
   if (!pill) return;
@@ -254,15 +274,19 @@ function render() {
   pill.classList.toggle('ok', status === 'ok' && !!boardSample());
   if (!show) return;
   const s = boardSample();
+  const standing = !!s && s.w >= BB.MIN_KG;
+  pill.classList.toggle('mini', mini);
   let html: string;
-  if (status === 'ok' && board) {
+  if (mini) {
+    html = `⚖️ ${status === 'ok' ? (standing ? '✓ erkannt' : '✓') : status === 'connecting' ? '…' : '✕'}`;
+  } else if (status === 'ok' && board) {
     const bat = board.battery >= 0 ? ` · 🔋 ${Math.round((board.battery / 0xc8) * 100)} %` : '';
-    html = s ? `⚖️ Balance Board: ${Math.round(s.w)} kg${bat}` : `⚖️ Balance Board verbunden – warte auf Messwerte …${bat}`;
+    html = `<button class="bb-x" data-a="mini" title="Ausblenden">✕</button>` + (s ? `⚖️ Balance Board: ${standing ? 'Spieler erkannt ✓' : 'bereit – niemand drauf'}${bat}` : `⚖️ Balance Board verbunden – warte auf Messwerte …${bat}`);
     html += `<div class="bb-sub">Leer lassen zum Tarieren · vorn/hinten vertauscht? → umdrehen</div><button data-a="tare">Tarieren</button><button data-a="flip">Vorn ↔ hinten${flipY ? ' (getauscht)' : ''}</button>`;
   } else if (status === 'connecting') {
     html = '⚖️ Verbinde Balance Board …';
   } else {
-    html = `⚖️ Kein Balance Board – <b>B</b> drücken oder hier klicken`;
+    html = `<button class="bb-x" data-a="mini" title="Ausblenden">✕</button>⚖️ Kein Balance Board – <b>B</b> drücken oder hier klicken`;
     html += `<div class="bb-sub">${statusMsg ? `${statusMsg}<br>` : ''}Ersatz: Pfeiltasten lehnen · J = Sprung</div>`;
   }
   if (pill.dataset.html !== html) {
@@ -281,6 +305,8 @@ export function installBalanceBoard(socket: Socket) {
   document.body.append(pill);
   pill.addEventListener('click', (e) => {
     const a = (e.target as HTMLElement).closest('button')?.dataset.a;
+    if (a === 'mini') return setMini(true);
+    if (mini) return setMini(false);
     if (a === 'tare') return board?.retare();
     if (a === 'flip') {
       flipY = !flipY;
@@ -321,6 +347,7 @@ export function installBalanceBoard(socket: Socket) {
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (e.key === 'b' || e.key === 'B') {
       pillForced = performance.now() + 8000;
+      if (mini) setMini(false);
       if (status !== 'ok') void requestBoard();
       return render();
     }

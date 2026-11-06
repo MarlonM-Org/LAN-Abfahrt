@@ -2,8 +2,9 @@
  * Tempel-Kugel (Balance Board): Labyrinth, Physik und Zustand (Server, TV, Bots).
  *
  * Schmaler, moosbewachsener Steinpfad hoch über einem Abgrund, gesehen aus der Verfolgerkamera hinter der Figur
- * (wie im Kart). Gelehnt wird aus Sicht der Kamera: vorn = geradeaus, seitlich = lenken; die Kamera dreht der
- * Fahrtrichtung nach. Verlässt die Mitte der Kugel den Pfad, stürzt sie ab und
+ * (wie im Kart). Gesteuert wird wie auf einem Hoverboard: vorn lehnen = Gas in Blickrichtung, hinten = bremsen,
+ * seitlich lehnen = sich drehen (die Kamera dreht mit). Die Kugel rollt dorthin, wohin man schaut – seitlich
+ * driftet sie kaum (Grip). Verlässt die Mitte der Kugel den Pfad, stürzt sie ab und
  * beginnt am letzten Kontrollpunkt neu (Strafzeit). Alle rollen dasselbe Labyrinth (Startwert pro Spiel), Bestzeit gewinnt.
  */
 import { type BalanceTurn, seeded } from './balance';
@@ -17,13 +18,22 @@ export const KUG = {
   OX: 36,
   OY: 50,
   /** Halbe Pfadbreite (px): liegt die Kugelmitte weiter von der Pfadlinie weg, stürzt sie ab */
-  R: 10,
+  R: 12,
   BALL_R: 5,
-  /** Beschleunigung bei vollem Ausschlag (px/s²), Dämpfung (1/s), Höchsttempo (px/s) */
-  ACCEL: 270,
-  DAMP: 1.5,
-  VMAX: 112,
-  DEADZONE: 0.07,
+  /** Gas bei vollem Ausschlag nach vorn (px/s²), Bremse beim Zurücklehnen, Rollwiderstand (1/s), Höchsttempo (px/s) */
+  ACCEL: 120,
+  BRAKE: 160,
+  DAMP: 0.9,
+  VMAX: 72,
+  /** Rückwärts nur langsam (zum Rangieren in Sackgassen) */
+  VBACK: 18,
+  /** Drehen bei vollem Seitenausschlag (rad/s) – auch im Stand, wie ein Hoverboard */
+  TURN: 2.1,
+  /** Seitliches Rutschen wird so schnell abgebaut (1/s) = Grip */
+  GRIP: 7,
+  /** Totzone und Kurve: kleine Ausschläge wirken sehr fein (Potenz > 1) */
+  DEADZONE: 0.12,
+  CURVE: 1.6,
   FALL_MS: 900,
   /** Strafe pro Absturz (s) */
   FALL_PEN_S: 4,
@@ -167,32 +177,37 @@ export function distToPath(course: KugelCourse, x: number, y: number): number {
 
 export const wrapAng = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
-/**
- * Schwerpunkt → Beschleunigung in Weltkoordinaten (px/s²), aus Sicht der Kamera mit Blickrichtung `ang`:
- * vorn (by > 0) = in Blickrichtung, rechts (bx > 0) = nach rechts davon.
- */
-export function kugelAccel(bx: number, by: number, ang: number): [number, number] {
-  const dz = (v: number) => (Math.abs(v) < KUG.DEADZONE ? 0 : (v - Math.sign(v) * KUG.DEADZONE) / (1 - KUG.DEADZONE));
-  const f = dz(by) * KUG.ACCEL;
-  const r = dz(bx) * KUG.ACCEL;
-  const cs = Math.cos(ang);
-  const sn = Math.sin(ang);
-  return [cs * f - sn * r, sn * f + cs * r];
+/** Ausschlag am Board (−1…1) → Steuerwert (−1…1): Totzone, dann feine Kurve */
+export function kugelInput(v: number): number {
+  const a = Math.abs(v);
+  if (a < KUG.DEADZONE) return 0;
+  return Math.sign(v) * Math.min(1, (a - KUG.DEADZONE) / (1 - KUG.DEADZONE)) ** KUG.CURVE;
 }
 
-/** Umkehrung der Totzone (für Bots): gewünschte Beschleunigung 0…1 → Ausschlag am Board */
-export const kugelLean = (l: number) => (Math.abs(l) < 0.01 ? 0 : Math.sign(l) * (Math.abs(l) * (1 - KUG.DEADZONE) + KUG.DEADZONE));
+/** Umkehrung (für Bots): gewünschter Steuerwert −1…1 → Ausschlag am Board */
+export const kugelLean = (l: number) => (Math.abs(l) < 0.01 ? 0 : Math.sign(l) * (Math.min(1, Math.abs(l)) ** (1 / KUG.CURVE) * (1 - KUG.DEADZONE) + KUG.DEADZONE));
 
 /**
- * Blickrichtung der Verfolgerkamera: dreht der Fahrtrichtung nach (je schneller, desto williger).
- * Rollt die Kugel rückwärts oder quer zur Blickrichtung (> 100°), bleibt die Kamera stehen.
+ * Hoverboard-Physik, ein Schritt: seitlich lehnen (bx) dreht die Blickrichtung `ang`, vorn/hinten (by) gibt Gas
+ * bzw. bremst entlang der Blickrichtung; seitliches Rutschen wird über den Grip abgebaut.
  */
-export function kugelHeading(ang: number, vx: number, vy: number, dt: number): number {
-  const sp = Math.hypot(vx, vy);
-  if (sp < 12) return ang;
-  const diff = wrapAng(Math.atan2(vy, vx) - ang);
-  if (Math.abs(diff) > 1.75) return ang;
-  return wrapAng(ang + diff * (1 - Math.exp(-dt * 3.2 * Math.min(1, sp / 45))));
+export function kugelDrive(k: { vx: number; vy: number; ang: number }, bx: number, by: number, dt: number) {
+  const steer = kugelInput(bx);
+  const thr = kugelInput(by);
+  k.ang = wrapAng(k.ang + steer * KUG.TURN * dt);
+  const cs = Math.cos(k.ang);
+  const sn = Math.sin(k.ang);
+  // in Vorwärts-/Seitenanteil zerlegen
+  let fwd = k.vx * cs + k.vy * sn;
+  let side = -k.vx * sn + k.vy * cs;
+  if (thr >= 0) fwd += thr * KUG.ACCEL * dt;
+  else if (fwd > 0) fwd = Math.max(0, fwd + thr * KUG.BRAKE * dt);
+  else fwd = Math.max(-KUG.VBACK, fwd + thr * KUG.ACCEL * 0.4 * dt);
+  fwd *= Math.exp(-KUG.DAMP * dt);
+  side *= Math.exp(-KUG.GRIP * dt);
+  fwd = Math.min(KUG.VMAX, fwd);
+  k.vx = cs * fwd - sn * side;
+  k.vy = sn * fwd + cs * side;
 }
 
 /** Blickrichtung am Start bzw. Kontrollpunkt: entlang des Lösungswegs */

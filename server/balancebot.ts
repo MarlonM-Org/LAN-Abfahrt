@@ -1,7 +1,7 @@
 import type { GameState } from '../shared/types';
 import { SKI, type SkiState } from '../shared/skisprung';
 import { TEP, type TepState, birdX, birdY, tepCourse } from '../shared/teppich';
-import { KUG, type KugelState, kugelCourse, kugelLean, routePoint } from '../shared/kugel';
+import { KUG, type KugelState, kugelCourse, kugelLean, routePoint, wrapAng } from '../shared/kugel';
 
 /**
  * Bots auf dem Balance Board: Ist der Bot dran, schickt er selbst Messwerte (Eingabe `bb`, 30 Hz) –
@@ -100,14 +100,14 @@ export function balanceBot(bot: BotLike, kind: 'skisprung' | 'teppich' | 'kugel'
         const cruise = (turn && toNext < 34 ? 22 : 62) * (0.55 + mem.skill * 0.55);
         const wantX = dir.x * cruise + (dir.x === 0 ? (p0.x - s.x) * 3 : 0);
         const wantY = dir.y * cruise + (dir.y === 0 ? (p0.y - s.y) * 3 : 0);
-        // Regler: Wunschtempo − Ist-Tempo → gewünschte Beschleunigung (Welt) → in die Kamera-Sicht drehen → Ausschlag
-        const gain = 2.6;
-        const wx = clamp(((wantX - s.vx) * gain) / KUG.ACCEL, -1, 1);
-        const wy = clamp(((wantY - s.vy) * gain) / KUG.ACCEL, -1, 1);
-        const cs = Math.cos(s.ang);
-        const sn = Math.sin(s.ang);
-        x += kugelLean(-wx * sn + wy * cs);
-        y += kugelLean(wx * cs + wy * sn);
+        // Hoverboard-Regler: zur Wunschrichtung drehen (seitlich lehnen), Tempo über vorn/hinten – in Kurven langsam
+        const err = wrapAng(Math.atan2(wantY, wantX) - s.ang);
+        const steer = clamp(err * 1.6, -1, 1);
+        const fwd = s.vx * Math.cos(s.ang) + s.vy * Math.sin(s.ang);
+        const want = Math.min(KUG.VMAX, Math.hypot(wantX, wantY)) * (Math.abs(err) > 0.5 ? 0.15 : 1);
+        const thr = clamp(((want - fwd) * 2.2) / KUG.ACCEL, -1, 1);
+        x += kugelLean(steer);
+        y += kugelLean(thr);
       }
     } else if (cur.kind === 'teppich') {
       const s = cur.state;
