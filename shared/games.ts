@@ -80,8 +80,8 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   schaetz: { title: 'Schätzkönig', icon: '🧮', inspiredBy: 'Wits & Wagers', tagline: 'Keine Ahnung? Egal – schätzen, dann auf die beste Zahl wetten!', minPlayers: 3, orientation: 'portrait' },
   maexchen: { title: 'Mäxchen am Pool', icon: '🎲', inspiredBy: 'Mäxchen', tagline: 'Würfeln, ansagen, bluffen – glaubst du das oder deckst du auf?', minPlayers: 2, orientation: 'portrait' },
   werwars: { title: 'Wer war’s?', icon: '🕵️‍♀️', inspiredBy: "Who's Who", tagline: 'Peinliche Geständnisse, anonym auf dem TV – wer hat das geschrieben?', minPlayers: 3, orientation: 'portrait' },
-  skisprung: { title: 'Schanzen-Springen', icon: '🎿', inspiredBy: 'Wii Fit', tagline: 'Balance Board: Hocke, Absprung, fliegen!', minPlayers: 1, orientation: 'portrait' },
-  teppich: { title: 'Teppich-Parcours', icon: '🧞', tagline: 'Balance Board: Lehnend durch die Wüstenstadt fliegen!', minPlayers: 1, orientation: 'portrait' },
+  skisprung: { title: 'Schanzen-Springen', icon: '🎿', inspiredBy: 'Wii Fit', tagline: 'Balance Board: Hocke, Absprung, fliegen!', minPlayers: 1, orientation: 'any' },
+  teppich: { title: 'Teppich-Parcours', icon: '🧞', tagline: 'Balance Board: Lehnend durch die Wüstenstadt fliegen!', minPlayers: 1, orientation: 'any' },
 };
 
 /** „🏎️ Kart-Rennen“ – Titel mit Icon für Listen und Ansagen */

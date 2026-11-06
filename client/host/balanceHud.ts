@@ -33,10 +33,10 @@ export class BalanceHud {
     this.label = txt(scene, w / 2, h + 4, '', { size: 8 });
     this.c.add([this.g, this.label, txt(scene, w / 2, -10, 'vorn', { size: 8, color: '#bcd3ff' })]);
 
-    this.card = scene.add.container(240, 120).setDepth(depth + 1).setScrollFactor(0);
-    const bg = scene.add.rectangle(0, 0, 300, 74, 0x141c30, 0.9).setStrokeStyle(2, 0xa0c8ff, 0.7);
-    this.cardTitle = txt(scene, 0, -28, '', { size: 16, color: '#ffd25e' });
-    this.cardSub = txt(scene, 0, 0, '', { size: 8, wrap: 280 });
+    this.card = scene.add.container(240, 128).setDepth(depth + 1).setScrollFactor(0);
+    const bg = scene.add.rectangle(0, 0, 360, 96, 0x141c30, 0.93).setStrokeStyle(2, 0xa0c8ff, 0.8);
+    this.cardTitle = txt(scene, 0, -38, '', { size: 16, color: '#ffd25e' });
+    this.cardSub = txt(scene, 0, -10, '', { size: 8, wrap: 330 });
     this.bar = scene.add.graphics();
     this.card.add([bg, this.cardTitle, this.cardSub, this.bar]);
     this.card.setVisible(false);
@@ -71,18 +71,18 @@ export class BalanceHud {
     this.card.setVisible(ready);
     if (ready) {
       const name = tagName(playerById(st.active)?.name ?? '?');
-      const title = `${name} ist dran!`;
+      const title = `${name}, du bist dran!`;
       if (this.cardTitle.text !== title) this.cardTitle.setText(title);
       const standing = !!b && b.w >= 15;
       const sub = !st.board
         ? 'Kein Balance Board verbunden – am Laptop B drücken.\nErsatz: Pfeiltasten + J'
         : standing
           ? 'Ruhig stehen … Gewicht wird eingemessen'
-          : `Rauf aufs Balance Board!  (${Math.ceil(st.endsIn / 1000)} s)`;
+          : `Stell dich aufs Balance Board!  (${Math.ceil(st.endsIn / 1000)} s)`;
       if (this.cardSub.text !== sub) this.cardSub.setText(sub);
       this.bar.clear();
-      this.bar.fillStyle(0x2a3550, 1).fillRect(-100, 26, 200, 6);
-      this.bar.fillStyle(0x3fbf5a, 1).fillRect(-100, 26, 200 * st.calib, 6);
+      this.bar.fillStyle(0x2a3550, 1).fillRect(-120, 34, 240, 8);
+      this.bar.fillStyle(0x3fbf5a, 1).fillRect(-120, 34, 240 * st.calib, 8);
     }
   }
 
