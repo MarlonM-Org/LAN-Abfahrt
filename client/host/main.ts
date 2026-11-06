@@ -11,7 +11,7 @@ import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
-import { mergeLive, mergeMeta, setState, setHostSocket, setViaTunnel } from './store';
+import { mergeLive, mergeMeta, setAtLaptop, setState, setHostSocket, setViaTunnel } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
@@ -141,6 +141,7 @@ async function start() {
   let controls = false;
   socket.on('host:info', (info: Partial<HostInfo>) => {
     setViaTunnel(!!info?.online);
+    setAtLaptop(!!info?.local);
     if (info?.local && !controls) {
       controls = true;
       installHostControls(socket);
