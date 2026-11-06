@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T20:01+00:00",
+  "updated": "2026-11-06T20:04+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -10,19 +10,22 @@
       "title": "Wasserbomben-Schlacht: feineres Zielen (kurz ziehen = nah treffen) + Spielende, sobald nur noch einer angreifen kann"
     },
     {
-      "title": "Regelkarte: Start erst, wenn alle bereit sind oder der VIP startet – kein Timer mehr"
-    },
-    {
       "title": "Strand-Volleyball: Daumen von LINKS nach RECHTS ziehen wechselt die Richtung; größerer Ball / kompakteres Feld"
     },
     {
       "title": "Urlaubs-Minigolf: VIP-Knopf „Nächstes Loch“, Handy quer (Ziehen passt zum TV), Bewegungssensor-Freigabe am iPhone, Bälle kollidieren miteinander, verwirrende Zuschauer-Anzeige zwischen den Schlägen"
+    },
+    {
+      "title": "Echte Aufwärmphase statt Übungsfeld: vor Action-Spielen mit der richtigen Steuerung üben (Handy + TV, nichts zählt), bis alle bereit sind"
     }
   ],
-  "queue": [
-    "Echte Aufwärmphase statt Übungsfeld: vor dem Spiel mit der richtigen Steuerung üben (Handy + TV, nichts zählt) – startet, sobald die laufenden PRs gemergt sind"
-  ],
+  "queue": [],
   "done": [
+    {
+      "title": "Regelkarte startet nicht mehr nach Timer: erst wenn alle verbundenen Spieler BEREIT gedrückt haben oder VIP („▶ JETZT STARTEN“) bzw. Laptop (Enter) startet; TV und Handy zeigen „BEREIT x/y“ und „Warte auf …“",
+      "pr": 102,
+      "date": "2026-11-06"
+    },
     {
       "title": "Bomben-Arena: kein Hängenbleiben mehr an Ecken und Kreuzungen (leicht schräger Stick läuft geradeaus durch, großzügige Ecken-Hilfe); Feld wächst mit der Spielerzahl (zu zweit 17×9 statt 25×13), TV zoomt kleine Felder groß",
       "pr": 101,
@@ -520,12 +523,12 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Regelkarte/Lobby: Start erst, wenn alle bereit sind oder der VIP erzwingt – nicht nach Timer",
-      "status": "in Arbeit"
+      "title": "Regelkarte/Lobby: Start erst, wenn alle bereit sind oder der VIP erzwingt – nicht nach Timer (#102)",
+      "status": "umgesetzt"
     },
     {
       "title": "Übungsfeld auf der Regelkarte passt nicht zur echten Steuerung, zu gequetscht → echte Aufwärmphase mit richtiger Steuerung",
-      "status": "offen"
+      "status": "in Arbeit"
     }
   ]
 }
