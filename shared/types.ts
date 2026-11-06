@@ -2207,15 +2207,19 @@ export interface ResultsState {
 /** `intro` = Regelkarte vor einem Minispiel (Ziel, Steuerung, Übungsfeld, „Bereit!“) */
 export type Phase = 'lobby' | 'board' | 'intro' | 'mini' | 'results' | 'story';
 
-/** Regelkarte vor dem Minispiel: Start, sobald alle bereit sind – spätestens bei `endsAt` (Server-Zeit, ms) */
+/**
+ * Regelkarte vor dem Minispiel: Start erst, wenn alle verbundenen Mitspieler bereit sind – oder wenn der VIP
+ * („▶ Jetzt starten“) bzw. der Laptop (Enter) ihn erzwingt. Kein Timer.
+ */
 export interface IntroState {
   kind: MiniKind;
-  /** Wer gleich mitspielt */
+  /** Wer gleich mitspielt (nur Verbundene – wer offline geht oder entfernt wird, fällt raus und blockiert nicht) */
   ids: string[];
-  /** Wer „Bereit!“ gedrückt hat (Bots sofort) */
+  /** Wer „Bereit!“ gedrückt hat (Bots sofort) – nur Einträge aus `ids` */
   ready: string[];
-  endsAt: number;
-  /** Spiel lief heute schon: nur 5 s, ohne Bereit-Pflicht */
+  /** Laufende Nummer der Regelkarte (neue Karte = neue Nummer) */
+  seq: number;
+  /** Spiel lief heute schon (kürzere Ansage) – gewartet wird trotzdem auf alle */
   short: boolean;
   /** Team-Minispiel vom Spielbrett (2 gegen 2, 1 gegen 3) */
   teams?: MiniTeams | null;

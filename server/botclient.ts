@@ -845,10 +845,11 @@ export class Bot {
     // Regelkarte vor dem Spiel: Bots sind sofort bereit
     if (s.phase === 'intro' && s.intro && !s.intro.ready.includes(this.id)) {
       const it = s.intro;
-      this.once(`intro-${it.kind}-${it.endsAt}`, async () => {
+      this.once(`intro-${it.seq}`, async () => {
         if (this.leader) {
           const teams = it.teams ? ` · ${it.teams.label} (Sonne ${it.teams.A.length} / Meer ${it.teams.B.length})` : '';
-          this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (kurz, 5 s)' : ' (15 s)'}${teams}`);
+          const humans = it.ids.filter((id) => !s.players.find((p) => p.id === id)?.bot).length;
+          this.opts.log?.(`[${new Date().toLocaleTimeString()}] Regelkarte: ${it.kind}${it.short ? ' (bekannt)' : ''}${teams}${humans ? ` – wartet auf ${humans} Mensch(en)` : ''}`);
         }
         await sleep(rand(150, 500));
         this.socket.emit('intro:ready');

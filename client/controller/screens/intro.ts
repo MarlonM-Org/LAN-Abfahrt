@@ -4,12 +4,12 @@ import { MINI_HOWTO, MINI_INFO, ORIENT_TEXT, howToPractice, miniInspired, teamHa
 import { type Screen, app, avatarCanvas, colorOfId, el, escapeHtml, me, message, nameOf, q, socket, store } from '../core';
 import { onInputReset, stickZone } from '../stick';
 import { haptic } from '../haptic';
-import { toLocalPerf } from '../../timesync';
 
 /**
  * Regelkarte vor jedem Minispiel (Raum-Phase `intro`): Ziel + 2–3 Steuer-Piktogramme aus `MINI_HOWTO`,
  * darunter ein **Übungsfeld** mit den echten Bedienelementen (schwebender Stick, Knöpfe mit Haptik) und einer
  * Mini-Figur, die darauf reagiert – nichts davon geht an den Server. Großer **BEREIT!**-Knopf (`intro:ready`).
+ * Kein Countdown: Oben „x/y ✓“, unten auf wen noch gewartet wird; der VIP hat „▶ JETZT STARTEN“ (`vip:continue`).
  * Der Screen hat die Haltung des Spiels (drittes Tupel-Element), damit Ansage-Karte und Overlay schon hier greifen.
  */
 export function pickIntro(it: IntroState, vip: boolean): Screen {
@@ -54,7 +54,7 @@ function buildIntro(kind: MiniKind, vipAtBuild: boolean, teams: MiniTeams | null
       <div class="it-head">
         <span class="it-icon">${info.icon}</span>
         <div class="it-title"><b>${escapeHtml(info.title)}</b>${insp ? `<small>${escapeHtml(insp)}</small>` : ''}</div>
-        <span class="it-timer"></span>
+        <span class="it-count"></span>
       </div>
       <div class="it-info">
         <p class="it-goal">${escapeHtml(how.goal)}</p>
@@ -74,7 +74,10 @@ function buildIntro(kind: MiniKind, vipAtBuild: boolean, teams: MiniTeams | null
       <div class="it-foot">
         <button class="big-btn it-ready">BEREIT!</button>
         <p class="it-status"></p>
-        <button class="secondary small it-go${vipAtBuild ? '' : ' hidden'}">▶ Jetzt starten</button>
+        <div class="it-vip${vipAtBuild ? '' : ' hidden'}">
+          <button class="it-go">▶ JETZT STARTEN</button>
+          <small>Du bist VIP: startet sofort, ohne auf alle zu warten</small>
+        </div>
       </div>
     </div>
   `);
@@ -213,8 +216,14 @@ function buildIntro(kind: MiniKind, vipAtBuild: boolean, teams: MiniTeams | null
     ready.disabled = true;
     ready.textContent = '✓ BEREIT';
   });
+  const vipBox = q(root, '.it-vip');
   const go = q<HTMLButtonElement>(root, '.it-go');
-  go.addEventListener('click', () => socket.emit('vip:continue'));
+  go.addEventListener('click', () => {
+    haptic('tap');
+    socket.emit('vip:continue');
+  });
+  const count = q(root, '.it-count');
+  const status = q(root, '.it-status');
 
   app.append(root);
   return () => {
@@ -222,23 +231,34 @@ function buildIntro(kind: MiniKind, vipAtBuild: boolean, teams: MiniTeams | null
     const st = s?.phase === 'intro' ? s.intro : null;
     if (!st) return;
     const id = store.playerId!;
-    const sec = Math.max(0, Math.ceil((toLocalPerf(st.endsAt) - performance.now()) / 1000));
-    q(root, '.it-timer').textContent = `${sec}s`;
-    const online = st.ids.filter((pid) => s!.players.find((p) => p.id === pid)?.connected);
-    const nReady = online.filter((pid) => st.ready.includes(pid)).length;
+    // Kein Timer: Los geht’s erst, wenn alle (verbundenen) bereit sind – oder der VIP startet
+    const n = st.ids.length;
+    const nReady = st.ready.length;
     const mine = st.ready.includes(id);
+    const others = st.ids.filter((pid) => pid !== id && !st.ready.includes(pid));
+    count.textContent = `${nReady}/${n} ✓`;
+    count.classList.toggle('all', n > 0 && nReady >= n);
     if (mine && !ready.disabled) {
       ready.disabled = true;
       ready.textContent = '✓ BEREIT';
     }
-    const missing = online.length - nReady;
-    q(root, '.it-status').textContent = st.short
-      ? `Kennt ihr schon – gleich geht’s los! (${nReady}/${online.length} bereit)`
-      : mine
-        ? missing > 0 ? `Warte auf ${missing} … (${nReady}/${online.length} bereit)` : 'Alle bereit – los geht’s!'
-        : `${nReady}/${online.length} bereit${practice ? ' · Probier die Steuerung aus!' : ''}`;
-    go.classList.toggle('hidden', !me()?.isVip);
+    status.textContent = !mine
+      ? `${nReady}/${n} bereit · ${practice ? 'Erst üben, dann BEREIT drücken' : 'Drück BEREIT, wenn du so weit bist'}`
+      : others.length
+        ? `Du bist bereit ✓ Warte auf ${waitingNames(others)} …`
+        : 'Alle bereit – los geht’s!';
+    const vip = !!me()?.isVip;
+    vipBox.classList.toggle('hidden', !vip);
+    // VIP ist bereit, andere fehlen noch → Start-Knopf pulsiert
+    go.classList.toggle('hot', vip && mine && others.length > 0);
   };
+}
+
+/** „Anna, Ben und Clara“ bzw. „Anna, Ben, Clara +2“ */
+function waitingNames(ids: string[]): string {
+  const names = ids.map((pid) => nameOf(pid));
+  if (names.length > 3) return `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}` : names[0] ?? '';
 }
 
 // ------------------------------------------------------------------ Stil (eigenes <style>, damit style.css unberührt bleibt)
@@ -260,7 +280,8 @@ const CSS = `
 .it-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .it-title b { font-weight: normal; font-size: 11px; line-height: 1.4; color: var(--red); }
 .it-title small { font-size: 7px; color: var(--ink-soft); }
-.it-timer { flex: none; font-size: 12px; color: var(--red); }
+.it-count { flex: none; font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.it-count.all { color: #2f7d32; }
 .it-info { grid-area: info; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .it-goal { font-size: 9px; line-height: 1.6; color: var(--ink); text-align: left; }
 .it-teams { font-size: 8px; line-height: 1.7; color: var(--ink); text-align: left; }
@@ -306,8 +327,12 @@ const CSS = `
 .big-btn.it-ready { min-height: 64px; flex: none; font-size: 18px; background: var(--green); box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
 .big-btn.it-ready:disabled { opacity: 1; filter: none; background: #2f7d32; color: #d8f5d0; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3); transform: translateY(2px); }
 .it-status { font-size: 7px; line-height: 1.6; color: var(--ink-soft); }
-.it-go { align-self: center; }
-.it-go.hidden { display: none; }
+.it-vip { display: flex; flex-direction: column; gap: 4px; }
+.it-vip.hidden { display: none; }
+.it-vip small { font-size: 6px; line-height: 1.5; color: var(--ink-soft); text-align: center; }
+.it-go { font-size: 12px; padding: 12px; background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
+.it-go.hot { animation: it-pulse 1.1s ease-in-out infinite; }
+@keyframes it-pulse { 50% { filter: brightness(1.15); transform: scale(1.03); } }
 @keyframes it-walk { 50% { translate: 0 -2px; } }
 @keyframes it-hop { 40% { translate: 0 -18px; } }
 @keyframes it-duck { 40% { scale: 1.15 0.6; } }
@@ -349,5 +374,7 @@ const CSS = `
 :where(html.land-short) .it-foot { justify-content: flex-end; gap: 4px; min-height: 0; }
 :where(html.land-short) .big-btn.it-ready { min-height: 0; flex: 1; font-size: 14px; }
 :where(html.land-short) .it-status { font-size: 6px; line-height: 1.4; }
-:where(html.land-short) .it-go { padding: 4px 8px; font-size: 7px; }
+:where(html.land-short) .it-go { padding: 6px 6px; font-size: 8px; }
+:where(html.land-short) .it-vip small { display: none; }
+:where(html.land-short) .it-count { font-size: 9px; }
 `;
