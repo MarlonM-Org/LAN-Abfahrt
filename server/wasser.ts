@@ -5,7 +5,6 @@ import {
   WASSER as W,
   WASSER_BASE,
   WASSER_BLOCKERS,
-  WASSER_COVER,
   WASSER_HOSE,
   WASSER_PISTOL_SPOTS,
   type WasserBalloon,
@@ -14,7 +13,7 @@ import {
   type WasserState,
   coverBetween,
   flightMs,
-  segHitsRect,
+  throwLanding,
   throwTarget,
 } from '../shared/wasser';
 import { playerColor } from '../shared/players';
@@ -51,6 +50,9 @@ interface P {
   lastHitBy: string | null;
   lastThrow: number;
   refillAt: number;
+  /** Dauer der laufenden Nachfüll-Bombe (Eimer bzw. Schlauch) – für den Fortschritt im Snapshot */
+  refillMs: number;
+  refillHose: boolean;
   hits: number;
   soaked: number;
   soaks: number;
@@ -76,6 +78,8 @@ interface Balloon {
  * SOAKED_AUTO_MS nicht selbst schafft, wird hingetragen. Klatschnass ist also nie ein Dauer-Aus.
  * Endet nach Ablauf der Zeit – oder sofort, wenn eine Seite gar nicht mehr mitspielen kann
  * (alle ihre Handys seit OFFLINE_OUT_MS weg bzw. vom VIP entfernt).
+ * Aufwärmrunde (`ctx.practice`): kein Zeitlimit, kein vorzeitiges Ende, Klatschnass zählt nicht fürs Team –
+ * die Wasserpistole kommt früher und öfter, damit man alles einmal ausprobieren kann.
  */
 export class WasserGame implements MiniGame {
   readonly kind = 'wasser' as const;
@@ -97,9 +101,10 @@ export class WasserGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) oder zufällig geteilt; bei 3 Spielern Jeder gegen jeden
+    // Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3), sonst die der Aufwärmrunde bzw. zufällig geteilt;
+    // bei 3 Spielern Jeder gegen jeden
     this.ffa = ids.length === 3 && !ctx.teams;
-    const split = splitTeams(ids, ctx.teams);
+    const split = splitTeams(ids, ctx.teams ?? ctx.warmTeams);
     const order = [...split.A, ...split.B];
     const teamOf = new Map<string, Team>([...split.A.map((id) => [id, 'A'] as const), ...split.B.map((id) => [id, 'B'] as const)]);
     // Handicap bei ungleichen Brett-Teams: das kleinere startet mit Vorsprung
@@ -135,6 +140,8 @@ export class WasserGame implements MiniGame {
         lastHitBy: null,
         lastThrow: 0,
         refillAt: 0,
+        refillMs: 0,
+        refillHose: false,
         hits: 0,
         soaked: 0,
         soaks: 0,
@@ -155,8 +162,9 @@ export class WasserGame implements MiniGame {
   private start() {
     this.sub = 'play';
     const now = Date.now();
-    this.deadline = now + W.TIME_MS;
-    this.nextPistol = now + W.PISTOL_FIRST_MS;
+    // Aufwärmrunde: kein Zeitlimit (endsIn 0)
+    this.deadline = this.ctx.practice ? Infinity : now + W.TIME_MS;
+    this.nextPistol = now + (this.ctx.practice ? W.PRACTICE_PISTOL_FIRST_MS : W.PISTOL_FIRST_MS);
     let last = now;
     this.timers.every(TICK_MS, () => {
       const t = Date.now();
@@ -205,10 +213,15 @@ export class WasserGame implements MiniGame {
           const atHose = Math.hypot(p.x - WASSER_HOSE.x, p.y - WASSER_HOSE.y) < W.HOSE_R;
           const atBucket = this.bases(p).some((b) => Math.hypot(p.x - b.bucket.x, p.y - b.bucket.y) < W.REFILL_R);
           if (atHose || atBucket) {
-            if (!p.refillAt) p.refillAt = now + (atHose ? W.HOSE_REFILL_MS : W.BUCKET_REFILL_MS);
-            else if (now >= p.refillAt) {
+            const ms = atHose ? W.HOSE_REFILL_MS : W.BUCKET_REFILL_MS;
+            p.refillHose = atHose;
+            if (!p.refillAt) {
+              p.refillAt = now + ms;
+              p.refillMs = ms;
+            } else if (now >= p.refillAt) {
               p.ammo++;
-              p.refillAt = p.ammo < W.MAX_AMMO ? now + (atHose ? W.HOSE_REFILL_MS : W.BUCKET_REFILL_MS) : 0;
+              p.refillAt = p.ammo < W.MAX_AMMO ? now + ms : 0;
+              p.refillMs = ms;
             }
           } else p.refillAt = 0;
         } else p.refillAt = 0;
@@ -216,7 +229,7 @@ export class WasserGame implements MiniGame {
         if (this.pistol && Math.hypot(p.x - this.pistol.x, p.y - this.pistol.y) < 10) {
           p.pistolUntil = now + W.PISTOL_MS;
           this.pistol = null;
-          this.nextPistol = now + W.PISTOL_EVERY_MS;
+          this.nextPistol = now + (this.ctx.practice ? W.PRACTICE_PISTOL_EVERY_MS : W.PISTOL_EVERY_MS);
         }
         if (p.pistolUntil > now) this.spray(p, now, dt);
       } else if (p.status === 'soaked') {
@@ -256,7 +269,7 @@ export class WasserGame implements MiniGame {
     }
 
     if (now >= this.deadline) this.end('time');
-    else if (this.oneSideLeft()) this.end('away');
+    else if (!this.ctx.practice && this.oneSideLeft()) this.end('away');
     else this.ctx.onChange();
   }
 
@@ -331,29 +344,15 @@ export class WasserGame implements MiniGame {
       victim.ax = victim.ay = 0;
       victim.soaked++;
       by.soaks++;
-      if (!this.ffa && by.team) this.score[by.team]++;
+      if (!this.ffa && by.team && !this.ctx.practice) this.score[by.team]++;
       this.lastSoak = { seq: ++this.seq, victim: victim.id, by: by.id };
     }
   }
 
   private land(b: Balloon, now: number) {
     const owner = this.players.get(b.owner);
-    // Deckung kurz vor dem Ziel fängt die Bombe ab (Hecke/Liege)
-    let x = b.tx;
-    let y = b.ty;
-    let cover = false;
-    const sx = b.fx + (b.tx - b.fx) * 0.6;
-    const sy = b.fy + (b.ty - b.fy) * 0.6;
-    let best = Infinity;
-    for (const r of WASSER_COVER) {
-      const t = segHitsRect(sx, sy, b.tx, b.ty, r, 0);
-      if (t !== null && t < best) best = t;
-    }
-    if (best !== Infinity) {
-      cover = true;
-      x = sx + (b.tx - sx) * best;
-      y = sy + (b.ty - sy) * best;
-    }
+    // Deckung kurz vor dem Ziel fängt die Bombe ab (Hecke/Liege) – gleiche Rechnung wie die Vorschau (shared/wasser.ts)
+    const { x, y, cover } = throwLanding(b.fx, b.fy, b.tx, b.ty);
     let big = false;
     if (owner) {
       const targets = [...this.players.values()].filter((p) => this.enemies(owner, p) && this.vulnerable(p, now));
@@ -537,6 +536,11 @@ export class WasserGame implements MiniGame {
         dp: p.status === 'drying' ? r2(Math.min(1, (now - p.dryStart) / W.TOWEL_DRY_MS)) : 0,
         sk: p.status === 'soaked' && this.sub === 'play' ? Math.max(0, p.soakedAt + W.SOAKED_AUTO_MS - now) : 0,
         ...(p.away ? { away: true } : {}),
+        ...(p.status === 'ok' && p.refillAt > now
+          ? { rf: r2(clamp(1 - (p.refillAt - now) / Math.max(1, p.refillMs), 0, 1)), ...(p.refillHose ? { rh: true as const } : {}) }
+          : {}),
+        ...(p.status === 'ok' && p.wet > 0 && this.sub === 'play' && now - p.lastHitAt > W.DRY_DELAY_MS ? { dr: true as const } : {}),
+        ...(p.status === 'ok' && now < p.shieldUntil ? { pr: true as const } : {}),
         h: p.hits,
         n: p.soaked,
         k: p.soaks,
@@ -557,7 +561,7 @@ export class WasserGame implements MiniGame {
       state: {
         sub: this.sub,
         endReason: this.endReason,
-        endsIn: Math.max(0, this.deadline - now),
+        endsIn: Number.isFinite(this.deadline) ? Math.max(0, this.deadline - now) : 0,
         ffa: this.ffa,
         players,
         balloons,

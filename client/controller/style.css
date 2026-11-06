@@ -999,23 +999,41 @@ table.lb td:not(:nth-child(2)):not(:first-child) { text-align: right; }
 table.lb tr.me td { color: var(--red); }
 
 /* ---------------------------------------------------------------- Wasserbomben-Schlacht (quer: Twin-Stick) */
-.lx.ws-lx { --lx-l: 41%; --lx-r: 41%; }
-.ws-wet { display: flex; align-items: center; gap: 6px; font-size: 8px; }
-.ws-meter { display: block; width: 90px; height: 12px; background: var(--paper-dark); border: 2px solid var(--wood-darker); }
+.lx.ws-lx { --lx-l: 37%; --lx-r: 37%; }
+/* Mitte: Munition + Nässe groß, darunter die Hinweis-Karte (gleiche Pixel-Symbole wie die Schilder am TV) */
+.lx-mid.ws-mid { gap: 2px; }
+.ws-ammo { display: flex; justify-content: center; gap: 6px; }
+.ws-ammo i { position: relative; width: 27px; height: 30px; box-sizing: border-box; border-radius: 50% 50% 45% 45%; border: 2px dashed rgba(61, 36, 20, 0.45); background: var(--paper-dark); }
+.ws-ammo b { position: absolute; inset: -2px; background: center / 27px 30px no-repeat; image-rendering: pixelated; clip-path: inset(calc((1 - var(--f, 0)) * 100%) 0 0 0); transition: clip-path 120ms linear; }
+.ws-ammo i.full { animation: ws-pop 0.25s ease-out; }
+@keyframes ws-pop { 50% { transform: scale(1.2); } }
+.ws-cap { display: block; font-size: 7px; line-height: 1.5; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-meter { display: block; width: 100%; height: 14px; box-sizing: border-box; background: var(--paper-dark); border: 2px solid var(--wood-darker); margin-top: 4px; }
 .ws-meter > div { height: 100%; width: 0; background: #7fc8f0; transition: width 120ms linear; }
 .ws-meter > div.danger { background: #2d64a8; }
 .ws.soaked .ws-meter { animation: shake 0.25s infinite; }
-.ws-ammo { display: flex; gap: 4px; }
-.ws-ammo i { width: 11px; height: 13px; border-radius: 50% 50% 45% 45%; border: 2px solid var(--outline); background: var(--paper-dark); opacity: 0.5; }
-.ws-ammo i.full { opacity: 1; box-shadow: inset 2px 2px 0 rgba(255, 255, 255, 0.5); }
-.ws-hint { color: var(--ink); }
-.ws.soaked .ws-hint { color: #2d64a8; }
-.ws.pistol .ws-hint { color: #c06a1f; }
+.ws-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: center; align-items: center; column-gap: 6px; min-height: 72px; box-sizing: border-box; margin-top: 6px; padding: 5px; text-align: left; background: #fff8e6; border: 2px solid var(--wood-dark); box-shadow: 0 2px 0 var(--outline); }
+.ws-card .ws-ico { grid-row: 1 / span 2; image-rendering: pixelated; }
+.lx-mid .ws-card p { margin: 0; text-align: left; }
+.lx-mid .ws-card .ws-hint { font-size: 8px; line-height: 1.4; color: var(--ink); }
+.lx-mid .ws-card .ws-sub { font-size: 7px; line-height: 1.5; color: var(--ink-soft); }
+.ws-card.c-refill { background: #dff1fb; border-color: #2d64a8; }
+.ws-card.c-soak { background: #d6e8ff; border-color: #1f4f8a; }
+.lx-mid .ws-card.c-soak .ws-hint { color: #2d64a8; }
+.ws-card.c-pistol { background: #ffe7cf; border-color: #c06a1f; }
+.lx-mid .ws-card.c-pistol .ws-hint { color: #a4521a; }
+.ws-card.c-cover { background: #e3f4d6; border-color: #2f7d32; }
+.lx-mid .ws-card.c-cover .ws-hint { color: #2f7d32; }
+.ws-card.c-sun { background: #fff1c4; border-color: #d99a2b; }
+.ws-card.c-urgent { animation: ws-pulse 0.6s ease-in-out infinite alternate; }
+.ws-card .ws-arr { font-size: 13px; line-height: 1; font-weight: normal; vertical-align: -2px; }
+.ws-sunmini { width: 13px; height: 13px; vertical-align: -3px; image-rendering: pixelated; }
+@keyframes ws-pulse { to { transform: scale(1.06); } }
 .st-zone.ws-aim { background: repeating-linear-gradient(-45deg, rgba(45, 100, 168, 0.1) 0 8px, transparent 8px 16px), #cfe8f7; border-color: #2d64a8; }
 .ws-aim .st-ring { background: radial-gradient(circle, #d6efff 0 55%, #9fd0f0 56%); border-color: #2d64a8; }
 .ws-aim .st-knob { background: #3f8fe0; border-color: #1f4f8a; box-shadow: inset 0 4px 0 #7fbcf0; }
 .ws.pistol .ws-aim .st-knob { background: #f0973a; border-color: #8a4a12; }
-.ws.soaked .ws-aim { opacity: 0.45; }
+.ws.soaked .ws-aim, .ws.empty .ws-aim { opacity: 0.45; }
 
 /* ---------------------------------------------------------------- Stille Post mit Bildern */
 textarea.sp-input {

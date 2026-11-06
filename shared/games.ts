@@ -132,7 +132,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   turm: { goal: 'Stapelt euer Gepäck bis zum Gipfelkreuz und haltet den Turm 2 s.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = schneller fallen' }] },
   igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦔', text: '◀ / ▶ / SPRUNG: laufen' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '🪢', text: 'Liane, Schirm, Schaufel: Zug geht weiter' }] },
   smash: { goal: 'Haut die anderen von der Bühne – je höher die Prozente, desto weiter fliegen sie.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Richtung = Schlag' }, { icon: '🥊', text: 'SCHLAG / SPEZIAL: hauen' }, { icon: '🛡️', text: 'SPRUNG / SCHILD: springen, blocken' }] },
-  wasser: { goal: 'Macht die anderen klatschnass – wer das öfter schafft, gewinnt.', controls: [{ icon: '🕹️', text: 'Linker Stick: laufen' }, { icon: '🕹️', text: 'Rechter Stick: zielen, loslassen = Wurf' }, { icon: '💦', text: 'Klatschnass? Ab zum Handtuch!' }] },
+  wasser: { goal: 'Macht die anderen klatschnass – wer das öfter schafft, gewinnt.', controls: [{ icon: '🕹️', text: 'Links laufen, rechts zielen/werfen' }, { icon: '💧', text: 'Leer? Auffüllen am Eimer/Schlauch' }, { icon: '🛡️', text: 'Hecken + Liegen = Deckung' }] },
   stillepost: { goal: 'Schreiben, malen, raten – reihum wandert alles weiter. Am Ende wird gelacht.', controls: [{ icon: '✍️', text: 'Satz schreiben' }, { icon: '🖍️', text: 'Das Bild dazu malen' }, { icon: '🤔', text: 'Bild beschreiben' }] },
   fangen: { goal: 'Der Animateur ist unsichtbar – fangt ihn gemeinsam (oder entkommt als Animateur)!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💨', text: 'SPRINT / ABLENKUNG: Spezialknopf' }, { icon: '👣', text: 'Auf Fußspuren achten, rufen!' }] },
   geist: { goal: 'Ein unsichtbarer Geist spukt – leuchtet ihn an, bevor er euch erschreckt.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Lampe zeigt nach vorn' }, { icon: '🔦', text: 'LICHT AN: Geist anleuchten' }, { icon: '👻', text: 'Als Geist: unsichtbar schweben' }] },
@@ -174,7 +174,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
  * (oder VIP/Laptop starten), beginnt das echte Spiel frisch mit Countdown.
  * Nicht hier: rundenbasierte, Quiz-, Abstimmungs-, Geheimrollen- und Balance-Board-Spiele.
  */
-export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint'];
+export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint', 'wasser'];
 export const isWarmupKind = (kind: MiniKind) => WARMUP_KINDS.includes(kind);
 
 /** Minispiele im Trinkspiel-Modus */
