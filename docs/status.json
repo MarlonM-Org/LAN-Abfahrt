@@ -1,22 +1,18 @@
 {
-  "updated": "2026-11-06T15:40+00:00",
+  "updated": "2026-11-06T15:50+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Balance Board: Feedback Skispringen + Tempel-Kugel",
-      "kind": "skisprung",
-      "type": "Balance Board",
-      "branch": "feat/balance-feedback",
-      "pr": 93,
-      "detail": "Kein Gewicht mehr (nur „erkannt“), Board-Anzeige einklappbar · Skispringen: 3-Schritt-Leiste + kurze Hinweise, Auslauf mit Abschwung, Landefahne, mehr Sounds · Tempel-Kugel: Hoverboard-Steuerung, deutlich weniger empfindlich, Pfad breiter. Wartet auf Test mit echtem Board."
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Balance Board: kein Gewicht, Anzeige einklappbar · Skispringen mit Schritt-Leiste, Auslauf, Landefahne, Sounds · Tempel-Kugel als Hoverboard (weniger empfindlich)",
+      "pr": 93,
+      "date": "2026-11-06"
+    },
     {
       "title": "Wii Balance Board unter Windows koppeln (scripts/wii-pair.ps1: Byte-PIN + HID-Dienst)",
       "pr": 88,
@@ -377,11 +373,11 @@
       "notes": "Finale-Zoom auf die letzten zwei, Zeitlupe beim letzten Platscher (#84)"
     },
     "kugel": {
-      "status": "in Arbeit",
+      "status": "umgesetzt",
       "notes": "Viel zu empfindlich, keine Kurve geschafft → Hoverboard-Steuerung (seitlich drehen, vorn Gas, hinten bremsen), Totzone + feine Kurve, Tempo runter, Pfad breiter (#93)"
     },
     "skisprung": {
-      "status": "in Arbeit",
+      "status": "umgesetzt",
       "notes": "Rekorde-Tafel (#91) · Unklar ob vorlehnen oder nur abspringen → 3-Schritt-Leiste + kurze Hinweise · nach Landung nicht stehen bleiben → Auslauf, Abschwung, Fahne · mehr Sound · kein Gewicht anzeigen (#93)"
     }
   },
