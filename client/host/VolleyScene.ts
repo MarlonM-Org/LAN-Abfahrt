@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import type { GameState, Team, VolleyState } from '../../shared/types';
 import { WORLD, TEAM_INFO } from '../../shared/flunky';
-import { VOLLEY as V, type VollBall, vollWon } from '../../shared/volley';
-import { paintVolleyBeach, volleyArrow, volleyBall, volleyNet } from '../art/volley';
+import { VOLLEY as V, type VollBall, vollPredict, vollWon } from '../../shared/volley';
+import { paintVolleyBeach, volleyArrow, volleyBall, volleyMark, volleyNet } from '../art/volley';
 import { Pix } from '../art/pix';
 import { bus, getState, playerById } from './store';
 import { avatarSprite, ensurePortrait, playAvatar } from './textures';
@@ -12,6 +12,7 @@ import { Juice } from './juice';
 import { SnapBuffer, lerp, lerpJump } from './interp';
 import { sfx } from './sfx';
 import { Parallax } from './parallax';
+import { CameraRig } from './camera';
 import { clouds, daylight, foam, gulls, waves } from './ambient';
 
 interface Fig {
@@ -25,11 +26,24 @@ interface Fig {
 
 const TEAMS: Team[] = ['A', 'B'];
 
-/** Strand-Volleyball: Seitenansicht am Strand bei Sonnenuntergang */
+/** Welt → Bildschirm (480 × 270) beim festen TV-Ausschnitt `V.VIEW` */
+const screenX = (x: number) => (x - V.VIEW.x) * V.VIEW.zoom + WORLD.W / 2;
+const screenY = (y: number) => (y - V.VIEW.y) * V.VIEW.zoom + WORLD.H / 2;
+/** Unterkante der Anzeigetafel (Bildschirm) – darüber ist der Ball verdeckt */
+const HUD_BOTTOM = 34;
+
+/**
+ * Strand-Volleyball: Seitenansicht am Strand bei Sonnenuntergang. Die Kamera steht fest und zoomt auf das
+ * kompakte Feld (`V.VIEW`, 1,25×) – Tafel, Banner und Pfeil liegen auf der ungezoomten HUD-Kamera (`rig.hud`).
+ */
 export class VolleyScene extends Phaser.Scene {
   private figs = new Map<string, Fig>();
   private ball!: Phaser.GameObjects.Image;
   private ballShadow!: Phaser.GameObjects.Ellipse;
+  /** Wo der Ball im Sand landen wird (Vorhersage ohne Spielerkontakte) */
+  private mark!: Phaser.GameObjects.Image;
+  private markX = V.NET_X;
+  private rig!: CameraRig;
   private arrow!: Phaser.GameObjects.Image;
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
@@ -61,6 +75,10 @@ export class VolleyScene extends Phaser.Scene {
     this.hitSeq = 0;
     this.pointSeq = 0;
     this.trailAt = 0;
+    this.markX = V.NET_X;
+    // Feste Kamera auf das Feld (vor allem anderen anlegen: alles Spätere ist Welt, außer in rig.hud())
+    this.rig = new CameraRig(this, { w: WORLD.W, h: WORLD.H });
+    this.rig.follow({ x: V.VIEW.x, y: V.VIEW.y }, V.VIEW.zoom, { cut: true });
     this.juice = new Juice(this, { depth: 1700, clock: this.buf });
 
     // Parallax: Abendhimmel (fern), Meer + ferne Palmen (mittel), Sand + Feld (nah) – die Kamera steht,
@@ -81,13 +99,16 @@ export class VolleyScene extends Phaser.Scene {
     foam(this, { y: 178, n: 14, depth: -900, spread: 1 });
     gulls(this, { n: 2, y: [26, 90], depth: -900 });
     this.add.image(V.NET_X, V.NET_TOP - 1, ensureTex(this, 'vb_net', volleyNet)).setOrigin(0.5, 0).setDepth(50);
-    this.ballShadow = this.add.ellipse(V.NET_X, V.GROUND + 1, 10, 3, 0x000000, 0.25).setDepth(40);
-    this.ball = this.add.image(V.NET_X, 110, ensureTex(this, 'vb_ball', volleyBall)).setDepth(300);
-    this.arrow = this.add.image(0, 36, ensureTex(this, 'vb_arrow', volleyArrow)).setOrigin(0.5, 0).setDepth(1900).setVisible(false);
+    this.ballShadow = this.add.ellipse(V.NET_X, V.GROUND + 1, V.BALL_R * 2, 4, 0x000000, 0.25).setDepth(40);
+    this.mark = this.add.image(V.NET_X, V.GROUND + 1, ensureTex(this, 'vb_mark', volleyMark)).setDepth(42).setVisible(false);
+    this.ball = this.add.image(V.NET_X, 110, ensureTex(this, `vb_ball${V.BALL_R}`, volleyBall)).setDepth(300);
 
-    this.hud = this.add.container(0, 0).setDepth(2000);
-    this.banner = txt(this, WORLD.W / 2, 84, '', { size: 16, color: '#ffd25e' }).setDepth(2001);
-    this.sub = txt(this, WORLD.W / 2, 108, '', { size: 8, wrap: 440 }).setDepth(2001);
+    this.rig.hud(() => {
+      this.arrow = this.add.image(0, HUD_BOTTOM + 2, ensureTex(this, 'vb_arrow', volleyArrow)).setOrigin(0.5, 0).setDepth(1900).setVisible(false);
+      this.hud = this.add.container(0, 0).setDepth(2000);
+      this.banner = txt(this, WORLD.W / 2, 84, '', { size: 16, color: '#ffd25e' }).setDepth(2001);
+      this.sub = txt(this, WORLD.W / 2, 108, '', { size: 8, wrap: 440 }).setDepth(2001);
+    });
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => bus.off('state', fn));
@@ -110,12 +131,14 @@ export class VolleyScene extends Phaser.Scene {
     const hgt = V.GROUND - this.shown.y;
     const sh = Math.max(0.35, 1 - hgt / 220);
     this.ballShadow.setPosition(this.shown.x, V.GROUND + 1).setScale(sh).setAlpha(0.3 * sh + 0.05);
-    this.arrow.setVisible(this.shown.y < 34).setX(Phaser.Math.Clamp(this.shown.x, 10, 470));
+    // Ball hinter der Anzeigetafel bzw. über dem Bildrand: Pfeil darunter zeigt, wo er ist
+    this.arrow.setVisible(screenY(this.shown.y + hover) < HUD_BOTTOM).setX(Phaser.Math.Clamp(screenX(this.shown.x), 10, 470));
+    this.showLanding(b.sub === 'rally', now);
     // Schnelle Bälle ziehen eine Spur
     const speed = Math.hypot(b.ball.vx, b.ball.vy);
-    if (b.sub === 'rally' && speed > 300 && now - this.trailAt > 30) {
+    if (b.sub === 'rally' && speed > 280 && now - this.trailAt > 30) {
       this.trailAt = now;
-      const d = this.add.circle(this.shown.x, this.shown.y, 4, 0xfff4d6, 0.6).setDepth(290);
+      const d = this.add.circle(this.shown.x, this.shown.y, V.BALL_R - 2, 0xfff4d6, 0.6).setDepth(290);
       this.tweens.add({ targets: d, scale: 0.2, alpha: 0, duration: 260, onComplete: () => d.destroy() });
     }
 
@@ -143,6 +166,29 @@ export class VolleyScene extends Phaser.Scene {
       g.air = p.air;
     }
     if (st.sub === 'intro') this.banner.setText(String(Math.max(1, this.clock.seconds)));
+  }
+
+  /**
+   * Landepunkt im Sand: wo der Ball ohne weiteren Kontakt aufkommt (Wände und Netz mitgerechnet).
+   * Ring in der Farbe der Seite, auf der er landet; je näher die Landung, desto kräftiger.
+   */
+  private showLanding(on: boolean, now: number) {
+    const land = on ? vollPredict(this.shown, V.GROUND - V.BALL_R, 4) : null;
+    if (!land) {
+      this.mark.setVisible(false);
+      return;
+    }
+    if (!this.mark.visible) this.markX = land.x;
+    this.markX += (land.x - this.markX) * 0.35;
+    const team: Team = this.markX < V.NET_X ? 'A' : 'B';
+    const soon = Phaser.Math.Clamp(1 - land.t / 1.4, 0, 1);
+    const pulse = 1 + Math.sin(now / 90) * 0.06 * (0.5 + soon);
+    this.mark
+      .setVisible(true)
+      .setPosition(this.markX, V.GROUND + 1)
+      .setTint(TEAM_INFO[team].colorNum)
+      .setAlpha(0.55 + 0.45 * soon)
+      .setScale(pulse * (0.8 + 0.2 * soon));
   }
 
   // ---------------------------------------------------------------- Zustand
@@ -267,23 +313,23 @@ export class VolleyScene extends Phaser.Scene {
     const x = this.shown.x;
     const y = this.shown.y;
     if (spike) {
-      const t = txt(this, x, y - 26, 'ZACK!', { color: '#ff9a6a' }).setDepth(1700);
-      this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 650, onComplete: () => t.destroy() });
-      // Schmettern: kurzer Hit-Stop + Zoom-Stoß
+      const t = txt(this, x, y - 30, 'ZACK!', { color: '#ff9a6a' }).setDepth(1700);
+      this.tweens.add({ targets: t, y: y - 44, alpha: 0, duration: 650, onComplete: () => t.destroy() });
+      // Schmettern: kurzer Hit-Stop + Zoom-Stoß (über das Kamera-Rig, das den Ausschnitt hält)
       this.juice.hitStop(70);
       this.juice.shake(2);
-      this.juice.zoomPunch(0.04, 200);
+      this.rig.punch(0.04, 200);
       this.juice.burst(x, y, 'spark', 10);
       sfx('hitHard', { x });
       sfx('whoosh', { x, pitch: 1.3, delay: 0.04 });
       for (let i = 0; i < 6; i++) {
         const ang = (i / 6) * Math.PI * 2;
         const l = this.add.rectangle(x, y, 6, 1, 0xffffff, 0.95).setRotation(ang).setDepth(320);
-        this.tweens.add({ targets: l, x: x + Math.cos(ang) * 14, y: y + Math.sin(ang) * 14, alpha: 0, duration: 240, onComplete: () => l.destroy() });
+        this.tweens.add({ targets: l, x: x + Math.cos(ang) * 17, y: y + Math.sin(ang) * 17, alpha: 0, duration: 240, onComplete: () => l.destroy() });
       }
     } else {
       sfx('hit', { x, vol: 0.7, pitch: st.sub === 'serve' ? 1.2 : 1 });
-      const ring = this.add.circle(x, y, 5).setStrokeStyle(1, 0xffffff, 0.9).setDepth(320);
+      const ring = this.add.circle(x, y, V.BALL_R - 1).setStrokeStyle(1, 0xffffff, 0.9).setDepth(320);
 
       this.tweens.add({ targets: ring, scale: 2.2, alpha: 0, duration: 220, onComplete: () => ring.destroy() });
     }
@@ -299,9 +345,10 @@ export class VolleyScene extends Phaser.Scene {
 
   private confetti(team: Team) {
     const colors = team === 'A' ? [0xf4c542, 0xffe7a0, 0xf0973a] : [0x3fa7e0, 0x93d3f3, 0xeaf8ff];
+    const top = V.VIEW.y - WORLD.H / 2 / V.VIEW.zoom;
     for (let i = 0; i < 40; i++) {
-      const x = team === 'A' ? 20 + Math.random() * 210 : 250 + Math.random() * 210;
-      const d = this.add.rectangle(x, 30, 2, 3, colors[i % 3]).setDepth(1800);
+      const x = team === 'A' ? V.WALL_L + Math.random() * (V.NET_X - V.WALL_L - 10) : V.NET_X + 10 + Math.random() * (V.WALL_R - V.NET_X - 10);
+      const d = this.add.rectangle(x, top + 20, 2, 3, colors[i % 3]).setDepth(1800);
       this.tweens.add({ targets: d, y: 120 + Math.random() * 110, angle: 360, alpha: 0, duration: 1400 + Math.random() * 900, delay: Math.random() * 500, onComplete: () => d.destroy() });
     }
   }
@@ -314,6 +361,11 @@ export class VolleyScene extends Phaser.Scene {
     const key = JSON.stringify([secs, st.sub, st.score, st.golden, st.serving, st.server, ids.map((id) => [st.players[id].court, st.players[id].team])]);
     if (key === this.hudKey) return;
     this.hudKey = key;
+    // Neue Tafel-Objekte gehören zur HUD-Kamera (sonst würden sie mitgezoomt bzw. gar nicht gezeigt)
+    this.rig.hud(() => this.buildHud(st, ids, secs));
+  }
+
+  private buildHud(st: VolleyState, ids: string[], secs: number) {
     this.hud.removeAll(true);
     this.hud.add(panel(this, 2, 1, 476, 32));
     // Mitte: Spielstand und Uhr
@@ -338,12 +390,12 @@ export class VolleyScene extends Phaser.Scene {
         this.hud.add(this.add.rectangle(cx, 3, 17, 17, pcol(id).num).setOrigin(0.5, 0).setAlpha(p.court ? 1 : 0.35));
         this.hud.add(this.add.image(cx, 4, ensurePortrait(this, pl.look)).setOrigin(0.5, 0).setAlpha(p.court ? 1 : 0.35));
         if (id === st.server && st.serving === t && (st.sub === 'serve' || st.sub === 'rally')) {
-          this.hud.add(this.add.image(cx + 6, 16, ensureTex(this, 'vb_ball', volleyBall)).setScale(0.5));
+          this.hud.add(this.add.image(cx + 6, 16, ensureTex(this, `vb_ball${V.BALL_R}`, volleyBall)).setScale(6 / (V.BALL_R * 2)));
         }
       });
       // Aufschlag-Seite markieren
       if (st.serving === t && st.sub !== 'over') {
-        this.hud.add(this.add.image(left ? 172 : 308, 12, ensureTex(this, 'vb_ball', volleyBall)).setScale(0.75));
+        this.hud.add(this.add.image(left ? 172 : 308, 12, ensureTex(this, `vb_ball${V.BALL_R}`, volleyBall)).setScale(10 / (V.BALL_R * 2)));
       }
     }
   }

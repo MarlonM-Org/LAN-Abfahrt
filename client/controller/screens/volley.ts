@@ -2,56 +2,8 @@ import type { VolleyState } from '../../../shared/types';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { VOLLEY } from '../../../shared/volley';
 import { haptic } from '../haptic';
+import { slideButtons } from '../slide';
 import { type Screen, app, avatarCanvas, el, me, message, nameOf, q, secondsLeft, send, store } from '../core';
-
-/** Halte-Knopf für mehrere Finger: gedrückt, solange mindestens ein Pointer drauf ist */
-function holdButton(btn: HTMLElement, onChange: () => void) {
-  const pointers = new Set<number>();
-  const update = () => {
-    btn.classList.toggle('held', pointers.size > 0);
-    onChange();
-  };
-  btn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    try {
-      btn.setPointerCapture(e.pointerId);
-    } catch {
-      /* egal */
-    }
-    pointers.add(e.pointerId);
-    update();
-  });
-  const up = (e: PointerEvent) => {
-    if (pointers.delete(e.pointerId)) update();
-  };
-  btn.addEventListener('pointerup', up);
-  btn.addEventListener('pointercancel', up);
-  btn.addEventListener('lostpointercapture', up);
-  btn.addEventListener('contextmenu', (e) => e.preventDefault());
-  return {
-    get held() {
-      return pointers.size > 0;
-    },
-    reset() {
-      pointers.clear();
-      btn.classList.remove('held');
-    },
-  };
-}
-
-/** Knopf, der sofort beim Berühren auslöst (mit kurzem Drück-Effekt) */
-function pressButton(btn: HTMLElement, onPress: () => void) {
-  btn.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    btn.classList.add('held');
-    onPress();
-  });
-  const up = () => btn.classList.remove('held');
-  btn.addEventListener('pointerup', up);
-  btn.addEventListener('pointercancel', up);
-  btn.addEventListener('pointerleave', up);
-  btn.addEventListener('contextmenu', (e) => e.preventDefault());
-}
 
 /** Strand-Volleyball: ◀ ▶ links, SPRUNG + SCHMETTERN rechts */
 export function pickVolley(s: VolleyState): Screen {
@@ -83,45 +35,38 @@ export function pickVolley(s: VolleyState): Screen {
       </div>
     `);
     if (look) q(root, '.vb-av').append(avatarCanvas(1, look));
+    // ◀ ▶ zum Rüberrutschen: die Richtung folgt dem Daumen, nicht dem Knopf, auf dem er aufgesetzt hat.
+    // Ganze linke Zone, jeder Punkt zählt zum näheren Knopf; bei zwei Fingern gewinnt der jüngste.
+    // Loslassen (auch input-reset, Blur, App im Hintergrund) = stehen bleiben.
     let lastDir = 0;
     const emit = (force = false) => {
-      const dir = (right.held ? 1 : 0) - (left.held ? 1 : 0);
+      const k = dirs.held()[0];
+      const dir = k === 'right' ? 1 : k === 'left' ? -1 : 0;
       if (!force && dir === lastDir) return;
-      if (dir !== lastDir && dir !== 0) haptic(8);
+      if (dir !== lastDir && dir !== 0) haptic('tick');
       lastDir = dir;
       send('move', { dir });
     };
-    const left = holdButton(q(root, '.vb-left'), () => emit());
-    const right = holdButton(q(root, '.vb-right'), () => emit());
-    pressButton(q(root, '.vb-jump'), () => {
-      send('jump');
-      haptic(10);
-    });
+    const dirs = slideButtons(q(root, '.vb-move'), { left: q(root, '.vb-left'), right: q(root, '.vb-right') }, () => emit(), { slack: Infinity, exclusive: true });
+    // SPRUNG / SCHMETTERN lösen beim Aufsetzen aus – und beim Draufrutschen (SPRUNG drücken, Daumen hoch = schmettern)
     const spikeBtn = q<HTMLButtonElement>(root, '.vb-spike');
-    pressButton(spikeBtn, () => {
-      send('spike');
-      haptic(20);
-    });
+    slideButtons(
+      q(root, '.vb-act'),
+      { spike: spikeBtn, jump: q(root, '.vb-jump') },
+      () => undefined,
+      {
+        slack: 10,
+        onEnter: (k) => {
+          send(k);
+          haptic(k === 'spike' ? 20 : 10);
+        },
+      },
+    );
     // Falls ein Paket verloren geht: Richtung regelmäßig wiederholen
     const keepAlive = setInterval(() => {
       if (!root.isConnected) return clearInterval(keepAlive);
       emit(true);
     }, 500);
-    const release = () => {
-      if (!root.isConnected) {
-        window.removeEventListener('blur', release);
-        window.removeEventListener('input-reset', release);
-        document.removeEventListener('visibilitychange', release);
-        return;
-      }
-      left.reset();
-      right.reset();
-      emit();
-    };
-    window.addEventListener('blur', release);
-    // Handy gedreht / Ausrichtungs-Overlay: gehaltene Knöpfe loslassen
-    window.addEventListener('input-reset', release);
-    document.addEventListener('visibilitychange', release);
     app.append(root);
 
     let touches = mine.touches;

@@ -78,13 +78,13 @@ export function paintVolleyBeach(p: Pix, w: number, h: number, layer: BgLayer = 
   for (let i = 0; i < 260; i++) p.px(r2() * w, V.GROUND + 2 + r2() * (h - V.GROUND - 2), r2() < 0.5 ? shade(C.sandDark, 0.88) : C.sand);
   p.hline(V.WALL_L, V.GROUND, V.WALL_R - V.WALL_L, '#fdf2d6');
   p.hline(V.WALL_L, V.GROUND + 1, V.WALL_R - V.WALL_L, shade(C.sandDark, 0.8));
-  // Begrenzungsstangen links und rechts (Bambus)
-  for (const x of [0, V.WALL_R]) {
+  // Begrenzungsstangen links und rechts (Bambus), außen an den Feldwänden
+  for (const x of [V.WALL_L - V.POLE, V.WALL_R]) {
     for (let y = 30; y < V.GROUND + 4; y++) {
-      p.rect(x, y, V.WALL_L, 1, y % 14 === 0 ? '#7a8a2a' : y % 2 ? '#c9c45a' : '#b5b04a');
+      p.rect(x, y, V.POLE, 1, y % 14 === 0 ? '#7a8a2a' : y % 2 ? '#c9c45a' : '#b5b04a');
     }
     p.vline(x, 30, V.GROUND - 26, '#5e6a1e');
-    p.vline(x + V.WALL_L - 1, 30, V.GROUND - 26, '#5e6a1e');
+    p.vline(x + V.POLE - 1, 30, V.GROUND - 26, '#5e6a1e');
   }
 }
 
@@ -114,23 +114,49 @@ export function volleyNet(): Pix {
   return p;
 }
 
-/** Beachvolleyball 12 × 12 (gelb/blau/weiß) */
+/** Beachvolleyball (gelb/blau/weiß), Durchmesser 2 · BALL_R inkl. Kontur */
 export function volleyBall(): Pix {
-  const p = new Pix(12, 12);
-  p.disc(6, 6, 5.5, C.white);
+  const n = VOLLEY.BALL_R * 2;
+  const c = n / 2;
+  const r = c - 0.5;
+  const p = new Pix(n, n);
+  p.disc(c, c, r, C.white);
   // Panels als gebogene Streifen
-  for (let y = 0; y < 12; y++) {
-    for (let x = 0; x < 12; x++) {
-      const dx = x + 0.5 - 6;
-      const dy = y + 0.5 - 6;
-      if (dx * dx + dy * dy > 30) continue;
-      const a = Math.atan2(dy, dx) + Math.hypot(dx, dy) * 0.35;
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const dx = x + 0.5 - c;
+      const dy = y + 0.5 - c;
+      if (dx * dx + dy * dy > (r - 0.3) * (r - 0.3)) continue;
+      const a = Math.atan2(dy, dx) + Math.hypot(dx, dy) * (2.1 / r);
       const seg = Math.floor(((a + Math.PI) / (Math.PI * 2)) * 3) % 3;
       if (seg === 0) p.px(x, y, '#f4c542');
       else if (seg === 1) p.px(x, y, '#3f8fe0');
     }
   }
-  p.px(4, 3, '#ffffff').px(3, 4, '#ffffff');
+  // Glanzlicht oben links
+  const g = Math.round(c * 0.6);
+  p.px(g, g - 1, '#ffffff').px(g - 1, g, '#ffffff').px(g, g, '#ffffff');
+  p.outline(C.outline);
+  return p;
+}
+
+/** Landepunkt im Sand: flacher Ring mit Kontur und Mittelpunkt (weiß – wird in der Teamfarbe der Seite eingefärbt) */
+export function volleyMark(): Pix {
+  const w = 25;
+  const h = 9;
+  const p = new Pix(w, h);
+  const cx = w / 2;
+  const cy = h / 2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const ox = (x + 0.5 - cx) / (cx - 1);
+      const oy = (y + 0.5 - cy) / (cy - 1);
+      const ix = (x + 0.5 - cx) / (cx - 3.5);
+      const iy = (y + 0.5 - cy) / (cy - 2.6);
+      if (ox * ox + oy * oy <= 1 && ix * ix + iy * iy > 1) p.px(x, y, '#ffffff');
+    }
+  }
+  p.rect(Math.floor(cx) - 1, Math.floor(cy), 3, 1, '#ffffff');
   p.outline(C.outline);
   return p;
 }

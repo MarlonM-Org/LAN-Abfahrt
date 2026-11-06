@@ -2962,13 +2962,16 @@ function vballBot(bot: Bot, st: VolleyState) {
   const home = vollSpot(me.team, Math.max(0, mates.findIndex(([id]) => id === bot.id)));
 
   let target = home;
-  const hitY = V.GROUND - V.P_BODY - V.P_R - V.BALL_R + 4;
+  // Abstand Ball–Körpermitte bei Kontakt bzw. Ballhöhe über den Füßen bei Kontakt im Stehen (skaliert mit Ball/Spieler)
+  const touch = V.P_R + V.BALL_R;
+  const stand = V.P_BODY + touch;
+  const hitY = V.GROUND - stand + 4;
   const pred = st.sub === 'serve' ? { x: b.x, t: 1 } : vollPredict(b, hitY);
   if (pred && ownSide(pred.x)) {
     const closest = mates.reduce((best, cur) => (Math.abs(cur[1].x - pred.x) < Math.abs(best[1].x - pred.x) ? cur : best), mates[0]);
     if (!closest || closest[0] === bot.id) {
       // Etwas hinter den Ball (vom Netz aus gesehen), damit er nach vorn abprallt
-      target = pred.x - d * (6 + mem.slop);
+      target = pred.x - d * (touch * 0.375 + mem.slop);
     }
   } else if (!ownSide(b.x)) {
     // Ball drüben: auf die Grundposition, leicht zur Mitte der eigenen Hälfte
@@ -2984,14 +2987,14 @@ function vballBot(bot: Bot, st: VolleyState) {
   const above = me.y - b.y;
   const falling = b.vy > -60 || st.sub === 'serve';
   const nearNet = Math.abs(b.x - V.NET_X) < 80 && ownSide(b.x) && me.cd <= 0;
-  const [jLo, jHi] = nearNet && mem.spikeChance > 0.3 ? [50, 100] : [26, 78];
-  if (!me.air && bx < 22 && above > jLo && above < jHi && falling && now - mem.jumpAt > 350 && Math.random() < 0.85) {
+  const [jLo, jHi] = nearNet && mem.spikeChance > 0.3 ? [stand + 21, stand + 71] : [stand - 3, stand + 49];
+  if (!me.air && bx < touch + 6 && above > jLo && above < jHi && falling && now - mem.jumpAt > 350 && Math.random() < 0.85) {
     mem.jumpAt = now;
     bot.send('jump');
   }
   // Schmettern: in der Luft, Ball in Reichweite, oberhalb der Netzkante und nicht zu weit vom Netz
   const reach = Math.hypot(b.x - me.x, b.y - (me.y - V.P_BODY));
-  if (me.air && me.cd <= 0 && reach < 36 && b.y < V.NET_TOP - 4 && Math.abs(b.x - V.NET_X) < 90 && ownSide(b.x) && Math.random() < mem.spikeChance + 0.2) {
+  if (me.air && me.cd <= 0 && reach < touch + 20 && b.y < V.NET_TOP - 4 && Math.abs(b.x - V.NET_X) < 90 && ownSide(b.x) && Math.random() < mem.spikeChance + 0.2) {
     bot.send('spike');
   }
 }
