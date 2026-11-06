@@ -57,6 +57,7 @@ import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt
 import { funkBot } from './funkbot';
 import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
+import { liederBot } from './liederbot';
 
 export interface BotOptions {
   url: string;
@@ -1335,6 +1336,7 @@ export class Bot {
 
     if (m.kind === 'funk') funkBot(this, m.state);
     if (m.kind === 'schaetz') schaetzBot(this, m.state);
+    if (m.kind === 'lieder') liederBot(this, m.state);
     if (m.kind === 'maexchen') maexBot(this, m.state, () => (this.state?.mini?.kind === 'maexchen' ? this.state.mini.state : null));
     if (m.kind === 'werwars') werwarsBot(this, m.state, !!me?.isVip);
 

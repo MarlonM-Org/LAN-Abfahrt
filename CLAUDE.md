@@ -10,6 +10,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run online` – Build + Server + Cloudflare-Quick-Tunnel (`server/online.ts`), Freunde spielen über `https://….trycloudflare.com` mit; feste Adresse per `ONLINE_URL`
 - `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
 - `npm run test:records` – Tests ohne Browser für die ewigen Bestleistungen der Board-Spiele (`server/records.ts`)
+- `npm run test:lieder` – Tests ohne Browser für Guess the Song (Genres/Runden, Dateien → Genre, Deezer-Trefferwahl, kompletter Rundenablauf)
 - `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen), MIDI-Parser und alle eingebauten Songs (Offline-Rendern: Pegel, Länge, stumme Kanäle, Szenen-Zuordnung); `npm run render:music -- <ordner>` schreibt sie als WAV
 
 ## Architektur-Regeln
@@ -28,6 +29,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - Handy-UI: Screens nur neu bauen, wenn sich der Screen-Key ändert (`pickScreen()`), sonst nur Werte updaten – sonst gehen Taps/Wischgesten verloren.
 - Phaser-Szenen werden beim Neustart wiederverwendet: Instanzfelder in `create()` zurücksetzen.
 - UI-Texte auf Deutsch, Pixel-Look (Font „Press Start 2P“, Welt 480 × 270).
+- Guess the Song (`lieder`): Ton nur über `server/liederton.ts` – der TV bekommt pro Runde einen Token (`/api/lieder/ton/…`, nie über den Tunnel), lädt in `prep` vor und meldet `ready`/`error` über `host:mini` → `MiniGame.hostInput()`. Quellen: eingebaute Synth-Songs, eigene Dateien in `data/lieder/<Genre>/`, Deezer-Hörproben nur mit `LIEDER_VORSCHAU=deezer`. Keine Dienste ohne erlaubte API einbauen (Spotify verbietet Quiz-Spiele, YouTube verlangt sichtbaren Player, Amazon hat keine API, iTunes-Previews nicht für Unterhaltung – siehe README).
 - Musik: Song-Format v2 in `shared/music.ts`, eingebaute Loops in `shared/musicBuiltin.ts`, Synth/Sequencer in `client/music/player.ts` (TV **und** Werkstatt `/musik.html` nutzen denselben). Eigene Songs + Szenen-Zuordnung speichert `server/music.ts` unter `data/music/`; Änderungen gehen per `music:songs`/`music:assign` live an die TVs.
 
 ## Status-Seite (Claude-Artefakt) – in JEDER Session pflegen

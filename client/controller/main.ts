@@ -44,6 +44,7 @@ import { pickSuess } from './screens/suess';
 import { pickUmzug } from './screens/umzug';
 import { pickWackel } from './screens/wackel';
 import { pickSchaetz } from './screens/schaetz';
+import { pickLieder } from './screens/lieder';
 import { pickMaexchen } from './screens/maexchen';
 import { pickBogen } from './screens/bogen';
 import { pickZauber } from './screens/zauber';
@@ -390,6 +391,8 @@ function pickScreen(): Screen {
           return pickKugel(m.state);
         case 'schaetz':
           return pickSchaetz(m.state, vip);
+        case 'lieder':
+          return pickLieder(m.state, vip);
         case 'maexchen':
           return pickMaexchen(m.state);
         case 'werwars':

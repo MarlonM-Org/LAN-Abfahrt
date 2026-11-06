@@ -88,6 +88,8 @@ import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { FunkGame } from './funk';
 import { SchaetzGame } from './schaetz';
+import { LiederGame } from './lieder';
+import { liederTon } from './liederton';
 import { MaexGame } from './maexchen';
 import { WerwarsGame } from './werwars';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
@@ -277,6 +279,12 @@ export class Room {
       if (!local || this.phase !== 'mini' || !this.mini?.balance) return;
       const s = parseSample(raw);
       if (s) this.mini.balance(s);
+    });
+
+    // TV → laufendes Minispiel (z. B. Guess the Song: „Ton geladen“) – nur von TV-Seiten im Heimnetz
+    socket.on('host:mini', (action: unknown, payload?: unknown) => {
+      if (online || !socket.rooms.has('hosts') || this.phase !== 'mini' || !this.mini?.hostInput) return;
+      this.mini.hostInput(String(action ?? ''), payload);
     });
 
     socket.on('host:cmd', (cmd: string, ack?: (r: { ok: boolean; msg?: string }) => void) => {
@@ -789,6 +797,7 @@ export class Room {
         return this.records.submit(k, this.nameOf(id), value, detail);
       },
       records: (k: BalanceKind) => this.records.top(k, 5),
+      hosts: () => this.io.sockets.adapter.rooms.get('hosts')?.size ?? 0,
     };
     switch (kind) {
       case 'flunky':
@@ -955,6 +964,9 @@ export class Room {
         break;
       case 'schaetz':
         this.mini = new SchaetzGame(ids, ctx);
+        break;
+      case 'lieder':
+        this.mini = new LiederGame(ids, ctx, liederTon);
         break;
       case 'maexchen':
         this.mini = new MaexGame(ids, ctx);

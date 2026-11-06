@@ -41,6 +41,8 @@ export interface MiniCtx {
   log?(type: string, data?: { p?: string; n?: number; o?: string }): void;
   /** Board-Spiele: Leistung melden (Weite/Zeit) → neuer Rekord / persönliche Bestleistung / nichts; Bots zählen nicht */
   record?(kind: import('../shared/balance').BalanceKind, id: string, value: number, detail?: string): import('../shared/balance').RecordResult | null;
+  /** Wie viele TV-Seiten (`/tv.html`) gerade verbunden sind – z. B. um nicht auf einen TV zu warten, der gar nicht offen ist */
+  hosts?(): number;
   /** Board-Spiele: Top-Liste der ewigen Bestenliste */
   records?(kind: import('../shared/balance').BalanceKind): import('../shared/balance').BoardRecord[];
 }
@@ -50,6 +52,8 @@ export interface MiniGame {
   snapshot(): MiniSnapshot;
   privateFor?(playerId: string): PrivateState;
   input(playerId: string, action: string, payload: unknown): void;
+  /** Rückmeldung vom TV (`host:mini`, nur aus dem Heimnetz) – z. B. „Ton geladen“ bei Guess the Song */
+  hostInput?(action: string, payload: unknown): void;
   /** Balance Board (nur Board-Spiele): Messwert vom Laptop für den Spieler, der gerade dran ist */
   balance?(sample: import('../shared/balance').BalanceSample): void;
   playerDisconnected(playerId: string): void;
