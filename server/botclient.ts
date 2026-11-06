@@ -6,7 +6,7 @@ import { io, type Socket } from 'socket.io-client';
 import type { ArenaState, GameLive, GameMeta, GameState, IgelState, IgelWeapon, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
 import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
-import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
+import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, isTool, ropeAnchor, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
@@ -1824,7 +1824,13 @@ function igelBot(bot: Bot, st: IgelState) {
         };
         const s0 = still();
         if (!s0) return;
-        await igelWalk(bot, s0, myHog(s0)!);
+        if (igelWantsTool()) {
+          await igelTool(bot, s0, myHog(s0)!.id, still);
+          await sleep(300);
+        }
+        const s1 = still();
+        if (!s1 || !myHog(s1)) return;
+        await igelWalk(bot, s1, myHog(s1)!);
         const now = still();
         const h = now && myHog(now);
         if (!now || !h) return;
@@ -1847,7 +1853,13 @@ function igelBot(bot: Bot, st: IgelState) {
         const s = cur();
         return s && s.active === bot.id && s.sub === 'aim' && s.turn === st.turn ? s : null;
       };
-      await igelWalk(bot, st, st.hogs[st.activeHog!]);
+      if (igelWantsTool()) {
+        await igelTool(bot, st, st.activeHog!, still);
+        await sleep(300);
+      }
+      const s1 = still();
+      if (!s1) return;
+      await igelWalk(bot, s1, s1.hogs[s1.activeHog!]);
       const now = still();
       if (!now) return;
       const plan = planIgelShot(now, bot.id, now.activeHog!);
@@ -1871,6 +1883,73 @@ function igelBot(bot: Bot, st: IgelState) {
       bot.send('done');
     });
   }
+}
+
+/** Ab und zu ein Werkzeug vor dem Schuss (zum Testen jedes Mal: IGEL_BOT_TOOLS=1) */
+const igelWantsTool = () => !!process.env.IGEL_BOT_TOOLS || Math.random() < 0.3;
+
+/**
+ * Werkzeug-Einsatz: Liane (hochschwingen, loslassen, evtl. Schirm auf), Sonnenschirm (hüpfen und Richtung Gegner gleiten)
+ * oder Schaufel (Loch Richtung Gegner graben). Wartet danach, bis der Igel wieder steht.
+ */
+async function igelTool(bot: Bot, st: IgelState, hogId: number, still: () => IgelState | null) {
+  const hog = st.hogs[hogId];
+  const ammo = st.ammo[bot.id];
+  if (!hog || !ammo) return;
+  const foe = st.hogs.filter((h) => h.state === 'ok' && !sameSide(st, h.owner, bot.id)).sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
+  const toward: 1 | -1 = foe ? (foe.x >= hog.x ? 1 : -1) : hog.x < 240 ? 1 : -1;
+  const mask = igelMask(st);
+  // Liane nur, wenn über dem Igel etwas zum Festhaken ist
+  const ropeAngles: number[] = [];
+  for (let a = -Math.PI + 0.35; a <= -0.35; a += 0.1) if (ropeAnchor(mask, hog.x, hog.y - 4, a)) ropeAngles.push(a);
+  const opts = (['rope', 'parasol', 'shovel'] as const).filter((w) => ammo[w] !== 0 && (w !== 'rope' || ropeAngles.length > 0));
+  if (!opts.length) return;
+  const w = opts[Math.floor(Math.random() * opts.length)];
+  bot.send('weapon', { weapon: w });
+  await sleep(250);
+  if (!still()) return;
+  if (w === 'shovel') {
+    const angle = toward > 0 ? rand(0, 0.7) : Math.PI - rand(0, 0.7);
+    bot.send('aim', { angle, power: 1 });
+    await sleep(250);
+    bot.send('fire', { angle, power: 1 });
+    await sleep(500);
+  } else if (w === 'parasol') {
+    bot.send('fire', {});
+    await sleep(200);
+    bot.send('move', { dir: toward });
+    await sleep(rand(1000, 2000));
+    bot.send('move', { dir: 0 });
+  } else {
+    const angle = ropeAngles[Math.floor(Math.random() * ropeAngles.length)];
+    bot.send('aim', { angle, power: 1 });
+    await sleep(250);
+    bot.send('fire', { angle, power: 1 });
+    await sleep(300);
+    bot.send('move', { dir: toward });
+    bot.send('climb', { dir: Math.random() < 0.6 ? 1 : -1 });
+    await sleep(rand(800, 1800));
+    bot.send('climb', { dir: 0 });
+    bot.send('move', { dir: 0 });
+    bot.send('jump');
+    // Im Fall manchmal noch den Schirm aufspannen
+    if (ammo.parasol !== 0 && Math.random() < 0.4) {
+      await sleep(250);
+      bot.send('weapon', { weapon: 'parasol' });
+      await sleep(150);
+      bot.send('fire', {});
+    }
+  }
+  // Warten, bis der Igel wieder Boden unter den Füßen hat
+  for (let i = 0; i < 25; i++) {
+    const s = still();
+    const h = s?.hogs[hogId];
+    if (!s || !h || h.state !== 'ok' || (!h.flying && !h.rope)) break;
+    if (h.rope) bot.send('jump');
+    await sleep(200);
+  }
+  bot.send('weapon', { weapon: 'bazooka' });
+  await sleep(150);
 }
 
 /** Ein Stück laufen – bevorzugt zu einer nahen Kiste, sonst manchmal Richtung Gegner (nie ins Meer) */
@@ -1937,7 +2016,7 @@ export function planIgelShot(st: IgelState, me: string, hogId: number, force?: I
   const ammo = st.ammo[me];
   // Zum Testen aller Waffen: IGEL_BOT_CHAOS=1 npm run bots -- 8 --game=igel
   if (!force && process.env.IGEL_BOT_CHAOS && Math.random() < 0.6) {
-    const pool = (Object.keys(ammo ?? {}) as IgelWeapon[]).filter((w) => ammo[w] !== 0);
+    const pool = (Object.keys(ammo ?? {}) as IgelWeapon[]).filter((w) => ammo[w] !== 0 && !isTool(w));
     const w = pool[Math.floor(Math.random() * pool.length)] ?? 'bazooka';
     const toward = near ? (near.x >= hog.x ? 0 : Math.PI) : 0;
     const angle = toward + (toward ? 0.5 : -0.5) + rand(-0.3, 0.3);
@@ -1968,7 +2047,7 @@ export function planIgelShot(st: IgelState, me: string, hogId: number, force?: I
   let best = { angle: -Math.PI / 4, power: 0.6, score: -Infinity };
   for (let a = -Math.PI; a < Math.PI; a += 0.07) {
     for (let pw = 0.2; pw <= 1.001; pw += 0.08) {
-      const hit = simulateBazooka(mask, from, a, pw, st.wind, st.water, all);
+      const hit = simulateBazooka(mask, from, a, pw, st.wind * (st.windMul ?? 1), st.water, all, { grav: st.grav ?? 1 });
       if (!hit) continue;
       const self = dmgAt(hit, friends);
       const gain = dmgAt(hit, enemies);

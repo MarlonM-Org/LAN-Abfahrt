@@ -3,7 +3,7 @@
  * Server (autoritativ), TV (eigene Terrain-Kopie) und Bots (Zielsimulation)
  * benutzen denselben Code – das Terrain wird nur als Seed + Kraterliste übertragen.
  */
-import type { IgelOp, IgelSquad, IgelWeapon } from './types';
+import type { IgelOp, IgelSquad, IgelThemeId, IgelWeapon } from './types';
 
 export const IGEL = {
   W: 480,
@@ -15,7 +15,7 @@ export const IGEL = {
   /** Zugzeit, wenn der Spieler gerade offline ist (kurze Trennung, App gewechselt) */
   OFFLINE_TURN_MS: 5000,
   RETREAT_MS: 3000,
-  COUNTDOWN_MS: 3500,
+  COUNTDOWN_MS: 6000, // etwas länger: die Themenkarte will gelesen werden
   SETTLE_MIN_MS: 700,
   /** Danach: Sudden Death (Wasser steigt nach jeder vollen Runde) – ab 7 Spielern `SUDDEN_MS_BIG` */
   SUDDEN_MS: 6 * 60_000,
@@ -42,7 +42,8 @@ export const IGEL = {
   HP_TICK_MAX_MS: 1600,
   /** Zuschauer-Sprüche: Abklingzeit pro Spieler und Anzeigedauer am TV */
   TAUNT_COOLDOWN_MS: 8000,
-  TAUNT_SHOW_MS: 2600,  /** Ab dieser Aufprallgeschwindigkeit gibt es Fallschaden */
+  TAUNT_SHOW_MS: 2600,
+  /** Ab dieser Aufprallgeschwindigkeit gibt es Fallschaden */
   FALL_SAFE: 200,
   FALL_DMG: 0.12,
   TELE_RANGE: 230,
@@ -62,6 +63,8 @@ export interface IgelWeaponInfo {
   info: string;
   /** Wie wird gezielt? drag = Winkel + Kraft, dir = nur Richtung, map = Ziel auf der Minikarte, none = gleich los */
   aim: 'drag' | 'dir' | 'map' | 'none';
+  /** Werkzeug: wirkt sofort und beendet den Zug nicht (danach darf noch geschossen werden) */
+  tool?: boolean;
 }
 
 export const WEAPONS: Record<IgelWeapon, IgelWeaponInfo> = {
@@ -77,11 +80,15 @@ export const WEAPONS: Record<IgelWeapon, IgelWeaponInfo> = {
   punch: { name: 'Igel-Schlag', short: 'Schlag', icon: '👊', ammo: -1, hint: 'Richtung wischen – haut Nachbarn weg', info: '22 · nah', aim: 'dir' },
   teleport: { name: 'Muschel-Teleport', short: 'Teleport', icon: '🐚', ammo: 2, hint: 'Richtung + Weite wischen – du landest dort', info: 'beamen', aim: 'drag' },
   bridge: { name: 'Surfbrett-Brücke', short: 'Surfbrett', icon: '🏄', ammo: 2, hint: 'Richtung wischen – legt ein Brett ins Gelände', info: 'Brücke', aim: 'dir' },
+  rope: { name: 'Lianen-Seil', short: 'Liane', icon: '🪢', ammo: 3, hint: 'Nach oben wischen – Liane hakt sich fest. Schwingen, klettern, loslassen', info: 'Werkzeug · schwingen', aim: 'dir', tool: true },
+  parasol: { name: 'Sonnenschirm-Gleiter', short: 'Schirm', icon: '⛱️', ammo: 2, hint: 'Hüpft hoch und gleitet sanft – kein Fallschaden, Wind schiebt', info: 'Werkzeug · gleiten', aim: 'none', tool: true },
+  shovel: { name: 'Schaufel', short: 'Schaufel', icon: '🪏', ammo: 3, hint: 'Richtung wischen – gräbt einen Tunnel (Deckung!)', info: 'Werkzeug · graben', aim: 'dir', tool: true },
 };
-/** Reihenfolge im Waffenraster (4 × 3): Wurfwaffen · Spezial · Nahkampf/Werkzeug */
-export const WEAPON_ORDER: IgelWeapon[] = ['bazooka', 'grenade', 'cluster', 'holy', 'shotgun', 'airstrike', 'dynamite', 'mine', 'paddle', 'punch', 'teleport', 'bridge'];
+/** Reihenfolge im Waffenraster (5 × 3): Wurfwaffen · Spezial/Nahkampf · Werkzeuge */
+export const WEAPON_ORDER: IgelWeapon[] = ['bazooka', 'grenade', 'cluster', 'holy', 'shotgun', 'airstrike', 'dynamite', 'mine', 'paddle', 'punch', 'teleport', 'bridge', 'rope', 'parasol', 'shovel'];
 /** Was in Kisten stecken kann (Heilige Ananas gibt's nur einmal pro Spiel) */
-export const CRATE_LOOT: IgelWeapon[] = ['grenade', 'grenade', 'cluster', 'airstrike', 'dynamite', 'mine', 'paddle', 'teleport', 'bridge'];
+export const CRATE_LOOT: IgelWeapon[] = ['grenade', 'grenade', 'cluster', 'airstrike', 'dynamite', 'mine', 'paddle', 'teleport', 'bridge', 'rope', 'parasol', 'shovel'];
+export const isTool = (w: IgelWeapon) => !!WEAPONS[w].tool;
 
 /** Zugzeit nach Spielerzahl: 30 s bis 4, 20 s bis 8, 15 s darüber */
 export const igelTurnMs = (n: number) => (n <= 4 ? IGEL.TURN_MS : n <= 8 ? 20000 : 15000);
@@ -89,7 +96,43 @@ export const igelMaxHp = (n: number) => (n >= 8 ? IGEL.HP_BIG : IGEL.HP);
 export const igelSuddenMs = (n: number) => (n >= 7 ? IGEL.SUDDEN_MS_BIG : IGEL.SUDDEN_MS);
 
 /** Zuschauer-Sprüche (Action `taunt` mit `{ i }` = Index in diese Liste) */
-export const IGEL_TAUNTS = ['Rache!', 'Feigling!', 'Ups.', 'Für die Strandbar!'];
+export const IGEL_TAUNTS = ['Rache!', 'Feigling!', 'Ups.', 'Für die Strandbar!', 'Daneben!', 'Volltreffer!'];
+
+/** Igel-Sprüche: was die Igel von selbst sagen (Sprechblase) */
+export const IGEL_QUIPS = {
+  /** Zugbeginn (ab und zu) */
+  start: ['Jetzt aber!', 'Ich hab einen Plan.', 'Mal sehen ...', 'Zielwasser!', 'Aus dem Weg!', 'Ganz ruhig ...'],
+  /** Beim Abschuss */
+  fire: ['Fang!', 'Friss Kokosnuss!', 'Achtung!', 'Für die Strandbar!', 'Hoppla ...', 'Lieferung!'],
+  /** Getroffen, aber noch da */
+  hurt: ['Autsch!', 'Meine Stacheln!', 'Das gibt Rache!', 'Aua aua!', 'Hey!', 'Mein Sonnenbrand!'],
+  /** Ins Wasser gefallen */
+  drown: ['Blubb ...', 'Ich kann nicht schwimmen!', 'Kaltes Wasser!'],
+  /** Liane / Schirm / Schaufel */
+  rope: ['Tarzan-Igel!', 'Huiii!', 'Hoch hinaus!'],
+  parasol: ['Abflug!', 'Schön luftig hier.', 'Sanft wie ein Blatt.'],
+  shovel: ['Ich grab mich ein.', 'Buddeln!', 'Sandburg 2.0'],
+};
+
+/** Themenkarten: eine pro Partie, verändert die Insel-Regeln */
+export interface IgelTheme {
+  name: string;
+  icon: string;
+  /** Kurzregel für Karte, Handy und Sprecher */
+  text: string;
+}
+export const IGEL_THEMES: Record<IgelThemeId, IgelTheme> = {
+  sturm: { name: 'Sturmtag', icon: '🌪️', text: 'Doppelter Wind – Kokosnüsse fliegen schief!' },
+  mond: { name: 'Mondnacht', icon: '🌙', text: 'Wenig Schwerkraft – alles fliegt weiter und höher.' },
+  kisten: { name: 'Kistenregen', icon: '📦', text: 'Jede Runde fallen Kisten vom Himmel.' },
+  spreng: { name: 'Sprengmeister', icon: '🧨', text: 'Doppelt so viele Gaskartuschen und Seeigel, jeder hat 2 Böller.' },
+  vampir: { name: 'Vampir-Igel', icon: '🧛', text: 'Ein Drittel deines Schadens heilt deinen Igel.' },
+  flut: { name: 'Flutwarnung', icon: '🌊', text: 'Das Wasser steht höher und die Flut kommt doppelt so früh.' },
+};
+export const IGEL_THEME_IDS = Object.keys(IGEL_THEMES) as IgelThemeId[];
+/** Schwerkraft- und Wind-Faktor der Themenkarte */
+export const themeGrav = (t: IgelThemeId) => (t === 'mond' ? 0.6 : 1);
+export const themeWind = (t: IgelThemeId) => (t === 'sturm' ? 1.8 : 1);
 
 export const BAZOOKA = { R: 21, DMG: 45, ARM_MS: 140 };
 export const GRENADE = { R: 19, DMG: 40, FUSE_MS: 3000, SPEED: 0.8, FUSE_MIN: 1, FUSE_MAX: 5 };
@@ -111,6 +154,14 @@ export const BRIDGE = { LEN: 34, THICK: 2.5, STEP: 2, MAX_TILT: 0.6 };
 export const BARREL = { R: 22, DMG: 32, MIN: 3, MAX: 5, CHAIN_MS: 180 };
 /** Kisten am Sonnenschirm-Fallschirm */
 export const CRATE = { CHANCE: 0.3, HP: 25, FALL: 34, MAX: 3, REACH: 9 };
+/** Lianen-Seil: Reichweite, Seillänge (min/max), Klettern px/s, Schwung px/s², Höchsttempo */
+export const ROPE = { RANGE: 120, MIN: 12, MAX: 130, CLIMB: 55, PUSH: 160, VMAX: 260 };
+/** Sonnenschirm: Absprung, Sinkrate, Steuern, Windeinfluss (px/s) */
+export const PARASOL = { HOP_VY: -150, FALL: 26, STEER: 45, WIND: 30 };
+/** Schaufel: Tunnel aus „carve“-Scheiben (Radius, Länge, Schrittweite) */
+export const SHOVEL = { R: 6, LEN: 26, STEP: 4 };
+/** „Schuss des Abends“: Mindestwert (Schaden + 30 je K.O.), Zeitlupe, längstes Stück Echtzeit */
+export const REPLAY = { MIN_SCORE: 30, KO_BONUS: 30, RATE: 0.5, MAX_MS: 3600, PRE_MS: 450, POST_MS: 900, LEAD_MS: 1800, TAIL_MS: 900 };
 /** Modus „Alle gleichzeitig“ */
 export const SIMUL = { MIN_PLAYERS: 7, AIM_MS: 15000, FLIGHT_MAX_MS: 12000 };
 
@@ -278,6 +329,33 @@ export function plankOps(x: number, y: number, angle: number): IgelOp[] {
   return ops;
 }
 
+/** Schaufel: Tunnel vor dem Igel (Körpermitte x/y) in Grabrichtung */
+export function shovelOps(x: number, y: number, angle: number): IgelOp[] {
+  const ops: IgelOp[] = [];
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  for (let d = 2; d <= SHOVEL.LEN; d += SHOVEL.STEP) {
+    const px = Math.round(x + ux * d);
+    const py = Math.round(y + uy * d);
+    if (px < 0 || px > IGEL.W || py < 0 || py > IGEL.H) break;
+    ops.push([px, py, SHOVEL.R, 'carve']);
+  }
+  return ops;
+}
+
+/** Lianen-Seil: erster fester Punkt in Zielrichtung (bis ROPE.RANGE), sonst null */
+export function ropeAnchor(m: Mask, x: number, y: number, angle: number): { x: number; y: number } | null {
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  for (let d = 6; d <= ROPE.RANGE; d += 1) {
+    const px = x + ux * d;
+    const py = y + uy * d;
+    if (px < 0 || px >= IGEL.W || py < 0) return null;
+    if (isSolid(m, px, py)) return { x: Math.round((px - ux) * 10) / 10, y: Math.round((py - uy) * 10) / 10 };
+  }
+  return null;
+}
+
 /** Oberste feste Zeile in Spalte x (oder H) */
 export function surfaceY(m: Mask, x: number): number {
   for (let y = 0; y < IGEL.H; y++) if (isSolid(m, x, y)) return y;
@@ -310,9 +388,10 @@ export function launch(x: number, y: number, angle: number, power: number, scale
   return { x: x + Math.cos(angle) * 7, y: y + Math.sin(angle) * 7, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v };
 }
 
-export function stepBallistic(p: Ballistic, dt: number, wind: number) {
+/** `grav` = Schwerkraft-Faktor der Themenkarte (Mondnacht 0.6) */
+export function stepBallistic(p: Ballistic, dt: number, wind: number, grav = 1) {
   p.vx += wind * IGEL.WIND_ACC * dt;
-  p.vy += IGEL.GRAVITY * dt;
+  p.vy += IGEL.GRAVITY * grav * dt;
   p.x += p.vx * dt;
   p.y += p.vy * dt;
 }
@@ -329,13 +408,13 @@ export function simulateBazooka(
   wind: number,
   water: number,
   hogs: { x: number; y: number; self?: boolean }[],
-  opts: { scale?: number; path?: { x: number; y: number }[] } = {},
+  opts: { scale?: number; path?: { x: number; y: number }[]; grav?: number } = {},
 ): { x: number; y: number } | null {
   const p = launch(from.x, from.y, angle, power, opts.scale ?? 1);
   const path = opts.path;
   let k = 0;
   for (let t = 0; t < 8; t += IGEL.DT) {
-    stepBallistic(p, IGEL.DT, wind);
+    stepBallistic(p, IGEL.DT, wind, opts.grav ?? 1);
     if (path && k++ % 4 === 0) path.push({ x: p.x, y: p.y });
     if (p.x < -60 || p.x > IGEL.W + 60 || p.y > water) return null;
     if (isSolid(m, p.x, p.y)) return { x: p.x, y: p.y };
@@ -358,9 +437,9 @@ export const isThrown = (w: IgelWeapon) => w === 'bazooka' || w === 'grenade' ||
  * Zielhilfe: Flugbahn bis zum ersten Aufprall – der TV zeichnet davon die ersten 20 % gestrichelt.
  * Hüpfer und Zünder werden nicht simuliert, es geht nur um Richtung und Bogen.
  */
-export function aimPath(m: Mask, from: { x: number; y: number }, angle: number, power: number, wind: number, water: number, w: IgelWeapon) {
+export function aimPath(m: Mask, from: { x: number; y: number }, angle: number, power: number, wind: number, water: number, w: IgelWeapon, grav = 1) {
   const path: { x: number; y: number }[] = [];
-  simulateBazooka(m, from, angle, power, wind * windFactor(w), water, [], { scale: speedScale(w), path });
+  simulateBazooka(m, from, angle, power, wind * windFactor(w), water, [], { scale: speedScale(w), path, grav });
   return path;
 }
 
