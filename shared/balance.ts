@@ -46,7 +46,7 @@ export const BB = {
 };
 
 /** Minispiele, die das Balance Board brauchen (nicht im Zufall, nicht auf dem Spielbrett, nicht im Turnier) */
-export const BALANCE_KINDS = ['skisprung', 'teppich'] as const;
+export const BALANCE_KINDS = ['skisprung', 'teppich', 'kugel'] as const;
 export type BalanceKind = (typeof BALANCE_KINDS)[number];
 export const isBalanceKind = (k: string | undefined | null): k is BalanceKind => !!k && (BALANCE_KINDS as readonly string[]).includes(k);
 

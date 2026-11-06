@@ -58,7 +58,7 @@ import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
 import { attachSpectator } from './spectator';
 import { pickFunk } from './screens/funk';
-import { pickSkisprung, pickTeppich } from './screens/balance';
+import { pickKugel, pickSkisprung, pickTeppich } from './screens/balance';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -386,6 +386,8 @@ function pickScreen(): Screen {
           return pickSkisprung(m.state);
         case 'teppich':
           return pickTeppich(m.state);
+        case 'kugel':
+          return pickKugel(m.state);
         case 'schaetz':
           return pickSchaetz(m.state, vip);
         case 'maexchen':

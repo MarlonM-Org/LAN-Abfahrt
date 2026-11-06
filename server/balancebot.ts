@@ -1,6 +1,7 @@
 import type { GameState } from '../shared/types';
 import { SKI, type SkiState } from '../shared/skisprung';
 import { TEP, type TepState, birdX, birdY, tepCourse } from '../shared/teppich';
+import { KUG, type KugelState, kugelCourse, routePoint } from '../shared/kugel';
 
 /**
  * Bots auf dem Balance Board: Ist der Bot dran, schickt er selbst Messwerte (Eingabe `bb`, 30 Hz) –
@@ -23,15 +24,17 @@ interface Mem {
   /** Teppich: Strecke (für die Ausweich-Logik) */
   seed: number;
   course: ReturnType<typeof tepCourse> | null;
+  kseed: number;
+  kcourse: ReturnType<typeof kugelCourse> | null;
 }
 
 const mems = new WeakMap<BotLike, Mem>();
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
-export function balanceBot(bot: BotLike, kind: 'skisprung' | 'teppich', st: SkiState | TepState) {
+export function balanceBot(bot: BotLike, kind: 'skisprung' | 'teppich' | 'kugel', st: SkiState | TepState | KugelState) {
   let m = mems.get(bot);
-  if (!m) mems.set(bot, (m = { timer: null, kg: rand(55, 95), skill: rand(0.45, 0.95), jitter: 0, jumpAt: 0, turn: '', seed: -1, course: null }));
+  if (!m) mems.set(bot, (m = { timer: null, kg: rand(55, 95), skill: rand(0.45, 0.95), jitter: 0, jumpAt: 0, turn: '', seed: -1, course: null, kseed: -1, kcourse: null }));
   const mine = st.active === bot.id && st.sub !== 'over';
   if (!mine) {
     if (m.timer) clearInterval(m.timer);
@@ -68,7 +71,45 @@ export function balanceBot(bot: BotLike, kind: 'skisprung' | 'teppich', st: SkiS
       const since = Date.now() - mem.jumpAt;
       if (mem.jumpAt && since < 200) w = mem.kg * 1.32;
       else if (mem.jumpAt && since < 320) w = mem.kg * 0.8;
-    } else {
+    } else if (cur.kind === 'kugel') {
+      const s = cur.state;
+      if (s.seed !== mem.kseed) {
+        mem.kseed = s.seed;
+        mem.kcourse = kugelCourse(s.seed);
+      }
+      const c = mem.kcourse;
+      if (s.sub === 'roll' && c && s.fall === 0) {
+        // Nächster Wegpunkt auf dem Lösungsweg: der vordere der beiden Zellen, an denen wir gerade „dran“ sind
+        let near = 0;
+        let nd = Infinity;
+        c.route.forEach((_, i) => {
+          const p = routePoint(c, i);
+          const d = Math.hypot(p.x - s.x, p.y - s.y);
+          if (d < nd) {
+            nd = d;
+            near = i;
+          }
+        });
+        const p0 = routePoint(c, near);
+        const p1 = routePoint(c, near + 1);
+        const p2 = routePoint(c, near + 2);
+        // Auf dem Weg bleiben: zur Pfadlinie hinziehen, dann in Laufrichtung. Vor Ecken abbremsen.
+        const dir = { x: Math.sign(p1.x - p0.x), y: Math.sign(p1.y - p0.y) };
+        const turn = Math.sign(p2.x - p1.x) !== dir.x || Math.sign(p2.y - p1.y) !== dir.y;
+        const toNext = Math.hypot(p1.x - s.x, p1.y - s.y);
+        const cruise = (turn && toNext < 34 ? 22 : 62) * (0.55 + mem.skill * 0.55);
+        const wantX = dir.x * cruise + (dir.x === 0 ? (p0.x - s.x) * 3 : 0);
+        const wantY = dir.y * cruise + (dir.y === 0 ? (p0.y - s.y) * 3 : 0);
+        // Regler: Wunschtempo − Ist-Tempo → Beschleunigung → Lehnen (Kehrwert von kugelAccel)
+        const gain = 2.4;
+        const lx = clamp(((wantX - s.vx) * gain) / KUG.ACCEL, -1, 1);
+        const ly = clamp(((wantY - s.vy) * gain) / KUG.ACCEL, -1, 1);
+        // Totzone des Boards ausgleichen (Umkehrung von `kugelAccel`)
+        const inv = (l: number) => (Math.abs(l) < 0.01 ? 0 : Math.sign(l) * (Math.abs(l) * (1 - KUG.DEADZONE) + KUG.DEADZONE));
+        x += inv(lx);
+        y += -inv(ly);
+      }
+    } else if (cur.kind === 'teppich') {
       const s = cur.state;
       if (s.seed !== mem.seed) {
         mem.seed = s.seed;
