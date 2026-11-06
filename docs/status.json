@@ -1,14 +1,11 @@
 {
-  "updated": "2026-11-06T19:55+00:00",
+  "updated": "2026-11-06T20:01+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
   "inProgress": [
-    {
-      "title": "Bomben-Arena: nicht mehr an Ecken/Kreuzungen hängen bleiben + Mapgröße skaliert mit Spielerzahl (kleiner bei 2–4)"
-    },
     {
       "title": "Wasserbomben-Schlacht: feineres Zielen (kurz ziehen = nah treffen) + Spielende, sobald nur noch einer angreifen kann"
     },
@@ -26,6 +23,11 @@
     "Echte Aufwärmphase statt Übungsfeld: vor dem Spiel mit der richtigen Steuerung üben (Handy + TV, nichts zählt) – startet, sobald die laufenden PRs gemergt sind"
   ],
   "done": [
+    {
+      "title": "Bomben-Arena: kein Hängenbleiben mehr an Ecken und Kreuzungen (leicht schräger Stick läuft geradeaus durch, großzügige Ecken-Hilfe); Feld wächst mit der Spielerzahl (zu zweit 17×9 statt 25×13), TV zoomt kleine Felder groß",
+      "pr": 101,
+      "date": "2026-11-06"
+    },
     {
       "title": "Auto-Fußball: Stick lenkt wie ein normaler Joystick in TV-Richtung (Auto dreht im Bogen dorthin), HÜPFER entfernt, GAS/BREMSE/BOOST als große Knöpfe (iPhone 12 Pro)",
       "pr": 99,
@@ -432,8 +434,8 @@
       "notes": "Am Rand durchfahren statt Crash, häufiger Lücken (#97) – „ansonsten gut“"
     },
     "arena": {
-      "status": "in Arbeit",
-      "notes": "Bleibt an Ecken und Kreuzungen hängen; Map für 2–4 Spieler zu groß → mit Spielerzahl skalieren, schnell in die Action"
+      "status": "umgesetzt",
+      "notes": "Hängenbleiben an Ecken/Kreuzungen behoben (Ursache: Abbiege-Regel ab 22° Stick-Schräge ließ die Figur zittern); Feld 17×9 (2) · 19×11 (3–4) · 23×11 (5–6) · 23×13 (7–8) · 25×13 (9–12) (#101)"
     },
     "wasser": {
       "status": "in Arbeit",
