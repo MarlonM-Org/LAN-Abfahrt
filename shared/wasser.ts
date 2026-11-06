@@ -50,6 +50,9 @@ export const WASSER = {
   PISTOL_WET_PER_S: 40,
   PISTOL_EVERY_MS: 22000,
   PISTOL_FIRST_MS: 14000,
+  /** Aufwärmrunde: Wasserpistole kommt früher und öfter, damit man sie ausprobieren kann */
+  PRACTICE_PISTOL_FIRST_MS: 4000,
+  PRACTICE_PISTOL_EVERY_MS: 9000,
   /** Kurzer Splash-Verlauf im Snapshot */
   SPLASH_KEEP_MS: 700,
 };
@@ -128,6 +131,38 @@ export function coverBetween(ax: number, ay: number, bx: number, by: number): bo
   return WASSER_COVER.some((r) => segHitsRect(ax, ay, bx, by, r) !== null);
 }
 
+/**
+ * Wo eine Wasserbombe von (fx, fy) Richtung (tx, ty) wirklich aufschlägt: Deckung im letzten Teil der Flugbahn
+ * (ab 60 %) fängt sie ab (`cover`). Server (Aufschlag) und TV/Handy (Vorschau „geblockt“) rechnen identisch.
+ */
+export function throwLanding(fx: number, fy: number, tx: number, ty: number): { x: number; y: number; cover: boolean } {
+  const sx = fx + (tx - fx) * 0.6;
+  const sy = fy + (ty - fy) * 0.6;
+  let best = Infinity;
+  for (const r of WASSER_COVER) {
+    const t = segHitsRect(sx, sy, tx, ty, r, 0);
+    if (t !== null && t < best) best = t;
+  }
+  if (best === Infinity) return { x: tx, y: ty, cover: false };
+  return { x: sx + (tx - sx) * best, y: sy + (ty - sy) * best, cover: true };
+}
+
+/** Zielvorschau: wohin der Wurf eines zielenden Spielers ginge (`target`) und wo er aufschlüge (Deckung!) */
+export function aimLanding(p: { x: number; y: number; ax: number; ay: number }) {
+  const target = throwTarget(p.x, p.y, p.ax, p.ay);
+  return { target, ...throwLanding(p.x, p.y - 8, target.x, target.y) };
+}
+
+/**
+ * Rettet Deckung `v` vor diesem Wurf? Ohne Deckung wäre v im Spritzradius – so aber nicht (Bombe an der Hecke
+ * abgefangen bzw. Hecke zwischen Aufschlag und v). Wer auf der Werfer-Seite direkt an der Hecke steht, wird trotzdem nass.
+ */
+export function coverSaves(l: ReturnType<typeof aimLanding>, v: Point): boolean {
+  const wetAtLanding = Math.hypot(v.x - l.x, v.y - l.y) <= WASSER.SPLASH_R && !coverBetween(l.x, l.y, v.x, v.y);
+  if (l.cover) return Math.hypot(v.x - l.target.x, v.y - l.target.y) <= WASSER.SPLASH_R && !wetAtLanding;
+  return Math.hypot(v.x - l.x, v.y - l.y) <= WASSER.SPLASH_R && !wetAtLanding;
+}
+
 export function flightMs(dist: number) {
   return WASSER.MIN_FLIGHT_MS + dist * WASSER.FLIGHT_MS_PER_PX;
 }
@@ -186,6 +221,13 @@ export interface WasserPlayer {
   sk: number;
   /** Verbindung weg: eingefroren und unverwundbar */
   away?: boolean;
+  /** Füllt gerade auf: Fortschritt bis zur nächsten Wasserbombe 0–1 (`rh` = am Gartenschlauch, sonst Eimer) */
+  rf?: number;
+  rh?: true;
+  /** Die Sonne trocknet gerade (eine Weile nicht getroffen) */
+  dr?: true;
+  /** Frisch abgetrocknet: kurz geschützt */
+  pr?: true;
   /** Treffer gelandet */
   h: number;
   /** selbst klatschnass geworden */

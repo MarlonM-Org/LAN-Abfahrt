@@ -143,3 +143,69 @@ export function paintGarden(p: Pix, area: { x: number; y: number; w: number; h: 
     p.rect(x, area.y - 2, 5, 3, C.leafDark).px(x + 2, area.y - 3, c);
   }
 }
+
+// ------------------------------------------------------------------ Symbole (TV-Schilder, Legende und Handy)
+
+const DROP = ['...a...', '..aaa..', '..aaa..', '.aaaaa.', '.waaaab', 'awaaaab', 'aaaaabb', '.aaabb.', '..bbb..'];
+
+/** Wassertropfen = Auffüllen (Eimer) */
+export function dropIcon(color: string = C.waterLight): Pix {
+  const p = new Pix(9, 11);
+  p.map(1, 1, DROP, { a: color, w: C.foam, b: shade(color, 0.72) });
+  p.outline(C.outline);
+  return p;
+}
+
+/** Tropfen mit Tempo-Strichen = schnell auffüllen (Gartenschlauch) */
+export function fastDropIcon(): Pix {
+  const p = new Pix(14, 11);
+  p.hline(1, 4, 3, C.foam).hline(0, 6, 4, C.foam).hline(2, 8, 2, C.foam);
+  p.map(6, 1, DROP, { a: C.waterLight, w: C.foam, b: shade(C.waterLight, 0.72) });
+  p.outline(C.outline);
+  return p;
+}
+
+/** Gefaltetes Handtuch = Trocknen */
+export function towelIcon(color: string): Pix {
+  const p = new Pix(12, 10);
+  p.map(1, 1, ['aaaaaaaaaa', 'wwwwwwwwww', 'aaaaaaaaaa', 'aaaaaaaaaa', 'wwwwwwwwww', 'aaaaaaaaaa', 'bbbbbbbbbb', '.bbbbbbbbb'], {
+    a: color,
+    w: C.white,
+    b: shade(color, 0.7),
+  });
+  p.outline(C.outline);
+  return p;
+}
+
+/** Schild = Deckung (grün wie die Hecken) */
+export function shieldIcon(): Pix {
+  const p = new Pix(11, 12);
+  p.map(1, 1, ['rrrrrrrrr', 'rlllllggr', 'rlllllggr', 'rlllllggr', 'rlllllggr', '.rlllggr.', '.rllgggr.', '..rlggr..', '...rgr...', '....r....'], {
+    r: '#efe6c8',
+    l: C.leafLight,
+    g: C.leaf,
+  });
+  p.px(3, 3, '#bfe8a0').px(3, 4, '#bfe8a0');
+  p.outline(C.outline);
+  return p;
+}
+
+/** Sonne = trocknet (wer eine Weile nicht getroffen wird) */
+export function sunIcon(): Pix {
+  const p = new Pix(13, 13);
+  const ray = '#ffb43a';
+  p.vline(6, 0, 2, ray).vline(6, 11, 2, ray).hline(0, 6, 2, ray).hline(11, 6, 2, ray);
+  p.px(2, 2, ray).px(10, 2, ray).px(2, 10, ray).px(10, 10, ray);
+  p.disc(6.5, 6.5, 3.6, C.gold);
+  p.px(5, 5, '#fff4b0').px(5, 6, '#fff4b0');
+  p.outline(C.outline);
+  return p;
+}
+
+/** Zeigepfeil nach unten (Hinweise der Aufwärm-Tour) */
+export function downArrow(color: string = C.gold): Pix {
+  const p = new Pix(9, 8);
+  p.map(1, 1, ['..aaa..', '..aaa..', 'aaaaaaa', '.aaaaa.', '..aaa..', '...a...'], { a: color });
+  p.outline(C.outline);
+  return p;
+}
