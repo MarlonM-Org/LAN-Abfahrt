@@ -20,47 +20,52 @@ export const VOLLEY = {
   /** Höchstens so viele pro Team gleichzeitig im Feld – der Rest wechselt nach jedem Punkt durch */
   COURT_MAX: 3,
 
-  // Spielfeld
+  // Spielfeld – kompakt (368 px zwischen den Bambusstangen statt fast der ganzen Welt), der TV zoomt darauf (VIEW)
   GROUND: 240,
-  WALL_L: 6,
-  WALL_R: 474,
+  WALL_L: 56,
+  WALL_R: 424,
+  /** Breite der Bambusstangen außen an WALL_L/WALL_R (nur Grafik) */
+  POLE: 6,
   NET_X: 240,
   NET_HALF: 4,
   NET_TOP: 184,
 
-  // Ball
-  BALL_R: 6,
-  BALL_G: 330,
-  BALL_MAX: 360,
+  // Ball – groß und etwas schwebend, damit man ihn am TV gut verfolgen und erlaufen kann
+  BALL_R: 8,
+  BALL_G: 250,
+  BALL_MAX: 320,
   /** Höchstes Tempo nach oben nach einem Treffer (Gipfel ≈ BALL_UP_MAX² / 2·BALL_G über dem Treffpunkt) */
-  BALL_UP_MAX: 300,
+  BALL_UP_MAX: 235,
   WALL_E: 0.85,
   NET_E: 0.55,
 
   // Spieler (Kollisionskreis um den Oberkörper)
-  P_R: 10,
+  P_R: 12,
   /** Kreismitte so weit über den Füßen */
   P_BODY: 13,
-  RUN: 125,
+  RUN: 135,
   JUMP_V: 320,
   P_G: 950,
   /** Abstand der Füße zu Wand/Netz */
   P_HALF: 7,
   /** Ball-Abpraller: Rückprall (relativ zum Spieler), Extra-Schwung, Mindesttempo */
   HIT_E: 0.75,
-  HIT_BOOST: 60,
-  HIT_MIN: 200,
+  HIT_BOOST: 55,
+  HIT_MIN: 175,
   /** Sprung kurz vor der Landung wird gemerkt */
   JUMP_BUFFER_MS: 150,
 
   // Schmettern
-  SPIKE_WINDOW_MS: 260,
+  SPIKE_WINDOW_MS: 300,
   SPIKE_CD_MS: 1400,
-  SPIKE_SPEED: 390,
+  SPIKE_SPEED: 370,
   /** Größere Reichweite, solange der Schmetterarm draußen ist */
-  SPIKE_REACH: 5,
+  SPIKE_REACH: 6,
   /** Ein Ballkontakt zählt erst wieder nach dieser Pause (sonst zählt ein Kontakt mehrfach) */
   TOUCH_GAP_MS: 160,
+
+  /** TV-Ausschnitt: Kamera-Zoom und Bildmitte (Welt) – Feld, Figuren und Ball erscheinen 1,25× so groß */
+  VIEW: { zoom: 1.25, x: 240, y: 154 },
 };
 
 /** Spielrichtung: Team Sonne (A) spielt links → nach rechts, Team Meer (B) umgekehrt */
@@ -74,7 +79,7 @@ export function vollSide(t: Team): [number, number] {
 
 /** Startplätze: der Aufschläger (Index 0) steht hinten, die anderen davor */
 export function vollSpot(t: Team, i: number): number {
-  const off = [52, 120, 180][i] ?? 150;
+  const off = [92, 145, 191][i] ?? 168;
   return t === 'A' ? off : 480 - off;
 }
 
