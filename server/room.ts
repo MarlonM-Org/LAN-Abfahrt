@@ -64,6 +64,9 @@ import { type MiniCtx, type MiniGame, type MiniResult, asRecord } from './miniga
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
+import { SkisprungGame } from './skisprung';
+import { TeppichGame } from './teppich';
+import { parseSample } from '../shared/balance';
 import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
@@ -263,6 +266,13 @@ export class Room {
       const reply = (r: { ok: boolean; msg?: string }) => typeof ack === 'function' && ack(r);
       if (!local) return reply({ ok: false, msg: 'Nur direkt am Laptop erlaubt.' });
       reply(this.hostStart(String(kind ?? '')));
+    });
+
+    // Balance Board am Laptop (WebHID bzw. Pfeiltasten-Ersatz): Messwerte für das laufende Board-Spiel
+    socket.on('bb:sample', (raw: unknown) => {
+      if (!local || this.phase !== 'mini' || !this.mini?.balance) return;
+      const s = parseSample(raw);
+      if (s) this.mini.balance(s);
     });
 
     socket.on('host:cmd', (cmd: string, ack?: (r: { ok: boolean; msg?: string }) => void) => {
@@ -864,6 +874,12 @@ export class Room {
         break;
       case 'wackel':
         this.mini = new WackelGame(ids, ctx);
+        break;
+      case 'skisprung':
+        this.mini = new SkisprungGame(ids, ctx);
+        break;
+      case 'teppich':
+        this.mini = new TeppichGame(ids, ctx);
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);

@@ -55,6 +55,7 @@ import type { AngelnState } from '../shared/angeln';
 import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
 import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt, isWalk as suessWalk, stepAlong as suessStep, suessBfs, tileCenter as suessCenter, tileOf as suessTile } from '../shared/suess';
 import { funkBot } from './funkbot';
+import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
 
 export interface BotOptions {
@@ -1297,6 +1298,8 @@ export class Bot {
     if (m.kind === 'sumo') sumoBot(this, m.state);
 
     if (m.kind === 'wackel') wackelBot(this, m.state);
+
+    if (m.kind === 'skisprung' || m.kind === 'teppich') balanceBot(this, m.kind, m.state);
 
     if (m.kind === 'bogen') bogenBot(this, m.state);
 

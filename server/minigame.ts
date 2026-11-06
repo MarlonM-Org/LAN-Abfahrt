@@ -46,6 +46,8 @@ export interface MiniGame {
   snapshot(): MiniSnapshot;
   privateFor?(playerId: string): PrivateState;
   input(playerId: string, action: string, payload: unknown): void;
+  /** Balance Board (nur Board-Spiele): Messwert vom Laptop für den Spieler, der gerade dran ist */
+  balance?(sample: import('../shared/balance').BalanceSample): void;
   playerDisconnected(playerId: string): void;
   /** Nur der VIP: z. B. Diskussion überspringen */
   vipAction?(action: string): void;
