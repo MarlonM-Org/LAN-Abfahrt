@@ -4,7 +4,7 @@
  */
 import { io, type Socket } from 'socket.io-client';
 import type { ArenaState, GameLive, GameMeta, GameState, IgelState, IgelWeapon, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
-import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
+import { ARENA, type ArenaCell, DIRS, arenaGeo, blastCells } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, isTool, ropeAnchor, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
@@ -309,8 +309,11 @@ export class Bot {
   private arenaThink(st: ArenaState) {
     const me = st.players[this.id];
     if (!me?.alive) return;
-    const W = ARENA.COLS;
-    const cellAt = (x: number, y: number): ArenaCell => (x < 0 || y < 0 || x >= W || y >= ARENA.ROWS ? '#' : (st.grid[cellIdx(x, y)] as ArenaCell));
+    // Feldgröße hängt von der Spielerzahl ab (kommt im Snapshot mit)
+    const geo = arenaGeo(st.cols, st.rows);
+    const W = geo.cols;
+    const cellIdx = (x: number, y: number) => geo.idx(x, y);
+    const cellAt = (x: number, y: number): ArenaCell => (x < 0 || y < 0 || x >= W || y >= geo.rows ? '#' : (st.grid[cellIdx(x, y)] as ArenaCell));
     const bombCells = new Set(st.bombs.map((b) => cellIdx(b.x, b.y)));
     const bombAt = (x: number, y: number) => bombCells.has(cellIdx(x, y));
     const mx = Math.round(me.x);
@@ -334,7 +337,7 @@ export class Bot {
     for (const b of bombs) for (const c of blastCells(cellAt, bombAt, b.x, b.y, b.range)) mark(cellIdx(c.x, c.y), b.t);
     const floodIn = st.floodActive ? 0 : st.endsIn;
     if (floodIn < 6000) {
-      for (let j = st.flood; j < Math.min(FLOOD_ORDER.length, st.flood + 40); j++) mark(FLOOD_ORDER[j], floodIn + (j - st.flood) * ARENA.FLOOD_STEP_MS);
+      for (let j = st.flood; j < Math.min(geo.flood.length, st.flood + 40); j++) mark(geo.flood[j], floodIn + (j - st.flood) * ARENA.FLOOD_STEP_MS);
     }
 
     const walk = (x: number, y: number) => cellAt(x, y) === '.' && (!bombAt(x, y) || cellIdx(x, y) === myIdx);
