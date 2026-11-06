@@ -4,7 +4,6 @@ import { type Screen, app, avatarCanvas, colorOfId, el, me, message, myColor, na
 import { stickZone, localPoint } from '../stick';
 import { haptic } from '../haptic';
 import { spectatorBar } from '../spectator';
-import { ARENA } from '../../../shared/arena';
 import { SPECTATOR } from '../../../shared/spectator';
 
 // ------------------------------------------------------------------ Joystick
@@ -197,7 +196,7 @@ function buildArenaGhost() {
     <div class="lx ar-lx ar-ghost">
       <div class="lx-head"><b>👻 Geist</b><span class="arena-round ghost-round"></span><span class="arena-stats grow ghost-hint"></span></div>
       <div class="lx-left ar-stick"><span class="st-label">ZIELEN · Zielkreuz am Rand verschieben</span></div>
-      <div class="lx-mid"><canvas class="ghost-map" width="${ARENA.COLS * GHOST_TILE}" height="${ARENA.ROWS * GHOST_TILE}"></canvas></div>
+      <div class="lx-mid"><canvas class="ghost-map"></canvas></div>
       <div class="lx-right"><button class="big-btn ghost-throw">WASSER-<br/>BOMBE<small>alle 8 s</small><i class="cd"></i></button></div>
     </div>
   `);
@@ -226,11 +225,15 @@ function buildArenaGhost() {
     const ready = st.sub === 'play' && !!g && g.cd <= 0;
     throwBtn.disabled = !ready;
     cd.style.transform = `scaleY(${g && st.sub === 'play' ? Math.min(1, g.cd / SPECTATOR.ARENA_GHOST_MS) : 1})`;
-    // Mini-Karte
+    // Mini-Karte (Feldgröße hängt von der Spielerzahl ab)
     const T = GHOST_TILE;
-    for (let y = 0; y < ARENA.ROWS; y++) {
-      for (let x = 0; x < ARENA.COLS; x++) {
-        ctx.fillStyle = MAP_COLORS[st.grid[y * ARENA.COLS + x]] ?? '#f1d49a';
+    if (canvas.width !== st.cols * T || canvas.height !== st.rows * T) {
+      canvas.width = st.cols * T;
+      canvas.height = st.rows * T;
+    }
+    for (let y = 0; y < st.rows; y++) {
+      for (let x = 0; x < st.cols; x++) {
+        ctx.fillStyle = MAP_COLORS[st.grid[y * st.cols + x]] ?? '#f1d49a';
         ctx.fillRect(x * T, y * T, T, T);
       }
     }
