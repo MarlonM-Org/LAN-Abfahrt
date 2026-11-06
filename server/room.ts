@@ -66,6 +66,7 @@ import { QuestionStore } from './questions';
 import { SprintGame } from './sprint';
 import { SkisprungGame } from './skisprung';
 import { TeppichGame } from './teppich';
+import { KugelGame } from './kugel';
 import { parseSample } from '../shared/balance';
 import { TttGame } from './ttt';
 import { WweGame } from './wwe';
@@ -880,6 +881,9 @@ export class Room {
         break;
       case 'teppich':
         this.mini = new TeppichGame(ids, ctx);
+        break;
+      case 'kugel':
+        this.mini = new KugelGame(ids, ctx);
         break;
       case 'geist':
         this.mini = new GeistGame(ids, ctx);

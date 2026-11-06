@@ -1,3 +1,4 @@
+import type { KugelState } from '../../../shared/kugel';
 import type { SkiState } from '../../../shared/skisprung';
 import type { TepState } from '../../../shared/teppich';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, store } from '../core';
@@ -66,3 +67,24 @@ export function pickTeppich(s: TepState): Screen {
   })];
 }
 
+
+// ---------------------------------------------------------------- Tempel-Kugel
+
+const kug = () => (store.state?.mini?.kind === 'kugel' ? store.state.mini.state : null);
+
+export function pickKugel(s: KugelState): Screen {
+  const id = store.playerId!;
+  if (!(id in s.points)) return ['spectate', message('Du schaust zu', 'Tempel-Kugel läuft – schau auf den Fernseher!')];
+  if (s.sub === 'over') {
+    const r = s.runs[id];
+    return ['kug-over', message(r && !r.dns ? `${r.score.toFixed(1)} s` : 'Vorbei!', 'Schau auf den Fernseher!')];
+  }
+  if (s.active === id) return goToBoard();
+  return ['kug-watch', buildWatch(() => {
+    const st = kug();
+    if (!st) return ['', ''];
+    const r = st.runs[id];
+    const mine = r ? (r.dns ? 'Du bist nicht gerollt.' : `Deine Wertung: ${r.score.toFixed(1)} s (${r.falls}× abgestürzt)`) : 'Du kommst noch dran.';
+    return [st.active ? `${escapeHtml(nameOf(st.active))} rollt` : 'Gleich geht’s weiter', mine];
+  })];
+}

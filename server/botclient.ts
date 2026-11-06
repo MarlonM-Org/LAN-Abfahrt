@@ -1299,7 +1299,7 @@ export class Bot {
 
     if (m.kind === 'wackel') wackelBot(this, m.state);
 
-    if (m.kind === 'skisprung' || m.kind === 'teppich') balanceBot(this, m.kind, m.state);
+    if (m.kind === 'skisprung' || m.kind === 'teppich' || m.kind === 'kugel') balanceBot(this, m.kind, m.state);
 
     if (m.kind === 'bogen') bogenBot(this, m.state);
 

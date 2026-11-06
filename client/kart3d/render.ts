@@ -186,11 +186,12 @@ function kartBody(color: string, step: number): Pix {
   });
 }
 
-function portrait(look: Look): Pix {
-  const key = `pt_${look.skin}_${look.hair}_${look.hairStyle}_${look.shirt}_${look.beard ?? 0}`;
+/** `back`: Fahrer von hinten gesehen – Hinterkopf mit Haaren statt Gesicht */
+function portrait(look: Look, back = false): Pix {
+  const key = `pt_${look.skin}_${look.hair}_${look.hairStyle}_${look.shirt}_${look.beard ?? 0}${back ? '_b' : ''}`;
   return cached(key, () => {
     const full = new Pix(AV_W, AV_H);
-    drawAvatar(full.g, look);
+    drawAvatar(full.g, look, 0, 0, 1, back ? { view: 'back' } : undefined);
     const p = new Pix(AV_W, 14);
     p.g.drawImage(full.canvas, 0, 0, AV_W, 14, 0, 0, AV_W, 14);
     return p;
@@ -435,7 +436,8 @@ export class Mode7Renderer {
       }
     }
     blit(kartBody(color, step), q.sx, q.sy + 2 * s * K, s, K);
-    if (look) blit(portrait(look), q.sx, q.sy, s * 0.75, K, 6.5);
+    // Von hinten und von der Seite (Drehstufen 12–4) sieht man den Hinterkopf, nur von vorn das Gesicht
+    if (look) blit(portrait(look, step <= 4 || step >= 12), q.sx, q.sy, s * 0.75, K, 6.5);
     g.globalAlpha = 1;
   }
 }

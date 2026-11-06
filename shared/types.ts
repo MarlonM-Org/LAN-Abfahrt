@@ -12,6 +12,7 @@ import type { KofferState } from './koffer';
 import type { WackelState } from './wackel';
 import type { SkiState } from './skisprung';
 import type { TepState } from './teppich';
+import type { KugelState } from './kugel';
 import type { SuessState } from './suess';
 import type { UmzugState } from './umzug';
 
@@ -91,7 +92,8 @@ export type MiniKind =
   | 'maexchen'
   | 'werwars'
   | 'skisprung'
-  | 'teppich';
+  | 'teppich'
+  | 'kugel';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade' | 'turnier';
 
@@ -2191,7 +2193,8 @@ export type MiniSnapshot =
   | { kind: 'maexchen'; state: MaexState }
   | { kind: 'werwars'; state: WerwarsState }
   | { kind: 'skisprung'; state: SkiState }
-  | { kind: 'teppich'; state: TepState };
+  | { kind: 'teppich'; state: TepState }
+  | { kind: 'kugel'; state: KugelState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
