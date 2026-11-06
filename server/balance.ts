@@ -3,6 +3,12 @@ import type { MiniKind, MiniSnapshot, SkipInfo } from '../shared/types';
 import { possessive } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers } from './minigame';
 
+const median = (a: number[]) => {
+  const b = [...a].sort((x, y) => x - y);
+  const m = b.length >> 1;
+  return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2;
+};
+
 /**
  * Messwerte des Balance Boards für den Spieler, der gerade dran ist: frisch halten, Körpergewicht einmessen,
  * Gewichtsspitzen (Abdrücken/Hochschnellen) erkennen.
@@ -12,10 +18,12 @@ export class BoardFeed {
   private at = 0;
   /** Eingemessenes Körpergewicht (kg), 0 = noch nicht */
   base = 0;
-  private calibSince = 0;
-  private calibRef = 0;
-  private calibSum = 0;
-  private calibN = 0;
+  /** Einmessen: gesammelte ruhige Stehzeit (ms), Gewichte der letzten ~2 s, wann zuletzt jemand stand */
+  private calibMs = 0;
+  private calibW: number[] = [];
+  private calibLast = 0;
+  private calibSeen = 0;
+  private calibFirst = 0;
   /** Für die Sprung-Erkennung: vorheriges Verhältnis Gewicht/Körpergewicht */
   private spikeArmed = true;
 
@@ -35,28 +43,41 @@ export class BoardFeed {
   /** Neuer Spieler: Einmessung verwerfen (der Messwert selbst bleibt – das Board ist ja noch da) */
   resetPlayer() {
     this.base = 0;
-    this.calibSince = 0;
+    this.calibReset();
     this.spikeArmed = true;
   }
 
-  /** Ruhig stehen → Fortschritt 0…1; bei 1 ist `base` gesetzt */
+  private calibReset() {
+    this.calibMs = 0;
+    this.calibW = [];
+    this.calibSeen = 0;
+    this.calibFirst = 0;
+  }
+
+  /**
+   * Ruhig stehen → Fortschritt 0…1; bei 1 ist `base` gesetzt (Median der letzten Werte).
+   * Nachsichtig mit echten Boards: kurze Funklöcher (< 1,5 s) und Wackeln setzen nicht zurück, sondern halten bzw.
+   * bremsen den Fortschritt; wer 5 s drauf steht, ist auf jeden Fall eingemessen.
+   */
   calibrate(): number {
     const s = this.sample;
     const now = Date.now();
+    const dt = this.calibLast ? Math.min(150, now - this.calibLast) : 0;
+    this.calibLast = now;
     if (!s || s.w < BB.MIN_KG) {
-      this.calibSince = 0;
-      return 0;
+      if (!this.calibSeen || now - this.calibSeen > 1500) this.calibReset();
+      return Math.min(1, this.calibMs / BB.CALIB_MS);
     }
-    if (!this.calibSince || Math.abs(s.w - this.calibRef) > Math.max(4, this.calibRef * 0.08)) {
-      this.calibSince = now;
-      this.calibRef = s.w;
-      this.calibSum = 0;
-      this.calibN = 0;
-    }
-    this.calibSum += s.w;
-    this.calibN++;
-    const p = Math.min(1, (now - this.calibSince) / BB.CALIB_MS);
-    if (p >= 1) this.base = this.calibSum / this.calibN;
+    this.calibSeen = now;
+    if (!this.calibFirst) this.calibFirst = now;
+    const w = this.calibW;
+    w.push(s.w);
+    if (w.length > 60) w.shift();
+    const med = median(w);
+    const calm = Math.abs(s.w - med) <= Math.max(6, med * 0.12);
+    this.calibMs = calm ? this.calibMs + dt : Math.max(0, this.calibMs - dt);
+    const p = now - this.calibFirst >= BB.CALIB_MAX_MS ? 1 : Math.min(1, this.calibMs / BB.CALIB_MS);
+    if (p >= 1) this.base = med;
     return p;
   }
 
