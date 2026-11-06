@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T19:48+00:00",
+  "updated": "2026-11-06T19:55+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -16,9 +16,6 @@
       "title": "Regelkarte: Start erst, wenn alle bereit sind oder der VIP startet – kein Timer mehr"
     },
     {
-      "title": "Auto-Fußball: Joystick lenkt absolut (Stick links = Auto fährt nach links, mit Kurve), Hüpfer entfernt, größere Knöpfe rechts (iPhone 12 Pro)"
-    },
-    {
       "title": "Strand-Volleyball: Daumen von LINKS nach RECHTS ziehen wechselt die Richtung; größerer Ball / kompakteres Feld"
     },
     {
@@ -29,6 +26,11 @@
     "Echte Aufwärmphase statt Übungsfeld: vor dem Spiel mit der richtigen Steuerung üben (Handy + TV, nichts zählt) – startet, sobald die laufenden PRs gemergt sind"
   ],
   "done": [
+    {
+      "title": "Auto-Fußball: Stick lenkt wie ein normaler Joystick in TV-Richtung (Auto dreht im Bogen dorthin), HÜPFER entfernt, GAS/BREMSE/BOOST als große Knöpfe (iPhone 12 Pro)",
+      "pr": 99,
+      "date": "2026-11-06"
+    },
     {
       "title": "Sumo-Steg: Rempler schubsen deutlich weiter (≈ 3 Planken, +47 %), Sprint 25 % kürzer und bremst am Ende ab – seltener aus Versehen vom Steg",
       "pr": 98,
@@ -406,8 +408,8 @@
       "notes": "Max. 8 Spieler, SnapBuffer-Glättung, Parallax (#79, #83, #84)"
     },
     "autoball": {
-      "status": "in Arbeit",
-      "notes": "Neu: normaler Joystick statt Links/Rechts aus Autosicht, Hüpfer weg, Knöpfe rechts größer (iPhone 12 Pro) · vorher: Tor-Wiederholung in Zeitlupe, Tick 30 Hz (#83)"
+      "status": "umgesetzt",
+      "notes": "Joystick absolut statt Links/Rechts aus Autosicht, Hüpfer weg, große Knöpfe rechts; Kippen-Steuerung entfällt hier (#99) · vorher: Tor-Wiederholung, Tick 30 Hz (#83)"
     },
     "sumo": {
       "status": "umgesetzt",
