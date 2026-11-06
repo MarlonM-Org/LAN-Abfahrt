@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T19:40+00:00",
+  "updated": "2026-11-06T19:41+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -25,7 +25,7 @@
       "title": "Strand-Volleyball: Daumen von LINKS nach RECHTS ziehen wechselt die Richtung; größerer Ball / kompakteres Feld"
     },
     {
-      "title": "Urlaubs-Minigolf: VIP-Knopf „Nächstes Loch“, Handy quer (Ziehen passt zum TV), Bewegungssensor-Freigabe am iPhone, verwirrende Zuschauer-Anzeige zwischen den Schlägen"
+      "title": "Urlaubs-Minigolf: VIP-Knopf „Nächstes Loch“, Handy quer (Ziehen passt zum TV), Bewegungssensor-Freigabe am iPhone, Bälle kollidieren miteinander, verwirrende Zuschauer-Anzeige zwischen den Schlägen"
     }
   ],
   "queue": [
@@ -441,7 +441,7 @@
     },
     "golf": {
       "status": "in Arbeit",
-      "notes": "VIP soll zum nächsten Loch springen können; Handy quer statt hochkant; Sensor fragt nie nach Erlaubnis; „Du spielst gar nicht, warum spielst du?“"
+      "notes": "VIP soll zum nächsten Loch springen können; Handy quer statt hochkant; Sensor fragt nie nach Erlaubnis; „Du spielst gar nicht, warum spielst du?“ · Bälle sollen kollidieren"
     }
   },
   "general": [
