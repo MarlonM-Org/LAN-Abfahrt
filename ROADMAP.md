@@ -165,7 +165,7 @@ Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), d
 ### Phase 4 · Igel-Krieg → Worms
 - [x] (S) Wind driftet statt neu gewürfelt; Zugzeit 30/20/15 s nach Spielerzahl; Flut pro Runde statt pro Zug; HP 60 ab 8 Spielern; Sudden Death ab 7 Spielern nach 3 min; HP am Zugende herunterzählen; Kamera (Aktiver, Geschoss, Krater); Wind sichtbar (Wolken, Balken, Pfeil im Ziel-Pad); Zuschauer-Sprüche; FEUER-Knopf *(#46)*
 - [x] (M) Modus „Alle gleichzeitig“ ab 7 Spielern; Waffen 4 → 10 (Wasser-Schrotflinte, Möwen-Luftschlag per Minikarte, Böller, Seeigel-Mine, Ananas-Splitterbombe, Paddel, Heilige Ananas, Surfbrett-Brücke); Kisten am Fallschirm; Gaskartuschen; Spieler-Teams; größere Insel *(#68 – größere Insel offen)*
-- [ ] (L) Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche
+- [x] (L) Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche *(Branch `feat/igel-stufe-l`: Werkzeuge beenden den Zug nicht, Liane mit Pendel/Klettern/Loslassen; 6 Themenkarten pro Partie (Sturmtag, Mondnacht, Kistenregen, Sprengmeister, Vampir-Igel, Flutwarnung); bester Treffer der Partie als Zeitlupe über `SnapBuffer.replay()` + `Juice.slowMo()` vor dem Ergebnis; Igel-Sprechblasen + Sprecher-Kommentare per `say()` – größere Insel weiter offen)*
 
 ### Phase 5 · Portfolio umsteuern (neue Spiele, je S–M)
 - [x] Wer war's? (#71), Schätzkönig (#75), Mäxchen am Pool (#74), Funkfrequenz (#76)
