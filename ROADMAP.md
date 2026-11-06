@@ -169,6 +169,7 @@ Leitregel: erst, was allen Spielen hilft (Ton, Juice, Ausrichtung, Zuschauer), d
 
 ### Phase 5 · Portfolio umsteuern (neue Spiele, je S–M)
 - [x] Wer war's? (#71), Schätzkönig (#75), Mäxchen am Pool (#74), Funkfrequenz (#76)
+- [x] Guess the Song (Liederraten à la SongPop: Genre-Wahl, 4 → 6 → 8 Antworten, Soundtrack/eigene Dateien/Deezer-Hörproben)
 - [ ] Dann: Spion unter Gästen (läuft), Montagsmaler live, Strand-Band, Sektkorken (fürs Brett), Lügen-Lexikon, Strandkorb-Scharade, Geheimcode am Pool, Kofferbombe entschärfen, Urlaubs-Wahnsinn (WarioWare)
 - [x] Verräter-Redesign „Stromausfall“ (Sichtbeschränkung mit der Dunkelheits-Technik der Geisterjagd) *(Branch feat/ttt-stromausfall: Licht pro Raum, Lichtschalter, Verräter-Shop „Licht aus“; im Dunkeln nur namenlose Umrisse und „BONK!“, serverseitig reduziert; 2 Runden à 100 s)*
 - [ ] Gestrichen/zusammengelegt: Wackel-Prügelei, Umzugschaos; Kofferpacken als Wackelturm-Variante

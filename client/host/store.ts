@@ -49,3 +49,11 @@ export const playerById = (id: string | null | undefined): PlayerPublic | undefi
   id ? current?.players.find((p) => p.id === id) : undefined;
 
 export const FONT = '"Press Start 2P", monospace';
+
+/** Socket der TV-Seite (für Rückmeldungen an das laufende Minispiel, `host:mini`) */
+let hostSocket: { emit(ev: string, ...args: unknown[]): unknown } | null = null;
+export const setHostSocket = (s: { emit(ev: string, ...args: unknown[]): unknown }) => {
+  hostSocket = s;
+};
+/** TV → laufendes Minispiel (z. B. Guess the Song: Ton geladen / kaputt) */
+export const hostMini = (action: string, payload?: unknown) => hostSocket?.emit('host:mini', action, payload);

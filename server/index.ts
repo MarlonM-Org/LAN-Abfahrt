@@ -8,6 +8,7 @@ import { Server } from 'socket.io';
 import { domainConfigFromEnv, prepareDomain } from './domain';
 import { getLanAddress } from './net';
 import { MusicStore, musicRouter } from './music';
+import { liederTon } from './liederton';
 import { QUICK_TUNNEL_HOSTS, onlineUrlFromEnv, startQuickTunnel } from './online';
 import { Room } from './room';
 
@@ -57,6 +58,9 @@ io.on('connection', (socket) => room.handle(socket));
 // Musik-Bibliothek (eigene Songs + Szenen-Zuordnung) – REST für TV-Menü und /musik.html
 const music = new MusicStore();
 app.use('/api/music', musicRouter(music, io));
+// Guess the Song: Ton der Runde (eigene Dateien / Hörproben) für den TV – nur im Heimnetz
+liederTon.attachMusic(music);
+app.use('/api/lieder', liederTon.router());
 
 if (PROD) {
   app.use(express.static(path.resolve(dir, '../dist')));

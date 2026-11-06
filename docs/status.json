@@ -1,11 +1,19 @@
 {
-  "updated": "2026-11-06T15:01+00:00",
+  "updated": "2026-11-06T15:48+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Guess the Song (Liederraten)",
+      "kind": "lieder",
+      "type": "Neues Spiel",
+      "branch": "feat/liederraten",
+      "detail": "Genre-Wahl vorab (1 gegen 1: je 4), reihum ein Genre pro Spieler, Song am TV, 4 → 6 → 8 Titel am Handy, Tempo-Punkte. Ton: eingebauter 8-Bit-Soundtrack, eigene MP3s in data/lieder/<Genre>/, Deezer-Hörproben optional (LIEDER_VORSCHAU=deezer). Wartet auf Marlons Entscheidung zur Musikquelle."
+    }
+  ],
   "queue": [],
   "done": [
     {
@@ -369,6 +377,10 @@
     "skisprung": {
       "status": "in Arbeit",
       "notes": "„Highscore pro Spieler“: Rekorde-Tafel + Rekord-Ansage (weiteste Weite, über alle Abende)"
+    },
+    "lieder": {
+      "status": "in Arbeit",
+      "notes": "Wunsch: Liederraten mit Genre-Wahl vorab, 4 Antworten → später 8; umbenannt in „Guess the Song“. Lizenz: Spotify/YouTube/Amazon/iTunes nicht nutzbar – eigene gekaufte MP3s oder Deezer-Hörproben (nicht-kommerziell, mit Hinweis)."
     }
   },
   "general": [

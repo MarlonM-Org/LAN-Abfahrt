@@ -11,7 +11,7 @@ import { WweScene } from './WweScene';
 import { SprintScene } from './SprintScene';
 import { MurderScene } from './MurderScene';
 import { TttScene } from './TttScene';
-import { mergeLive, mergeMeta, setState, setViaTunnel } from './store';
+import { mergeLive, mergeMeta, setState, setHostSocket, setViaTunnel } from './store';
 import { installHostControls } from './hostControls';
 import { startTimeSync } from '../timesync';
 import { connectMusic, setScene, unlockMusic } from './music';
@@ -61,6 +61,7 @@ import { WackelScene } from './WackelScene';
 import { FunkScene } from './FunkScene';
 import { IntroScene } from './IntroScene';
 import { SchaetzScene } from './SchaetzScene';
+import { LiederScene } from './LiederScene';
 import { WerwarsScene } from './WerwarsScene';
 import { MaexScene } from './MaexScene';
 import { SkisprungScene } from './SkisprungScene';
@@ -69,7 +70,7 @@ import { KugelScene } from './KugelScene';
 import { installBalanceBoard } from './balanceBoard';
 import { hdFactor, installHd } from './hd';
 
-const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'funk', 'skisprung', 'teppich', 'kugel'];
+const SCENE_KEYS = ['lobby', 'board', 'intro', 'results', 'flunky', 'wwe', 'sprint', 'murder', 'story', 'descent', 'rhythm', 'wrap', 'stars', 'nhie', 'hilo', 'bomb', 'kingscup', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'skisprung', 'teppich', 'kugel'];
 
 /** Welche Phaser-Szene gehört zu welchem Zustand? */
 function sceneKey(s: GameState): string {
@@ -97,7 +98,7 @@ async function start() {
     pixelArt: true,
     backgroundColor: '#2d1b12',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, WerwarsScene, MaexScene, SchaetzScene, FunkScene, SkisprungScene, TeppichScene, KugelScene],
+    scene: [LobbyScene, BoardScene, IntroScene, ResultsScene, FlunkyScene, WweScene, SprintScene, MurderScene, ...DATE_SCENES, ...DRINK_SCENES, KingsCupScene, ...CONTROLLER_SCENES, FliegerScene, KurveScene, ArenaScene, BowlingScene, EntenScene, TttScene, VersteckScene, ParcoursScene, ...KART_SCENES, TurmScene, IgelScene, SmashScene, WasserScene, StillepostScene, FangenScene, GeistScene, GrillScene, BouleScene, SumoScene, VolleyScene, TouristScene, SpruecheScene, WerwolfScene, PixelScene, BogenScene, DartsScene, GolfScene, AutoballScene, WpistoleScene, ZauberScene, AngelnScene, KofferScene, SuessScene, SpionScene, UmzugScene, WackelScene, WerwarsScene, MaexScene, SchaetzScene, LiederScene, FunkScene, SkisprungScene, TeppichScene, KugelScene],
   });
 
   let currentKey = '';
@@ -106,6 +107,7 @@ async function start() {
   startTimeSync(socket);
   initPlayersPanel(socket); // Panel „Spieler“ (Taste P)
   connectMusic(socket);
+  setHostSocket(socket);
   setupMusicMenu();
   watchServerVersion(socket);
   void import('./emotes').then((m) => m.initSpectatorOverlay()); // Emotes + Wetten der Zuschauer als DOM-Overlay über allen Szenen

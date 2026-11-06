@@ -89,6 +89,7 @@ export type MiniKind =
   | 'wackel'
   | 'funk'
   | 'schaetz'
+  | 'lieder'
   | 'maexchen'
   | 'werwars'
   | 'skisprung'
@@ -2273,6 +2274,7 @@ export type MiniSnapshot =
   | { kind: 'wackel'; state: WackelState }
   | { kind: 'funk'; state: FunkState }
   | { kind: 'schaetz'; state: SchaetzState }
+  | { kind: 'lieder'; state: LiederState }
   | { kind: 'maexchen'; state: MaexState }
   | { kind: 'werwars'; state: WerwarsState }
   | { kind: 'skisprung'; state: SkiState }
@@ -2449,6 +2451,7 @@ export type PrivateState =
   | { kind: 'spion'; state: SpionPrivate }
   | { kind: 'funk'; state: FunkPrivate }
   | { kind: 'schaetz'; state: SchaetzPrivate }
+  | { kind: 'lieder'; state: LiederPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
   | { kind: 'board'; state: BoardPrivate }
@@ -2612,6 +2615,88 @@ export interface SchaetzPrivate {
   round: number;
   /** Eigene Schätzung dieser Runde */
   guess: number | null;
+}
+
+// ------------------------------------------------------------------ Guess the Song (à la SongPop, intern „lieder“)
+
+/** Woher der Ton einer Runde kommt: eingebauter 8-Bit-Song, eigene Datei (`data/lieder/`) oder Hörprobe (Deezer, nur mit LIEDER_VORSCHAU=deezer) */
+export type LiederQuelle = 'synth' | 'datei' | 'vorschau';
+
+/** Ein wählbares Genre (eingebaut oder eigener Ordner unter `data/lieder/`) */
+export interface LiederGenreInfo {
+  id: string;
+  name: string;
+  icon: string;
+  /** So viele Lieder (mit Ton-Quelle) stehen zur Wahl */
+  n: number;
+}
+
+export interface LiederAnswer {
+  title: string;
+  artist: string;
+  year: number | null;
+  /** Index der richtigen Antwort in `options` */
+  index: number;
+}
+
+export interface LiederState {
+  /**
+   * pick = Genres wählen · genres = Übersicht, wer was gewählt hat · prep = Ansage der Runde (TV lädt den Song) ·
+   * play = Song läuft, alle tippen · reveal = Auflösung · over = Ende
+   */
+  sub: 'pick' | 'genres' | 'prep' | 'play' | 'reveal' | 'over';
+  round: number;
+  rounds: number;
+  endsIn: number;
+  players: string[];
+  /** So viele Genres wählt jeder (1 gegen 1: 4) */
+  perPlayer: number;
+  /** Wählbare Genres */
+  genres: LiederGenreInfo[];
+  /** Wer seine Genres schon bestätigt hat (die Wahl selbst bleibt bis `genres` geheim) */
+  picked: string[];
+  /** Ab `genres`: Wahl aller Spieler */
+  picks: Record<string, string[]> | null;
+  /** Ab `genres`: Rundenplan – welches Genre von wem */
+  plan: { genre: string; owner: string }[] | null;
+  /** Genre der aktuellen Runde (bei leerem Genre ein Ersatz) und wessen Wahl es war */
+  genre: string | null;
+  owner: string | null;
+  /** Titel zum Antippen (ab `play`, 4 → 6 → 8) */
+  options: string[];
+  /** Wer schon getippt hat (was, bleibt bis `reveal` geheim) */
+  answered: string[];
+  /**
+   * Ton für den TV (ab `prep`, sobald gefunden): `/api/lieder/ton/<token>` liefert die Datei bzw. leitet zur Hörprobe
+   * weiter (ab Sekunde `start`) – bei `synth` (eingebaute 8-Bit-Songs) kommt dort nur die Song-ID als JSON.
+   * Der Token verrät den Titel nicht.
+   */
+  audio: { token: string; start: number; kind: LiederQuelle } | null;
+  /** Ab `reveal` */
+  answer: LiederAnswer | null;
+  /** Ab `reveal`: Spieler → gewählter Index */
+  choices: Record<string, number> | null;
+  /** Ab `reveal`: Spieler → benötigte Zeit (ms) */
+  times: Record<string, number> | null;
+  /** Ab `reveal`: Punkte dieser Runde */
+  gain: Record<string, number> | null;
+  /** Ab `reveal`: schnellste richtige Antwort */
+  first: string | null;
+  points: Record<string, number>;
+  /** Quellenhinweis des Tons (z. B. „Hörprobe: Apple Music“), null bei eigenen Dateien */
+  credit: string | null;
+  /** Kurzer Hinweis auf dem TV („Song hakt – der nächste!“, „Kein Ton gefunden“) */
+  note: string | null;
+}
+
+export interface LiederPrivate {
+  round: number;
+  /** Eigene, bestätigte Genre-Wahl */
+  picks: string[];
+  /** Eigene Antwort dieser Runde */
+  choice: number | null;
+  /** Nur für Testspieler: Index der richtigen Antwort (der Bot „erkennt“ den Song nicht immer) */
+  botAnswer?: number;
 }
 
 // ------------------------------------------------------------------ Mäxchen am Pool (Würfel-Bluff)
