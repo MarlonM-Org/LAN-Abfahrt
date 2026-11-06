@@ -5,6 +5,7 @@ import type {
   GameMeta,
   GameMode,
   HostInfo,
+  IntroState,
   JoinRequest,
   JoinResponse,
   KickResponse,
@@ -401,7 +402,7 @@ export class Room {
     });
 
     socket.on('vip:continue', (action?: string) => {
-      // Regelkarte: VIP kürzt ab
+      // Regelkarte: VIP startet sofort („▶ Jetzt starten“), ohne auf alle zu warten
       if (this.phase === 'intro') return void (isVip() && this.introGo());
       if (!(isVip() || inCouple()) || this.phase !== 'results') return;
       if (this.singleResults()) {
@@ -697,16 +698,16 @@ export class Room {
 
   // ---------------------------------------------------------------- Regelkarte (Phase `intro`)
 
-  /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, Ende (Server-Zeit) */
-  private intro: { kind: MiniKind; opts?: MiniOpts; ready: Set<string>; endsAt: number; short: boolean; timer: NodeJS.Timeout } | null = null;
-  /** Spiele, die heute (seit Serverstart) schon liefen → Regelkarte nur kurz */
+  /** Laufende Regelkarte: Spiel, Start-Optionen, wer bereit ist, laufende Nummer */
+  private intro: { kind: MiniKind; opts?: MiniOpts; ready: Set<string>; seq: number; short: boolean; timer: NodeJS.Timeout } | null = null;
+  private introSeq = 0;
+  /** Spiele, die heute (seit Serverstart) schon liefen → kürzere Ansage auf der Regelkarte */
   private introSeen = new Set<MiniKind>();
-  private static readonly INTRO_MS = 15_000;
-  private static readonly INTRO_SHORT_MS = 5_000;
 
   /**
    * Minispiel starten – vorher die Regelkarte (Ziel, Steuerung, Übungsfeld, „Bereit!“). Ohne Karte:
    * Date-Night-Kapitel, Trinkspiele und „Nochmal“ desselben Spiels.
+   * Kein Timer: Los geht's erst, wenn alle verbundenen Mitspieler bereit sind oder VIP/Laptop starten (`introGo()`).
    */
   private startMini(kind: MiniKind, opts?: MiniOpts) {
     const again = this.singleResults() && this.lastKind === kind;
@@ -718,29 +719,34 @@ export class Room {
     if (!this.gameIds().length) return this.backToLobby();
     this.showBoard = false;
     this.results = null;
-    const short = this.introSeen.has(kind);
     this.intro = {
       kind,
       opts,
       ready: new Set(),
-      endsAt: Date.now() + (short ? Room.INTRO_SHORT_MS : Room.INTRO_MS),
-      short,
+      seq: ++this.introSeq,
+      short: this.introSeen.has(kind),
+      // Schaut regelmäßig, ob die Letzten inzwischen offline/entfernt sind – auf die wird dann nicht mehr gewartet
       timer: setInterval(() => this.introCheck(), 250),
     };
     this.phase = 'intro';
     this.changed();
   }
 
-  /** Alle (verbundenen) bereit oder Zeit um → los. Bei der kurzen Karte wird nicht auf „Bereit“ gewartet. */
+  /** Mitspieler, auf die die Regelkarte wartet: verbunden und nicht entfernt (Offline-Handys blockieren nicht) */
+  private introIds() {
+    return this.gameIds().filter((id) => this.isOnline(id));
+  }
+
+  /** Alle verbundenen Mitspieler bereit → los. Bewusst ohne Zeitlimit (Wunsch: nie nach Timer starten). */
   private introCheck() {
     const it = this.intro;
     if (!it) return;
     if (this.phase !== 'intro') return this.endIntro();
-    const online = this.gameIds().filter((id) => this.isOnline(id));
-    if (Date.now() >= it.endsAt || (online.length > 0 && online.every((id) => it.ready.has(id)))) this.introGo();
+    const online = this.introIds();
+    if (online.length > 0 && online.every((id) => it.ready.has(id))) this.introGo();
   }
 
-  /** Regelkarte beenden und das Spiel wirklich starten (auch VIP „Weiter“ bzw. Laptop) */
+  /** Regelkarte beenden und das Spiel wirklich starten (alle bereit, VIP „Jetzt starten“ bzw. Laptop Enter/Weiter) */
   private introGo() {
     const it = this.intro;
     if (!it || this.phase !== 'intro') return;
@@ -762,10 +768,11 @@ export class Room {
     this.introCheck();
   }
 
-  private introState() {
+  private introState(): IntroState | null {
     const it = this.intro;
     if (this.phase !== 'intro' || !it) return null;
-    return { kind: it.kind, ids: this.gameIds(), ready: [...it.ready], endsAt: it.endsAt, short: it.short, teams: it.opts?.teams ?? null };
+    const ids = this.introIds();
+    return { kind: it.kind, ids, ready: ids.filter((id) => it.ready.has(id)), seq: it.seq, short: it.short, teams: it.opts?.teams ?? null };
   }
 
   private launchMini(kind: MiniKind, opts?: MiniOpts) {
@@ -1236,6 +1243,7 @@ export class Room {
    */
   private waitingStep(): { key: unknown; ms: number | null } | null {
     if (this.phase === 'results' && this.results) return { key: this.results, ms: AUTO_RESULTS_MS };
+    // Regelkarte: kein Auto-Weiter – Bots sind sofort bereit, gewartet wird nur auf verbundene Menschen
     if (this.phase === 'intro' && this.intro) return { key: this.intro, ms: null };
     if (this.phase === 'story' && this.dateRun?.state.card) return { key: this.dateRun.state.card, ms: AUTO_STORY_MS };
     const m = this.phase === 'mini' ? this.mini?.snapshot() : null;
