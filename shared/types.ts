@@ -1239,6 +1239,8 @@ export interface IgelRecFrame {
   p: [number, IgelProjType, number, number][];
   b: [number, IgelObj['type'], number, number][];
   o: number;
+  /** Wasserspiegel */
+  w: number;
 }
 
 /** „Schuss des Abends“: bester Treffer der Partie zum Abspielen in Zeitlupe */

@@ -953,7 +953,7 @@ export class IgelGame implements MiniGame {
       this.damage[attacker] = (this.damage[attacker] ?? 0) + real;
       // Vampir-Igel: ein Drittel des Schadens heilt den eigenen (gesteuerten) Igel
       const mine = this.theme === 'vampir' ? (this.ctrlHog(attacker) ?? this.ownHog(attacker)) : null;
-      const heal = Math.round(real / 3);
+      const heal = mine ? Math.min(Math.round(real / 3), Math.max(0, this.maxHp - mine.hp)) : 0;
       if (mine && heal > 0) {
         mine.hp += heal;
         mine.shown = Math.max(mine.shown, mine.hp);
@@ -1438,6 +1438,7 @@ export class IgelGame implements MiniGame {
       p: this.projs.map((p) => [p.id, p.type, r1(p.x), r1(p.y)]),
       b: this.objs.map((o) => [o.id, o.type, r1(o.x), r1(o.y)]),
       o: this.ops.length,
+      w: this.water,
     };
   }
 
