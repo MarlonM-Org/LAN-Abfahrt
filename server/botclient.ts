@@ -19,7 +19,7 @@ import { GEIST, inCone, navTarget, roomCenter } from '../shared/geist';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
-import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState } from '../shared/wasser';
+import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState, aimFor as wasserAimFor } from '../shared/wasser';
 import { grillBot } from './grillbot';
 import { spectatorBot } from './spectatorbot';
 import { umzugBot } from './umzugbot';
@@ -661,10 +661,11 @@ export class Bot {
         if (d < WASSER.PISTOL_RANGE + 8) this.send('aim', { x: (target.x - me.x) / d, y: (target.y - me.y) / d });
       } else if (me.a > 0 && d < WASSER.RANGE * 0.95 && now > mem.nextThrow) {
         mem.nextThrow = now + rand(900, 1800);
-        const vx = (target.x - me.x) / WASSER.RANGE + rand(-0.08, 0.08);
-        const vy = (target.y - me.y) / WASSER.RANGE + rand(-0.08, 0.08);
-        this.send('aim', { x: vx, y: vy });
-        setTimeout(() => this.send('throw', { x: vx, y: vy }), rand(250, 450));
+        // Streuung in Pixeln, dann über die Wurfkurve (wenig Stick = kurz) zurück in einen Stick-Ausschlag
+        const v = wasserAimFor(target.x - me.x + rand(-12, 12), target.y - me.y + rand(-12, 12));
+        const aim = { x: Math.round(v.x * 100) / 100, y: Math.round(v.y * 100) / 100 };
+        this.send('aim', aim);
+        setTimeout(() => this.send('throw', aim), rand(250, 450));
       }
     } else goal = nearest(bases.map((b) => b.bucket));
 

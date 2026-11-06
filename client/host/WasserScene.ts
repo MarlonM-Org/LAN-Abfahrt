@@ -1,7 +1,17 @@
 import Phaser from 'phaser';
 import type { GameState, Team } from '../../shared/types';
 import { TEAM_INFO, WORLD } from '../../shared/flunky';
-import { WASSER as W, WASSER_BASE, WASSER_COVER, WASSER_HOSE, WASSER_HOSE_REEL, WASSER_POOL, type WasserBalloon, type WasserState } from '../../shared/wasser';
+import {
+  WASSER as W,
+  WASSER_BASE,
+  WASSER_COVER,
+  WASSER_HOSE,
+  WASSER_HOSE_REEL,
+  WASSER_POOL,
+  type WasserBalloon,
+  type WasserState,
+  throwTarget,
+} from '../../shared/wasser';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { bucket, hedge, hoseReel, nozzle, paintGarden, waterBalloon, waterPistol } from '../art/garden';
@@ -29,6 +39,8 @@ interface Fig {
   y: number;
   barKey: string;
   dripAt: number;
+  /** Status im letzten Snapshot (Hintragen zum Handtuch erkennen) */
+  status: string;
 }
 
 export class WasserScene extends Phaser.Scene {
@@ -146,7 +158,21 @@ export class WasserScene extends Phaser.Scene {
       const bar = this.add.graphics();
       const gun = this.add.image(7, -9, ensureTex(this, 'w_pistol', waterPistol)).setScale(0.75).setVisible(false);
       f.add([bar, gun]);
-      this.figs.set(id, { f, img, bar, gun, x: p.x, y: p.y, barKey: '', dripAt: 0 });
+      this.figs.set(id, { f, img, bar, gun, x: p.x, y: p.y, barKey: '', dripAt: 0, status: p.s });
+    }
+
+    // Klatschnass und nicht selbst zum Handtuch geschafft → hingetragen: Figur springt, kleine Staubwolke
+    for (const [id, p] of Object.entries(st.players)) {
+      const a = this.figs.get(id);
+      if (!a) continue;
+      if (a.status === 'soaked' && p.s === 'drying' && Math.hypot(p.x - a.x, p.y - a.y) > 24) {
+        this.juice.burst(a.x, a.y - 4, 'puff', 8);
+        a.x = p.x;
+        a.y = p.y;
+        this.juice.burst(p.x, p.y - 4, 'puff', 10);
+        sfx('whoosh', { x: p.x, vol: 0.5 });
+      }
+      a.status = p.s;
     }
 
     // Wasserbomben in der Luft
@@ -218,8 +244,9 @@ export class WasserScene extends Phaser.Scene {
       this.banner.setText('');
       this.help.setText('');
     } else {
-      if (this.banner.text !== 'Zeit um!') sfx('whistle');
-      this.banner.setText('Zeit um!');
+      const end = st.endReason === 'away' ? 'Spielende!' : 'Zeit um!';
+      if (this.banner.text !== end) sfx('whistle');
+      this.banner.setText(end);
       this.help.setText('');
     }
 
@@ -300,7 +327,8 @@ export class WasserScene extends Phaser.Scene {
       else if (p.s === 'drying') a.img.setTint(0xfff0b0);
       else if (p.w > 60) a.img.setTint(0xc8e2ff);
       else a.img.clearTint();
-      a.f.setAlpha(p.s === 'ok' || Math.floor(now / 200) % 2 ? 1 : 0.75);
+      // away = Verbindung weg (eingefroren, unverwundbar)
+      a.f.setAlpha(p.away ? 0.4 : p.s === 'ok' || Math.floor(now / 200) % 2 ? 1 : 0.75);
       a.gun.setVisible(p.pi > 0).setFlipX(p.d < 0).setX(p.d < 0 ? -7 : 7);
 
       // Nässe-Balken + Munition
@@ -324,9 +352,34 @@ export class WasserScene extends Phaser.Scene {
         this.tweens.add({ targets: d, y: d.y + 10, alpha: 0, duration: 400, onComplete: () => d.destroy() });
       }
 
+      // Klatschnass: gestrichelte Spur zum eigenen Handtuch (wer nicht hinläuft, wird nach SOAKED_AUTO_MS hingetragen)
+      if (p.s === 'soaked' && st.sub === 'play') {
+        const bases = p.t ? [WASSER_BASE[p.t]] : [WASSER_BASE.A, WASSER_BASE.B];
+        const towel = bases.map((b) => b.towel).reduce((u, v) => (Math.hypot(a.x - u.x, a.y - u.y) <= Math.hypot(a.x - v.x, a.y - v.y) ? u : v));
+        const dist = Math.hypot(towel.x - a.x, towel.y - a.y);
+        if (dist > W.TOWEL_R) {
+          const n = Math.max(2, Math.floor(dist / 9));
+          const shift = (now / 260) % 1;
+          for (let i = 0; i < n; i++) {
+            const t = (i + shift) / n;
+            const x = Math.round(a.x + (towel.x - a.x) * t);
+            const y = Math.round(a.y + (towel.y - a.y) * t);
+            g.fillStyle(0x2d1b12, 0.6).fillRect(x - 1, y - 1, 3, 3);
+            g.fillStyle(0x93d3f3, 0.9).fillRect(x, y, 1, 1);
+          }
+          // Handtuch pulsiert, Ring zeigt, wie lange es noch bis zum Hintragen dauert
+          const k = clamp(p.sk / W.SOAKED_AUTO_MS, 0, 1);
+          g.lineStyle(2, p.c, 0.5 + 0.4 * Math.abs(Math.sin(now / 180))).strokeEllipse(towel.x, towel.y, W.TOWEL_R * 2 + 8, W.TOWEL_R + 10);
+          if (k > 0) {
+            g.lineStyle(2, 0x2d1b12, 0.8).beginPath();
+            g.arc(a.x + 11, a.y - 20, 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k).strokePath();
+          }
+        }
+      }
+
       // Zielvorschau
       const len = Math.hypot(p.ax, p.ay);
-      if (p.s !== 'ok' || len < 0.15) continue;
+      if (p.s !== 'ok' || p.away || len < W.AIM_MIN) continue;
       const fx = a.x;
       const fy = a.y - 8;
       if (p.pi > 0) {
@@ -341,12 +394,12 @@ export class WasserScene extends Phaser.Scene {
         }
         continue;
       }
-      const tx = clamp(p.x + p.ax * W.RANGE, W.AREA.x + 2, W.AREA.x + W.AREA.w - 2);
-      const ty = clamp(p.y + p.ay * W.RANGE, W.AREA.y + 2, W.AREA.y + W.AREA.h - 2);
+      // Dieselbe Kurve wie der Server beim Wurf (shared/wasser.ts): wenig ziehen = nah, voll ziehen = RANGE
+      const { x: tx, y: ty } = throwTarget(p.x, p.y, p.ax, p.ay);
       const dist = Math.hypot(tx - p.x, ty - p.y);
       const h = 10 + dist * 0.3;
       const col = p.a > 0 ? p.c : 0x7a5a3a;
-      const steps = Math.max(6, Math.round(dist / 7));
+      const steps = Math.max(3, Math.round(dist / 7));
       const shift = (now / 90) % 1;
       for (let i = 0; i < steps; i++) {
         const t = (i + shift) / steps;
