@@ -149,7 +149,7 @@ export function pickWasser(s: WasserState): Screen {
         }
 
         // Hinweis-Karte: das Dringendste zuerst, mit Richtung
-        const bases = (p.t ? [WASSER_BASE[p.t]] : [WASSER_BASE.A, WASSER_BASE.B]);
+        const bases = p.t ? [WASSER_BASE[p.t]] : [WASSER_BASE.A, WASSER_BASE.B];
         const bucket = nearest(p, bases.map((b) => b.bucket));
         const towel = nearest(p, bases.map((b) => b.towel));
         const enemyAim = Object.entries(st.players).find(
@@ -166,7 +166,7 @@ export function pickWasser(s: WasserState): Screen {
         else if (p.s === 'drying') c = { ico: 'towel', hint: 'Abtrocknen …', sub: 'gleich geht’s weiter', cls: 'c-soak' };
         else if (p.pi > 0) c = { ico: 'pistol', hint: 'WASSERPISTOLE!', sub: `Rechts zielen = spritzen · ${Math.ceil(p.pi / 1000)} s`, cls: 'c-pistol' };
         else if (p.rf) c = { ico: p.rh ? 'fast' : 'drop', hint: `Füllt auf … ${p.a}/${WASSER.MAX_AMMO}`, sub: p.rh ? 'Schlauch: schnell!' : 'stehen bleiben', cls: 'c-refill' };
-        else if (p.a === 0) c = { ico: 'drop', hint: 'Keine Bomben!', sub: `Eimer ${dir(p, bucket)} · Schlauch ${dir(p, WASSER_HOSE)}`, cls: 'c-refill c-urgent' };
+        else if (p.a === 0) c = { ico: 'drop', hint: 'Keine Bomben!', sub: `Eimer ${dir(p, bucket)}<br>Schlauch ${dir(p, WASSER_HOSE)}`, cls: 'c-refill c-urgent' };
         else if (flash && now < flash.until) c = flash;
         else if (p.w >= 70) c = { ico: 'shield', hint: 'Fast klatschnass!', sub: 'Ab hinter Hecke oder Liege', cls: 'c-cover c-urgent' };
         else if (st.pistol) c = { ico: 'pistol', hint: 'Wasserpistole liegt aus!', sub: `Drüberlaufen ${dir(p, st.pistol)}`, cls: 'c-pistol' };
