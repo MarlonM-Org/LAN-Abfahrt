@@ -149,9 +149,10 @@ export class SumoScene extends Phaser.Scene {
       }
       a.f.setPosition(a.x, a.y + 3).setDepth(figDepth(a.y)).setAlpha(p.away ? 0.4 : 1); // away = Verbindung weg (eingefroren)
       a.ring.setPosition(a.x, a.y + 2);
-      if (p.dash && now - a.dustAt > 45) {
+      // Staubspur beim Sprinten – und beim Weggeschubst-Werden (der Getroffene rutscht sichtbar über die Planken)
+      if ((p.dash || p.stun) && now - a.dustAt > 45) {
         a.dustAt = now;
-        this.dust(a.x - p.f * 5, a.y + 2);
+        this.dust(p.stun ? a.x : a.x - p.f * 5, a.y + 2);
       }
     }
     // Knackende Planken blinken rötlich
