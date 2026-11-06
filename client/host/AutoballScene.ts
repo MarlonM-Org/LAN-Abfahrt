@@ -14,13 +14,12 @@ import { sfx } from './sfx';
 
 interface CarView {
   root: Phaser.GameObjects.Container;
-  lift: Phaser.GameObjects.Container;
-  shadow: Phaser.GameObjects.Ellipse;
   body: Phaser.GameObjects.Image;
+  /** Kleiner Pfeil in Spielerfarbe: dahin zeigt der Stick (solange das Auto noch nicht so steht) */
+  aim: Phaser.GameObjects.Triangle;
   x: number;
   y: number;
   a: number;
-  hopStart: number;
   lastPuff: number;
   touches: number;
 }
@@ -64,7 +63,7 @@ export class AutoballScene extends Phaser.Scene {
   private juice!: Juice;
   /** Anstoß-Countdown ohne Tafel (die Tafel lag sonst über dem Feld) */
   private kick!: Phaser.GameObjects.Text;
-  private carFx = new Map<string, { bo: boolean; hop: boolean }>();
+  private carFx = new Map<string, { bo: boolean }>();
   private cd = new Countdown();
   private clockCd = new Countdown();
 
@@ -143,9 +142,9 @@ export class AutoballScene extends Phaser.Scene {
     const shadow = this.add.ellipse(1, 3, 15, 8, 0x000000, 0.25).setStrokeStyle(1, pcol(id).num);
     const body = this.add.image(0, 0, ensureTex(this, `afb_kart_${car.t}`, () => kartSprite(color)));
     const head = this.add.image(0, -3, ensurePortrait(this, pl.look)).setScale(0.62).setOrigin(0.5, 0.6);
-    const lift = this.add.container(0, 0, [body, head]);
-    const root = this.add.container(car.x, car.y, [shadow, lift]);
-    const v: CarView = { root, lift, shadow, body, x: car.x, y: car.y, a: car.a, hopStart: 0, lastPuff: 0, touches: car.k };
+    const aim = this.add.triangle(0, 0, 0, 0, 7, 3.5, 0, 7, pcol(id).num).setStrokeStyle(1, 0x2d1b12).setVisible(false);
+    const root = this.add.container(car.x, car.y, [shadow, aim, body, head]);
+    const v: CarView = { root, body, aim, x: car.x, y: car.y, a: car.a, lastPuff: 0, touches: car.k };
     this.cars.set(id, v);
     return v;
   }
@@ -168,17 +167,11 @@ export class AutoballScene extends Phaser.Scene {
       v.y = lerpJump(ca.y, car.y, f, 60);
       v.a = lerpAngle(ca.a, car.a, f);
       v.body.setRotation(v.a + (car.d ? car.d * 0.35 : 0));
-      // Hüpfer: lokal animiert (Start aus dem Rest-Wert)
-      if (car.hop > 0 && !v.hopStart) v.hopStart = now - (AFB.HOP_MS - car.hop);
-      let lift = 0;
-      if (v.hopStart) {
-        const t = (now - v.hopStart) / AFB.HOP_MS;
-        if (t >= 1) v.hopStart = 0;
-        else lift = Math.sin(Math.PI * t) * 7;
-      }
-      v.lift.setY(-lift).setScale(1 + lift * 0.035);
-      v.shadow.setScale(1 - lift * 0.05);
-      v.root.setPosition(v.x, v.y).setDepth(10 + v.y + (lift ? 40 : 0));
+      // Stick-Richtung (absolute Lenkung): Pfeil, solange das Auto noch dorthin eindreht
+      const off = car.s === null ? 0 : Math.abs(Phaser.Math.Angle.Wrap(car.s - v.a));
+      v.aim.setVisible(live && off > 0.35);
+      if (car.s !== null && off > 0.35) v.aim.setPosition(Math.cos(car.s) * 13, Math.sin(car.s) * 13).setRotation(car.s);
+      v.root.setPosition(v.x, v.y).setDepth(10 + v.y);
       if (live && now - v.lastPuff > 70) {
         v.lastPuff = now;
         const bx = v.x - Math.cos(v.a) * 8;
@@ -258,7 +251,7 @@ export class AutoballScene extends Phaser.Scene {
 
   private buildIntro() {
     if (this.intro.length) return;
-    this.intro.add(panel(this, 50, 64, 380, 128, 'dark'));
+    this.intro.add(panel(this, 50, 64, 380, 140, 'dark'));
     this.intro.add(txt(this, WORLD.W / 2, 74, 'AUTO-FUSSBALL', { size: 16, color: GOLD }));
     const lines = [
       'Schiebt den Wasserball ins Tor des',
@@ -267,7 +260,8 @@ export class AutoballScene extends Phaser.Scene {
       'SONNE spielt nach rechts ->',
       '<- MEER spielt nach links',
       '',
-      'Handy quer: GAS, BREMSE, BOOST, HÜPFER',
+      'Handy quer: Stick = Richtung wie hier,',
+      'dazu GAS, BREMSE und BOOST',
       '3 Minuten – bei Gleichstand Golden Goal',
     ];
     lines.forEach((l, i) => {
@@ -307,15 +301,12 @@ export class AutoballScene extends Phaser.Scene {
       // Neuer Anstoß: eine laufende Wiederholung abbrechen
       if (this.buf.replaying) this.buf.live();
     }
-    // Ballkontakt: kleiner Staub-Ring am Ball + Plopp; Boost und Hüpfer mit Ton – erst, wenn die Wiedergabe-Uhr den Stand zeigt
+    // Ballkontakt: kleiner Staub-Ring am Ball + Plopp; Boost mit Ton – erst, wenn die Wiedergabe-Uhr den Stand zeigt
     for (const [id, car] of Object.entries(st.cars)) {
       const v = this.cars.get(id);
-      const fx = this.carFx.get(id) ?? { bo: false, hop: false };
-      if (v && st.sub === 'play') {
-        if (car.bo && !fx.bo) sfx('powerup', { x: car.x, vol: 0.45, pitch: 1.4 });
-        if (car.hop > 0 && !fx.hop) sfx('jump', { x: car.x, vol: 0.6 });
-      }
-      this.carFx.set(id, { bo: !!car.bo, hop: car.hop > 0 });
+      const fx = this.carFx.get(id) ?? { bo: false };
+      if (v && st.sub === 'play' && car.bo && !fx.bo) sfx('powerup', { x: car.x, vol: 0.45, pitch: 1.4 });
+      this.carFx.set(id, { bo: !!car.bo });
       if (v && car.k !== v.touches) {
         v.touches = car.k;
         const ball = { ...st.ball };

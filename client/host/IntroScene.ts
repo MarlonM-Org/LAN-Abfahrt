@@ -1,22 +1,22 @@
 import Phaser from 'phaser';
 import type { GameState, IntroState, MiniKind, MiniTeams, Team } from '../../shared/types';
 import { TEAM_INFO, WORLD } from '../../shared/flunky';
-import { MINI_HOWTO, MINI_INFO, ORIENT_TEXT, miniInspired, teamHandicapText } from '../../shared/games';
+import { MINI_HOWTO, MINI_INFO, ORIENT_TEXT, miniInspired, teamHandicap } from '../../shared/games';
 import { playerColor } from '../../shared/players';
 import { paintWoodFloor } from '../art/ground';
-import { bus, getState, playerById } from './store';
-import { GREEN_INK, INK, RED_INK, background, ink, panel, txt } from './ui';
+import { bus, getState, isAtLaptop, playerById } from './store';
+import { GREEN_INK, INK, RED_INK, background, fitText, ink, panel, txt } from './ui';
 import { figure } from './textures';
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { say, spokenName } from './speech';
-import { toLocalPerf } from '../timesync';
 import { setScene } from './music';
 
 /**
  * Regelkarte vor jedem Minispiel (Raum-Phase `intro`): Icon, Titel, „à la …“, Ziel-Satz, bis zu 3 Steuer-Kacheln
- * aus `MINI_HOWTO`, Haltung des Handys, darunter alle Mitspieler mit Häkchen „bereit“ und der Countdown.
- * Das Spiel startet, sobald alle bereit sind (spätestens nach 15 s, bekannte Spiele nach 5 s).
+ * aus `MINI_HOWTO`, Haltung des Handys, darunter alle Mitspieler mit Häkchen „bereit“ (wer noch fehlt: „...“).
+ * Kein Countdown: Das Spiel startet erst, wenn alle bereit sind – oder der VIP („▶ Jetzt starten“) bzw. der Laptop
+ * (Enter) es erzwingt. Oben rechts „BEREIT x/y“, unter der Karte „Warte auf …“ mit Namen.
  */
 export class IntroScene extends Phaser.Scene {
   private juice!: Juice;
@@ -25,12 +25,11 @@ export class IntroScene extends Phaser.Scene {
   private teams: MiniTeams | null = null;
   private card!: Phaser.GameObjects.Container;
   private crowd!: Phaser.GameObjects.Container;
-  private timer!: Phaser.GameObjects.Text;
+  private count!: Phaser.GameObjects.Text;
+  private hint!: Phaser.GameObjects.Text;
   private status!: Phaser.GameObjects.Text;
-  private figs = new Map<string, { fig: Phaser.GameObjects.Container; check: Phaser.GameObjects.Graphics; ready: boolean }>();
+  private figs = new Map<string, { fig: Phaser.GameObjects.Container; check: Phaser.GameObjects.Graphics; wait: Phaser.GameObjects.Text; ready: boolean }>();
   private crowdKey = '';
-  private endsAt = 0;
-  private short = false;
 
   constructor() {
     super('intro');
@@ -41,15 +40,14 @@ export class IntroScene extends Phaser.Scene {
     this.teams = null;
     this.crowdKey = '';
     this.figs = new Map();
-    this.endsAt = 0;
-    this.short = false;
     this.juice = new Juice(this);
     background(this, 'intro_wood', WORLD.W, WORLD.H, (p) => paintWoodFloor(p, 0, 0, WORLD.W, WORLD.H, 23));
     this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x1a1008, 0.35).setOrigin(0).setDepth(-900);
     this.card = this.add.container(0, 0);
     this.crowd = this.add.container(0, 0);
-    this.timer = txt(this, 452, 14, '', { size: 16, color: '#ffd25e', origin: [1, 0] }).setDepth(10);
-    this.status = txt(this, WORLD.W / 2, 186, '', { color: '#fff4d6' }).setDepth(10);
+    this.count = ink(this, 452, 14, '', { origin: [1, 0] }).setDepth(10);
+    this.hint = ink(this, WORLD.W / 2, 168, '', { color: '#7a5a3a' }).setDepth(10);
+    this.status = txt(this, WORLD.W / 2, 186, '', { color: '#ffd25e' }).setDepth(10);
 
     const onState = (s: GameState) => this.render(s);
     bus.on('state', onState);
@@ -58,18 +56,9 @@ export class IntroScene extends Phaser.Scene {
     if (s) this.render(s);
   }
 
-  update() {
-    if (!this.endsAt) return;
-    const sec = Math.max(0, Math.ceil((toLocalPerf(this.endsAt) - performance.now()) / 1000));
-    const t = String(sec);
-    if (this.timer.text !== t) this.timer.setText(t);
-  }
-
   private render(s: GameState) {
     const it = s.phase === 'intro' ? s.intro : null;
     if (!it) return;
-    this.endsAt = it.endsAt;
-    this.short = it.short;
     const key = `${it.kind}|${it.teams?.label ?? ''}`;
     if (key !== this.cardKey) {
       this.cardKey = key;
@@ -132,6 +121,10 @@ export class IntroScene extends Phaser.Scene {
     c.setScale(0.6).setAlpha(0);
     c.setPosition(WORLD.W * 0.2, 270 * 0.2);
     this.tweens.add({ targets: c, scale: 1, x: 0, y: 0, alpha: 1, duration: 380, ease: 'Back.out' });
+    // Zähler und Start-Hinweis liegen auf der Karte, gehören aber nicht zum Container → nach dem Aufklappen einblenden
+    this.count.setAlpha(0);
+    this.hint.setAlpha(0);
+    this.tweens.add({ targets: [this.count, this.hint], alpha: 1, delay: 320, duration: 200 });
     sfx('whoosh', { vol: 0.6 });
   }
 
@@ -161,7 +154,9 @@ export class IntroScene extends Phaser.Scene {
           const ids = groups[t];
           const cx = t === 'A' ? 128 : 352;
           ids.forEach((id, i) => slots.set(id, { x: cx + (i - (ids.length - 1) / 2) * tStep, feet: 240, step: tStep }));
-          this.crowd.add(txt(this, cx, 196, `${t === 'A' ? '☀' : '🌊'} ${TEAM_INFO[t].name}`, { color: TEAM_INFO[t].color }));
+          // Handicap (kleineres Team startet mit Vorsprung) direkt am Team – die Zeile darüber zeigt, auf wen gewartet wird
+          const hc = teamHandicap(teams.A.length, teams.B.length)[t];
+          this.crowd.add(txt(this, cx, 196, `${t === 'A' ? '☀' : '🌊'} ${TEAM_INFO[t].name}${hc ? ` · +${hc} Vorsprung` : ''}`, { color: TEAM_INFO[t].color }));
         }
         this.crowd.add(txt(this, WORLD.W / 2, 206, 'VS', { size: 16, color: '#ffd25e' }));
       } else {
@@ -183,17 +178,19 @@ export class IntroScene extends Phaser.Scene {
         check.fillStyle(0x2f7d32).fillCircle(x + 9, feet - 26, 6).lineStyle(2, 0xffffff);
         check.lineBetween(x + 6, feet - 26, x + 8, feet - 23).lineBetween(x + 8, feet - 23, x + 12, feet - 29);
         check.setVisible(false);
-        this.crowd.add([fig, name, check]);
-        this.figs.set(id, { fig, check, ready: false });
+        // Noch nicht bereit: blinkendes „...“ an derselben Stelle wie später das Häkchen
+        const wait = txt(this, x + 9, feet - 32, '...', { color: '#ffd25e' });
+        this.tweens.add({ targets: wait, alpha: 0.25, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        this.crowd.add([fig, name, check, wait]);
+        this.figs.set(id, { fig, check, wait, ready: false });
       });
     }
-    const s = getState();
     let fresh = 0;
     for (const [id, f] of this.figs) {
       const ready = it.ready.includes(id);
-      const online = !!s?.players.find((p) => p.id === id)?.connected;
-      f.fig.setAlpha(ready ? 1 : online ? 0.5 : 0.25);
+      f.fig.setAlpha(ready ? 1 : 0.5);
       f.check.setVisible(ready);
+      f.wait.setVisible(!ready);
       if (ready && !f.ready) {
         fresh++;
         this.tweens.add({ targets: f.fig, y: f.fig.y - 6, duration: 110, yoyo: true, ease: 'Quad.out' });
@@ -202,15 +199,20 @@ export class IntroScene extends Phaser.Scene {
       f.ready = ready;
     }
     if (fresh) sfx('select', { pitch: 1 + Math.min(0.4, it.ready.length * 0.04) });
-    const online = it.ids.filter((id) => s?.players.find((p) => p.id === id)?.connected);
-    const nReady = online.filter((id) => it.ready.includes(id)).length;
-    const hc = this.teams ? teamHandicapText(this.teams, it.kind) : '';
-    this.status.setText(
-      this.teams
-        ? `${this.teams.label}${hc ? ` · ${hc}` : ' · Rot gegen Blau'} · ${nReady}/${online.length} bereit`
-        : this.short
-          ? `Kennt ihr schon – gleich geht's los! (${nReady}/${online.length} bereit)`
-          : `Am Handy üben, dann BEREIT drücken · ${nReady}/${online.length} bereit`,
-    );
+
+    // Kein Countdown: „BEREIT x/y“ oben rechts, darunter auf wen gewartet wird (Offline-Handys sind gar nicht erst in `ids`)
+    const waiting = it.ids.filter((id) => !it.ready.includes(id));
+    this.count.setText(`BEREIT ${it.ready.length}/${it.ids.length}`).setColor(waiting.length ? INK : GREEN_INK);
+    if (!waiting.length) this.status.setText('Alle bereit – los geht’s!').setColor('#9be37b');
+    else {
+      const names = waiting.map((id) => playerById(id)?.name ?? '?');
+      const list = names.length > 4 ? `${names.slice(0, 4).join(', ')} +${names.length - 4}` : names.join(', ');
+      this.status.setScale(1).setText(`Am Handy BEREIT drücken · Warte auf ${list}`).setColor('#ffd25e');
+      // Zu lang → Namen gehen vor die Anleitung
+      if (this.status.width > 466) this.status.setText(`Warte auf ${list}`);
+    }
+    fitText(this.status, 466, 0.75);
+    this.hint.setText(isAtLaptop() ? 'Sofort starten: VIP-Handy oder Enter am Laptop' : 'Sofort starten: „Jetzt starten“ am VIP-Handy');
+    fitText(this.hint, 430);
   }
 }

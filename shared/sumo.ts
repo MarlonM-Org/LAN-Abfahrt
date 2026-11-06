@@ -34,12 +34,19 @@ export const SUMO = {
   /** Reibung, während man weggeschubst wurde (rutscht weiter) */
   FRICTION_HIT: 3.4,
   DASH_SPEED: 210,
-  DASH_MS: 230,
+  /** Reibung (1/s) während des Sprints */
+  DASH_FRICTION: 1.2,
+  /** Sprintdauer – mit DASH_BRAKE trägt ein Rempler aus dem Stand ≈ 49 px (3 Planken) weit, getroffen wird bis ≈ 49 px Mitte–Mitte */
+  DASH_MS: 200,
+  /** Abbremsen am Ende eines Sprints ohne Treffer (Faktor auf die Geschwindigkeit) – weniger Überschießen */
+  DASH_BRAKE: 0.5,
   DASH_COOLDOWN_MS: 1300,
-  /** Stoß, den ein Rempler beim Gegner auslöst */
-  KNOCK: 150,
+  /** Stoß, den ein Rempler beim Gegner auslöst (Getroffene fliegen ≈ 53 px, also weiter als der Sprint selbst) */
+  KNOCK: 220,
   /** Faktor, wenn der Getroffene selbst gerade rempelt (Frontalzusammenstoß) */
-  KNOCK_DASHING: 1.8,
+  KNOCK_DASHING: 1.5,
+  /** Was dem Rempler nach einem Treffer an Tempo bleibt (der Schwung geht in den Getroffenen) */
+  KNOCK_RECOIL: 0.2,
   /** Kurze Kontrollsperre nach einem Treffer */
   STUN_MS: 380,
   /** Normales Anrempeln ohne Dash: kleiner Abpraller */

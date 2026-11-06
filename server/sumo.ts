@@ -40,8 +40,9 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 /**
  * Sumo-Steg: Alle stehen auf einem Holzsteg im Meer, der nach und nach wegbricht.
- * Joystick zum Laufen, „REMPELN“ für einen kurzen Sprint – wer getroffen wird, fliegt
- * (beim Frontal-Rempler doppelt weit). Wer zuletzt auf dem Steg steht, gewinnt die Runde;
+ * Joystick zum Laufen, „REMPELN“ für einen kurzen Sprint – wer getroffen wird, fliegt weiter, als
+ * der Sprint selbst trägt (beim Frontal-Rempler noch weiter); wer danebenrempelt, bremst am Ende ab,
+ * schießt aber trotzdem ein Stück übers Ziel hinaus. Wer zuletzt auf dem Steg steht, gewinnt die Runde;
  * wer zuerst 2 Runden gewinnt (max. 3), ist Steg-Champion.
  */
 export class SumoGame implements MiniGame {
@@ -290,6 +291,14 @@ export class SumoGame implements MiniGame {
   private move(p: P, now: number, dt: number) {
     const stunned = now < p.stunUntil;
     const dashing = now < p.dashUntil;
+    if (p.dashUntil && !dashing) {
+      // Sprint vorbei, ohne jemanden zu treffen: kräftig abbremsen (sonst schießt man weit übers Ziel hinaus)
+      p.dashUntil = 0;
+      if (!stunned) {
+        p.vx *= SUMO.DASH_BRAKE;
+        p.vy *= SUMO.DASH_BRAKE;
+      }
+    }
     let ax = 0;
     let ay = 0;
     if (!stunned && !dashing) {
@@ -298,7 +307,7 @@ export class SumoGame implements MiniGame {
     }
     p.vx += ax * dt;
     p.vy += ay * dt;
-    const fr = dashing ? 1.2 : stunned ? SUMO.FRICTION_HIT : SUMO.FRICTION;
+    const fr = dashing ? SUMO.DASH_FRICTION : stunned ? SUMO.FRICTION_HIT : SUMO.FRICTION;
     const k = Math.exp(-fr * dt);
     p.vx *= k;
     p.vy *= k;
@@ -348,16 +357,16 @@ export class SumoGame implements MiniGame {
       // Frontal-Rempler: beide fliegen weit
       if (aDash) hit(b, ida, nx, ny, SUMO.KNOCK * (bDash ? SUMO.KNOCK_DASHING : 1));
       if (bDash) hit(a, idb, -nx, -ny, SUMO.KNOCK * (aDash ? SUMO.KNOCK_DASHING : 1));
-      // Der Rempler selbst wird abgebremst
+      // Der Rempler bleibt fast stehen – sein Schwung steckt jetzt im Getroffenen
       if (aDash && !bDash) {
-        a.dashUntil = now;
-        a.vx *= 0.3;
-        a.vy *= 0.3;
+        a.dashUntil = 0;
+        a.vx *= SUMO.KNOCK_RECOIL;
+        a.vy *= SUMO.KNOCK_RECOIL;
       }
       if (bDash && !aDash) {
-        b.dashUntil = now;
-        b.vx *= 0.3;
-        b.vy *= 0.3;
+        b.dashUntil = 0;
+        b.vx *= SUMO.KNOCK_RECOIL;
+        b.vy *= SUMO.KNOCK_RECOIL;
       }
       return;
     }
