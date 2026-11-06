@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T20:22+00:00",
+  "updated": "2026-11-06T20:26+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -10,14 +10,16 @@
       "title": "Strand-Volleyball: ◀ ▶ rüberrutschen (Richtung folgt dem Daumen), größerer Ball, kompakteres Feld mit Zoom, Landepunkt-Ring – PR #103 fertig, wartet auf Marlons OK zum Mergen"
     },
     {
-      "title": "Urlaubs-Minigolf: VIP-Knopf „Nächstes Loch“, Handy quer (Ziehen passt zum TV), Bewegungssensor-Freigabe am iPhone, Bälle kollidieren miteinander, verwirrende Zuschauer-Anzeige zwischen den Schlägen"
-    },
-    {
       "title": "Echte Aufwärmphase statt Übungsfeld: vor Action-Spielen mit der richtigen Steuerung üben (Handy + TV, nichts zählt), bis alle bereit sind"
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Urlaubs-Minigolf: Handy quer (rechts am Handy = rechts am TV), Bälle stoßen zusammen, VIP-Knopf „⏭ Nächstes Loch“, „Bewegungssensor aktivieren“ fragt am iPhone nach Erlaubnis; Computer puttet erst nach 20 s ohne Handy",
+      "pr": 104,
+      "date": "2026-11-06"
+    },
     {
       "title": "Wasserbomben-Schlacht: Zielen nah am Spieler viel feiner (kurz ziehen trifft auch direkt daneben), Klatschnasse werden nach 5 s zum Handtuch getragen, Spielende sofort, wenn eine Seite nicht mehr mitspielen kann (Handy weg)",
       "pr": 100,
@@ -451,8 +453,8 @@
       "notes": "Rüberziehen von links nach rechts bleibt links hängen → Richtung folgt dem Daumen; zu schwer: Ball zu klein, Feld zu groß · PR #103 wartet auf Freigabe"
     },
     "golf": {
-      "status": "in Arbeit",
-      "notes": "VIP soll zum nächsten Loch springen können; Handy quer statt hochkant; Sensor fragt nie nach Erlaubnis; „Du spielst gar nicht, warum spielst du?“ · Bälle sollen kollidieren"
+      "status": "umgesetzt",
+      "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
     }
   },
   "general": [
