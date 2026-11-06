@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T19:28+00:00",
+  "updated": "2026-11-06T21:29+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -8,6 +8,46 @@
   "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Strand-Volleyball: ◀ ▶ lassen sich rüberrutschen (Richtung folgt dem Daumen), größerer Ball, kompakteres Feld mit 1,25×-Zoom am TV, schwebenderer Ball und Landepunkt-Ring im Sand",
+      "pr": 103,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Echte Aufwärmphase: Action-Spiele (Arena, Sumo, Kart, Smash, Auto-Fußball, Kurven-Duell, Bogen, Zauber, Wackel, Aufräumen, Süßigkeiten, Umzug, Grill, Koffer, Turm, Sprint) starten mit Aufwärmrunde – echte Steuerung, nichts zählt, nach 1,5 s wieder drin; alle anderen Spiele mit aufgeräumter Regelkarte ohne Übungsfeld",
+      "pr": 105,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Urlaubs-Minigolf: Handy quer (rechts am Handy = rechts am TV), Bälle stoßen zusammen, VIP-Knopf „⏭ Nächstes Loch“, „Bewegungssensor aktivieren“ fragt am iPhone nach Erlaubnis; Computer puttet erst nach 20 s ohne Handy",
+      "pr": 104,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Wasserbomben-Schlacht: Zielen nah am Spieler viel feiner (kurz ziehen trifft auch direkt daneben), Klatschnasse werden nach 5 s zum Handtuch getragen, Spielende sofort, wenn eine Seite nicht mehr mitspielen kann (Handy weg)",
+      "pr": 100,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Regelkarte startet nicht mehr nach Timer: erst wenn alle verbundenen Spieler BEREIT gedrückt haben oder VIP („▶ JETZT STARTEN“) bzw. Laptop (Enter) startet; TV und Handy zeigen „BEREIT x/y“ und „Warte auf …“",
+      "pr": 102,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Bomben-Arena: kein Hängenbleiben mehr an Ecken und Kreuzungen (leicht schräger Stick läuft geradeaus durch, großzügige Ecken-Hilfe); Feld wächst mit der Spielerzahl (zu zweit 17×9 statt 25×13), TV zoomt kleine Felder groß",
+      "pr": 101,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Auto-Fußball: Stick lenkt wie ein normaler Joystick in TV-Richtung (Auto dreht im Bogen dorthin), HÜPFER entfernt, GAS/BREMSE/BOOST als große Knöpfe (iPhone 12 Pro)",
+      "pr": 99,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Sumo-Steg: Rempler schubsen deutlich weiter (≈ 3 Planken, +47 %), Sprint 25 % kürzer und bremst am Ende ab – seltener aus Versehen vom Steg",
+      "pr": 98,
+      "date": "2026-11-06"
+    },
     {
       "title": "Kurven-Duell: offene Ränder (rechts raus → links rein, oben/unten genauso) + Lücken alle 1–2 s statt 1,5–3 s; Power-up „Durch Wände“ entfällt",
       "pr": 97,
@@ -381,11 +421,11 @@
     },
     "autoball": {
       "status": "umgesetzt",
-      "notes": "Tor-Wiederholung in Zeitlupe, Tick 30 Hz (#83)"
+      "notes": "Joystick absolut statt Links/Rechts aus Autosicht, Hüpfer weg, große Knöpfe rechts; Kippen-Steuerung entfällt hier (#99) · vorher: Tor-Wiederholung, Tick 30 Hz (#83)"
     },
     "sumo": {
       "status": "umgesetzt",
-      "notes": "Finale-Zoom auf die letzten zwei, Zeitlupe beim letzten Platscher (#84)"
+      "notes": "Zu wenig Wirkung beim Treffer, man fällt oft selbst runter → Stoß 36 → 53 px, Sprint 65 → 49 px mit Abbremsen (#98) · vorher: Finale-Zoom, Zeitlupe (#84)"
     },
     "kugel": {
       "status": "umgesetzt",
@@ -402,6 +442,22 @@
     "kurve": {
       "status": "umgesetzt",
       "notes": "Am Rand durchfahren statt Crash, häufiger Lücken (#97) – „ansonsten gut“"
+    },
+    "arena": {
+      "status": "umgesetzt",
+      "notes": "Hängenbleiben an Ecken/Kreuzungen behoben (Ursache: Abbiege-Regel ab 22° Stick-Schräge ließ die Figur zittern); Feld 17×9 (2) · 19×11 (3–4) · 23×11 (5–6) · 23×13 (7–8) · 25×13 (9–12) (#101)"
+    },
+    "wasser": {
+      "status": "umgesetzt",
+      "notes": "Zielweite 6 + 154 × Stick² (kürzester Wurf ≈ 6 statt 32 px); Klatschnasse werden nach 5 s zum Handtuch getragen statt ewig zu stehen; Seite weg → sofort Ende (#100) – offen: lieber „klatschnass = verloren“ im 1 gegen 1?"
+    },
+    "volley": {
+      "status": "umgesetzt",
+      "notes": "Rüberziehen von links nach rechts blieb links hängen → Richtung folgt dem Daumen; Ball 12 → 20 px am TV, Feld 468 → 368 px, Landepunkt-Ring (#103)"
+    },
+    "golf": {
+      "status": "umgesetzt",
+      "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
     }
   },
   "general": [
@@ -471,6 +527,14 @@
     },
     {
       "title": "Wii Balance Board am Laptop (WebHID) für eigene Board-Spiele (#86, #87)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Regelkarte/Lobby: Start erst, wenn alle bereit sind oder der VIP erzwingt – nicht nach Timer (#102)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Übungsfeld auf der Regelkarte passt nicht zur echten Steuerung, zu gequetscht → echte Aufwärmphase mit richtiger Steuerung (#105)",
       "status": "umgesetzt"
     }
   ]
