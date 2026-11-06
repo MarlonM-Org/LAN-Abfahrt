@@ -1,5 +1,5 @@
 import type { IgelState, IgelWeapon } from '../../../shared/types';
-import { GRENADE, IGEL, IGEL_TAUNTS, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, squadOf, windArrows } from '../../../shared/igel';
+import { GRENADE, IGEL, IGEL_TAUNTS, IGEL_THEMES, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, isTool, squadOf, windArrows } from '../../../shared/igel';
 import { type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
 import { haptic } from '../haptic';
 import { onInputReset, localPoint } from '../stick';
@@ -12,6 +12,13 @@ const squadColor = (st: IgelState, id: string) => {
   return i >= 0 ? st.squads![i].color : null;
 };
 const myHog = (st: IgelState, id: string) => st.hogs.find((h) => h.owner === id && h.state === 'ok') ?? null;
+/** Themenkarte als kurze Zeile („🌙 Mondnacht“) */
+const themeLine = (st: IgelState) => {
+  const th = IGEL_THEMES[st.theme];
+  return th ? `${th.icon} ${th.name}` : '';
+};
+/** Flut-/Themenzeile unter der Karte */
+const sdText = (st: IgelState) => `${themeLine(st)} · ${st.suddenDeath ? 'SUDDEN DEATH – die Flut steigt!' : `Flut in ${Math.ceil(st.suddenIn / 1000)}s`}`;
 
 /** Zuschauer-Sprüche: Abklingzeit lokal mitzählen (überlebt das Neubauen des Screens) */
 let tauntUntil = 0;
@@ -27,8 +34,11 @@ export function pickIgel(s: IgelState): Screen {
     const mode = s.simul
       ? 'ALLE GLEICHZEITIG: 15 s zielen, FEUER drücken – dann fliegt alles zugleich!'
       : 'Wenn du dran bist: laufen, Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER.';
-    return ['ig-count', message('Igel-Krieg!', `Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der Insel.${team} ${mode} Kisten einsammeln, Seeigel meiden – Wasser = raus!`)];
+    const th = IGEL_THEMES[s.theme];
+    const card = th ? `Themenkarte ${th.icon} ${th.name}: ${th.text} ` : '';
+    return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
   }
+  if (s.sub === 'replay') return ['ig-over-replay', message('Schuss des Abends!', 'Die Wiederholung läuft am Fernseher.')];
   if (s.sub === 'over') {
     const alive = s.hogs.some((h) => h.owner === id && h.state === 'ok');
     return ['ig-over', message(alive ? 'Überlebt!' : 'Vorbei!', 'Schau auf den Fernseher!')];
@@ -78,7 +88,7 @@ function buildActive(turn: number) {
   const mapCanvas = q<HTMLCanvasElement>(root, '.ig-map');
   const drawMap = miniMap(mapCanvas);
 
-  // Waffenraster 4 × 3 mit Symbol + Munition
+  // Waffenraster 5 × 3 mit Symbol + Munition
   const wrap = q(root, '.ig-weapons');
   const wBtns = new Map<IgelWeapon, HTMLButtonElement>();
   for (const w of WEAPON_ORDER) {
@@ -225,8 +235,23 @@ function buildActive(turn: number) {
   };
   const aimKind = () => WEAPONS[weapon].aim;
   const sendAim = (angle: number, power: number) => send('aim', { angle: Math.round(angle * 100) / 100, power: Math.round(power * 100) / 100 });
+  /** Am Seil: Pad oben = hochklettern, unten = runterlassen (gedrückt halten) */
+  let climbing: number | null = null;
+  const stopClimb = () => {
+    if (climbing === null) return;
+    climbing = null;
+    send('climb', { dir: 0 });
+  };
   pad.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    if (roped()) {
+      pad.setPointerCapture(e.pointerId);
+      climbing = e.pointerId;
+      const p = localPoint(pad, e);
+      send('climb', { dir: p.y < pad.clientHeight / 2 ? 1 : -1 });
+      haptic(6);
+      return;
+    }
     if (!canAim() || drag || aimKind() === 'map' || aimKind() === 'none') return;
     pad.setPointerCapture(e.pointerId);
     const p = localPoint(pad, e);
@@ -266,9 +291,9 @@ function buildActive(turn: number) {
     draw();
     haptic(8);
   };
-  pad.addEventListener('pointerup', (e) => release(e));
-  pad.addEventListener('pointercancel', (e) => release(e, true));
-  onInputReset(pad, () => release(null, true));
+  pad.addEventListener('pointerup', (e) => (e.pointerId === climbing ? stopClimb() : release(e)));
+  pad.addEventListener('pointercancel', (e) => (e.pointerId === climbing ? stopClimb() : release(e, true)));
+  onInputReset(pad, () => (stopClimb(), release(null, true)));
 
   // Möwen-Luftschlag: Ziel auf der Minikarte antippen
   mapCanvas.addEventListener('pointerdown', (e) => {
@@ -286,6 +311,13 @@ function buildActive(turn: number) {
   });
 
   tapButton(fireBtn, () => {
+    // Am Seil wird FEUER zu LOSLASSEN
+    if (roped()) {
+      stopClimb();
+      send('jump');
+      haptic(20);
+      return;
+    }
     if (!canAim()) return;
     const kind = aimKind();
     if (kind === 'map') {
@@ -297,12 +329,26 @@ function buildActive(turn: number) {
       if (!ready) return;
       send('fire', { angle: ready.angle, power: ready.power });
     }
+    haptic(isTool(weapon) ? 20 : 40);
+    // Werkzeuge beenden den Zug nicht: gleich weiter zielen (Liane neu wischen)
+    if (isTool(weapon)) {
+      ready = null;
+      draw();
+      return;
+    }
     fired = true;
     firedAt = performance.now();
-    haptic(40);
     if (weapon !== 'shotgun') ready = null;
     draw();
   });
+
+  /** Hängt der gesteuerte Igel gerade an der Liane? */
+  const roped = () => {
+    const st = igel();
+    if (!st) return false;
+    const h = st.simul ? myHog(st, me) : st.active === me && st.activeHog !== null ? st.hogs[st.activeHog] : null;
+    return !!h?.rope;
+  };
 
   let windKey = NaN;
   let weaponKey = '';
@@ -355,11 +401,14 @@ function buildActive(turn: number) {
       draw();
     }
     const kind = aimKind();
-    const armed = aiming && (kind === 'none' || (kind === 'map' ? target !== null : !!ready));
-    pad.classList.toggle('off', !aiming && !locked);
+    const onRope = !!hog?.rope && (hog.owner === me || !st.simul);
+    if (!onRope) stopClimb();
+    const armed = onRope || (aiming && (kind === 'none' || (kind === 'map' ? target !== null : !!ready)));
+    pad.classList.toggle('off', !aiming && !locked && !onRope);
+    pad.classList.toggle('ig-climb', onRope);
     fireBtn.disabled = !armed;
     fireBtn.classList.toggle('armed', armed);
-    fireBtn.textContent = kind === 'none' ? 'ABLEGEN' : kind === 'map' ? 'MÖWEN LOS' : 'FEUER';
+    fireBtn.textContent = onRope ? 'LOSLASSEN' : weapon === 'rope' ? 'LIANE!' : weapon === 'parasol' ? 'SCHIRM AUF' : weapon === 'shovel' ? 'GRABEN' : kind === 'none' ? 'ABLEGEN' : kind === 'map' ? 'MÖWEN LOS' : 'FEUER';
     // Simultan: nach FEUER warten – mit Sprüchen für die Wartezeit
     const wait = q(root, '.ig-wait');
     wait.classList.toggle('hidden', !locked || st.sub !== 'aimAll');
@@ -375,10 +424,12 @@ function buildActive(turn: number) {
     else if (st.sub === 'flight' || st.sub === 'flightAll') head.textContent = 'Flieeeeg ...';
     else if (retreat) head.textContent = 'Schnell weg hier!';
     else head.textContent = 'Abwarten ...';
-    q(root, '.ig-sd').textContent = st.suddenDeath ? 'SUDDEN DEATH – die Flut steigt!' : `Flut in ${Math.ceil(st.suddenIn / 1000)}s`;
+    q(root, '.ig-sd').textContent = sdText(st);
     if (!drag) {
       const shotgun2 = st.sub === 'aim' && st.shotsLeft > 0;
-      padText.textContent = locked
+      padText.textContent = onRope
+        ? '▲ oben halten = hochklettern\n▼ unten halten = runter\n◀ ▶ = schwingen · LOSLASSEN'
+        : locked
         ? ''
         : aiming
           ? shotgun2
@@ -387,6 +438,8 @@ function buildActive(turn: number) {
               ? target === null
                 ? 'Tippe auf der Karte das Ziel an!'
                 : `Ziel gesetzt – MÖWEN LOS!\nKarte antippen = neues Ziel`
+              : weapon === 'parasol'
+                ? `${WEAPONS[weapon].hint}\nSCHIRM AUF – dann mit ◀ ▶ steuern`
               : kind === 'none'
                 ? `${WEAPONS[weapon].hint}\nABLEGEN drücken, dann weglaufen`
                 : ready
@@ -488,7 +541,7 @@ function buildWatch() {
         ? 'Gleich bist du dran!'
         : '';
     next.classList.toggle('ig-soon', st.next === me && (mineAlive || teamAlive));
-    q(root, '.ig-sd').textContent = st.suddenDeath ? 'SUDDEN DEATH – die Flut steigt!' : `Flut in ${Math.ceil(st.suddenIn / 1000)}s`;
+    q(root, '.ig-sd').textContent = sdText(st);
     const key = JSON.stringify(st.hogs.map((h) => [h.hp, h.state]));
     if (key === teamsKey) return;
     teamsKey = key;
@@ -611,9 +664,10 @@ function ensureStyle() {
   s.textContent = `
 .lx.ig-lx.ig-m { --lx-l: 34%; --lx-r: 38%; }
 .ig-m .ig-left-col { grid-template-rows: minmax(0, 1fr) auto minmax(0, 0.55fr); gap: 4px; }
-.ig-m .ig-weapons.ig-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.ig-m .ig-weapons.ig-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 3px; }
+.ig-pad.ig-climb { background: linear-gradient(#d8f0c0 0 50%, #f0dcb0 50% 100%); }
 .ig-m .ig-weapon { position: relative; padding: 0; justify-content: center; flex-direction: column; gap: 0; }
-.ig-m .ig-weapon .ig-ico { font-size: 18px; line-height: 1; filter: drop-shadow(1px 1px 0 rgba(45, 27, 18, 0.5)); }
+.ig-m .ig-weapon .ig-ico { font-size: 16px; line-height: 1; filter: drop-shadow(1px 1px 0 rgba(45, 27, 18, 0.5)); }
 .ig-m .ig-weapon small { position: absolute; right: 2px; bottom: 1px; font-size: 7px; }
 .ig-m .ig-weapon:disabled { opacity: 0.4; }
 .ig-m .ig-weapon.sel:disabled { opacity: 0.75; }

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import type { GameState, IgelFx, IgelState, Look } from '../../shared/types';
-import { IGEL, WEAPONS, type Mask, carve, genTerrain, seeded, surfaceY } from '../../shared/igel';
+import type { GameState, IgelFx, IgelOp, IgelRecFrame, IgelReplay, IgelState, Look } from '../../shared/types';
+import { IGEL, IGEL_THEMES, REPLAY, WEAPONS, type Mask, genTerrain, seeded, surfaceY } from '../../shared/igel';
 import { C } from '../art/palette';
 import { cloud } from '../art/flieger';
 import * as O from '../art/objects';
@@ -15,6 +15,8 @@ import { Pix } from '../art/pix';
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { daylight, gulls } from './ambient';
+import { SnapBuffer, lerp, lerpJump } from './interp';
+import { say } from './speech';
 
 const TERRAIN_KEY = 'igel_terrain';
 const lookKey = (l: Look) => `${l.hair}_${l.hairStyle}_${l.shirt}`;
@@ -34,6 +36,8 @@ type CamMode = 'overview' | 'hog' | 'proj' | 'hold';
 interface HogView {
   c: Phaser.GameObjects.Container;
   spr: Phaser.GameObjects.Image;
+  /** Sonnenschirm-Gleiter über dem Igel */
+  umb: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
   x: number;
   y: number;
@@ -82,6 +86,22 @@ export class IgelScene extends Phaser.Scene {
   private lastSub = '';
   private shownSum = -1;
   private lastTick = 0;
+  /** Lianen-Seile (hinter den Igeln) */
+  private ropeG!: Phaser.GameObjects.Graphics;
+  /** Themenkarte (Countdown) und Mondnacht-Abdunklung */
+  private themeCard!: Phaser.GameObjects.Container;
+  private themeKey = '';
+  private night: Phaser.GameObjects.GameObject[] = [];
+  /** Sprecher-Laufschrift + Ansage */
+  private quipText!: Phaser.GameObjects.Text;
+  private quipUntil = 0;
+  private lastSay = 0;
+  /** „Schuss des Abends“: laufende Wiederholung, Titel, schon abgespielt? */
+  private rp: Replay | null = null;
+  private rpTitle!: Phaser.GameObjects.Text;
+  private rpSub!: Phaser.GameObjects.Text;
+  private rpBg!: Phaser.GameObjects.Image;
+  private rpSeed = -1;
 
   constructor() {
     super('igel');
@@ -112,6 +132,12 @@ export class IgelScene extends Phaser.Scene {
     this.lastSub = '';
     this.shownSum = -1;
     this.lastTick = 0;
+    this.themeKey = '';
+    this.night = [];
+    this.quipUntil = 0;
+    this.lastSay = 0;
+    this.rp = null;
+    this.rpSeed = -1;
 
     // Kameras: Hauptkamera für die Welt (Zoom/Schwenk), HUD-Kamera fix darüber.
     // Alles, was neu in die Szene kommt, sieht die HUD-Kamera nicht – außer beim HUD-Aufbau.
@@ -136,6 +162,7 @@ export class IgelScene extends Phaser.Scene {
       const r = this.add.rectangle(x, y, i % 3 ? 2 : 3, 1, i % 3 ? 0xf3e2b0 : 0x7cc46a).setDepth(5).setAlpha(0);
       this.specks.push({ r, x, y, ph: Math.random() * Math.PI * 2 });
     }
+    this.ropeG = this.add.graphics().setDepth(9);
     this.aimG = this.add.graphics().setDepth(25);
     this.waterG = this.add.graphics().setDepth(30);
     this.activeName = txt(this, 0, 0, '', {}).setDepth(26);
@@ -144,8 +171,13 @@ export class IgelScene extends Phaser.Scene {
     this.banner = txt(this, IGEL.W / 2, 92, '', { size: 24, color: GOLD }).setDepth(1001);
     this.bannerSub = txt(this, IGEL.W / 2, 124, '', { size: 8 }).setDepth(1001);
     this.windG = this.add.graphics().setDepth(1002);
+    this.quipText = ink(this, IGEL.W / 2, 27, '', { origin: [0.5, 0] }).setBackgroundColor('#fff6dc').setPadding(4, 3, 4, 3).setDepth(1003).setVisible(false);
+    this.themeCard = this.add.container(0, 0).setDepth(1004).setVisible(false);
+    this.rpBg = panel(this, 50, 26, 380, 42, 'dark').setDepth(1005).setVisible(false);
+    this.rpTitle = txt(this, IGEL.W / 2, 31, '', { size: 16, color: GOLD }).setDepth(1006);
+    this.rpSub = txt(this, IGEL.W / 2, 52, '', { size: 8 }).setDepth(1006);
     this.hudBuilding = false;
-    main.ignore([this.hud, this.banner, this.bannerSub, this.windG]);
+    main.ignore([this.hud, this.banner, this.bannerSub, this.windG, this.quipText, this.themeCard, this.rpBg, this.rpTitle, this.rpSub]);
     // Partikel/Töne aus dem gemeinsamen Baukasten (Emitter landen nur in der Welt-Kamera)
     this.juice = new Juice(this, { depth: 41 });
 
@@ -154,6 +186,7 @@ export class IgelScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       bus.off('state', fn);
       this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
+      if (this.textures.exists(REPLAY_KEY)) this.textures.remove(REPLAY_KEY);
     });
     const s = getState();
     if (s) this.onState(s);
@@ -177,74 +210,27 @@ export class IgelScene extends Phaser.Scene {
     const img = ctx.createImageData(IGEL.W, IGEL.H);
     paintTerrain(img, this.mask);
     ctx.putImageData(img, 0, 0);
-    this.paintDecor(ctx, st);
+    paintDecor(ctx, st.seed, this.mask);
     this.tex.refresh();
     this.terrainImg = this.add.image(0, 0, TERRAIN_KEY).setOrigin(0, 0).setDepth(0);
+    // Mondnacht: Himmel abdunkeln, Mond und Sterne (über Himmel/Horizont, unter der Insel)
+    for (const o of this.night) o.destroy();
+    this.night = [];
+    if (st.theme === 'mond') {
+      this.night.push(this.add.rectangle(0, 0, IGEL.W, IGEL.H, 0x141c48, 0.5).setOrigin(0, 0).setDepth(-855).setScrollFactor(0));
+      this.night.push(this.add.circle(400, 40, 13, 0xfff4d6).setDepth(-854).setScrollFactor(0.1));
+      this.night.push(this.add.circle(394, 36, 11, 0x141c48, 0.5).setDepth(-853).setScrollFactor(0.1));
+      const r = seeded(st.seed ^ 0x57a2);
+      for (let i = 0; i < 28; i++) this.night.push(this.add.rectangle(Math.floor(r() * IGEL.W), Math.floor(r() * 120), 1, 1, 0xfff4d6, 0.4 + r() * 0.6).setDepth(-854).setScrollFactor(0.12));
+    }
     // Effekte von vor dem Szenenstart nicht nochmal abspielen
     this.lastFx = st.fx.length ? st.fx[st.fx.length - 1].seq : 0;
-  }
-
-  /** Palmen und Sonnenschirm direkt ins Terrain malen (gehen bei Explosionen mit kaputt) */
-  private paintDecor(ctx: CanvasRenderingContext2D, st: IgelState) {
-    const m = this.mask!;
-    const r = seeded(st.seed ^ 0x5eed);
-    const used: number[] = [];
-    const items = [() => O.palm(6), () => O.palm(11), () => O.umbrella(C.red), () => O.umbrella(C.blue)];
-    let placed = 0;
-    for (let tries = 0; tries < 60 && placed < 3; tries++) {
-      const x = 30 + Math.floor(r() * (IGEL.W - 60));
-      const sy = surfaceY(m, x);
-      if (sy > IGEL.WATER_Y - 22 || sy < 60 || used.some((u) => Math.abs(u - x) < 70)) continue;
-      if (Math.abs(surfaceY(m, x - 6) - surfaceY(m, x + 6)) > 6) continue;
-      // Nur auf festem Boden (nicht auf schwebenden Felsen oder über Höhlen)
-      if (![6, 14, 24, 34].every((dy) => m[(sy + dy) * IGEL.W + x] === 1)) continue;
-      const pix = items[Math.floor(r() * items.length)]();
-      ctx.drawImage(pix.canvas, Math.round(x - pix.w / 2), sy - pix.h + 3);
-      used.push(x);
-      placed++;
-    }
   }
 
   /** Neue Terrain-Operationen einarbeiten: Krater stanzen bzw. Surfbrett-Pixel aufmalen */
   private applyCraters(st: IgelState) {
     if (!this.mask || !this.tex || this.applied >= st.ops.length) return;
-    const ctx = this.tex.getContext();
-    for (; this.applied < st.ops.length; this.applied++) {
-      const op = st.ops[this.applied];
-      const [cx, cy, r, kind] = op;
-      applyOp(this.mask, op);
-      const pad = kind === 'add' ? 1 : 4;
-      const x0 = Math.max(0, Math.floor(cx - r - pad));
-      const y0 = Math.max(0, Math.floor(cy - r - pad));
-      const x1 = Math.min(IGEL.W, Math.ceil(cx + r + pad));
-      const y1 = Math.min(IGEL.H, Math.ceil(cy + r + pad));
-      if (x1 <= x0 || y1 <= y0) continue;
-      const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0);
-      if (kind === 'add') this.paintPlank(img, x0, y0, cx, cy, r);
-      else paintCrater(img, x0, y0, this.mask, cx, cy, r);
-      ctx.putImageData(img, x0, y0);
-    }
-    this.tex.refresh();
-  }
-
-  /** Surfbrett: neue feste Pixel in Brettfarben (gelb mit rotem Streifen, dunkler Rand unten) */
-  private paintPlank(img: ImageData, ox: number, oy: number, cx: number, cy: number, r: number) {
-    const d = img.data;
-    for (let j = 0; j < img.height; j++) {
-      for (let i = 0; i < img.width; i++) {
-        const x = ox + i;
-        const y = oy + j;
-        if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > r + 0.01 || !this.mask![y * IGEL.W + x]) continue;
-        const k = (j * img.width + i) * 4;
-        if (d[k + 3] > 0 && !(d[k] === 0xff && d[k + 1] === 0xd2) && !(d[k] === 0xe0 && d[k + 1] === 0x50) && !(d[k] === 0xa8 && d[k + 1] === 0x34)) continue;
-        const dy = y + 0.5 - cy;
-        const [rr, gg, bb] = dy > r * 0.45 ? [0xa8, 0x34, 0x2a] : Math.abs(dy) < 0.6 ? [0xe0, 0x50, 0x3f] : [0xff, 0xd2, 0x5e];
-        d[k] = rr;
-        d[k + 1] = gg;
-        d[k + 2] = bb;
-        d[k + 3] = 255;
-      }
-    }
+    this.applied = stampOps(this.mask, this.tex, st.ops, this.applied, st.ops.length);
   }
 
   // ---------------------------------------------------------------- Zustand
@@ -262,12 +248,13 @@ export class IgelScene extends Phaser.Scene {
       if (!v) {
         const look = playerById(h.owner)?.look ?? { skin: 0, hair: 0, hairStyle: 0, shirt: 0, beard: 0 };
         const spr = this.add.image(0, 2, this.hogTex(look, 0)).setOrigin(0.5, 1);
+        const umb = this.add.image(0, -8, ensureTex(this, 'igel_umb', parasolPix)).setOrigin(0.5, 1).setVisible(false);
         const label = txt(this, 0, -24, String(h.hp), { color: colorOf(st, h.owner) });
-        const c = this.add.container(h.x, h.y, [spr, label]).setDepth(10);
+        const c = this.add.container(h.x, h.y, [umb, spr, label]).setDepth(10);
         // Spieler-Teams: kleines Fähnchen in Teamfarbe links neben der HP-Zahl
         const sq = squadOf(st, h.owner);
         if (sq >= 0) c.add(this.add.rectangle(-17, -24, 4, 6, colorNum(st.squads![sq].color)).setStrokeStyle(1, 0x2d1b12));
-        v = { c, spr, label, x: h.x, y: h.y, state: 'ok', look };
+        v = { c, spr, umb, label, x: h.x, y: h.y, state: 'ok', look };
         this.hogs.set(h.id, v);
       }
       if (h.state !== v.state) {
@@ -334,6 +321,21 @@ export class IgelScene extends Phaser.Scene {
     }
     this.shownSum = sum;
 
+    // Themenkarte: im Countdown groß, einmal angesagt
+    this.themeCard.setVisible(st.sub === 'countdown' && !this.rp);
+    if (st.sub === 'countdown' && this.themeKey !== `${st.seed}`) this.showThemeCard(st);
+
+    // „Schuss des Abends“: Server schaltet auf `replay` – kurz das Siegerbanner, dann die Zeitlupe
+    if (st.sub === 'replay' && st.best && this.rpSeed !== st.seed) {
+      this.rpSeed = st.seed;
+      const best = st.best;
+      this.time.delayedCall(REPLAY.LEAD_MS - 300, () => {
+        const now = this.latest?.mini?.kind === 'igel' ? this.latest.mini.state : null;
+        if (now?.sub === 'replay' && now.seed === st.seed) this.startReplay(now, best);
+      });
+    }
+    if (this.rp && st.sub !== 'replay') this.stopReplay();
+
     // Phasenwechsel im Simultan-Modus
     if (st.sub !== this.lastSub) {
       if (st.sub === 'aimAll') {
@@ -351,7 +353,10 @@ export class IgelScene extends Phaser.Scene {
       this.banner.setText('IGEL-KRIEG!');
       const sq = st.squads ? `${st.squads.map((s) => s.name).join(' · ')}  –  ` : '';
       this.bannerSub.setText(`${sq}${st.simul ? 'ALLE GLEICHZEITIG  –  ' : ''}Los geht's in ${Math.max(1, Math.ceil(st.endsIn / 1000))} ...`);
-    } else if (st.sub === 'over') {
+    } else if (this.rp) {
+      this.banner.setText('');
+      this.bannerSub.setText('');
+    } else if (st.sub === 'over' || st.sub === 'replay') {
       const winners = st.teams.filter((id) => !st.out.includes(id));
       const squadWin = st.squads ? st.squads.filter((s) => s.members.some((m) => winners.includes(m))) : null;
       const n = squadWin ? squadWin.length : winners.length;
@@ -586,11 +591,30 @@ export class IgelScene extends Phaser.Scene {
         sfx('tick', { x: f.x, pitch: 2, delay: 0.25 });
         break;
       }
+      case 'rope': {
+        // Liane schnellt hinaus (bei Fehlschuss verblasst sie wieder)
+        const x2 = f.x2 ?? f.x;
+        const y2 = f.y2 ?? f.y;
+        const line = this.add.line(0, 0, f.x, f.y, x2, y2, 0x5fa437).setOrigin(0, 0).setLineWidth(1.5).setDepth(9);
+        this.tweens.add({ targets: line, alpha: 0, duration: f.text === 'miss' ? 450 : 200, onComplete: () => line.destroy() });
+        sfx(f.text === 'miss' ? 'whoosh' : 'catch', { x: x2, vol: 0.6, pitch: 1.3 });
+        if (f.text !== 'miss') this.juice.burst(x2, y2, 'sand', 4);
+        break;
+      }
+      case 'dig':
+        this.juice.burst(f.x, f.y, 'sand', 14);
+        sfx('crack', { x: f.x, vol: 0.5, pitch: 0.8 });
+        break;
+      case 'quip':
+        this.showQuip(f.text ?? '');
+        break;
       case 'dmg': {
-        const t = txt(this, f.x, f.y - 8, f.text ?? '', { color: '#ff6b5a' }).setDepth(43);
+        const heal = f.text?.startsWith('+');
+        const t = txt(this, f.x, f.y - 8, f.text ?? '', { color: heal ? '#9ad65a' : '#ff6b5a' }).setDepth(43);
         this.tweens.add({ targets: t, y: t.y - 18, duration: 1100, ease: 'Quad.out' });
         this.tweens.add({ targets: t, alpha: 0, duration: 400, delay: 900, onComplete: () => t.destroy() });
-        sfx('hit', { x: f.x, vol: 0.6 });
+        if (heal) sfx('powerup', { x: f.x, vol: 0.4, pitch: 1.5 });
+        else sfx('hit', { x: f.x, vol: 0.6 });
         break;
       }
       case 'splash': {
@@ -657,9 +681,226 @@ export class IgelScene extends Phaser.Scene {
     }
   }
 
+  // ---------------------------------------------------------------- Themenkarte, Sprecher
+
+  private showThemeCard(st: IgelState) {
+    this.themeKey = `${st.seed}`;
+    const th = IGEL_THEMES[st.theme];
+    if (!th) return;
+    this.hudBuilding = true;
+    try {
+      this.themeCard.removeAll(true);
+      this.themeCard.add(panel(this, 90, 144, 300, 84, 'dark'));
+      this.themeCard.add(txt(this, IGEL.W / 2, 151, 'THEMENKARTE', { color: '#9fb6c4' }));
+      this.themeCard.add(txt(this, IGEL.W / 2, 165, th.name.toUpperCase(), { size: 16, color: GOLD }));
+      this.themeCard.add(txt(this, IGEL.W / 2, 189, th.text, { wrap: 280 }));
+    } finally {
+      this.hudBuilding = false;
+    }
+    this.themeCard.setScale(1).setAlpha(0).setY(10);
+    this.tweens.add({ targets: this.themeCard, alpha: 1, y: 0, duration: 350, ease: 'Back.out' });
+    sfx('drumroll', { vol: 0.5 });
+    this.speak(`Themenkarte: ${th.name}! ${th.text}`, true);
+  }
+
+  /** Sprecher-Kommentar: Laufschrift unter dem HUD + Ansage */
+  private showQuip(text: string) {
+    if (!text) return;
+    this.quipText.setText(text).setVisible(true).setScale(0.4);
+    this.tweens.add({ targets: this.quipText, scale: 1, duration: 180, ease: 'Back.out' });
+    this.quipUntil = this.time.now + 2800;
+    this.speak(text);
+  }
+
+  /** Ansage über say(): Bots ohne „Bot“, höchstens alle 2,5 s (außer `force`) */
+  private speak(text: string, force = false) {
+    const now = performance.now();
+    if (!force && now - this.lastSay < 2500) return;
+    this.lastSay = now;
+    say(text.replace(/\bBot\s+/g, ''), force ? { interrupt: true } : {});
+  }
+
+  // ---------------------------------------------------------------- „Schuss des Abends“
+
+  /** Wiederholung starten: eigenes Terrain (Stand vor dem Schuss), eigene Figuren, SnapBuffer im Zeitlupen-Modus */
+  private startReplay(st: IgelState, best: IgelReplay) {
+    if (this.rp || best.frames.length < 2) return;
+    // Live-Ansicht ausblenden
+    this.terrainImg?.setVisible(false);
+    for (const v of this.hogs.values()) v.c.setVisible(false);
+    for (const v of this.objViews.values()) (v.img.setVisible(false), v.chute?.setVisible(false));
+    for (const v of this.projs.values()) v.img.setVisible(false);
+    for (const r of this.rings) r.img.setVisible(false);
+    for (const b of this.bubbles) b.t.destroy();
+    this.bubbles = [];
+    this.activeName.setVisible(false);
+    this.aimG.clear();
+    this.ropeG.clear();
+    this.themeCard.setVisible(false);
+    // Terrain wie vor dem Schuss: Seed + die ersten ops0 Operationen (gleiche Bemalung wie live)
+    if (this.textures.exists(REPLAY_KEY)) this.textures.remove(REPLAY_KEY);
+    const mask = genTerrain(st.seed);
+    const tex = this.textures.createCanvas(REPLAY_KEY, IGEL.W, IGEL.H)!;
+    const ctx = tex.getContext();
+    const img0 = ctx.createImageData(IGEL.W, IGEL.H);
+    paintTerrain(img0, mask);
+    ctx.putImageData(img0, 0, 0);
+    paintDecor(ctx, st.seed, mask);
+    const applied = stampOps(mask, tex, st.ops, 0, best.ops0);
+    const img = this.add.image(0, 0, REPLAY_KEY).setOrigin(0, 0).setDepth(0);
+    // Wiedergabe über den gemeinsamen SnapBuffer: alle Bilder rein, dann replay() in Zeitlupe
+    const buf = new SnapBuffer<IgelRecFrame>();
+    buf.keep = 60_000;
+    for (const f of best.frames) buf.push(f.t, f);
+    const t0 = best.frames[0].t;
+    const t1 = best.frames[best.frames.length - 1].t;
+    buf.replay(t0, t1, best.rate);
+    const g = this.add.graphics().setDepth(9);
+    const owner = st.hogs.find((h) => h.owner === best.owner);
+    this.rp = { best, buf, mask, tex, img, applied, hogs: new Map(), projs: new Map(), objs: new Map(), g, fxIdx: 0, camX: owner?.x ?? best.fx0, camY: (owner?.y ?? best.fy0) - 10 };
+    // Effekte (Partikel, Tweens) laufen im selben Tempo mit
+    this.juice.slowMo(best.rate, best.ms + 200);
+    const cam = this.cameras.main;
+    cam.stopFollow();
+    cam.panEffect.reset();
+    cam.zoomTo(1.4, 500, 'Sine.easeInOut', true);
+    const name = playerById(best.owner)?.name ?? '?';
+    const extra = [`${best.dmg} Schaden`, best.kos ? `${best.kos} K.O.` : '', WEAPONS[best.weapon]?.short ?? ''].filter(Boolean).join(' · ');
+    this.rpBg.setVisible(true);
+    this.rpTitle.setText('SCHUSS DES ABENDS');
+    this.rpSub.setText(`<< ${name.replace(/^Bot\s+/, '')} · ${extra}`);
+    this.quipUntil = 0;
+    this.quipText.setVisible(false);
+    this.banner.setText('');
+    this.bannerSub.setText('');
+    sfx('drumroll', { vol: 0.6 });
+    this.speak(`Schuss des Abends: ${name}!`, true);
+  }
+
+  private updateReplay(time: number) {
+    const rp = this.rp!;
+    const s = rp.buf.sample();
+    if (!s) return;
+    if (!rp.buf.replaying) {
+      this.finishReplay();
+      return;
+    }
+    const { a, b, f, t } = s;
+    // Terrain: Operationen bis zum Bild vor der Uhr
+    if (a.o > rp.applied) rp.applied = stampOps(rp.mask, rp.tex, this.latestIgel()?.ops ?? [], rp.applied, a.o);
+    // Effekte zur passenden Zeit (Sprechblasen und Sprecher nicht)
+    const fx = rp.best.fx;
+    while (rp.fxIdx < fx.length && fx[rp.fxIdx].t <= t) {
+      const e = fx[rp.fxIdx++];
+      if (e.type !== 'taunt' && e.type !== 'quip' && e.type !== 'water') this.playFx(e);
+    }
+    const live = this.latestIgel();
+    this.drawWater(a.w ?? live?.water ?? IGEL.WATER_Y, time, 1);
+    rp.g.clear();
+    // Igel
+    b.h.forEach((row, id) => {
+      const ra = a.h[id] ?? row;
+      let v = rp.hogs.get(id);
+      if (!v) {
+        const owner = live?.hogs[id]?.owner;
+        const look = (owner && playerById(owner)?.look) || { skin: 0, hair: 0, hairStyle: 0, shirt: 0, beard: 0 };
+        const spr = this.add.image(0, 2, this.hogTex(look, 0)).setOrigin(0.5, 1);
+        const umb = this.add.image(0, -8, ensureTex(this, 'igel_umb', parasolPix)).setOrigin(0.5, 1).setVisible(false);
+        const c = this.add.container(row[0], row[1], [umb, spr]).setDepth(10);
+        v = { c, spr, umb, look };
+        rp.hogs.set(id, v);
+      }
+      const x = lerpJump(ra[0], row[0], f, 40);
+      const y = lerpJump(ra[1], row[1], f, 40);
+      const state = f < 0.5 ? ra[3] : row[3];
+      const flags = row[4];
+      v.c.setPosition(Math.round(x), Math.round(y)).setVisible(state !== 2);
+      if (state === 1) v.spr.setTexture(ensureTex(this, 'igel_castle', sandcastle)).setAngle(0).setFlipX(false);
+      else v.spr.setTexture(this.hogTex(v.look, 0)).setFlipX(row[2] < 0).setAngle(flags & 1 && !(flags & 6) ? Math.sin(time / 60) * 12 : 0);
+      v.umb.setVisible(state === 0 && !!(flags & 4));
+      if (flags & 2 && row.length >= 7) drawRope(rp.g, row[5], row[6], x, y - 5);
+    });
+    // Geschosse (Kamera folgt dem ersten)
+    const alive = new Set<number>();
+    let follow: { x: number; y: number } | null = null;
+    for (const p of b.p) {
+      alive.add(p[0]);
+      const pa = a.p.find((q) => q[0] === p[0]) ?? p;
+      const x = lerp(pa[2], p[2], f);
+      const y = lerp(pa[3], p[3], f);
+      let img = rp.projs.get(p[0]);
+      if (!img) {
+        const [texKey, make] = PROJ_TEX[p[1]] ?? PROJ_TEX.bazooka;
+        img = this.add.image(x, y, ensureTex(this, texKey, make)).setDepth(20);
+        rp.projs.set(p[0], img);
+      }
+      img.setPosition(Math.round(x), Math.round(y)).setAngle(p[1] === 'dynamite' ? 0 : time * 0.4);
+      if (!follow && p[1] !== 'frag') follow = { x, y };
+    }
+    for (const [id, img] of rp.projs) if (!alive.has(id)) (img.destroy(), rp.projs.delete(id));
+    // Gegenstände
+    const objAlive = new Set<number>();
+    for (const o of b.b) {
+      objAlive.add(o[0]);
+      let img = rp.objs.get(o[0]);
+      if (!img) {
+        const tex = o[1] === 'barrel' ? ensureTex(this, 'igel_gas', gasCan) : o[1] === 'crate' ? ensureTex(this, 'igel_crate', crateBox) : ensureTex(this, 'igel_mine_1', () => urchin(true));
+        img = this.add.image(o[2], o[3] + 1, tex).setOrigin(0.5, 1).setDepth(9);
+        rp.objs.set(o[0], img);
+      }
+      img.setPosition(Math.round(o[2]), Math.round(o[3] + 1));
+    }
+    for (const [id, img] of rp.objs) if (!objAlive.has(id)) (img.destroy(), rp.objs.delete(id));
+    // Kamera: dem Geschoss folgen, sonst zum großen Einschlag gleiten
+    const tx = follow ? follow.x : rp.best.fx0;
+    const ty = follow ? follow.y : rp.best.fy0;
+    rp.camX += (tx - rp.camX) * 0.08;
+    rp.camY += (ty - rp.camY) * 0.08;
+    this.cameras.main.centerOn(rp.camX, rp.camY);
+  }
+
+  private latestIgel(): IgelState | null {
+    return this.latest?.mini?.kind === 'igel' ? this.latest.mini.state : null;
+  }
+
+  /** Wiederholung fertig: Siegerbanner wieder, Kamera zurück */
+  private finishReplay() {
+    this.stopReplay();
+    const st = this.latestIgel();
+    if (st) this.onState(this.latest!);
+    sfx('cheer', { vol: 0.7 });
+  }
+
+  /** Wiederholung abbauen und die Live-Ansicht zurückholen */
+  private stopReplay() {
+    const rp = this.rp;
+    if (!rp) return;
+    this.rp = null;
+    for (const v of rp.hogs.values()) v.c.destroy();
+    for (const v of rp.projs.values()) v.destroy();
+    for (const v of rp.objs.values()) v.destroy();
+    rp.g.destroy();
+    rp.img.destroy();
+    if (this.textures.exists(REPLAY_KEY)) this.textures.remove(REPLAY_KEY);
+    this.juice.slowMo(1, 0);
+    this.terrainImg?.setVisible(true);
+    for (const v of this.hogs.values()) v.c.setVisible(v.state !== 'drowned');
+    for (const v of this.objViews.values()) (v.img.setVisible(true), v.chute?.setVisible(true));
+    for (const v of this.projs.values()) v.img.setVisible(true);
+    for (const r of this.rings) r.img.setVisible(true);
+    this.rpBg.setVisible(false);
+    this.rpTitle.setText('');
+    this.rpSub.setText('');
+    const cam = this.cameras.main;
+    cam.pan(IGEL.W / 2, IGEL.H / 2, 500, 'Sine.easeInOut', true);
+    cam.zoomTo(1, 500, 'Sine.easeInOut', true);
+    this.camMode = 'overview';
+  }
+
   // ---------------------------------------------------------------- Kamera
 
   private updateCamera(st: IgelState) {
+    if (this.rp) return;
     const cam = this.cameras.main;
     // Alle gleichzeitig: immer die ganze Insel im Blick
     if (st.simul) {
@@ -747,7 +988,7 @@ export class IgelScene extends Phaser.Scene {
       const key = `${Math.round(hx)},${Math.round(hy)},${a},${p},${weapon},${st.wind},${st.ops.length}`;
       let c = this.aimCache.get(hogId);
       if (!c || c.key !== key) {
-        c = { key, pts: aimPath(this.mask, { x: hx, y: cy }, a, p, st.wind, st.water, weapon) };
+        c = { key, pts: aimPath(this.mask, { x: hx, y: cy }, a, p, st.wind * (st.windMul ?? 1), st.water, weapon, st.grav ?? 1) };
         this.aimCache.set(hogId, c);
       }
       const n = Math.min(c.pts.length, Math.max(8, Math.ceil(c.pts.length * AIM_HELP)));
@@ -794,7 +1035,17 @@ export class IgelScene extends Phaser.Scene {
       p.r.setPosition(Math.round(p.x), Math.round(p.y + Math.sin(time / 300 + p.ph) * 3)).setAlpha(Math.min(0.9, Math.abs(st.wind) * 1.2));
     }
 
-    // Igel
+    if (this.quipUntil && time > this.quipUntil) {
+      this.quipUntil = 0;
+      this.quipText.setVisible(false);
+    }
+    if (this.rp) {
+      this.updateReplay(time);
+      return;
+    }
+
+    // Igel (+ Lianen-Seile dahinter)
+    this.ropeG.clear();
     for (const h of st.hogs) {
       const v = this.hogs.get(h.id);
       if (!v || h.state === 'drowned') continue;
@@ -805,9 +1056,12 @@ export class IgelScene extends Phaser.Scene {
       if (h.state === 'ok') {
         const frame = h.walking ? Math.floor(time / 130) % 2 : 0;
         v.spr.setTexture(this.hogTex(v.look, frame)).setFlipX(h.dir < 0);
-        v.spr.setAngle(h.flying ? Math.sin(time / 60) * 12 : 0);
+        // Am Seil und unterm Schirm wackelt der Igel nicht wild herum
+        v.spr.setAngle(h.flying && !h.rope && !h.chute ? Math.sin(time / 60) * 12 : h.chute ? Math.sin(time / 300) * 5 : 0);
         v.spr.setY(h.walking ? 2 - (Math.floor(time / 130) % 2) : 2);
+        if (h.rope) drawRope(this.ropeG, h.rope[0], h.rope[1], v.x, v.y - 5);
       }
+      v.umb.setVisible(h.state === 'ok' && !!h.chute).setAngle(Math.sin(time / 300) * 6);
       v.c.setDepth(h.id === st.activeHog ? 12 : 10);
     }
 
@@ -882,8 +1136,17 @@ export class IgelScene extends Phaser.Scene {
       else v.img.clearTint();
     }
 
-    // Wasser (steigt im Sudden Death)
-    this.waterY += (st.water - this.waterY) * 0.05;
+    this.drawWater(st.water, time, 0.05);
+    for (const r of this.rings) {
+      r.img.x += r.vx * (1 / 60);
+      r.img.y = this.waterY + Math.sin(time / 300 + r.img.x / 20) * 1.5;
+      if (r.img.x < -20 || r.img.x > IGEL.W + 20) r.img.setVisible(false);
+    }
+  }
+
+  /** Wasser (steigt im Sudden Death; `k` = wie schnell der Spiegel nachzieht) */
+  private drawWater(target: number, time: number, k: number) {
+    this.waterY += (target - this.waterY) * k;
     const wy = this.waterY;
     const g = this.waterG;
     g.clear();
@@ -893,11 +1156,6 @@ export class IgelScene extends Phaser.Scene {
       const off = Math.round(Math.sin(x / 11 + time / 400) * 1.5 + Math.sin(x / 5 + time / 260) * 0.7);
       g.fillStyle(0x4aa2dc, 0.9).fillRect(x, wy + off, 3, 3);
       g.fillStyle(0xeaf8ff, 0.95).fillRect(x, wy + off - 1, 3, 1);
-    }
-    for (const r of this.rings) {
-      r.img.x += r.vx * (1 / 60);
-      r.img.y = wy + Math.sin(time / 300 + r.img.x / 20) * 1.5;
-      if (r.img.x < -20 || r.img.x > IGEL.W + 20) r.img.setVisible(false);
     }
   }
 }
@@ -1020,3 +1278,109 @@ const PROJ_TEX: Record<IgelProjType, [string, () => Pix]> = {
   gull: ['igel_egg', gullEgg],
   dynamite: ['igel_dyn', boeller],
 };
+
+// ---------------------------------------------------------------- Terrain-Helfer (live und Wiederholung)
+
+/** Operationen [from, to) in Maske und Terrain-Textur einarbeiten; liefert den neuen Stand */
+function stampOps(mask: Mask, tex: Phaser.Textures.CanvasTexture, ops: IgelOp[], from: number, to: number) {
+  const ctx = tex.getContext();
+  let i = from;
+  for (; i < to && i < ops.length; i++) {
+    const op = ops[i];
+    const [cx, cy, r, kind] = op;
+    applyOp(mask, op);
+    const pad = kind === 'add' ? 1 : 4;
+    const x0 = Math.max(0, Math.floor(cx - r - pad));
+    const y0 = Math.max(0, Math.floor(cy - r - pad));
+    const x1 = Math.min(IGEL.W, Math.ceil(cx + r + pad));
+    const y1 = Math.min(IGEL.H, Math.ceil(cy + r + pad));
+    if (x1 <= x0 || y1 <= y0) continue;
+    const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+    if (kind === 'add') paintPlank(img, x0, y0, cx, cy, r, mask);
+    else paintCrater(img, x0, y0, mask, cx, cy, r);
+    ctx.putImageData(img, x0, y0);
+  }
+  tex.refresh();
+  return i;
+}
+
+/** Palmen und Sonnenschirm direkt ins Terrain malen (gehen bei Explosionen mit kaputt) */
+function paintDecor(ctx: CanvasRenderingContext2D, seed: number, m: Mask) {
+  const r = seeded(seed ^ 0x5eed);
+  const used: number[] = [];
+  const items = [() => O.palm(6), () => O.palm(11), () => O.umbrella(C.red), () => O.umbrella(C.blue)];
+  let placed = 0;
+  for (let tries = 0; tries < 60 && placed < 3; tries++) {
+    const x = 30 + Math.floor(r() * (IGEL.W - 60));
+    const sy = surfaceY(m, x);
+    if (sy > IGEL.WATER_Y - 22 || sy < 60 || used.some((u) => Math.abs(u - x) < 70)) continue;
+    if (Math.abs(surfaceY(m, x - 6) - surfaceY(m, x + 6)) > 6) continue;
+    // Nur auf festem Boden (nicht auf schwebenden Felsen oder über Höhlen)
+    if (![6, 14, 24, 34].every((dy) => m[(sy + dy) * IGEL.W + x] === 1)) continue;
+    const pix = items[Math.floor(r() * items.length)]();
+    ctx.drawImage(pix.canvas, Math.round(x - pix.w / 2), sy - pix.h + 3);
+    used.push(x);
+    placed++;
+  }
+}
+
+/** Surfbrett: neue feste Pixel in Brettfarben (gelb mit rotem Streifen, dunkler Rand unten) */
+function paintPlank(img: ImageData, ox: number, oy: number, cx: number, cy: number, r: number, mask: Mask) {
+  const d = img.data;
+  for (let j = 0; j < img.height; j++) {
+    for (let i = 0; i < img.width; i++) {
+      const x = ox + i;
+      const y = oy + j;
+      if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > r + 0.01 || !mask[y * IGEL.W + x]) continue;
+      const k = (j * img.width + i) * 4;
+      if (d[k + 3] > 0 && !(d[k] === 0xff && d[k + 1] === 0xd2) && !(d[k] === 0xe0 && d[k + 1] === 0x50) && !(d[k] === 0xa8 && d[k + 1] === 0x34)) continue;
+      const dy = y + 0.5 - cy;
+      const [rr, gg, bb] = dy > r * 0.45 ? [0xa8, 0x34, 0x2a] : Math.abs(dy) < 0.6 ? [0xe0, 0x50, 0x3f] : [0xff, 0xd2, 0x5e];
+      d[k] = rr;
+      d[k + 1] = gg;
+      d[k + 2] = bb;
+      d[k + 3] = 255;
+    }
+  }
+}
+
+/** Liane vom Anker zum Igel (grün mit dunklem Rand, Blättchen am Anker) */
+function drawRope(g: Phaser.GameObjects.Graphics, ax: number, ay: number, x: number, y: number) {
+  g.lineStyle(3, 0x2d1b12, 0.8).lineBetween(ax, ay, x, y);
+  g.lineStyle(1.5, 0x5fa437, 1).lineBetween(ax, ay, x, y);
+  g.fillStyle(0x46b04a).fillRect(Math.round(ax) - 2, Math.round(ay) - 1, 4, 3);
+  g.fillStyle(0x2d1b12).fillRect(Math.round(ax) - 1, Math.round(ay), 2, 1);
+}
+
+/** Sonnenschirm-Gleiter: rot-weiß gestreifter Schirm mit Stiel */
+function parasolPix(): Pix {
+  const p = new Pix(17, 13);
+  p.ellipse(8.5, 5, 8, 4.5, '#fdf7ea');
+  p.overlayOn(() => {
+    for (let x = 0; x < 17; x++) if (Math.floor(x / 3) % 2 === 0) p.vline(x, 0, 6, '#e0503f');
+  });
+  p.outline(OUTLINE);
+  p.g.clearRect(0, 6, 17, 7);
+  p.hline(1, 5, 15, OUTLINE);
+  p.vline(8, 6, 7, '#5e4e40');
+  return p;
+}
+
+/** Laufende Wiederholung „Schuss des Abends“ (eigene Terrain-Kopie, eigene Figuren) */
+interface Replay {
+  best: IgelReplay;
+  buf: SnapBuffer<IgelRecFrame>;
+  mask: Mask;
+  tex: Phaser.Textures.CanvasTexture;
+  img: Phaser.GameObjects.Image;
+  applied: number;
+  hogs: Map<number, { c: Phaser.GameObjects.Container; spr: Phaser.GameObjects.Image; umb: Phaser.GameObjects.Image; look: Look }>;
+  projs: Map<number, Phaser.GameObjects.Image>;
+  objs: Map<number, Phaser.GameObjects.Image>;
+  g: Phaser.GameObjects.Graphics;
+  fxIdx: number;
+  camX: number;
+  camY: number;
+}
+
+const REPLAY_KEY = 'igel_replay_terrain';
