@@ -8,6 +8,7 @@ import { C } from '../art/palette';
 import { paintSky } from '../art/ground';
 import { Pix, rng, shade } from '../art/pix';
 import { bus, getState, playerById } from './store';
+import { Juice } from './juice';
 import { Countdown, background, ensureTex, txt } from './ui';
 
 const A = KURVE.ARENA;
@@ -25,20 +26,22 @@ function powerIcon(type: KurvePower): Pix {
   if (type === 'turbo') {
     // Blitz
     p.map(3, 2, ['...WW', '..WW.', '.WWWW', '...WW', '..WW.', '.WW..', '.W...'], { W, D });
-  } else if (type === 'slow') {
+  } else {
     // Schnecke
     p.map(2, 3, ['..DDD...', '.DWWWD..', '.DWDWD..', '.DWWWD.W', 'WWWWWWWW', '........'], { W, D: '#7a4a26' });
-  } else {
-    // Portal-Ring
-    p.map(3, 3, ['.WWW.', 'W...W', 'W.D.W', 'W...W', '.WWW.'], { W, D: W });
   }
   p.outline(C.outline);
   return p;
 }
 
+/** Rand ist offen: Position zurück in die Spielfläche falten (rechts raus = links rein) */
+const wrapX = (x: number) => (x < A.x ? x + A.w : x >= A.x + A.w ? x - A.w : x);
+const wrapY = (y: number) => (y < A.y ? y + A.h : y >= A.y + A.h ? y - A.h : y);
+
 /**
  * Kurven-Duell auf dem TV. Die Spuren kommen nur stückweise (letzte Punkte + Startindex)
  * und werden inkrementell in eine RenderTexture gemalt – neue Runde = leeren.
+ * Die Ränder sind offen: wer rechts rausfährt, kommt links wieder rein (Funken an beiden Stellen).
  */
 export class KurveScene extends Phaser.Scene {
   private rt!: Phaser.GameObjects.RenderTexture;
@@ -50,6 +53,9 @@ export class KurveScene extends Phaser.Scene {
   private stormText!: Phaser.GameObjects.Text;
   private cursors = new Map<string, TrailCursor>();
   private labels = new Map<string, Phaser.GameObjects.Text>();
+  /** Letzte Kopfposition pro Spieler – ein großer Sprung = über den Rand gefahren */
+  private lastPos = new Map<string, { x: number; y: number }>();
+  private juice!: Juice;
   private powerImgs = new Map<number, Phaser.GameObjects.Image>();
   private latest: KurveState | null = null;
   private latestAt = 0;
@@ -68,6 +74,7 @@ export class KurveScene extends Phaser.Scene {
     // Szene wird wiederverwendet → alles zurücksetzen
     this.cursors.clear();
     this.labels.clear();
+    this.lastPos.clear();
     this.powerImgs.clear();
     this.latest = null;
     this.round = 0;
@@ -89,6 +96,9 @@ export class KurveScene extends Phaser.Scene {
       p.speckle(A.x, A.y, A.w, A.h, '#4a3d5f', 1400, r);
       p.speckle(A.x, A.y, A.w, A.h, '#352a47', 900, r);
       p.speckle(A.x, A.y, A.w, A.h, '#5a4b70', 120, r);
+      // Offener Rand: leuchtende Punktlinie statt fester Bande
+      for (let x = A.x; x < A.x + A.w; x += 3) p.px(x, A.y, '#8a6fb0').px(x, A.y + A.h - 1, '#8a6fb0');
+      for (let y = A.y; y < A.y + A.h; y += 3) p.px(A.x, y, '#8a6fb0').px(A.x + A.w - 1, y, '#8a6fb0');
       // Holzsteg-Rahmen
       for (let x = 0; x < WORLD.W; x += 12) {
         p.rect(x, A.y - 4, 11, 4, C.woodDark).hline(x, A.y - 4, 11, C.wood);
@@ -109,6 +119,7 @@ export class KurveScene extends Phaser.Scene {
     this.rt = this.add.renderTexture(0, 0, WORLD.W, WORLD.H).setOrigin(0, 0).setDepth(10);
     this.pen = this.make.graphics({}, false);
     this.heads = this.add.graphics().setDepth(30);
+    this.juice = new Juice(this, { depth: 36 });
     this.hud = this.add.container(0, 0).setDepth(1000);
     this.banner = txt(this, WORLD.W / 2, 112, '', { size: 24, color: C.gold }).setDepth(1001);
     this.subText = txt(this, WORLD.W / 2, 90, '', { size: 16 }).setDepth(1001);
@@ -125,6 +136,7 @@ export class KurveScene extends Phaser.Scene {
     this.round = st.round;
     this.rt.clear();
     this.cursors.clear();
+    this.lastPos.clear();
     for (const l of this.labels.values()) l.destroy();
     this.labels.clear();
     for (const img of this.powerImgs.values()) img.destroy();
@@ -157,6 +169,17 @@ export class KurveScene extends Phaser.Scene {
     }
     this.rt.draw(this.pen);
     this.pen.clear();
+
+    // Über den Rand gefahren? Funken an Aus- und Eintrittsstelle
+    for (const [id, h] of Object.entries(st.players)) {
+      const prev = this.lastPos.get(id);
+      this.lastPos.set(id, { x: h.x, y: h.y });
+      if (!prev || !h.alive || st.sub !== 'play') continue;
+      if (Math.abs(h.x - prev.x) > A.w / 2 || Math.abs(h.y - prev.y) > A.h / 2) {
+        this.juice.burst(prev.x, prev.y, 'spark', 4);
+        this.juice.burst(h.x, h.y, 'spark', 4);
+      }
+    }
 
     // Power-ups
     const present = new Set(st.powerups.map((p) => p.id));
@@ -259,8 +282,8 @@ export class KurveScene extends Phaser.Scene {
       }
       // Kopf leicht vorhersagen, damit er zwischen den Updates nicht ruckelt
       const moving = st.sub === 'play';
-      const x = h.x + (moving ? Math.cos(h.a) * h.v * ahead : 0);
-      const y = h.y + (moving ? Math.sin(h.a) * h.v * ahead : 0);
+      const x = wrapX(h.x + (moving ? Math.cos(h.a) * h.v * ahead : 0));
+      const y = wrapY(h.y + (moving ? Math.sin(h.a) * h.v * ahead : 0));
       if (counting) {
         // Blinken + Richtungspfeil, damit jeder seinen Kopf findet
         if (Math.floor(now / 160) % 2 === 0) {
@@ -269,7 +292,6 @@ export class KurveScene extends Phaser.Scene {
         g.fillStyle(col, 1);
         for (const d of [7, 10, 13]) g.fillRect(Math.round(x + Math.cos(h.a) * d) - 1, Math.round(y + Math.sin(h.a) * d) - 1, 2, 2);
       }
-      if (h.fx.includes('wrap')) g.lineStyle(1, 0xb07ae0, 0.5 + 0.5 * Math.sin(now / 80)).strokeCircle(x, y, 6);
       if (h.fx.includes('turbo')) g.lineStyle(1, 0xf0973a, 1).strokeCircle(x, y, 5 + (Math.floor(now / 60) % 3));
       if (h.fx.includes('slow')) g.lineStyle(1, 0x46b04a, 0.8).strokeCircle(x, y, 5);
       // In einer Lücke: heller Rand statt dunklem

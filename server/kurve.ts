@@ -9,7 +9,7 @@ const TICK_MS = 50;
 const GW = 480;
 const GH = 270;
 const A = KURVE.ARENA;
-const POWERS: KurvePower[] = ['turbo', 'slow', 'wrap'];
+const POWERS: KurvePower[] = ['turbo', 'slow'];
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -33,14 +33,13 @@ interface Racer {
   nextGap: number;
   turboUntil: number;
   slowUntil: number;
-  wrapUntil: number;
   v: number;
 }
 
 /**
  * Kurven-Duell (à la "Achtung, die Kurve!"): Jeder Kopf fährt ständig geradeaus und zieht eine Spur.
- * Am Handy nur LINKS/RECHTS halten. Wer gegen Rand oder Spur fährt, ist raus –
- * alle anderen bekommen dafür je einen Punkt. 5–7 Runden (je nach Spielerzahl).
+ * Am Handy nur LINKS/RECHTS halten. Wer gegen eine Spur fährt, ist raus – alle anderen bekommen
+ * dafür je einen Punkt. Die Ränder sind offen (rechts raus = links wieder rein). 5–7 Runden (je nach Spielerzahl).
  */
 export class KurveGame implements MiniGame {
   readonly kind = 'kurve' as const;
@@ -92,7 +91,7 @@ export class KurveGame implements MiniGame {
       }
       this.racers.set(id, {
         id, idx: i + 1, color: c, x: 0, y: 0, a: 0, turn: 0, alive: true, score: 0,
-        pts: [], steps: 0, gapLeft: 0, nextGap: 0, turboUntil: 0, slowUntil: 0, wrapUntil: 0, v: KURVE.SPEED,
+        pts: [], steps: 0, gapLeft: 0, nextGap: 0, turboUntil: 0, slowUntil: 0, v: KURVE.SPEED,
       });
     });
     this.startRound();
@@ -124,7 +123,7 @@ export class KurveGame implements MiniGame {
       r.steps = 0;
       r.gapLeft = 0;
       r.nextGap = this.gapDistance();
-      r.turboUntil = r.slowUntil = r.wrapUntil = 0;
+      r.turboUntil = r.slowUntil = 0;
       r.v = KURVE.SPEED;
     });
     this.sub = 'countdown';
@@ -165,7 +164,7 @@ export class KurveGame implements MiniGame {
     }
   }
 
-  /** Zufällige Startrichtung mit genug Platz bis zur Wand (nicht alle zur Mitte – sonst knallt's sofort) */
+  /** Zufällige Startrichtung mit etwas Platz bis zum Rand (nicht alle zur Mitte – sonst knallt's sofort; nicht gleich auf die andere Seite springen) */
   private spawnAngle(x: number, y: number) {
     const room = (a: number) => {
       const dx = Math.cos(a);
@@ -221,7 +220,6 @@ export class KurveGame implements MiniGame {
     const n = Math.max(1, Math.ceil(dist));
     const step = dist / n;
     const da = (r.turn * KURVE.TURN * dt) / n;
-    const wrap = now < r.wrapUntil;
     for (let i = 0; i < n; i++) {
       r.a += da;
       r.x += Math.cos(r.a) * step;
@@ -243,27 +241,23 @@ export class KurveGame implements MiniGame {
         }
       }
 
-      // Rand
+      // Rand ist offen: rechts raus → links wieder rein (oben/unten genauso)
       const minX = A.x + 1, maxX = A.x + A.w - 1, minY = A.y + 1, maxY = A.y + A.h - 1;
+      let wrapped = false;
       if (r.x < minX || r.x > maxX || r.y < minY || r.y > maxY) {
-        if (wrap) {
-          r.x = Math.max(minX, Math.min(maxX, r.x));
-          r.y = Math.max(minY, Math.min(maxY, r.y));
-          this.push(r, r.gapLeft > 0 ? 0 : 1);
-          if (r.x <= minX) r.x = maxX - 0.5;
-          else if (r.x >= maxX) r.x = minX + 0.5;
-          if (r.y <= minY) r.y = maxY - 0.5;
-          else if (r.y >= maxY) r.y = minY + 0.5;
-          this.push(r, 0);
-        } else {
-          r.x = Math.max(minX, Math.min(maxX, r.x));
-          r.y = Math.max(minY, Math.min(maxY, r.y));
-          this.die(r);
-          return false;
-        }
+        const outX = r.x < minX ? -1 : r.x > maxX ? 1 : 0;
+        const outY = r.y < minY ? -1 : r.y > maxY ? 1 : 0;
+        // Spur bis an den Rand ziehen, dann ohne Strich auf die andere Seite springen
+        r.x = Math.max(minX, Math.min(maxX, r.x));
+        r.y = Math.max(minY, Math.min(maxY, r.y));
+        this.push(r, r.gapLeft > 0 ? 0 : 1);
+        if (outX) r.x = outX < 0 ? maxX - 0.5 : minX + 0.5;
+        if (outY) r.y = outY < 0 ? maxY - 0.5 : minY + 0.5;
+        this.push(r, 0);
+        wrapped = true;
       }
 
-      if (this.hits(r)) {
+      if (this.hits(r, wrapped)) {
         this.die(r);
         return false;
       }
@@ -277,8 +271,11 @@ export class KurveGame implements MiniGame {
     r.pts.push(r1(r.x), r1(r.y), pen);
   }
 
-  /** Prüft drei Punkte knapp vor dem Kopf gegen das Raster */
-  private hits(r: Racer): boolean {
+  /**
+   * Prüft drei Punkte knapp vor dem Kopf gegen das Raster – direkt nach dem Sprung über den Rand
+   * auch die Landestelle selbst (sonst rutscht man durch eine Spur, die dicht am Rand entlangläuft).
+   */
+  private hits(r: Racer, landed = false): boolean {
     const c = Math.cos(r.a);
     const s = Math.sin(r.a);
     const probes = [
@@ -286,6 +283,7 @@ export class KurveGame implements MiniGame {
       [r.x + c * 1.6 - s * 1.3, r.y + s * 1.6 + c * 1.3],
       [r.x + c * 1.6 + s * 1.3, r.y + s * 1.6 - c * 1.3],
     ];
+    if (landed) probes.push([r.x, r.y]);
     for (const [px, py] of probes) {
       const gx = Math.floor(px);
       const gy = Math.floor(py);
@@ -353,7 +351,6 @@ export class KurveGame implements MiniGame {
     if (!hit) return;
     this.powerups = this.powerups.filter((p) => p !== hit);
     if (hit.type === 'turbo') r.turboUntil = now + KURVE.TURBO_MS;
-    else if (hit.type === 'wrap') r.wrapUntil = now + KURVE.WRAP_MS;
     else for (const o of this.racers.values()) if (o !== r) o.slowUntil = now + KURVE.SLOW_MS;
     this.pickup = { id: r.id, type: hit.type, x: hit.x, y: hit.y, seq: ++this.pickupSeq };
   }
@@ -410,7 +407,6 @@ export class KurveGame implements MiniGame {
       const fx: KurvePower[] = [];
       if (now < r.turboUntil) fx.push('turbo');
       if (now < r.slowUntil) fx.push('slow');
-      if (now < r.wrapUntil) fx.push('wrap');
       players[r.id] = {
         x: r1(r.x),
         y: r1(r.y),

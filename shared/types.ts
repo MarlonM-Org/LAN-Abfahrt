@@ -482,7 +482,7 @@ export interface FliegerPrivate {
 
 // ------------------------------------------------------------------ Controller-Spiele: Kurven-Duell
 
-export type KurvePower = 'turbo' | 'slow' | 'wrap';
+export type KurvePower = 'turbo' | 'slow';
 
 export interface KurveHead {
   x: number;

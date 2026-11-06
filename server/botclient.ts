@@ -1658,7 +1658,6 @@ export interface KurveBrain {
 export function kurveLookAhead(st: KurveState, myId: string, brain: KurveBrain, dir: number, horizon: number, ownLatest: number): number {
   const me = st.players[myId];
   const A = KURVE.ARENA;
-  const wrap = me.fx.includes('wrap');
   const v = Math.max(20, me.v || KURVE.SPEED);
   let { x, y, a } = me;
   const da = (dir * KURVE.TURN * 2) / v;
@@ -1670,10 +1669,9 @@ export function kurveLookAhead(st: KurveState, myId: string, brain: KurveBrain, 
     a += da;
     x += Math.cos(a) * 2;
     y += Math.sin(a) * 2;
-    // Ohne "Durch Wände" lieber etwas Abstand zum Rand halten
-    const m = wrap ? 2 : 6;
+    // Rand ist offen: auf der anderen Seite weiterrechnen
+    const m = 2;
     if (x < A.x + m || x > A.x + A.w - m || y < A.y + m || y > A.y + A.h - m) {
-      if (!wrap) return k;
       if (x < A.x + m) x = A.x + A.w - 3;
       else if (x > A.x + A.w - m) x = A.x + 3;
       if (y < A.y + m) y = A.y + A.h - 3;
