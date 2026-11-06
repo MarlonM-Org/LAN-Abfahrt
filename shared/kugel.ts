@@ -1,8 +1,9 @@
 /**
  * Tempel-Kugel (Balance Board): Labyrinth, Physik und Zustand (Server, TV, Bots).
  *
- * Draufsicht auf einen schmalen, moosbewachsenen Steinpfad hoch über einem Abgrund. Die Kugel rollt dorthin, wohin
- * man sich lehnt (vorn = weg vom Spieler = nach oben im Bild). Verlässt ihre Mitte den Pfad, stürzt sie ab und
+ * Schmaler, moosbewachsener Steinpfad hoch über einem Abgrund, gesehen aus der Verfolgerkamera hinter der Figur
+ * (wie im Kart). Gelehnt wird aus Sicht der Kamera: vorn = geradeaus, seitlich = lenken; die Kamera dreht der
+ * Fahrtrichtung nach. Verlässt die Mitte der Kugel den Pfad, stürzt sie ab und
  * beginnt am letzten Kontrollpunkt neu (Strafzeit). Alle rollen dasselbe Labyrinth (Startwert pro Spiel), Bestzeit gewinnt.
  */
 import { type BalanceTurn, seeded } from './balance';
@@ -19,9 +20,9 @@ export const KUG = {
   R: 10,
   BALL_R: 5,
   /** Beschleunigung bei vollem Ausschlag (px/s²), Dämpfung (1/s), Höchsttempo (px/s) */
-  ACCEL: 230,
-  DAMP: 1.15,
-  VMAX: 125,
+  ACCEL: 270,
+  DAMP: 1.5,
+  VMAX: 112,
   DEADZONE: 0.07,
   FALL_MS: 900,
   /** Strafe pro Absturz (s) */
@@ -164,10 +165,41 @@ export function distToPath(course: KugelCourse, x: number, y: number): number {
   return best;
 }
 
-/** Gewicht-Schwerpunkt → Beschleunigung (px/s²): vorn (y > 0) = nach oben im Bild */
-export function kugelAccel(bx: number, by: number): [number, number] {
+export const wrapAng = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Schwerpunkt → Beschleunigung in Weltkoordinaten (px/s²), aus Sicht der Kamera mit Blickrichtung `ang`:
+ * vorn (by > 0) = in Blickrichtung, rechts (bx > 0) = nach rechts davon.
+ */
+export function kugelAccel(bx: number, by: number, ang: number): [number, number] {
   const dz = (v: number) => (Math.abs(v) < KUG.DEADZONE ? 0 : (v - Math.sign(v) * KUG.DEADZONE) / (1 - KUG.DEADZONE));
-  return [dz(bx) * KUG.ACCEL, -dz(by) * KUG.ACCEL];
+  const f = dz(by) * KUG.ACCEL;
+  const r = dz(bx) * KUG.ACCEL;
+  const cs = Math.cos(ang);
+  const sn = Math.sin(ang);
+  return [cs * f - sn * r, sn * f + cs * r];
+}
+
+/** Umkehrung der Totzone (für Bots): gewünschte Beschleunigung 0…1 → Ausschlag am Board */
+export const kugelLean = (l: number) => (Math.abs(l) < 0.01 ? 0 : Math.sign(l) * (Math.abs(l) * (1 - KUG.DEADZONE) + KUG.DEADZONE));
+
+/**
+ * Blickrichtung der Verfolgerkamera: dreht der Fahrtrichtung nach (je schneller, desto williger).
+ * Rollt die Kugel rückwärts oder quer zur Blickrichtung (> 100°), bleibt die Kamera stehen.
+ */
+export function kugelHeading(ang: number, vx: number, vy: number, dt: number): number {
+  const sp = Math.hypot(vx, vy);
+  if (sp < 12) return ang;
+  const diff = wrapAng(Math.atan2(vy, vx) - ang);
+  if (Math.abs(diff) > 1.75) return ang;
+  return wrapAng(ang + diff * (1 - Math.exp(-dt * 3.2 * Math.min(1, sp / 45))));
+}
+
+/** Blickrichtung am Start bzw. Kontrollpunkt: entlang des Lösungswegs */
+export function routeHeading(course: KugelCourse, i: number): number {
+  const a = routePoint(course, i);
+  const b = routePoint(course, i + 1);
+  return Math.atan2(b.y - a.y, b.x - a.x);
 }
 
 export interface KugelRun {
@@ -190,6 +222,8 @@ export interface KugelState extends BalanceTurn {
   y: number;
   vx: number;
   vy: number;
+  /** Blickrichtung der Verfolgerkamera (rad, 0 = nach rechts im Labyrinth) */
+  ang: number;
   /** Rollzeit (s) */
   ft: number;
   /** Absturz: 0 = keiner, sonst Fortschritt der Fall-Animation 0…1 */

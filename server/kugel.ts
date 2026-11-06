@@ -1,5 +1,5 @@
 import type { MiniSnapshot } from '../shared/types';
-import { KUG, type KugelCourse, type KugelRun, type KugelState, cellX, cellY, distToPath, kugelAccel, kugelCourse, routePoint } from '../shared/kugel';
+import { KUG, type KugelCourse, type KugelRun, type KugelState, cellX, cellY, distToPath, kugelAccel, kugelCourse, kugelHeading, routeHeading, routePoint } from '../shared/kugel';
 import { BalanceTurnGame } from './balance';
 import { type MiniCtx, groupByScore, shuffle } from './minigame';
 
@@ -27,7 +27,7 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
     this.state = {
       sub: 'ready', t: Date.now(), seed,
       order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
-      x: cellX(this.course.start.c), y: cellY(this.course.start.r), vx: 0, vy: 0, ft: 0, fall: 0, falls: 0, cp: 0,
+      x: cellX(this.course.start.c), y: cellY(this.course.start.r), vx: 0, vy: 0, ang: routeHeading(this.course, 0), ft: 0, fall: 0, falls: 0, cp: 0,
       runs: {}, points, last: null,
     };
     this.start();
@@ -69,6 +69,7 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
     s.x = p.x;
     s.y = p.y;
     s.vx = s.vy = 0;
+    s.ang = routeHeading(this.course, cp === 0 ? 0 : this.course.checkpoints[cp - 1]);
     s.fall = 0;
     this.fallMs = 0;
   }
@@ -92,7 +93,7 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
       return;
     }
 
-    const [ax, ay] = kugelAccel(b.x, b.y);
+    const [ax, ay] = kugelAccel(b.x, b.y, s.ang);
     s.vx = (s.vx + ax * dt) * Math.exp(-KUG.DAMP * dt);
     s.vy = (s.vy + ay * dt) * Math.exp(-KUG.DAMP * dt);
     const sp = Math.hypot(s.vx, s.vy);
@@ -102,6 +103,7 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
     }
     s.x += s.vx * dt;
     s.y += s.vy * dt;
+    s.ang = kugelHeading(s.ang, s.vx, s.vy, dt);
 
     if (distToPath(this.course, s.x, s.y) > KUG.R) {
       s.falls += 1;
@@ -133,6 +135,7 @@ export class KugelGame extends BalanceTurnGame<KugelState> {
     s.vx = Math.round(s.vx * 10) / 10;
     s.vy = Math.round(s.vy * 10) / 10;
     s.fall = Math.round(s.fall * 100) / 100;
+    s.ang = Math.round(s.ang * 1000) / 1000;
   }
 
   private finishRun(finished: boolean) {

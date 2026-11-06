@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T13:03+00:00",
+  "updated": "2026-11-06T13:17+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -11,7 +11,7 @@
       "kind": "kugel",
       "type": "Balance Board",
       "branch": "feat/balance-kugel",
-      "detail": "Kugel über einen schmalen Moos-Steinpfad (Labyrinth) lehnen, Absturz = zurück zur Fackel. Wartet auf Test mit echtem Board."
+      "detail": "3D-Verfolgerkamera (Mode 7) hinter der Figur auf der Kugel, Moos-Tempelpfad über dem Abgrund, Minikarte, Absturz = zurück zur Fackel. Plus: Kart/Kugel zeigen von hinten Haare statt Gesicht. Wartet auf Test mit echtem Board."
     }
   ],
   "queue": [],
@@ -299,8 +299,8 @@
   ],
   "feedback": {
     "kart": {
-      "status": "umgesetzt",
-      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert · TV-Regie in der Draufsicht: Zweikämpfe, Zielfoto (#84)"
+      "status": "in Arbeit",
+      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert · TV-Regie in der Draufsicht: Zweikämpfe, Zielfoto (#84) · Rückansicht: von hinten sieht man Haare statt Gesicht (Glatze: glatte Haut)"
     },
     "enten": {
       "status": "positiv",
@@ -349,6 +349,10 @@
     "sumo": {
       "status": "umgesetzt",
       "notes": "Finale-Zoom auf die letzten zwei, Zeitlupe beim letzten Platscher (#84)"
+    },
+    "kugel": {
+      "status": "in Arbeit",
+      "notes": "3D-Verfolgerkamera hinter der Figur wie im Kart, Hinterkopf mit Haaren, Minikarte, Lenken aus Kamerasicht"
     }
   },
   "general": [

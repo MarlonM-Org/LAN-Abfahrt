@@ -60,6 +60,8 @@ export interface AvatarPose {
   arms?: 'down' | 'swingL' | 'swingR' | 'out' | 'up';
   /** Gesicht: normal, Augen zu (Blinzeln), zugekniffen + Mund auf (Treffer), Grinsen (Jubel) */
   face?: 'normal' | 'blink' | 'hit' | 'happy';
+  /** Ansicht: von vorn (Standard) oder von hinten – dann Hinterkopf mit Haaren statt Gesicht (Glatze: glatte Haut) */
+  view?: 'front' | 'back';
 }
 
 /** Baut das Pixel-Raster (null = transparent) */
@@ -87,6 +89,7 @@ export function avatarGrid(look: Look, pose: AvatarPose = {}): (string | null)[]
   const legs = pose.legs ?? 'stand';
   const arms = pose.arms ?? 'down';
   const face = pose.face ?? 'normal';
+  const back = pose.view === 'back';
 
   // Beine & Schuhe
   const leg = (x: number, lift: number, shoe: number) => {
@@ -148,39 +151,42 @@ export function avatarGrid(look: Look, pose: AvatarPose = {}): (string | null)[]
   // Hals
   rect(6, U + 11, 4, 1, skinSoft);
 
-  // Gesicht
-  set(6, U + 7, EYE);
-  set(6, U + 8, EYE);
-  set(9, U + 7, EYE);
-  set(9, U + 8, EYE);
-  set(5, U + 9, '#f0928a');
-  set(10, U + 9, '#f0928a');
-  set(7, U + 9, shade(skin, 0.7));
-  set(8, U + 9, shade(skin, 0.7));
+  if (!back) {
+    // Gesicht
+    set(6, U + 7, EYE);
+    set(6, U + 8, EYE);
+    set(9, U + 7, EYE);
+    set(9, U + 8, EYE);
+    set(5, U + 9, '#f0928a');
+    set(10, U + 9, '#f0928a');
+    set(7, U + 9, shade(skin, 0.7));
+    set(8, U + 9, shade(skin, 0.7));
 
-  // Bart (in Haarfarbe)
-  const bc = look.beard === 1 ? shade(hair, 1.15) : hair;
-  switch (look.beard) {
-    case 1: // 3-Tage
-      for (const [x, y] of [[4, 9], [5, 10], [7, 10], [9, 10], [11, 9], [6, 10], [10, 10], [8, 10]]) set(x, U + y, bc);
-      break;
-    case 2: // Vollbart
-      rect(4, U + 8, 1, 3, hair);
-      rect(11, U + 8, 1, 3, hairS);
-      rect(5, U + 10, 6, 2, hair);
-      rect(6, U + 9, 1, 1, hair);
-      rect(9, U + 9, 1, 1, hair);
-      set(7, U + 9, shade(skin, 0.7));
-      set(8, U + 9, shade(skin, 0.7));
-      break;
-    case 3: // Schnauzer
-      rect(6, U + 9, 4, 1, hair);
-      set(5, U + 9, hairS);
-      set(10, U + 9, hairS);
-      break;
-    case 4: // Kinnbart
-      rect(7, U + 10, 2, 2, hair);
-      break;
+    // Bart (in Haarfarbe)
+    const bc = look.beard === 1 ? shade(hair, 1.15) : hair;
+    switch (look.beard) {
+      case 1: // 3-Tage
+        for (const [x, y] of [[4, 9], [5, 10], [7, 10], [9, 10], [11, 9], [6, 10], [10, 10], [8, 10]]) set(x, U + y, bc);
+        break;
+      case 2: // Vollbart
+        rect(4, U + 8, 1, 3, hair);
+        rect(11, U + 8, 1, 3, hairS);
+        rect(5, U + 10, 6, 2, hair);
+        rect(6, U + 9, 1, 1, hair);
+        rect(9, U + 9, 1, 1, hair);
+        set(7, U + 9, shade(skin, 0.7));
+        set(8, U + 9, shade(skin, 0.7));
+        break;
+      case 3: // Schnauzer
+        rect(6, U + 9, 4, 1, hair);
+        set(5, U + 9, hairS);
+        set(10, U + 9, hairS);
+        break;
+      case 4: // Kinnbart
+        rect(7, U + 10, 2, 2, hair);
+        break;
+    }
+
   }
 
   // Frisuren
@@ -195,7 +201,69 @@ export function avatarGrid(look: Look, pose: AvatarPose = {}): (string | null)[]
     rect(3, U + 3, 10, 1, hairS);
     rect(4, U + 2, 8, 1, hair);
   };
-  switch (look.hairStyle) {
+  // Hinterkopf: Haare über dem ganzen Kopf, kein Gesicht (Glatze: glatte Haut mit Glanzpunkt)
+  const backHair = () => {
+    const style = look.hairStyle;
+    if (style === 7) {
+      set(6, U + 4, shade(skin, 1.25));
+      set(7, U + 4, shade(skin, 1.15));
+      rect(5, U + 9, 6, 1, skinS);
+      return;
+    }
+    if (style === 3) {
+      // Cap von hinten: Kappe bis über die Ohren, darunter der Hinterkopf, Verstellband
+      rect(5, U + 1, 6, 1, hair);
+      rect(3, U + 2, 10, 4, hair);
+      rect(11, U + 2, 2, 4, hairS);
+      rect(4, U + 6, 8, 1, hairS);
+      set(7, U + 6, hairL);
+      set(8, U + 6, hairL);
+      set(6, U + 2, hairL);
+      set(7, U + 1, hairL);
+      return;
+    }
+    rect(4, U + 1, 8, 1, hair);
+    rect(3, U + 2, 10, 7, hair);
+    rect(4, U + 9, 8, style === 1 ? 4 : 1, hair);
+    rect(11, U + 2, 2, 8, hairS);
+    set(6, U + 2, hairL);
+    set(7, U + 2, hairL);
+    set(5, U + 3, hairL);
+    set(8, U + 4, hairS);
+    set(8, U + 5, hairS);
+    set(7, U + 6, hairS);
+    if (style === 1) {
+      // lang: Haar fällt über den Nacken auf die Schultern
+      rect(3, U + 9, 1, 4, hair);
+      rect(12, U + 9, 1, 4, hairS);
+      set(6, U + 11, hairS);
+      set(9, U + 12, hairS);
+      set(5, U + 13, hair);
+    } else {
+      // Nacken: Haaransatz, darunter Haut
+      rect(5, U + 10, 6, 1, skinSoft);
+    }
+    if (style === 2) for (const [x, y] of [[4, 0], [7, 0], [10, 0], [5, 1], [8, 1]]) set(x, U + y, y === 0 ? hair : hairL);
+    if (style === 4) {
+      rect(6, U - 2, 4, 3, hair);
+      set(7, U - 2, hairL);
+    }
+    if (style === 5) {
+      // Zopf: hängt in der Mitte den Rücken hinunter
+      rect(7, U + 10, 2, 7, hair);
+      set(7, U + 12, hairS);
+      set(8, U + 14, hairS);
+      set(7, U + 16, hairL);
+    }
+    if (style === 6) {
+      for (const [x, y] of [[2, 3], [2, 6], [13, 3], [13, 6], [5, 0], [9, 0], [3, 8], [12, 8]]) {
+        set(x, U + y, hair);
+        set(x, U + y + 1, hairS);
+      }
+    }
+  };
+  if (back) backHair();
+  else switch (look.hairStyle) {
     case 0: // kurz
       cap();
       set(5, U + 5, hair);
