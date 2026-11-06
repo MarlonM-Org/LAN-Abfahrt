@@ -695,11 +695,16 @@ export interface GolfBallPub {
   m: boolean;
   /** in der Looping-Röhre (unsichtbar) */
   tube?: boolean;
+  /** rollt, weil ein anderer Ball ihn angestoßen hat */
+  k?: boolean;
+  /** so oft hat der Computer auf diesem Loch für den Spieler geputtet (Handy war lange offline) */
+  auto?: number;
   /** Zielen: Winkel (rad) und Kraft 0 … 1 */
   aim: [number, number] | null;
 }
 
-export type GolfFxKind = 'hole' | 'ace' | 'water' | 'bump' | 'tube' | 'lip' | 'cap' | 'out';
+/** knock = Ball trifft Ball (`n` = Aufprall), lucky = angestoßen eingelocht, water: `n` = Strafschläge (0 = angestoßen) */
+export type GolfFxKind = 'hole' | 'ace' | 'water' | 'bump' | 'tube' | 'lip' | 'cap' | 'out' | 'knock' | 'lucky';
 
 export interface GolfFx {
   seq: number;
@@ -727,6 +732,8 @@ export interface GolfState {
   scores: Record<string, (number | null)[]>;
   par: number[];
   fx: GolfFx[];
+  /** Loch wurde vom VIP vorzeitig beendet („Nächstes Loch“) */
+  ended?: boolean;
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Ententeich

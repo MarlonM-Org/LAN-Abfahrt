@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { GameState, GolfState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { GOLF, GOLF_HOLES, moverAt, spinnerBlades } from '../../shared/golf';
+import { GOLF, GOLF_HOLES, golfAimHit, golfOnTee, moverAt, spinnerBlades } from '../../shared/golf';
 import { flagPix, flamingoBumperPix, golfBallPix, lighthouseTopPix, paintGolfHole, surfboardPix } from '../art/golf';
 import { crown } from '../art/objects';
 import { Pix } from '../art/pix';
@@ -17,6 +17,7 @@ const MAX_P = 12;
 /**
  * Urlaubs-Minigolf (TV): Loch von oben, alle Bälle gleichzeitig. Der Server simuliert in Echtzeit und
  * schickt nur Ballpositionen; Leuchtturm-Flügel und Surfbrett rechnet die Szene aus der Lochzeit `t` aus.
+ * Bälle stoßen sich an (Server) – angestoßene Bälle rollen hier einfach mit, die Zielhilfe endet am ersten Ball.
  */
 export class GolfScene extends Phaser.Scene {
   private latest: GolfState | null = null;
@@ -186,12 +187,12 @@ export class GolfScene extends Phaser.Scene {
       this.boards[i]?.setPosition(p.x, p.y);
     });
 
-    // Bälle: weich zur Serverposition gleiten; liegende Bälle am selben Fleck leicht auffächern
+    // Bälle: weich zur Serverposition gleiten; auf dem Abschlag (dort liegen alle übereinander) leicht auffächern
     const ids = st.order;
     const groups = new Map<string, number[]>();
     ids.forEach((id, k) => {
       const b = st.balls[id];
-      if (!b || b.m || b.d) return;
+      if (!b || b.m || b.d || !golfOnTee(h, b)) return;
       const key = `${Math.round(b.x / 5)}|${Math.round(b.y / 5)}`;
       groups.set(key, [...(groups.get(key) ?? []), k]);
     });
@@ -223,23 +224,33 @@ export class GolfScene extends Phaser.Scene {
       img.setTexture(ensureTex(this, `golf_ball_${col}`, () => golfBallPix(col)));
       img.setVisible(true).setPosition(Math.round(cur.x), Math.round(cur.y)).setAlpha(b.d === 2 ? 0.5 : 1);
       g.fillStyle(0x1d1410, 0.3).fillEllipse(Math.round(cur.x) + 1, Math.round(cur.y) + 3, 6, 2);
-      // Zielhilfe: gepunktete Linie in Spielerfarbe
+      // Zielhilfe: gepunktete Linie in Spielerfarbe – endet am ersten Ball, der im Weg liegt
       if (b.aim && !b.m && !b.d && st.sub === 'play') {
         const [a, pw] = b.aim;
         const len = 10 + pw * 70;
-        this.dotted(cur.x, cur.y, a, len, st.colors[id] ?? 0xffffff, time);
+        const solid = ids.filter((o) => o !== id && st.balls[o] && !st.balls[o].d && !st.balls[o].m && !st.balls[o].tube && !golfOnTee(h, st.balls[o])).map((o) => st.balls[o]);
+        this.dotted(cur.x, cur.y, a, len, st.colors[id] ?? 0xffffff, time, golfAimHit(b, a, len, solid));
       }
     }
   }
 
-  private dotted(x: number, y: number, a: number, len: number, color: number, time: number) {
+  private dotted(x: number, y: number, a: number, len: number, color: number, time: number, hit: ReturnType<typeof golfAimHit> = null) {
     const g = this.g;
     const off = (time / 60) % 4;
-    for (let d = 5 + off; d < len; d += 4) {
+    const end = hit ? hit.d : len;
+    for (let d = 5 + off; d < end; d += 4) {
       const px = Math.round(x + Math.cos(a) * d);
       const py = Math.round(y + Math.sin(a) * d);
       g.fillStyle(0x1d1410, 0.8).fillRect(px, py + 1, 2, 2);
       g.fillStyle(color, 1).fillRect(px, py, 2, 2);
+    }
+    if (hit) {
+      // Treffer: eigener Ball als Ring an der Kontaktstelle, kurzer Pfeil, wohin der andere rollt
+      g.lineStyle(1, color, 1).strokeCircle(x + Math.cos(a) * hit.d, y + Math.sin(a) * hit.d, GOLF.BALL_R);
+      const bx = hit.ball.x + hit.nx * (GOLF.BALL_R + 1);
+      const by = hit.ball.y + hit.ny * (GOLF.BALL_R + 1);
+      g.lineStyle(1, 0xfff4d6, 0.9).lineBetween(bx, by, bx + hit.nx * 8, by + hit.ny * 8);
+      return;
     }
     const ex = x + Math.cos(a) * (len + 2);
     const ey = y + Math.sin(a) * (len + 2);
@@ -296,7 +307,20 @@ export class GolfScene extends Phaser.Scene {
       this.splash(f.x, f.y);
       this.juice.burst(f.x, f.y, 'splash', 10);
       sfx('splash', { x: f.x });
-      this.floatText(f.x, f.y - 12, 'PLATSCH! +1', '#8fd8ff');
+      // n = 0: von einem anderen Ball hineingestoßen → straffrei
+      this.floatText(f.x, f.y - 12, f.n === 0 ? 'PLATSCH! (gratis)' : 'PLATSCH! +1', '#8fd8ff');
+    } else if (f.k === 'knock') {
+      sfx('tick', { x: f.x, pitch: 1.6, vol: Math.min(0.9, 0.35 + (f.n ?? 60) / 300) });
+      sfx('bonk', { x: f.x, pitch: 2.2, vol: 0.25 });
+      this.juice.burst(f.x, f.y, 'spark', 4);
+      if ((f.n ?? 0) > 80) this.floatText(f.x, f.y - 10, 'KLACK!', LIGHT);
+    } else if (f.k === 'lucky') {
+      this.floatText(f.x, f.y - 14, `${name}: ${f.n} – GESCHENKT!`, col);
+      this.sparkle(f.x, f.y, 10);
+      this.juice.burst(f.x, f.y, 'confetti', 16);
+      sfx('coin', { x: f.x });
+      sfx('cheer', { delay: 0.2, vol: 0.6 });
+      this.fans?.cheer();
     } else if (f.k === 'tube') {
       this.floatText(f.x, f.y - 14, 'WUSCH!', '#ffd25e');
       sfx('whoosh', { x: f.x });
@@ -305,7 +329,8 @@ export class GolfScene extends Phaser.Scene {
       sfx('tick', { x: f.x, pitch: 0.8 });
       sfx('lose', { x: f.x, vol: 0.3, pitch: 1.4, delay: 0.08 });
     } else if (f.k === 'cap') {
-      this.floatText(f.x, f.y - 12, `MAX ${f.n ?? GOLF.MAX_SCORE}`, '#ff9a7a');
+      // Schlag-Limit bzw. Loch vorzeitig beendet: Wertung zeigen
+      this.floatText(f.x, f.y - 12, st.ended ? `${name}: ${f.n}` : `MAX ${f.n ?? GOLF.MAX_SCORE}`, '#ff9a7a');
       sfx('error', { x: f.x, vol: 0.6 });
     } else if (f.k === 'bump') {
       sfx('bonk', { x: f.x, pitch: 1.3 });
@@ -375,7 +400,7 @@ export class GolfScene extends Phaser.Scene {
         this,
         240,
         96,
-        `${st.holes} Löcher – alle putten gleichzeitig!\nAm Handy vom Ball zurückziehen\nwie eine Schleuder, loslassen = Schlag.\nWasser = +1 Schlag. Max. ${GOLF.MAX_STROKES} Schläge,\n${GOLF.HOLE_S} Sekunden pro Loch.\nWenigste Schläge gewinnen!`,
+        `${st.holes} Löcher – alle putten gleichzeitig!\nHandy quer, vom Ball zurückziehen wie\neine Schleuder, loslassen = Schlag.\nBälle stoßen sich an! Wasser = +1,\nmax. ${GOLF.MAX_STROKES} Schläge pro Loch.\nWenigste Schläge gewinnen!`,
       ),
     );
   }
@@ -486,9 +511,11 @@ export class GolfScene extends Phaser.Scene {
         : `${(playerById(rows[0])?.name ?? '').slice(0, 14)} gewinnt!`
       : aces.length
         ? `HOLE-IN-ONE: ${aces.map((id) => (playerById(id)?.name ?? '').replace(/^Bot\s+/, '')).join(', ').slice(0, 30)}!`
-        : st.hole + 1 < st.holes
+        : st.ended
+          ? `Vom VIP beendet: Rest +2, mind. ${st.par[st.hole] + 1}`
+          : st.hole + 1 < st.holes
           ? `Gleich: Loch ${st.hole + 2} – ${GOLF_HOLES[st.hole + 1].name}`
           : 'Gleich: Endstand';
-    this.card.add(ink(this, 240, y0 + h - 14, foot, { color: aces.length || over ? '#c98a10' : INK }));
+    this.card.add(ink(this, 240, y0 + h - 14, foot, { color: aces.length || over ? '#c98a10' : st.ended ? RED_INK : INK }));
   }
 }
