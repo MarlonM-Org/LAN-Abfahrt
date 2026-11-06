@@ -1,4 +1,4 @@
-import type { WasserState } from '../../../shared/wasser';
+import { WASSER, type WasserState } from '../../../shared/wasser';
 import { TEAM_INFO } from '../../../shared/flunky';
 import { type Screen, app, el, message, q, send, store } from '../core';
 import { stickZone } from '../stick';
@@ -10,7 +10,7 @@ export function pickWasser(s: WasserState): Screen {
   const id = store.playerId!;
   const me = s.players[id];
   if (!me) return ['spectate', message('Du schaust zu')];
-  if (s.sub === 'over') return ['ws-over', message('Zeit um!', `${me.h} Treffer · ${me.n}× nass – schau auf den Fernseher!`)];
+  if (s.sub === 'over') return ['ws-over', message(s.endReason === 'away' ? 'Spielende!' : 'Zeit um!', `${me.h} Treffer · ${me.n}× nass – schau auf den Fernseher!`)];
   return [
     `ws-${s.sub}`,
     () => {
@@ -34,12 +34,14 @@ export function pickWasser(s: WasserState): Screen {
         </div>
       `);
       stickZone(q(root, '.ws-move'), (x, y) => send('stick', { x, y }));
-      // Ziel-Stick: Ziehen = Richtung + Weite (Vorschau auf dem TV), Loslassen = werfen, kurz antippen bricht ab
+      // Ziel-Stick: Ziehen = Richtung + Weite (Vorschau auf dem TV), Loslassen = werfen, nur antippen bricht ab.
+      // Weite wächst quadratisch (shared/wasser.ts throwDist): ein kleines Stück ziehen = Wurf direkt neben einen selbst.
       stickZone(q(root, '.ws-aim'), (x, y) => send('aim', { x, y }), {
-        radius: 56,
+        radius: 64,
         trailing: false,
+        step: 0.03,
         onRelease: (x, y, ok) => {
-          if (ok && Math.hypot(x, y) >= 0.2) {
+          if (ok && Math.hypot(x, y) >= WASSER.AIM_MIN) {
             send('throw', { x, y });
             haptic(15);
           } else send('aim', { x: 0, y: 0 });
@@ -65,9 +67,9 @@ export function pickWasser(s: WasserState): Screen {
         });
         const towel = p.t ? `eurem Handtuch (${p.t === 'A' ? 'links' : 'rechts'})` : 'einem Handtuch';
         const bucket = p.t ? `Eimer (${p.t === 'A' ? 'links' : 'rechts'})` : 'Eimer';
-        let hint = 'Rechts ziehen = zielen, loslassen = werfen. Hinter Hecken bist du sicher!';
+        let hint = 'Rechts ziehen = zielen (wenig = nah), loslassen = werfen. Hinter Hecken bist du sicher!';
         if (st.sub === 'countdown') hint = 'Gleich geht’s los! Links laufen, rechts zielen + loslassen.';
-        else if (p.s === 'soaked') hint = `KLATSCHNASS! Lauf zu ${towel}.`;
+        else if (p.s === 'soaked') hint = `KLATSCHNASS! Lauf zu ${towel}${p.sk > 0 ? ` – sonst wirst du in ${Math.ceil(p.sk / 1000)} s hingetragen` : ''}.`;
         else if (p.s === 'drying') hint = 'Abtrocknen ... gleich geht’s weiter!';
         else if (p.pi > 0) hint = `WASSERPISTOLE! Rechts zielen = spritzen (${Math.ceil(p.pi / 1000)}s)`;
         else if (p.a === 0) hint = `Leer! Nachfüllen am ${bucket} oder am Schlauch (Mitte, schneller).`;

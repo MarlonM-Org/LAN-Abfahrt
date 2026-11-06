@@ -97,6 +97,8 @@ export const GOLF = {
   CUP_PULL: 300,
   STOP_V: 4,
   WALL_E: 0.7,
+  /** Ball gegen Ball: Stoßzahl (1 = verlustfrei) – der getroffene Ball übernimmt gut 90 % des Tempos */
+  BALL_E: 0.84,
   BUMPER_E: 1.15,
   BUMPER_MIN_V: 90,
   TUBE_S: 0.7,
@@ -105,7 +107,7 @@ export const GOLF = {
   MAX_SCORE: 7,
   /**
    * Zeit pro Loch: `null` = kein Limit (vorher 60 s). Ein Loch endet, wenn alle eingelocht oder
-   * MAX_STROKES erreicht haben – oder wenn der VIP im Menü „Loch beenden“ wählt (Rest bekommt +2).
+   * MAX_STROKES erreicht haben – oder wenn der VIP „Nächstes Loch“ drückt (Wertung: `golfSkipScore`).
    */
   HOLE_S: null as number | null,
   /** Erklär-Screen (VIP kann überspringen; vorher 6,5 s) */
@@ -114,12 +116,16 @@ export const GOLF = {
   /** Scorekarte nach jedem Loch (VIP kann überspringen; vorher 6,5 s / 8 s) */
   CARD_MS: 12000,
   LAST_CARD_MS: 12000,
+  /** Scorekarte nach „Nächstes Loch“ (VIP): nur kurz, damit jeder seine Wertung sieht */
+  SKIP_CARD_MS: 4000,
   DONE_PAUSE_MS: 1400,
   /** Physik-Takt: TICK_S pro Tick, in SUBSTEPS Teilschritten */
   TICK_S: 1 / 30,
   SUBSTEPS: 4,
-  /** Spieler offline → automatischer Schlag nach … ms */
+  /** Spieler offline → automatischer Schlag nach … ms Ruhe … */
   AUTO_MS: 2500,
+  /** … aber erst, wenn das Handy so lange weg ist (Bildschirm kurz aus ≠ „der Computer spielt für dich“) */
+  AUTO_OFFLINE_MS: 20000,
   /** Ball rollt länger als das → wird angehalten (Sicherheitsnetz) */
   MAX_ROLL_S: 14,
 };
@@ -384,7 +390,111 @@ export interface GolfBody {
   lip: number;
 }
 
-export type GolfEvent = 'stop' | 'hole' | 'water' | 'tube' | 'tubeOut' | 'bump' | 'wall' | 'lip' | 'out';
+export type GolfEvent = 'stop' | 'hole' | 'water' | 'tube' | 'tubeOut' | 'bump' | 'wall' | 'lip' | 'out' | 'ball';
+
+/**
+ * Ball gegen Ball (gleiche Masse): `b` ist der Ball, der gerade bewegt wird – nur er wird aus der Überlappung
+ * geschoben (der andere könnte sonst in eine Bande rutschen, ohne dass sie geprüft wird). Der Normalanteil der
+ * Relativgeschwindigkeit wird mit der Stoßzahl BALL_E aufgeteilt. Liefert die Aufprallstärke (px/s, 0 = kein Stoß).
+ */
+function hitBall(b: GolfBody, o: GolfBody): number {
+  let dx = b.x - o.x;
+  let dy = b.y - o.y;
+  const min = 2 * GOLF.BALL_R;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= min * min) return 0;
+  let d = Math.sqrt(d2);
+  if (d < 1e-6) {
+    // genau aufeinander → entgegen der eigenen Bewegung ausweichen
+    const v = Math.hypot(b.vx, b.vy) || 1;
+    dx = -b.vx / v;
+    dy = -b.vy / v;
+    d = 1;
+  }
+  const nx = dx / d;
+  const ny = dy / d;
+  b.x = o.x + nx * min;
+  b.y = o.y + ny * min;
+  const vn = (b.vx - o.vx) * nx + (b.vy - o.vy) * ny;
+  if (vn >= 0) return 0;
+  const j = (-(1 + GOLF.BALL_E) * vn) / 2;
+  b.vx += j * nx;
+  b.vy += j * ny;
+  o.vx -= j * nx;
+  o.vy -= j * ny;
+  return -vn;
+}
+
+/** Liegt der Ball (noch) genau auf dem Abschlag? Dort stören sich die Bälle nicht – alle starten am selben Punkt. */
+export const golfOnTee = (h: GolfHole, p: Point) => Math.abs(p.x - h.tee.x) < 0.6 && Math.abs(p.y - h.tee.y) < 0.6;
+
+/**
+ * Wertung für alle, die noch spielen, wenn das Loch vorzeitig endet („Nächstes Loch“ vom VIP, Zeitlimit):
+ * bisherige Schläge + 2, aber nie besser als Par + 1 (sonst lohnte es sich, nicht fertig zu spielen) und
+ * höchstens MAX_SCORE.
+ */
+export const golfSkipScore = (strokes: number, par: number) => Math.min(GOLF.MAX_SCORE, Math.max(par + 1, strokes + 2));
+
+/**
+ * Zielhilfe: Trifft ein Schlag von `from` in Richtung `angle` innerhalb von `len` px einen der Bälle `balls`?
+ * Liefert die Strecke bis zur Berührung, die Lage des eigenen Balls dabei und die Richtung, in die der
+ * getroffene Ball wegrollt (Stoßnormale). Banden zählen hier nicht (die Vorschau ist nur ein Pfeil).
+ */
+export function golfAimHit(from: Point, angle: number, len: number, balls: readonly Point[]): { d: number; x: number; y: number; nx: number; ny: number; ball: Point } | null {
+  const ux = Math.cos(angle);
+  const uy = Math.sin(angle);
+  const r = 2 * GOLF.BALL_R;
+  let best: { d: number; x: number; y: number; nx: number; ny: number; ball: Point } | null = null;
+  for (const c of balls) {
+    const ox = c.x - from.x;
+    const oy = c.y - from.y;
+    const along = ox * ux + oy * uy;
+    if (along <= 0) continue;
+    const off2 = ox * ox + oy * oy - along * along;
+    if (off2 >= r * r) continue;
+    const d = along - Math.sqrt(r * r - off2);
+    if (d < 0 || d > len || (best && d >= best.d)) continue;
+    const x = from.x + ux * d;
+    const y = from.y + uy * d;
+    best = { d, x, y, nx: (c.x - x) / r, ny: (c.y - y) / r, ball: c };
+  }
+  return best;
+}
+
+/** Abstand eines Punktes zur nächsten Bande */
+function wallDist(walls: number[][], x: number, y: number) {
+  let m = Infinity;
+  for (const w of walls) m = Math.min(m, segDist(x, y, w[0], w[1], w[2], w[3]));
+  return m;
+}
+
+/**
+ * Nächste freie Stelle um (x, y) – für Bälle, die zurückgelegt werden (Wasser, aus dem Platz) oder nach einem Stoß
+ * minimal auf einem anderen liegen: auf der Bahn, nicht im Wasser/Loch/in der Röhre, mit Abstand zu Banden und zu
+ * allen Bällen in `balls`. Findet sich nichts, bleibt es bei (x, y).
+ */
+export function golfFreeSpot(h: GolfHole, x: number, y: number, balls: readonly Point[], walls = golfWalls(h)): Point {
+  const R = GOLF.BALL_R;
+  const ok = (px: number, py: number) =>
+    onCourse(h, px, py) &&
+    !inWater(h, px, py) &&
+    Math.hypot(px - h.cup.x, py - h.cup.y) > GOLF.CUP_R + R &&
+    !h.tubes.some((tb) => Math.hypot(px - tb.x, py - tb.y) < tb.r + R) &&
+    !h.bumpers.some((bp) => Math.hypot(px - bp.x, py - bp.y) < bp.r + R + 0.5) &&
+    wallDist(walls, px, py) >= R + 0.3 &&
+    balls.every((o) => Math.hypot(px - o.x, py - o.y) >= 2 * R + 0.3);
+  if (ok(x, y)) return { x, y };
+  for (let rad = 1.5; rad <= 40; rad += 1.5) {
+    const n = Math.max(8, Math.round((rad * Math.PI * 2) / 2.5));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const px = x + Math.cos(a) * rad;
+      const py = y + Math.sin(a) * rad;
+      if (ok(px, py)) return { x: Math.round(px * 10) / 10, y: Math.round(py * 10) / 10 };
+    }
+  }
+  return { x, y };
+}
 
 /** Kreis-gegen-Kapsel-Stoß; `vel` liefert die Geschwindigkeit des Hindernisses am Kontaktpunkt */
 function hitCapsule(b: GolfBody, ax: number, ay: number, bx: number, by: number, rad: number, e: number, vel?: (x: number, y: number) => [number, number]): number {
@@ -438,9 +548,19 @@ export const inWater = (h: GolfHole, x: number, y: number) => h.water.some((s) =
 
 /**
  * Ein Physik-Schritt (dt s) für einen Ball zur Lochzeit t. Liefert Ereignisse (Loch, Wasser, Stopp …).
- * Bälle verschiedener Spieler stoßen NICHT zusammen – jeder spielt „seine“ Bahn.
+ * `others` = Bälle der anderen, die im Weg liegen bzw. rollen (der Aufrufer filtert: nicht eingelocht, nicht in
+ * der Röhre, nicht auf dem Abschlag). Trifft `b` einen davon, bekommt der andere Schwung (`onBall` meldet ihn,
+ * damit der Server ihn rollen lässt). Ohne `others` (Bot-Vorschau) rollt der Ball allein.
  */
-export function golfStep(b: GolfBody, h: GolfHole, walls: number[][], t: number, dt: number): GolfEvent[] {
+export function golfStep(
+  b: GolfBody,
+  h: GolfHole,
+  walls: number[][],
+  t: number,
+  dt: number,
+  others?: readonly GolfBody[],
+  onBall?: (other: GolfBody, impact: number) => void,
+): GolfEvent[] {
   const ev: GolfEvent[] = [];
   if (b.tube > 0) {
     b.tube -= dt;
@@ -482,6 +602,16 @@ export function golfStep(b: GolfBody, h: GolfHole, walls: number[][], t: number,
   for (let i = 0; i < n; i++) {
     b.x += (b.vx * dt) / n;
     b.y += (b.vy * dt) / n;
+    // erst die Bälle, dann die Banden: wer weggeschoben wird, landet so nie in einer Wand
+    if (others) {
+      for (const o of others) {
+        const imp = hitBall(b, o);
+        if (imp > 0) {
+          onBall?.(o, imp);
+          if (imp > 25) ev.push('ball');
+        }
+      }
+    }
     let wallHit = 0;
     for (const w of walls) wallHit = Math.max(wallHit, hitCapsule(b, w[0], w[1], w[2], w[3], 0, GOLF.WALL_E));
     for (const bp of h.bumpers) {
