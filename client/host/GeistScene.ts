@@ -13,6 +13,7 @@ import { GREEN_INK, NameTags, RED_INK, background, ensureTex, ink, panel, tagNam
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { pcol } from './playerColor';
+import { Darkness } from './darkness';
 
 const A = GEIST.AREA;
 const DARK = 0x060818;
@@ -79,8 +80,7 @@ interface HunterView {
 }
 
 export class GeistScene extends Phaser.Scene {
-  private dark!: Phaser.GameObjects.RenderTexture;
-  private eraser!: Phaser.GameObjects.Graphics;
+  private dark!: Darkness;
   private glow!: Phaser.GameObjects.Graphics;
   private ui!: Phaser.GameObjects.Graphics;
   private ghosts = new Map<string, GhostView>();
@@ -130,8 +130,7 @@ export class GeistScene extends Phaser.Scene {
     this.add.image(roomRect(2).x + roomRect(2).w - 3, roomRect(2).y + 3, ensureTex(this, 'g_cobweb', cobweb)).setOrigin(0, 0).setAngle(90).setDepth(5);
 
     // Dunkelheit: Lichtkegel werden herausradiert
-    this.dark = this.add.renderTexture(0, 0, WORLD.W, WORLD.H).setOrigin(0).setDepth(600);
-    this.eraser = this.make.graphics({}, false);
+    this.dark = new Darkness(this, 600);
     this.glow = this.add.graphics().setDepth(610).setBlendMode(Phaser.BlendModes.ADD);
     this.ui = this.add.graphics().setDepth(720);
 
@@ -270,10 +269,8 @@ export class GeistScene extends Phaser.Scene {
     const k = Math.min(1, dms / 1000 * 14);
     // Dunkelheit
     this.darkAlpha += (1 - this.darkAlpha) * Math.min(1, dms / 600);
-    this.dark.clear();
     const lightsOut = g.sub === 'play' || g.sub === 'intro';
-    this.dark.fill(DARK, (lightsOut ? 0.94 : 0.55) * this.darkAlpha);
-    this.eraser.clear();
+    const eraser = this.dark.begin(DARK, (lightsOut ? 0.94 : 0.55) * this.darkAlpha);
     this.glow.clear();
     this.ui.clear();
 
@@ -298,12 +295,12 @@ export class GeistScene extends Phaser.Scene {
       v.status.setColor(h.down ? '#ff9fc4' : C.gold);
       tagSpecs.push({ id, x: v.x, y: v.y - 30, name: v.name, color: pcol(id).hex, alpha: h.down ? 0.6 : 1 });
       // Kleiner Lichthof um jede Figur, damit man sich selbst findet
-      this.eraser.fillStyle(0xffffff, 0.5).fillCircle(v.x, v.y, 15);
+      eraser.fillStyle(0xffffff, 0.5).fillCircle(v.x, v.y, 15);
       if (h.light && !h.down) {
         const poly = conePolygon(v.x, v.y, v.angle, 16);
-        this.eraser.fillStyle(0xffffff, 0.55).fillPoints(poly, true);
+        eraser.fillStyle(0xffffff, 0.55).fillPoints(poly, true);
         const inner = conePolygon(v.x, v.y, v.angle, 16).map((p, i) => (i === 0 ? p : { x: v.x + (p.x - v.x) * 0.8, y: v.y + (p.y - v.y) * 0.8 }));
-        this.eraser.fillStyle(0xffffff, 0.9).fillPoints(inner, true);
+        eraser.fillStyle(0xffffff, 0.9).fillPoints(inner, true);
         this.glow.fillStyle(0xffd97a, 0.13).fillPoints(poly, true);
       }
       // Akku-Balken
@@ -323,7 +320,7 @@ export class GeistScene extends Phaser.Scene {
         }
       }
     }
-    this.dark.erase(this.eraser);
+    this.dark.end();
     this.tags.update(tagSpecs);
 
     // Geister (nur wenn enthüllt)

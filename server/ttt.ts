@@ -3,16 +3,18 @@ import type {
   PrivateState,
   TttAttack,
   TttBody,
+  TttDarkBody,
   TttItemKind,
   TttPlayerPub,
   TttRole,
   TttRoundResult,
+  TttShadow,
   TttShopItem,
   TttState,
   TttWeapon,
 } from '../shared/types';
 import { ROOMS, SHIRT_NAMES, TTT, TTT_ITEMS, TTT_ROLES, TTT_SHOP } from '../shared/games';
-import { DOORS, lineFree, roomInner, walkable } from '../shared/house';
+import { DOORS, lightSwitch, lineFree, roomAt, roomInner, walkable } from '../shared/house';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
 
 const TICK_MS = 50;
@@ -40,6 +42,8 @@ interface P {
   nextAttack: number;
   stunUntil: number;
   cloakUntil: number;
+  /** Verräter: ab wann „Licht aus“ wieder geht */
+  blackoutAt: number;
   info: { seq: number; text: string } | null;
 }
 
@@ -56,6 +60,12 @@ interface Item {
  * Alle laufen per Joystick durchs Ferienhaus. Ein paar Verräter (geheim) wollen
  * alle mit Poolnudel, Wasserpistole und Kokosnuss ausknocken. Der Detektiv ist bekannt
  * und kann an Ausgeknockten Spuren finden. Mehrere Runden mit neuen Rollen, Punkte pro Runde.
+ *
+ * Stromausfall: Jeder Raum hat Licht oder nicht. Der Fernseher zeigt nur beleuchtete Räume genau;
+ * aus dunklen Räumen landen im öffentlichen Snapshot nur anonyme Umrisse (keine ID, kein Name),
+ * Treffer nur als „BONK!“ ohne Täter/Herkunft, Ausgeknockte als namenloser Umriss, bis ihr Raum
+ * wieder Licht hat. Jeder kann am Lichtschalter (BENUTZEN) das Licht anmachen, Verräter knipsen es
+ * über den Shop aus (gratis, mit Abklingzeit).
  */
 export class TttGame implements MiniGame {
   readonly kind = 'ttt' as const;
@@ -69,6 +79,10 @@ export class TttGame implements MiniGame {
   private detective: string | null = null;
   private items: Item[] = [];
   private bodies: TttBody[] = [];
+  /** Ausgeknockte, deren Raum seit dem K.O. Licht hatte – erst dann sieht der TV, wer da liegt */
+  private seen = new Set<string>();
+  /** Licht pro Raum */
+  private lights: boolean[] = ROOMS.map(() => true);
   private koBy = new Map<string, string | null>();
   private tracked = new Set<string>();
   private traps: { owner: string; x: number; y: number }[] = [];
@@ -87,7 +101,8 @@ export class TttGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    this.rounds = ids.length >= 6 ? 2 : 3;
+    // 2 Runden à 100 s: Ausgeknockte warten nicht ewig
+    this.rounds = 2;
     this.scores = Object.fromEntries(ids.map((id) => [id, 0]));
     this.traitorRounds = Object.fromEntries(ids.map((id) => [id, 0]));
     let last = Date.now();
@@ -134,6 +149,7 @@ export class TttGame implements MiniGame {
         nextAttack: 0,
         stunUntil: 0,
         cloakUntil: 0,
+        blackoutAt: 0,
         info: null,
       });
     });
@@ -150,6 +166,9 @@ export class TttGame implements MiniGame {
     add('medkit', Math.ceil(n / 4));
 
     this.bodies = [];
+    this.seen.clear();
+    this.lights = ROOMS.map(() => true);
+    for (const r of shuffle(ROOMS.map((_, i) => i)).slice(0, TTT.DARK_START)) this.lights[r] = false;
     this.koBy.clear();
     this.tracked.clear();
     this.traps = [];
@@ -204,11 +223,13 @@ export class TttGame implements MiniGame {
       const victim = [...this.players.values()].find((p) => p.alive && p.role !== 'traitor' && Math.hypot(p.x - t.x, p.y - t.y) < TTT.TRAP_R);
       if (!victim) return true;
       victim.stunUntil = now + TTT.STUN_MS;
-      this.trapFx = [...this.trapFx.slice(-4), { seq: ++this.seq, x: t.x, y: t.y }];
+      // Im Dunkeln sieht der Fernseher die Falle nicht zuschnappen
+      if (!this.darkAt(t.x, t.y)) this.trapFx = [...this.trapFx.slice(-4), { seq: ++this.seq, x: t.x, y: t.y }];
       this.tell(victim, 'Ausgerutscht! Eine Bananenschale ...');
       this.damage(victim, 1, t.owner);
       return false;
     });
+    this.spotBodies();
     if (this.checkWin()) return;
     if (now >= this.deadline) {
       this.endRound('innocent', 'Zeit um – die Unschuldigen haben durchgehalten!');
@@ -235,6 +256,9 @@ export class TttGame implements MiniGame {
   private endRound(winner: 'innocent' | 'traitor', reason: string) {
     this.sub = 'roundEnd';
     this.wins[winner] += 1;
+    // Licht an für die Auflösung
+    this.lights = ROOMS.map(() => true);
+    this.spotBodies();
     for (const p of this.players.values()) p.moving = false;
     for (const p of this.players.values()) {
       const team = p.role === 'traitor' ? 'traitor' : 'innocent';
@@ -331,11 +355,23 @@ export class TttGame implements MiniGame {
       }
       if (hit) end = { x: hit.x, y: hit.y };
     }
+    const hx = hit ? Math.round(hit.x) : 0;
+    const hy = hit ? Math.round(hit.y) : 0;
+    const targetDark = hit ? this.darkAt(hit.x, hit.y) : false;
     const ko = hit ? this.damage(hit, dmg, p.id) : false;
-    this.attacks = [
-      ...this.attacks.slice(-9),
-      { seq: ++this.seq, by, kind, x1: Math.round(p.x), y1: Math.round(p.y), x2: Math.round(end.x), y2: Math.round(end.y), target: hit?.id ?? null, ko },
-    ];
+    let pub: TttAttack | null;
+    if (this.darkAt(p.x, p.y)) {
+      // Täter im Dunkeln: nur ein „BONK!“ am Einschlag, ohne Herkunft, Waffe, Täter, Opfer und K.O.
+      pub = hit ? { seq: 0, by: null, kind: 'noodle', x1: hx, y1: hy, x2: hx, y2: hy, target: null, ko: false, dark: true } : null;
+      if (hit) this.tell(hit, ko ? 'Ausgeknockt – im Dunkeln! Wer war das?' : `Im Dunkeln erwischt! Noch ${hit.hp} ${hit.hp === 1 ? 'Herz' : 'Herzen'}.`);
+    } else {
+      // Täter im Licht: Angriff wie gehabt, aber ein Opfer im Dunkeln bleibt anonym
+      pub = { seq: 0, by, kind, x1: Math.round(p.x), y1: Math.round(p.y), x2: Math.round(end.x), y2: Math.round(end.y), target: targetDark ? null : (hit?.id ?? null), ko: targetDark ? false : ko };
+    }
+    if (pub) {
+      pub.seq = ++this.seq;
+      this.attacks = [...this.attacks.slice(-9), pub];
+    }
   }
 
   /** Fernkampf mit etwas Zielhilfe: nächster Spieler im Kegel vor einem */
@@ -380,6 +416,7 @@ export class TttGame implements MiniGame {
     q.alive = false;
     q.sx = q.sy = 0;
     this.bodies.push({ id: q.id, x: Math.round(q.x), y: Math.round(q.y), role: null, inspectedBy: null });
+    if (!this.darkAt(q.x, q.y)) this.seen.add(q.id);
     this.koBy.set(q.id, by);
     if (q.weapon) {
       this.items.push({ id: ++this.itemSeq, kind: q.weapon, x: Math.round(q.x + 6), y: Math.round(q.y), ammo: q.weapon === 'pistol' ? q.ammo : 1 });
@@ -399,10 +436,18 @@ export class TttGame implements MiniGame {
   }
 
   /** Was kann man gerade benutzen? */
-  private nearThing(p: P): { body?: TttBody; item?: Item; label: string } | null {
-    let best: { body?: TttBody; item?: Item; label: string } | null = null;
+  private nearThing(p: P): { body?: TttBody; item?: Item; light?: number; label: string } | null {
+    // Im dunklen Raum geht der Lichtschalter vor
+    const room = roomAt(p.x, p.y);
+    if (room >= 0 && !this.lights[room]) {
+      const sw = lightSwitch(room);
+      if (Math.hypot(sw.x - p.x, sw.y - p.y) <= TTT.USE_RANGE) return { light: room, label: '💡 Licht anmachen' };
+    }
+    let best: { body?: TttBody; item?: Item; light?: number; label: string } | null = null;
     let bestD: number = TTT.USE_RANGE;
     for (const b of this.bodies) {
+      // Untersuchen nur bei Licht
+      if (this.darkAt(b.x, b.y)) continue;
       const d = Math.hypot(b.x - p.x, b.y - p.y);
       if (d > bestD) continue;
       const canTrack = p.role === 'detective' && !this.tracked.has(b.id);
@@ -422,6 +467,12 @@ export class TttGame implements MiniGame {
   private use(p: P) {
     const near = this.nearThing(p);
     if (!near) return;
+    if (near.light !== undefined) {
+      this.lights[near.light] = true;
+      this.spotBodies();
+      this.tell(p, 'Klick – Licht ist an!');
+      return;
+    }
     if (near.item) {
       const it = near.item;
       if (it.kind === 'medkit') {
@@ -476,6 +527,14 @@ export class TttGame implements MiniGame {
     } else if (item === 'cloak') {
       p.cloakUntil = now + TTT.CLOAK_MS;
       this.tell(p, 'Du bist unsichtbar!');
+    } else if (item === 'blackout') {
+      if (!Number.isInteger(room) || room < 0 || room >= ROOMS.length) return;
+      if (now < p.blackoutAt) return this.tell(p, `Sicherung noch heiß – ${Math.ceil((p.blackoutAt - now) / 1000)} s warten.`);
+      if (!this.lights[room]) return this.tell(p, `${ROOMS[room].name}: Da ist schon dunkel.`);
+      this.lights[room] = false;
+      p.blackoutAt = now + TTT.BLACKOUT_COOLDOWN;
+      this.say(`Stromausfall ${WHERE[room]}!`, 'alert');
+      this.tell(p, `Licht aus ${WHERE[room]}. Psst!`);
     } else if (item === 'radio') {
       if (!Number.isInteger(room) || room < 0 || room >= ROOMS.length) return;
       const others = [...this.players.values()].filter((q) => q.alive && q.role !== 'traitor');
@@ -493,6 +552,17 @@ export class TttGame implements MiniGame {
   }
 
   // ---------------------------------------------------------------- Helfer
+
+  /** Liegt der Punkt in einem dunklen Raum? */
+  private darkAt(x: number, y: number): boolean {
+    const r = roomAt(x, y);
+    return r >= 0 && !this.lights[r];
+  }
+
+  /** Ausgeknockte in beleuchteten Räumen gelten ab jetzt als gefunden */
+  private spotBodies() {
+    for (const b of this.bodies) if (!this.seen.has(b.id) && !this.darkAt(b.x, b.y)) this.seen.add(b.id);
+  }
 
   private roleOf(id: string): TttRole {
     return this.players.get(id)?.role ?? 'innocent';
@@ -513,11 +583,18 @@ export class TttGame implements MiniGame {
   snapshot(): MiniSnapshot {
     const now = Date.now();
     const players: Record<string, TttPlayerPub> = {};
+    const shadows: TttShadow[] = [];
     for (const p of this.players.values()) {
       // Unsichtbare (Tarnumhang) und Ausgeknockte erscheinen nicht – Letztere liegen als Körper herum
       if (!p.alive || now < p.cloakUntil) continue;
-      players[p.id] = { x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, moving: p.moving, hp: p.hp, weapon: p.weapon, stunned: now < p.stunUntil };
+      // Dunkler Raum: nur ein anonymer Umriss – ID, Herzen, Waffe und Betäubung bleiben auf dem Server
+      if (this.darkAt(p.x, p.y)) shadows.push({ x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, moving: p.moving });
+      else players[p.id] = { x: Math.round(p.x), y: Math.round(p.y), dir: p.dir, moving: p.moving, hp: p.hp, weapon: p.weapon, stunned: now < p.stunUntil };
     }
+    // Sortiert statt in Spielerreihenfolge, damit der Listenplatz niemanden verrät
+    shadows.sort((a, b) => a.x - b.x || a.y - b.y);
+    const bodies = this.bodies.filter((b) => this.seen.has(b.id));
+    const darkBodies: TttDarkBody[] = this.bodies.filter((b) => !this.seen.has(b.id)).map(({ x, y }) => ({ x, y }));
     const reveal = this.sub === 'roundEnd' || this.sub === 'over';
     return {
       kind: 'ttt',
@@ -527,10 +604,14 @@ export class TttGame implements MiniGame {
         round: this.round,
         rounds: this.rounds,
         players,
-        alive: Object.fromEntries([...this.players.values()].map((p) => [p.id, p.alive])),
+        shadows,
+        lights: [...this.lights],
+        // Im Dunkeln Ausgeknockte, die noch keiner gefunden hat, gelten öffentlich noch als im Spiel
+        alive: Object.fromEntries([...this.players.values()].map((p) => [p.id, p.alive || !this.seen.has(p.id)])),
         detective: this.detective,
         traitorCount: this.traitors.length,
-        bodies: this.bodies,
+        bodies,
+        darkBodies,
         items: this.items.map(({ id, kind, x, y }) => ({ id, kind, x, y })),
         attacks: this.attacks,
         feed: this.feed,
@@ -562,6 +643,9 @@ export class TttGame implements MiniGame {
         cloakLeft: Math.max(0, p.cloakUntil - now),
         attackReady: now >= p.nextAttack && now >= p.stunUntil,
         inDoor: !!this.doorNear(p),
+        room: roomAt(p.x, p.y),
+        dark: this.darkAt(p.x, p.y),
+        blackoutIn: p.role === 'traitor' ? Math.max(0, p.blackoutAt - now) : 0,
         info: p.info,
       },
     };

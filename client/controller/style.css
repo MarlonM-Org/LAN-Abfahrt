@@ -509,6 +509,9 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .ttt-stash .shop-btn { line-height: 1.6; font-size: 9px; }
 .ttt-stash .shop-btn small { font-size: 7px; opacity: 0.9; }
 .ttt-stash .room-btn { font-size: 7px; }
+.ttt-stash .pick-title { grid-column: 1 / -1; margin: 4px 0 0; font-size: 8px; }
+.ttt-top .lamp { font-size: 9px; }
+.ttt-top .lamp.dark { color: #6b5fa8; }
 /* Rollen-Ansage: quer zweispaltig, damit nichts gescrollt werden muss */
 .ttt-roles, .ttt-roles-a { display: flex; flex-direction: column; gap: 14px; }
 /* war: @media (orientation: landscape) and (max-height: 500px) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */

@@ -5,9 +5,9 @@ import { getState } from './store';
 /**
  * Wii Balance Board am Laptop – per WebHID direkt in der TV-Seite (Chrome/Edge, nur auf localhost bzw. HTTPS).
  *
- * Einrichten (einmalig, Windows): Einstellungen → Bluetooth → Gerät hinzufügen → Bluetooth, dann am Board im
- * Batteriefach den roten SYNC-Knopf drücken. Es erscheint als „Nintendo RVL-WBC-01“; fragt Windows nach einer PIN,
- * einfach leer lassen und „Weiter“. Danach auf der TV-Seite B drücken (oder auf die Board-Anzeige klicken) und das
+ * Einrichten (einmalig, Windows): scripts/wii-pair.ps1 als Administrator starten und SYNC im Batteriefach drücken
+ * (koppelt mit der Adapter-Adresse als PIN und schaltet den HID-Dienst ein – der Windows-Assistent kann das nicht,
+ * dann fehlt das Board unter „Human Interface Devices“ und WebHID findet es nicht). Danach auf der TV-Seite B drücken (oder auf die Board-Anzeige klicken) und das
  * Board auswählen – ab dann verbindet sich die Seite beim Neuladen von selbst.
  *
  * Protokoll (siehe wiibrew.org „Wii Balance Board“): das Board meldet sich als Wiimote mit Erweiterung.

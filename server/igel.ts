@@ -1,4 +1,4 @@
-import type { IgelAim, IgelFx, IgelHog, IgelObj, IgelOp, IgelProjType, IgelSquad, IgelState, IgelWeapon, MiniSnapshot, SkipInfo } from '../shared/types';
+import type { IgelAim, IgelFx, IgelHog, IgelObj, IgelOp, IgelProjType, IgelRecFrame, IgelReplay, IgelSquad, IgelState, IgelThemeId, IgelWeapon, MiniSnapshot, SkipInfo } from '../shared/types';
 import { possessive } from '../shared/players';
 import {
   AIRSTRIKE,
@@ -11,11 +11,17 @@ import {
   GRENADE,
   HOLY,
   IGEL,
+  IGEL_QUIPS,
   IGEL_SQUADS,
   IGEL_TAUNTS,
+  IGEL_THEMES,
+  IGEL_THEME_IDS,
   MINE,
   PADDLE,
+  PARASOL,
   PUNCH,
+  REPLAY,
+  ROPE,
   SHOTGUN,
   SIMUL,
   WEAPONS,
@@ -30,12 +36,17 @@ import {
   igelSuddenMs,
   igelTurnMs,
   isSolid,
+  isTool,
   launch,
   plankOps,
+  ropeAnchor,
+  shovelOps,
   speedScale,
   stepBallistic,
   supported,
   surfaceY,
+  themeGrav,
+  themeWind,
   windFactor,
 } from '../shared/igel';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
@@ -46,6 +57,9 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const randInt = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)];
+/** Aufnahme ohne den internen Wert fürs Vergleichen */
+const replayOf = ({ score: _score, ...r }: IgelReplay & { score: number }): IgelReplay => r;
 
 interface Hog extends IgelHog {
   vx: number;
@@ -54,6 +68,24 @@ interface Hog extends IgelHog {
   walkDir: -1 | 0 | 1;
   /** Rest für das Herunterzählen der HP-Anzeige */
   shownAcc: number;
+  /** Lianen-Seil: Ankerpunkt + aktuelle Seillänge */
+  anchor: { x: number; y: number; len: number } | null;
+  /** Klettern am Seil: 1 = hoch, −1 = runter */
+  climb: -1 | 0 | 1;
+}
+
+/** Laufende Aufnahme eines Zugs / einer Simultan-Runde (Kandidat für den „Schuss des Abends“) */
+interface Rec {
+  frames: IgelRecFrame[];
+  fx: (IgelFx & { t: number })[];
+  weapons: Record<string, IgelWeapon>;
+  hp0: Map<number, number>;
+  ok0: Set<number>;
+  dmg0: Record<string, number>;
+  /** Wer welchen Igel in dieser Aufnahme zuletzt getroffen hat (für K.O.s) */
+  hitBy: Map<number, string>;
+  self: Record<string, number>;
+  team: Record<string, number>;
 }
 
 interface Proj {
@@ -155,6 +187,19 @@ export class IgelGame implements MiniGame {
   private suddenMs: number;
   /** Zuschauer-Sprüche: wann darf der Spieler wieder? */
   private tauntReady: Record<string, number> = {};
+  /** Themenkarte der Partie und ihre Faktoren */
+  private theme: IgelThemeId;
+  private grav: number;
+  private windMul: number;
+  /** Lianen-Seil: in welchem Zug zuletzt Munition verbraucht (Nachschießen im selben Zug ist frei) */
+  private ropeTurn: Record<string, number> = {};
+  /** Aufnahme: rollender Vorlauf (Zielen) und laufende Aufnahme ab dem Schuss */
+  private pre: IgelRecFrame[] = [];
+  private rec: Rec | null = null;
+  private best: (IgelReplay & { score: number }) | null = null;
+  /** Igel-Sprüche (Sprechblasen) pro Zug begrenzen */
+  private quipBudget = 0;
+  private finishFn: (() => void) | null = null;
 
   constructor(
     private ids: string[],
@@ -162,6 +207,11 @@ export class IgelGame implements MiniGame {
   ) {
     this.mask = genTerrain(this.seed);
     const n = ids.length;
+    // Themenkarte: zufällig pro Partie (zum Testen: IGEL_THEME=mond npm run dev)
+    const forced = process.env.IGEL_THEME as IgelThemeId | undefined;
+    this.theme = forced && forced in IGEL_THEMES ? forced : pick(IGEL_THEME_IDS);
+    this.grav = themeGrav(this.theme);
+    this.windMul = themeWind(this.theme);
     // Zum Testen mit wenigen Spielern: IGEL_SIMUL=1 npm run dev
     this.simul = process.env.IGEL_SIMUL === '1' || igelSimul(n);
     const order = shuffle(ids);
@@ -181,7 +231,8 @@ export class IgelGame implements MiniGame {
     // Simultan schießt jeder pro Runde – volle 100 HP, damit die Partie nicht nach 3 Runden vorbei ist
     this.maxHp = this.simul ? IGEL.HP : igelMaxHp(n);
     // Zum Testen kürzer: IGEL_SUDDEN_MS=20000 npm run dev
-    this.suddenMs = Number(process.env.IGEL_SUDDEN_MS) || igelSuddenMs(n);
+    this.suddenMs = Number(process.env.IGEL_SUDDEN_MS) || igelSuddenMs(n) * (this.theme === 'flut' ? 0.5 : 1);
+    if (this.theme === 'flut') this.water -= 10;
     // Startwind leicht, danach driftet er pro Zug
     this.wind = Math.round((Math.random() - 0.5) * 0.8 * 100) / 100;
     const perPlayer = n <= 4 ? 2 : 1;
@@ -191,6 +242,7 @@ export class IgelGame implements MiniGame {
       this.weaponOf[id] = 'bazooka';
       this.fuseOf[id] = GRENADE.FUSE_MS / 1000;
       this.ammo[id] = Object.fromEntries((Object.keys(WEAPONS) as IgelWeapon[]).map((w) => [w, WEAPONS[w].ammo])) as Record<IgelWeapon, number>;
+      if (this.theme === 'spreng') this.ammo[id].dynamite = 2;
     }
     for (const s of this.sides) (this.memberPtr[s] = 0), (this.hogPtr[s] = 0);
     // Spawnpunkte: abwechselnd nach Spieler, damit die Igel (und Teams) gemischt stehen
@@ -199,13 +251,14 @@ export class IgelGame implements MiniGame {
     for (let i = 0; i < perPlayer; i++) {
       for (const owner of this.teams) {
         const s = spots[k++];
-        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < IGEL.W / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, walkDir: 0, shownAcc: 0 });
+        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < IGEL.W / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, walkDir: 0, shownAcc: 0, anchor: null, climb: 0 });
       }
     }
     // Umgebung: Gaskartuschen vom Grill und scharfe Seeigel-Minen – nicht direkt neben einem Igel
     const avoid = spots.slice(0, this.hogs.length);
-    const nB = randInt(BARREL.MIN, BARREL.MAX);
-    const nM = randInt(MINE.START_MIN, MINE.START_MAX);
+    const more = this.theme === 'spreng' ? 2 : 1;
+    const nB = randInt(BARREL.MIN, BARREL.MAX) * more;
+    const nM = randInt(MINE.START_MIN, MINE.START_MAX) * more;
     const objSpots = this.spawnSpots(nB + nM, avoid, 44, true);
     objSpots.forEach((s, i) => this.addObj(i < nB ? 'barrel' : 'mine', s.x, s.y, { armed: true }));
     this.timers.every(TICK_MS, () => this.tick());
@@ -311,8 +364,10 @@ export class IgelGame implements MiniGame {
   private beginCycle() {
     this.turn += 1;
     // Wind driftet nur leicht weiter – so lernt man aus dem Schuss des Vorgängers
-    if (this.turn > 1) this.wind = Math.round(clamp(this.wind + (Math.random() - 0.5) * IGEL.WIND_DRIFT, -1, 1) * 100) / 100;
-    for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0), (h.walkDir = 0);
+    if (this.turn > 1) this.wind = Math.round(clamp(this.wind + (Math.random() - 0.5) * IGEL.WIND_DRIFT * this.windMul, -1, 1) * 100) / 100;
+    this.quipBudget = 3;
+    this.pre = [];
+    for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0), (h.walkDir = 0), (h.climb = 0);
     for (const id of this.ids) if (this.ammo[id][this.weaponOf[id]] === 0) this.weaponOf[id] = 'bazooka';
     this.aim = null;
     this.aims = {};
@@ -351,6 +406,7 @@ export class IgelGame implements MiniGame {
     this.sub = 'aim';
     // Kurz offline (App gewechselt)? 5 s Gnadenfrist statt sofort weiter
     this.deadline = Date.now() + (this.ctx.isConnected(ctrl) ? this.turnMs : IGEL.OFFLINE_TURN_MS);
+    if (Math.random() < 0.25) this.quip(hog, 'start');
   }
 
   private startRound() {
@@ -364,6 +420,7 @@ export class IgelGame implements MiniGame {
 
   /** Simultan: alle gepufferten Schüsse zugleich auslösen (in zufälliger Reihenfolge) */
   private startFlightAll() {
+    if (Object.keys(this.shots).length) this.startRec();
     for (const id of shuffle(Object.keys(this.shots))) {
       const h = this.ownHog(id);
       const shot = this.shots[id];
@@ -371,7 +428,11 @@ export class IgelGame implements MiniGame {
       const n = shot.weapon === 'shotgun' ? SHOTGUN.SHOTS : 1;
       let ok = false;
       for (let i = 0; i < n; i++) ok = this.execShot(h, id, shot) !== null || ok;
-      if (ok) this.useAmmo(id, shot.weapon);
+      if (ok) {
+        this.useAmmo(id, shot.weapon);
+        if (this.rec) this.rec.weapons[id] = shot.weapon;
+        if (Math.random() < 0.1) this.quip(h, 'fire');
+      }
     }
     for (const h of this.hogs) h.walkDir = 0;
     this.aims = {};
@@ -383,7 +444,7 @@ export class IgelGame implements MiniGame {
   private toSettle() {
     this.sub = 'settle';
     this.settleAt = Date.now() + IGEL.SETTLE_MIN_MS;
-    for (const h of this.hogs) h.walkDir = 0;
+    for (const h of this.hogs) (h.walkDir = 0), (h.climb = 0), this.detach(h);
     this.aim = null;
     this.aims = {};
     this.dirty = true;
@@ -398,6 +459,7 @@ export class IgelGame implements MiniGame {
       }
     }
     for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0);
+    this.evalCycle();
     // Volle Runde vorbei? (Simultan: immer; Rundlauf: der nächste Zug springt wieder nach vorn)
     const nextIdx = this.nextSideFrom(this.sidePtr);
     const roundDone = this.simul || (nextIdx >= 0 && nextIdx <= this.sidePtr);
@@ -427,7 +489,14 @@ export class IgelGame implements MiniGame {
 
   /** 30 % pro Zug/Runde: Kiste am Sonnenschirm (zufällige Waffe oder +25 HP) */
   private maybeDropCrate() {
-    if (this.objs.filter((o) => o.type === 'crate').length >= CRATE.MAX || Math.random() >= CRATE.CHANCE) return;
+    const rain = this.theme === 'kisten';
+    if (this.objs.filter((o) => o.type === 'crate').length >= (rain ? CRATE.MAX * 2 : CRATE.MAX) || Math.random() >= (rain ? 1 : CRATE.CHANCE)) return;
+    // Kistenregen: manchmal gleich zwei
+    if (rain && Math.random() < 0.4) this.dropCrate();
+    this.dropCrate();
+  }
+
+  private dropCrate() {
     for (let tries = 0; tries < 30; tries++) {
       const x = 20 + Math.random() * (IGEL.W - 40);
       const sy = surfaceY(this.mask, x);
@@ -471,7 +540,10 @@ export class IgelGame implements MiniGame {
     // Igel-Physik
     for (const h of this.hogs) {
       if (h.state === 'drowned') continue;
-      if (!h.flying) {
+      if (h.anchor) {
+        moving = true;
+        this.swingHog(h);
+      } else if (!h.flying) {
         if (bodyHits(this.mask, h.x, h.y)) this.unstick(h);
         if (!supported(this.mask, h.x, h.y)) {
           h.flying = true;
@@ -479,7 +551,7 @@ export class IgelGame implements MiniGame {
           h.vy = 0;
         }
       }
-      if (h.flying) {
+      if (h.flying && !h.anchor) {
         moving = true;
         this.flyHog(h);
       }
@@ -544,7 +616,8 @@ export class IgelGame implements MiniGame {
         break;
       }
     }
-    if (this.sub === 'over') return;
+    if (this.sub === 'over' || this.sub === 'replay') return;
+    this.record(now);
     if (moving || this.dirty || this.tickNo % 4 === 0) {
       this.dirty = false;
       this.ctx.onChange();
@@ -606,7 +679,12 @@ export class IgelGame implements MiniGame {
   private flyHog(h: Hog) {
     const dt = IGEL.DT;
     for (let s = 0; s < STEPS; s++) {
-      h.vy = Math.min(420, h.vy + IGEL.GRAVITY * dt);
+      if (h.chute) {
+        // Sonnenschirm: langsam sinken, mit dem Stick steuern, der Wind schiebt
+        h.vy = Math.min(PARASOL.FALL, h.vy + IGEL.GRAVITY * this.grav * dt);
+        const want = h.walkDir * PARASOL.STEER + this.wind * this.windMul * PARASOL.WIND;
+        h.vx += (want - h.vx) * Math.min(1, dt * 3);
+      } else h.vy = Math.min(420, h.vy + IGEL.GRAVITY * this.grav * dt);
       const nx = h.x + h.vx * dt;
       if (bodyHits(this.mask, nx, h.y)) h.vx = -h.vx * 0.35;
       else h.x = clamp(nx, -40, IGEL.W + 40);
@@ -633,6 +711,13 @@ export class IgelGame implements MiniGame {
       h.flying = true;
       return;
     }
+    if (h.chute) {
+      // Schirm zu – sanft gelandet, kein Fallschaden
+      h.chute = false;
+      this.addFx({ type: 'land', x: h.x, y: h.y });
+      this.dirty = true;
+      return;
+    }
     if (impact > IGEL.FALL_SAFE && h.state === 'ok') this.hurt(h, Math.round((impact - IGEL.FALL_SAFE) * IGEL.FALL_DMG), null);
   }
 
@@ -644,9 +729,12 @@ export class IgelGame implements MiniGame {
     h.shown = 0;
     h.flying = false;
     h.walkDir = 0;
+    h.anchor = null;
+    h.chute = false;
     h.y = this.water;
     h.x = clamp(h.x, 4, IGEL.W - 4);
     this.addFx({ type: 'splash', x: h.x, y: this.water, text: wasAlive ? 'PLATSCH!' : undefined });
+    if (wasAlive && Math.random() < 0.6) this.quip(h, 'drown');
     if (!this.simul && h.id === this.activeHog && this.sub === 'aim') this.toSettle();
     this.dirty = true;
   }
@@ -661,7 +749,7 @@ export class IgelGame implements MiniGame {
         case 'frag':
         case 'gull': {
           // Aufschlagzünder
-          stepBallistic(p, dt, this.wind * p.wind);
+          stepBallistic(p, dt, this.wind * p.wind * this.windMul, this.grav);
           if (this.offWorld(p)) break;
           const armed = p.age * 1000 >= BAZOOKA.ARM_MS;
           const hit =
@@ -674,7 +762,7 @@ export class IgelGame implements MiniGame {
         case 'dynamite': {
           // Liegt einfach da (fällt nur, wenn der Boden weg ist)
           if (!isSolid(this.mask, p.x, p.y + 1)) {
-            p.vy = Math.min(300, p.vy + IGEL.GRAVITY * dt);
+            p.vy = Math.min(300, p.vy + IGEL.GRAVITY * this.grav * dt);
             const ny = p.y + p.vy * dt;
             if (isSolid(this.mask, p.x, ny + 1)) p.vy = 0;
             else p.y = ny;
@@ -685,7 +773,7 @@ export class IgelGame implements MiniGame {
         }
         default: {
           // Wasserbombe / Heilige Ananas: hüpfen, Zeitzünder
-          p.vy += IGEL.GRAVITY * dt;
+          p.vy += IGEL.GRAVITY * this.grav * dt;
           const nx = p.x + p.vx * dt;
           if (isSolid(this.mask, nx, p.y)) {
             p.vx = -p.vx * 0.45;
@@ -751,6 +839,8 @@ export class IgelGame implements MiniGame {
       const ny = d < 1 ? -1 : (cy - y) / d;
       h.flying = true;
       h.walkDir = 0;
+      h.anchor = null;
+      h.chute = false;
       h.vx = nx * 210 * f;
       h.vy = ny * 210 * f - 90 * f;
       if (h.state === 'ok') this.hurt(h, Math.round(maxDmg * Math.min(1, f * 1.3)), owner);
@@ -782,9 +872,9 @@ export class IgelGame implements MiniGame {
       if (!ground) {
         if (!o.falling) o.falling = true;
         const max = o.chute ? CRATE.FALL : 320;
-        o.vy = Math.min(max, o.vy + IGEL.GRAVITY * dt);
+        o.vy = Math.min(max, o.vy + IGEL.GRAVITY * this.grav * dt);
         // Der Sonnenschirm treibt mit dem Wind
-        if (o.chute) o.x = clamp(o.x + this.wind * 12 * dt, 6, IGEL.W - 6);
+        if (o.chute) o.x = clamp(o.x + this.wind * this.windMul * 12 * dt, 6, IGEL.W - 6);
         const target = o.y + o.vy * dt;
         let y = o.y;
         while (y < target) {
@@ -859,7 +949,23 @@ export class IgelGame implements MiniGame {
     const real = Math.min(h.hp, dmg);
     h.hp -= real;
     this.addFx({ type: 'dmg', x: h.x, y: h.y - 12, text: `-${dmg}` });
-    if (attacker && !this.sameSide(attacker, h.owner)) this.damage[attacker] = (this.damage[attacker] ?? 0) + real;
+    if (attacker && !this.sameSide(attacker, h.owner)) {
+      this.damage[attacker] = (this.damage[attacker] ?? 0) + real;
+      // Vampir-Igel: ein Drittel des Schadens heilt den eigenen (gesteuerten) Igel
+      const mine = this.theme === 'vampir' ? (this.ctrlHog(attacker) ?? this.ownHog(attacker)) : null;
+      const heal = mine ? Math.min(Math.round(real / 3), Math.max(0, this.maxHp - mine.hp)) : 0;
+      if (mine && heal > 0) {
+        mine.hp += heal;
+        mine.shown = Math.max(mine.shown, mine.hp);
+        this.addFx({ type: 'dmg', x: mine.x, y: mine.y - 12, text: `+${heal}` });
+      }
+    }
+    if (this.rec && attacker) {
+      this.rec.hitBy.set(h.id, attacker);
+      if (attacker === h.owner) this.rec.self[attacker] = (this.rec.self[attacker] ?? 0) + real;
+      else if (this.sameSide(attacker, h.owner)) this.rec.team[attacker] = (this.rec.team[attacker] ?? 0) + real;
+    }
+    if (real >= 20 && h.hp > 0 && Math.random() < 0.4) this.quip(h, 'hurt');
     if (attacker) this.ctx.log?.(attacker === h.owner ? 'selfhit' : this.sameSide(attacker, h.owner) ? 'teamhit' : 'igelhit', { p: attacker, o: h.owner });
     // Wer sich selbst verletzt (Fallschaden, Mine), dessen Zug ist vorbei (nur Rundlauf)
     if (!this.simul && h.id === this.activeHog && this.sub === 'aim') this.toSettle();
@@ -871,6 +977,7 @@ export class IgelGame implements MiniGame {
     if (f.y2 !== undefined) fx.y2 = Math.round(f.y2);
     this.fx.push(fx);
     if (this.fx.length > 40) this.fx.shift();
+    if (this.rec && this.rec.fx.length < 160 && fx.type !== 'taunt' && fx.type !== 'quip' && fx.type !== 'water') this.rec.fx.push({ ...fx, t: Date.now() });
     this.dirty = true;
   }
 
@@ -896,7 +1003,19 @@ export class IgelGame implements MiniGame {
         if (h.walkDir) h.dir = h.walkDir;
         break;
       }
+      case 'climb': {
+        // Am Lianen-Seil: 1 = hochklettern, −1 = runterlassen
+        const d = Number(pl.dir);
+        h.climb = canMove && h.anchor ? (d > 0 ? 1 : d < 0 ? -1 : 0) : 0;
+        break;
+      }
       case 'jump':
+        if (h.anchor) {
+          // Liane loslassen: Schwung mitnehmen, kleiner Schubs nach oben
+          this.detach(h);
+          h.vy -= 40;
+          break;
+        }
         if (canMove && !h.flying && supported(this.mask, h.x, h.y)) {
           h.flying = true;
           h.vx = h.dir * IGEL.JUMP_VX;
@@ -906,7 +1025,7 @@ export class IgelGame implements MiniGame {
       case 'weapon': {
         const w = String(pl.weapon) as IgelWeapon;
         // Mitten in der Schrotflinte (erster Schuss raus) bleibt die Waffe
-        if (canAim && w in WEAPONS && this.ammo[id][w] !== 0 && this.shotsLeft === 0) this.weaponOf[id] = w;
+        if (canAim && w in WEAPONS && (this.ammo[id][w] !== 0 || (w === 'rope' && this.ropeTurn[id] === this.turn)) && this.shotsLeft === 0) this.weaponOf[id] = w;
         break;
       }
       case 'aim': {
@@ -925,6 +1044,13 @@ export class IgelGame implements MiniGame {
       }
       case 'fire': {
         if (!canAim) break;
+        // Werkzeuge (Liane, Schirm, Schaufel) wirken sofort und beenden den Zug nicht
+        if (isTool(this.weaponOf[id])) {
+          if (this.shotsLeft === 0) this.useTool(h, id, this.weaponOf[id], pl);
+          break;
+        }
+        // Wer an der Liane hängt und schießt, lässt los
+        this.detach(h);
         const shot = this.readShot(id, pl);
         if (!shot) break;
         if (this.simul) {
@@ -934,6 +1060,7 @@ export class IgelGame implements MiniGame {
           const a = this.readAim(pl);
           if (a) this.aims[id] = a;
           h.walkDir = 0;
+          h.climb = 0;
         } else this.fireNow(h, id, shot);
         break;
       }
@@ -970,8 +1097,16 @@ export class IgelGame implements MiniGame {
 
   /** Rundlauf: Schuss sofort ausführen und in die passende Phase wechseln */
   private fireNow(h: Hog, owner: string, shot: Shot) {
+    const fresh = !this.rec;
+    this.startRec();
     const res = this.execShot(h, owner, shot);
-    if (res === null) return;
+    if (res === null) {
+      // Ungültig (z. B. Teleport-Ziel): Aufnahme verwerfen
+      if (fresh) this.rec = null;
+      return;
+    }
+    this.rec!.weapons[owner] = shot.weapon;
+    if (fresh && Math.random() < 0.25) this.quip(h, 'fire');
     if (res === 'again') {
       // Schrotflinte: erster Schuss raus, zweiter folgt im selben Zug
       if (this.shotsLeft === 0) this.shotsLeft = SHOTGUN.SHOTS - 1;
@@ -1086,6 +1221,8 @@ export class IgelGame implements MiniGame {
           ty = sy;
         } else ty = found;
         this.addFx({ type: 'tele', x: h.x, y: cy });
+        h.anchor = null;
+        h.chute = false;
         h.x = tx;
         h.y = ty;
         h.vx = 0;
@@ -1094,6 +1231,11 @@ export class IgelGame implements MiniGame {
         this.addFx({ type: 'tele', x: tx, y: ty - 4 });
         return 'retreat';
       }
+      case 'rope':
+      case 'parasol':
+      case 'shovel':
+        // Werkzeuge laufen über useTool()
+        return null;
       case 'punch':
       case 'paddle': {
         const dir = Math.cos(angle) >= 0 ? 1 : -1;
@@ -1107,6 +1249,8 @@ export class IgelGame implements MiniGame {
           if (dx < -3 || dx > reach || Math.abs(o.y - h.y) > 12) continue;
           o.flying = true;
           o.walkDir = 0;
+          o.anchor = null;
+          o.chute = false;
           if (paddle) {
             // Schlagrichtung zählt: weit in Zielrichtung, immer etwas nach oben
             const ux = Math.max(0.3, Math.abs(Math.cos(angle))) * dir;
@@ -1130,7 +1274,7 @@ export class IgelGame implements MiniGame {
   private taunt(id: string, pl: Record<string, unknown>) {
     const i = Number(pl.i);
     if (!Number.isInteger(i) || i < 0 || i >= IGEL_TAUNTS.length) return;
-    if (this.sub === 'over' || id === this.active || !this.teams.includes(id)) return;
+    if (this.sub === 'over' || this.sub === 'replay' || id === this.active || !this.teams.includes(id)) return;
     const now = Date.now();
     if (now < (this.tauntReady[id] ?? 0)) return;
     // Lebender Igel bevorzugt, sonst der Grabstein; wer ertrunken ist, ruft vom Schwimmring
@@ -1141,15 +1285,259 @@ export class IgelGame implements MiniGame {
     this.addFx({ type: 'taunt', x: hog.x, y: hog.state === 'drowned' ? this.water : hog.y, text: IGEL_TAUNTS[i], hog: hog.id });
   }
 
+  // ---------------------------------------------------------------- Werkzeuge
+
+  /** Liane, Schirm, Schaufel: sofort ausführen, der Zug läuft weiter */
+  private useTool(h: Hog, id: string, w: IgelWeapon, pl: Record<string, unknown>) {
+    const free = w === 'rope' && this.ropeTurn[id] === this.turn;
+    if (this.ammo[id][w] === 0 && !free) return;
+    const angle = Number(pl.angle);
+    const cy = h.y - 4;
+    let used = false;
+    switch (w) {
+      case 'rope': {
+        if (!Number.isFinite(angle)) return;
+        const a = ropeAnchor(this.mask, h.x, cy, angle);
+        const miss = { x: h.x + Math.cos(angle) * ROPE.RANGE, y: cy + Math.sin(angle) * ROPE.RANGE };
+        this.addFx({ type: 'rope', x: h.x, y: cy, x2: a?.x ?? miss.x, y2: a?.y ?? miss.y, text: a ? undefined : 'miss' });
+        if (!a) break;
+        h.anchor = { x: a.x, y: a.y, len: clamp(Math.hypot(h.x - a.x, cy - a.y), ROPE.MIN, ROPE.MAX) };
+        h.chute = false;
+        h.flying = true;
+        h.walking = false;
+        h.climb = 0;
+        if (Math.abs(Math.cos(angle)) > 0.05) h.dir = Math.cos(angle) > 0 ? 1 : -1;
+        if (this.ropeTurn[id] !== this.turn) {
+          this.ropeTurn[id] = this.turn;
+          used = true;
+        }
+        if (Math.random() < 0.35) this.quip(h, 'rope');
+        break;
+      }
+      case 'parasol': {
+        if (h.chute) return;
+        this.detach(h);
+        if (!h.flying) {
+          // Absprung, dann gleiten
+          h.flying = true;
+          h.vx = h.dir * 20;
+          h.vy = PARASOL.HOP_VY;
+        }
+        h.chute = true;
+        this.addFx({ type: 'pow', x: h.x, y: h.y - 22, text: 'Schirm auf!' });
+        if (Math.random() < 0.35) this.quip(h, 'parasol');
+        used = true;
+        break;
+      }
+      case 'shovel': {
+        if (h.flying || !Number.isFinite(angle)) return;
+        const ops = shovelOps(h.x, cy, angle);
+        if (!ops.length) return;
+        for (const op of ops) {
+          applyOp(this.mask, op);
+          this.ops.push(op);
+        }
+        const last = ops[ops.length - 1];
+        this.addFx({ type: 'dig', x: last[0], y: last[1] });
+        if (Math.abs(Math.cos(angle)) > 0.05) h.dir = Math.cos(angle) > 0 ? 1 : -1;
+        if (Math.random() < 0.35) this.quip(h, 'shovel');
+        used = true;
+        break;
+      }
+    }
+    if (used) this.useAmmo(id, w);
+    this.dirty = true;
+  }
+
+  private detach(h: Hog) {
+    if (!h.anchor) return;
+    h.anchor = null;
+    h.climb = 0;
+    h.flying = true;
+  }
+
+  /** Pendel am Lianen-Seil: Schwerkraft, Schwung per ◀ ▶, Klettern, Seil bleibt gespannt */
+  private swingHog(h: Hog) {
+    const a = h.anchor!;
+    const ctrl = this.simul ? h.owner : this.active;
+    if (h.state !== 'ok' || !ctrl || this.ctrlHog(ctrl) !== h || !this.canMove(ctrl)) return this.detach(h);
+    const dt = IGEL.DT;
+    h.walking = false;
+    for (let s = 0; s < STEPS; s++) {
+      if (h.climb) a.len = clamp(a.len - h.climb * ROPE.CLIMB * dt, ROPE.MIN, ROPE.MAX);
+      const cx = h.x - a.x;
+      const cy = h.y - 4 - a.y;
+      const d = Math.hypot(cx, cy) || 1;
+      if (h.walkDir) {
+        // Schwung quer zum Seil, in Stick-Richtung
+        let tx = -cy / d;
+        let ty = cx / d;
+        if (tx * h.walkDir < 0) (tx = -tx), (ty = -ty);
+        h.vx += tx * ROPE.PUSH * dt;
+        h.vy += ty * ROPE.PUSH * dt;
+      }
+      h.vy += IGEL.GRAVITY * this.grav * dt;
+      let nx = h.x + h.vx * dt;
+      let ny = h.y + h.vy * dt;
+      const ex = nx - a.x;
+      const ey = ny - 4 - a.y;
+      const e = Math.hypot(ex, ey) || 1;
+      if (e > a.len) {
+        // Seil gespannt: auf den Kreis zurück, Geschwindigkeit nach außen wegnehmen
+        const ux = ex / e;
+        const uy = ey / e;
+        nx = a.x + ux * a.len;
+        ny = a.y + 4 + uy * a.len;
+        const vr = h.vx * ux + h.vy * uy;
+        if (vr > 0) {
+          h.vx -= vr * ux;
+          h.vy -= vr * uy;
+        }
+      }
+      if (bodyHits(this.mask, nx, ny)) {
+        // Gegen Fels: abprallen (und notfalls freischieben)
+        h.vx *= -0.3;
+        h.vy *= -0.3;
+        if (bodyHits(this.mask, h.x, h.y)) this.unstick(h);
+        continue;
+      }
+      h.x = clamp(nx, 2, IGEL.W - 2);
+      h.y = ny;
+    }
+    const sp = Math.hypot(h.vx, h.vy);
+    if (sp > ROPE.VMAX) {
+      h.vx *= ROPE.VMAX / sp;
+      h.vy *= ROPE.VMAX / sp;
+    }
+  }
+
+  // ---------------------------------------------------------------- Igel-Sprüche
+
+  /** Sprechblase über einem Igel (dieselbe Anzeige wie die Zuschauer-Sprüche), höchstens ein paar pro Zug */
+  private quip(h: Hog, kind: keyof typeof IGEL_QUIPS) {
+    if (this.quipBudget <= 0 || this.sub === 'over' || this.sub === 'replay') return;
+    this.quipBudget--;
+    this.addFx({ type: 'taunt', x: h.x, y: h.state === 'drowned' ? this.water : h.y, text: pick(IGEL_QUIPS[kind]), hog: h.id });
+  }
+
+  /** Sprecher-Kommentar (TV sagt ihn an) */
+  private comment(text: string) {
+    this.addFx({ type: 'quip', x: IGEL.W / 2, y: 40, text });
+  }
+
+  // ---------------------------------------------------------------- „Schuss des Abends“
+
+  private frame(now: number): IgelRecFrame {
+    return {
+      t: now,
+      h: this.hogs.map((h) => {
+        const row = [r1(h.x), r1(h.y), h.dir, h.state === 'ok' ? 0 : h.state === 'dead' ? 1 : 2, (h.flying ? 1 : 0) | (h.anchor ? 2 : 0) | (h.chute ? 4 : 0)];
+        if (h.anchor) row.push(r1(h.anchor.x), r1(h.anchor.y));
+        return row;
+      }),
+      p: this.projs.map((p) => [p.id, p.type, r1(p.x), r1(p.y)]),
+      b: this.objs.map((o) => [o.id, o.type, r1(o.x), r1(o.y)]),
+      o: this.ops.length,
+      w: this.water,
+    };
+  }
+
+  /** Pro Tick: beim Zielen ein kurzer Vorlauf, ab dem Schuss die ganze Aufnahme (höchstens 12 s) */
+  private record(now: number) {
+    if (this.rec) {
+      if (this.rec.frames.length < 240) this.rec.frames.push(this.frame(now));
+    } else if (this.sub === 'aim' || this.sub === 'aimAll') {
+      this.pre.push(this.frame(now));
+      const keep = Math.ceil(REPLAY.PRE_MS / TICK_MS) + 1;
+      if (this.pre.length > keep) this.pre.splice(0, this.pre.length - keep);
+    }
+  }
+
+  private startRec() {
+    if (this.rec) return;
+    this.rec = {
+      frames: [...this.pre, this.frame(Date.now())],
+      fx: [],
+      weapons: {},
+      hp0: new Map(this.hogs.map((h) => [h.id, Math.max(0, h.hp)])),
+      ok0: new Set(this.hogs.filter((h) => h.state === 'ok').map((h) => h.id)),
+      dmg0: { ...this.damage },
+      hitBy: new Map(),
+      self: {},
+      team: {},
+    };
+    this.pre = [];
+  }
+
+  /** Zug-/Rundenende: Sprecher-Kommentar und Kandidat für den „Schuss des Abends“ */
+  private evalCycle() {
+    const rec = this.rec;
+    this.rec = null;
+    this.pre = [];
+    if (!rec) return;
+    const per = this.ids.map((id) => {
+      let kos = 0;
+      for (const [hogId, by] of rec.hitBy) {
+        const h = this.hogs[hogId];
+        if (by === id && rec.ok0.has(hogId) && h.state !== 'ok' && !this.sameSide(id, h.owner)) kos++;
+      }
+      const dmg = (this.damage[id] ?? 0) - (rec.dmg0[id] ?? 0);
+      return { id, dmg, kos, self: rec.self[id] ?? 0, team: rec.team[id] ?? 0, score: dmg + kos * REPLAY.KO_BONUS };
+    });
+    const top = [...per].sort((a, b) => b.score - a.score)[0];
+    const name = (id: string) => this.ctx.nameOf(id);
+    // Sprecher: nur Bemerkenswertes (bei „Alle gleichzeitig“ noch sparsamer)
+    if (top && top.kos >= 2) this.comment(`${top.kos === 2 ? 'Doppel' : top.kos === 3 ? 'Dreifach' : 'Mega'}-K.O. von ${name(top.id)}!`);
+    else if (top && top.dmg >= 70) this.comment(pick([`Volltreffer von ${name(top.id)}!`, `Was für ein Schuss, ${name(top.id)}!`, `${name(top.id)} räumt die Insel auf!`]));
+    else if (top && top.kos === 1 && !this.simul) this.comment(pick([`K.O. durch ${name(top.id)}!`, `${name(top.id)} schickt einen Igel nach Hause!`]));
+    else if (!this.simul) {
+      const shooter = Object.keys(rec.weapons)[0];
+      const me = per.find((p) => p.id === shooter);
+      const w = shooter ? rec.weapons[shooter] : null;
+      if (me && me.dmg === 0 && me.self > 0) this.comment(pick([`Eigentor, ${name(me.id)}!`, `${name(me.id)} trifft ... sich selbst.`, 'Autsch – das war der eigene Igel!']));
+      else if (me && me.dmg === 0 && me.team > 0) this.comment(`Freundliches Feuer von ${name(me.id)}!`);
+      else if (me && me.dmg === 0 && w && w !== 'teleport' && w !== 'bridge' && Math.random() < 0.4) this.comment(pick(['Daneben!', 'Knapp vorbei ist auch daneben.', 'Die Möwen lachen schon.', 'Das war wohl ein Warnschuss.']));
+    }
+    if (!top || top.score < REPLAY.MIN_SCORE || (this.best && top.score <= this.best.score)) return;
+    // Ausschnitt: bis kurz nach dem letzten Treffer, höchstens REPLAY.MAX_MS Echtzeit
+    const frames = rec.frames;
+    if (frames.length < 3) return;
+    const t0 = frames[0].t;
+    const tLast = frames[frames.length - 1].t;
+    const hits = rec.fx.filter((f) => f.type === 'boom' || f.type === 'dmg' || f.type === 'ko' || f.type === 'shot' || (f.type === 'splash' && f.text));
+    const lastHit = hits.length ? Math.max(...hits.map((f) => f.t)) : tLast;
+    const endT = Math.min(tLast, lastHit + REPLAY.POST_MS);
+    const startT = Math.max(t0, endT - REPLAY.MAX_MS);
+    const cut = frames.filter((f) => f.t >= startT - TICK_MS && f.t <= endT + TICK_MS);
+    if (cut.length < 3) return;
+    const booms = hits.filter((f) => f.type === 'boom' && f.t >= startT);
+    const big = booms.sort((a, b) => (b.r ?? 0) - (a.r ?? 0))[0] ?? hits[hits.length - 1];
+    const from = cut[0].t;
+    const to = cut[cut.length - 1].t;
+    this.best = {
+      owner: top.id,
+      weapon: rec.weapons[top.id] ?? 'bazooka',
+      dmg: top.dmg,
+      kos: top.kos,
+      ops0: cut[0].o,
+      frames: cut,
+      fx: rec.fx.filter((f) => f.t >= from && f.t <= to),
+      rate: REPLAY.RATE,
+      ms: Math.round((to - from) / REPLAY.RATE),
+      fx0: big ? big.x : IGEL.W / 2,
+      fy0: big ? big.y : IGEL.H / 2,
+      score: top.score,
+    };
+  }
+
   // ---------------------------------------------------------------- Ende
 
   private end() {
-    if (this.sub === 'over') return;
-    this.sub = 'over';
+    if (this.sub === 'over' || this.sub === 'replay') return;
     this.active = null;
     this.activeHog = null;
     this.timers.clear();
-    this.ctx.onChange();
+    this.rec = null;
     const sideHp = (side: string) => this.sideHogs(side).reduce((s, h) => s + Math.max(0, h.hp), 0);
     const outSide = (side: string) => this.membersOf(side).every((id) => this.out.includes(id));
     // Team-Platzierung (Überlebende nach HP, Ausgeschiedene nach Runde, bei Gleichstand nach Team-Schaden),
@@ -1166,7 +1554,7 @@ export class IgelGame implements MiniGame {
         : alive.length === 0
           ? 'Alle baden gegangen – Unentschieden!'
           : 'Zeit um – die meisten Lebenspunkte gewinnen!';
-    this.timers.later(3200, () =>
+    this.finishFn = () =>
       this.ctx.finish({
         groups: groupByScore(this.ids, score),
         details: Object.fromEntries(
@@ -1178,8 +1566,20 @@ export class IgelGame implements MiniGame {
           }),
         ),
         subtitle,
-      }),
-    );
+      });
+    if (this.best) {
+      // Erst der „Schuss des Abends“ in Zeitlupe, dann das Ergebnis
+      this.sub = 'replay';
+      this.ctx.onChange();
+      this.timers.later(REPLAY.LEAD_MS + this.best.ms + REPLAY.TAIL_MS, () => this.toOver(2400));
+    } else this.toOver(3200);
+  }
+
+  private toOver(ms: number) {
+    this.timers.clear();
+    this.sub = 'over';
+    this.ctx.onChange();
+    this.timers.later(ms, () => this.finishFn?.());
   }
 
   snapshot(): MiniSnapshot {
@@ -1206,7 +1606,12 @@ export class IgelGame implements MiniGame {
         wind: this.wind,
         teams: this.teams,
         squads: this.squads,
-        hogs: this.hogs.map((h) => ({ id: h.id, owner: h.owner, x: r1(h.x), y: r1(h.y), hp: h.hp, shown: h.shown, dir: h.dir, state: h.state, flying: h.flying, walking: h.walking })),
+        hogs: this.hogs.map((h) => {
+          const v: IgelHog = { id: h.id, owner: h.owner, x: r1(h.x), y: r1(h.y), hp: h.hp, shown: h.shown, dir: h.dir, state: h.state, flying: h.flying, walking: h.walking };
+          if (h.anchor) v.rope = [r1(h.anchor.x), r1(h.anchor.y)];
+          if (h.chute) v.chute = true;
+          return v;
+        }),
         objs: this.objs.map((o) => {
           const v: IgelObj = { id: o.id, type: o.type, x: r1(o.x), y: r1(o.y) };
           if (o.type === 'mine') v.armed = !!o.armed;
@@ -1234,6 +1639,10 @@ export class IgelGame implements MiniGame {
         turnMs: this.turnMs,
         damage: this.damage,
         out: this.out,
+        theme: this.theme,
+        grav: this.grav,
+        windMul: this.windMul,
+        best: this.sub === 'replay' && this.best ? replayOf(this.best) : null,
       },
     };
   }
@@ -1241,10 +1650,12 @@ export class IgelGame implements MiniGame {
   /** VIP/Laptop: Zug des aktiven Spielers beenden (ohne Schuss) bzw. im Simultan-Modus sofort feuern lassen */
   skippable(): SkipInfo | null {
     if (this.sub === 'aimAll') return { label: 'Zielen beenden – alle feuern' };
+    if (this.sub === 'replay') return { label: 'Wiederholung überspringen' };
     return this.sub === 'aim' && this.active ? { label: `${possessive(this.ctx.nameOf(this.active))} Zug überspringen` } : null;
   }
 
   skip() {
+    if (this.sub === 'replay') return this.toOver(800);
     if (this.sub === 'aimAll') this.startFlightAll();
     else if (this.sub === 'aim') this.toSettle();
     else return;
@@ -1257,7 +1668,7 @@ export class IgelGame implements MiniGame {
       this.deadline = Math.min(this.deadline, Date.now() + IGEL.OFFLINE_TURN_MS);
     }
     const h = this.ownHog(id);
-    if (h && this.simul) h.walkDir = 0;
+    if (h && this.simul) (h.walkDir = 0), (h.climb = 0);
   }
 
   dispose() {

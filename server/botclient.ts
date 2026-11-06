@@ -6,14 +6,14 @@ import { io, type Socket } from 'socket.io-client';
 import type { ArenaState, GameLive, GameMeta, GameState, IgelState, IgelWeapon, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
 import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
-import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
+import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, isTool, ropeAnchor, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
-import { lineFree, nextWaypoint, roomInner } from '../shared/house';
+import { lightSwitch, lineFree, nextWaypoint, roomAt, roomInner } from '../shared/house';
 import { SMASH_STAGES, mainPlatform } from '../shared/smash';
 import { GEIST, inCone, navTarget, roomCenter } from '../shared/geist';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
@@ -118,7 +118,7 @@ export class Bot {
   private aimTarget: number | null = null;
   private lastFire = 0;
   /** Gedächtnis für "Verräter im Ferienhaus" */
-  private ttt = { round: 0, grudges: new Set<string>(), lastAttack: 0, goal: null as { x: number; y: number } | null, stuckX: 0, stuckY: 0, stuckAt: 0 };
+  private ttt = { round: 0, grudges: new Set<string>(), lastAttack: 0, goal: null as { x: number; y: number } | null, stuckX: 0, stuckY: 0, stuckAt: 0, hunt: null as { x: number; y: number; at: number } | null, lightGoal: false };
   /** Versteckspiel: Plan des Verstecker-Bots bzw. Gedächtnis des Sucher-Bots */
   vs = {
     round: 0,
@@ -1390,6 +1390,8 @@ export class Bot {
       mem.round = t.round;
       mem.grudges.clear();
       mem.goal = null;
+      mem.hunt = null;
+      mem.lightGoal = false;
       mem.lastAttack = t.attacks.at(-1)?.seq ?? 0;
     }
     if (!p || t.sub !== 'play' || !p.alive) return;
@@ -1412,6 +1414,7 @@ export class Bot {
       // Ziel wählen
       let target: [string, { x: number; y: number }] | undefined;
       const grudge = visible.filter(([id]) => mem.grudges.has(id)).sort((a, b) => dist(a[1]) - dist(b[1]))[0];
+      const now0 = Date.now();
       if (grudge) target = grudge;
       else if (p.role === 'traitor') {
         const victims = visible.filter(([id]) => !p.partners.includes(id));
@@ -1419,6 +1422,25 @@ export class Bot {
         const late = t.endsIn < TTT.ROUND_MS - 45000;
         const pool = (lonely.length ? lonely : late ? victims : []).sort((a, b) => dist(a[1]) - dist(b[1]));
         if (pool[0] && (dist(pool[0][1]) < 120 || late)) target = pool[0];
+        if (target) mem.hunt = { x: target[1].x, y: target[1].y, at: now0 };
+        // Stromausfall: Opfer in der Nähe → genau dort das Licht ausknipsen
+        if (p.blackoutIn === 0) {
+          const room = target && dist(target[1]) < 90 ? roomAt(target[1].x, target[1].y) : -1;
+          if (room >= 0 && t.lights[room] && Math.random() < 0.4) this.send('buy', { item: 'blackout', room });
+          else if (Math.random() < 0.01) {
+            const lit = t.lights.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+            if (lit.length) this.send('buy', { item: 'blackout', room: lit[Math.floor(Math.random() * lit.length)] });
+          }
+        }
+        // Ziel ist im Dunkeln verschwunden: dem nächsten Umriss an der letzten bekannten Stelle nachgehen
+        if (!target && mem.hunt && now0 - mem.hunt.at < 6000) {
+          const h = mem.hunt;
+          const sh = t.shadows.filter((o) => Math.hypot(o.x - me.x, o.y - me.y) > 3).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0];
+          if (sh && Math.hypot(sh.x - h.x, sh.y - h.y) < 40) {
+            mem.hunt = { x: sh.x, y: sh.y, at: h.at };
+            target = ['?', sh];
+          }
+        }
         if (p.credits > 0) {
           if (p.inDoor && Math.random() < 0.3) this.send('buy', { item: 'trap' });
           else if (target && p.cloakLeft === 0 && dist(target[1]) < 60 && Math.random() < 0.3) this.send('buy', { item: 'cloak' });
@@ -1439,15 +1461,29 @@ export class Bot {
         return;
       }
 
-      // Nichts zu kämpfen: Sachen benutzen oder herumlaufen
-      if (p.near && (/untersuchen|Spur/.test(p.near) || (/aufheben/.test(p.near) && !p.weapon) || (/benutzen/.test(p.near) && p.hp < TTT.HP))) {
+      // Nichts zu kämpfen: Licht anmachen, Sachen benutzen oder herumlaufen
+      if (p.near && /Licht/.test(p.near) && p.role !== 'traitor') {
+        this.send('use');
+        mem.lightGoal = false;
+        mem.goal = null;
+      } else if (p.near && (/untersuchen|Spur/.test(p.near) || (/aufheben/.test(p.near) && !p.weapon) || (/benutzen/.test(p.near) && p.hp < TTT.HP))) {
         this.send('use');
       }
       const wanted = [
         ...t.items.filter((i) => (i.kind === 'medkit' ? p.hp < TTT.HP : !p.weapon)),
         ...t.bodies.filter((b) => !b.role || (p.role === 'detective' && Math.random() < 0.5)),
       ].sort((a, b) => dist(a) - dist(b))[0];
-      if (wanted && dist(wanted) < 160) mem.goal = { x: wanted.x, y: wanted.y };
+      if (wanted && dist(wanted) < 160 && !mem.lightGoal) mem.goal = { x: wanted.x, y: wanted.y };
+      // Unschuldige im Dunkeln suchen den Lichtschalter
+      if (p.role !== 'traitor' && p.dark && p.room >= 0 && !mem.lightGoal && Math.random() < 0.15) {
+        mem.goal = lightSwitch(p.room);
+        mem.goal = { x: mem.goal.x, y: mem.goal.y + 6 };
+        mem.lightGoal = true;
+      }
+      if (mem.lightGoal && mem.goal && t.lights[roomAt(mem.goal.x, mem.goal.y)]) {
+        mem.lightGoal = false;
+        mem.goal = null;
+      }
       const now = Date.now();
       if (now - mem.stuckAt > 1500) {
         const moved = Math.hypot(me.x - mem.stuckX, me.y - mem.stuckY);
@@ -1457,8 +1493,17 @@ export class Bot {
         mem.stuckAt = now;
       }
       if (!mem.goal || dist(mem.goal) < 5) {
-        const r = roomInner(Math.floor(Math.random() * ROOMS.length));
-        mem.goal = { x: r.x + 16 + Math.random() * (r.w - 32), y: r.y + 16 + Math.random() * (r.h - 32) };
+        mem.lightGoal = false;
+        // Ab und zu einen dunklen Raum ansteuern und dort Licht machen
+        const dark = t.lights.map((on, i) => (on ? -1 : i)).filter((i) => i >= 0);
+        if (p.role !== 'traitor' && dark.length && Math.random() < 0.5) {
+          const sw = lightSwitch(dark[Math.floor(Math.random() * dark.length)]);
+          mem.goal = { x: sw.x, y: sw.y + 6 };
+          mem.lightGoal = true;
+        } else {
+          const r = roomInner(Math.floor(Math.random() * ROOMS.length));
+          mem.goal = { x: r.x + 16 + Math.random() * (r.w - 32), y: r.y + 16 + Math.random() * (r.h - 32) };
+        }
       }
       // Gemütlich schlendern – wer jagt, ist schneller
       this.steer(me, nextWaypoint(me.x, me.y, mem.goal.x, mem.goal.y), 0.6, 0.6);
@@ -1824,7 +1869,13 @@ function igelBot(bot: Bot, st: IgelState) {
         };
         const s0 = still();
         if (!s0) return;
-        await igelWalk(bot, s0, myHog(s0)!);
+        if (igelWantsTool()) {
+          await igelTool(bot, s0, myHog(s0)!.id, still);
+          await sleep(300);
+        }
+        const s1 = still();
+        if (!s1 || !myHog(s1)) return;
+        await igelWalk(bot, s1, myHog(s1)!);
         const now = still();
         const h = now && myHog(now);
         if (!now || !h) return;
@@ -1847,7 +1898,13 @@ function igelBot(bot: Bot, st: IgelState) {
         const s = cur();
         return s && s.active === bot.id && s.sub === 'aim' && s.turn === st.turn ? s : null;
       };
-      await igelWalk(bot, st, st.hogs[st.activeHog!]);
+      if (igelWantsTool()) {
+        await igelTool(bot, st, st.activeHog!, still);
+        await sleep(300);
+      }
+      const s1 = still();
+      if (!s1) return;
+      await igelWalk(bot, s1, s1.hogs[s1.activeHog!]);
       const now = still();
       if (!now) return;
       const plan = planIgelShot(now, bot.id, now.activeHog!);
@@ -1871,6 +1928,73 @@ function igelBot(bot: Bot, st: IgelState) {
       bot.send('done');
     });
   }
+}
+
+/** Ab und zu ein Werkzeug vor dem Schuss (zum Testen jedes Mal: IGEL_BOT_TOOLS=1) */
+const igelWantsTool = () => !!process.env.IGEL_BOT_TOOLS || Math.random() < 0.3;
+
+/**
+ * Werkzeug-Einsatz: Liane (hochschwingen, loslassen, evtl. Schirm auf), Sonnenschirm (hüpfen und Richtung Gegner gleiten)
+ * oder Schaufel (Loch Richtung Gegner graben). Wartet danach, bis der Igel wieder steht.
+ */
+async function igelTool(bot: Bot, st: IgelState, hogId: number, still: () => IgelState | null) {
+  const hog = st.hogs[hogId];
+  const ammo = st.ammo[bot.id];
+  if (!hog || !ammo) return;
+  const foe = st.hogs.filter((h) => h.state === 'ok' && !sameSide(st, h.owner, bot.id)).sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
+  const toward: 1 | -1 = foe ? (foe.x >= hog.x ? 1 : -1) : hog.x < 240 ? 1 : -1;
+  const mask = igelMask(st);
+  // Liane nur, wenn über dem Igel etwas zum Festhaken ist
+  const ropeAngles: number[] = [];
+  for (let a = -Math.PI + 0.35; a <= -0.35; a += 0.1) if (ropeAnchor(mask, hog.x, hog.y - 4, a)) ropeAngles.push(a);
+  const opts = (['rope', 'parasol', 'shovel'] as const).filter((w) => ammo[w] !== 0 && (w !== 'rope' || ropeAngles.length > 0));
+  if (!opts.length) return;
+  const w = opts[Math.floor(Math.random() * opts.length)];
+  bot.send('weapon', { weapon: w });
+  await sleep(250);
+  if (!still()) return;
+  if (w === 'shovel') {
+    const angle = toward > 0 ? rand(0, 0.7) : Math.PI - rand(0, 0.7);
+    bot.send('aim', { angle, power: 1 });
+    await sleep(250);
+    bot.send('fire', { angle, power: 1 });
+    await sleep(500);
+  } else if (w === 'parasol') {
+    bot.send('fire', {});
+    await sleep(200);
+    bot.send('move', { dir: toward });
+    await sleep(rand(1000, 2000));
+    bot.send('move', { dir: 0 });
+  } else {
+    const angle = ropeAngles[Math.floor(Math.random() * ropeAngles.length)];
+    bot.send('aim', { angle, power: 1 });
+    await sleep(250);
+    bot.send('fire', { angle, power: 1 });
+    await sleep(300);
+    bot.send('move', { dir: toward });
+    bot.send('climb', { dir: Math.random() < 0.6 ? 1 : -1 });
+    await sleep(rand(800, 1800));
+    bot.send('climb', { dir: 0 });
+    bot.send('move', { dir: 0 });
+    bot.send('jump');
+    // Im Fall manchmal noch den Schirm aufspannen
+    if (ammo.parasol !== 0 && Math.random() < 0.4) {
+      await sleep(250);
+      bot.send('weapon', { weapon: 'parasol' });
+      await sleep(150);
+      bot.send('fire', {});
+    }
+  }
+  // Warten, bis der Igel wieder Boden unter den Füßen hat
+  for (let i = 0; i < 25; i++) {
+    const s = still();
+    const h = s?.hogs[hogId];
+    if (!s || !h || h.state !== 'ok' || (!h.flying && !h.rope)) break;
+    if (h.rope) bot.send('jump');
+    await sleep(200);
+  }
+  bot.send('weapon', { weapon: 'bazooka' });
+  await sleep(150);
 }
 
 /** Ein Stück laufen – bevorzugt zu einer nahen Kiste, sonst manchmal Richtung Gegner (nie ins Meer) */
@@ -1937,7 +2061,7 @@ export function planIgelShot(st: IgelState, me: string, hogId: number, force?: I
   const ammo = st.ammo[me];
   // Zum Testen aller Waffen: IGEL_BOT_CHAOS=1 npm run bots -- 8 --game=igel
   if (!force && process.env.IGEL_BOT_CHAOS && Math.random() < 0.6) {
-    const pool = (Object.keys(ammo ?? {}) as IgelWeapon[]).filter((w) => ammo[w] !== 0);
+    const pool = (Object.keys(ammo ?? {}) as IgelWeapon[]).filter((w) => ammo[w] !== 0 && !isTool(w));
     const w = pool[Math.floor(Math.random() * pool.length)] ?? 'bazooka';
     const toward = near ? (near.x >= hog.x ? 0 : Math.PI) : 0;
     const angle = toward + (toward ? 0.5 : -0.5) + rand(-0.3, 0.3);
@@ -1968,7 +2092,7 @@ export function planIgelShot(st: IgelState, me: string, hogId: number, force?: I
   let best = { angle: -Math.PI / 4, power: 0.6, score: -Infinity };
   for (let a = -Math.PI; a < Math.PI; a += 0.07) {
     for (let pw = 0.2; pw <= 1.001; pw += 0.08) {
-      const hit = simulateBazooka(mask, from, a, pw, st.wind, st.water, all);
+      const hit = simulateBazooka(mask, from, a, pw, st.wind * (st.windMul ?? 1), st.water, all, { grav: st.grav ?? 1 });
       if (!hit) continue;
       const self = dmgAt(hit, friends);
       const gain = dmgAt(hit, enemies);

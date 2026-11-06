@@ -127,12 +127,12 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   arena: { goal: 'Sprengt euch den Weg frei und erwischt die anderen – wer trocken bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💣', text: 'BOMBE: Kokosnuss legen' }, { icon: '🌊', text: 'Nach 60 s kommt die Flut' }] },
   bowling: { goal: 'Räumt alle Pins ab – Strike!', controls: [{ icon: '📱', text: 'Knopf halten, Handy schwingen, loslassen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }, { icon: '🎳', text: 'Reihum – zwei Würfe pro Frame' }] },
   enten: { goal: 'Schießt Enten, Möwen und Flamingos – aber keine Badegäste!', controls: [{ icon: '📱', text: 'Handy auf den TV richten' }, { icon: '👆', text: 'Tippen = schießen' }, { icon: '🔄', text: 'Nach unten wischen = laden' }] },
-  ttt: { goal: 'Findet die Verräter – oder knockt als Verräter heimlich alle aus.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🏊', text: 'ANGRIFF: Poolnudel & Co.' }, { icon: '🔍', text: 'BENUTZEN: aufheben, untersuchen' }] },
+  ttt: { goal: 'Stromausfall! Findet die Verräter – im Dunkeln zeigt der Fernseher nur Umrisse. Verräter knipsen heimlich das Licht aus.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🏊', text: 'ANGRIFF: Poolnudel & Co.' }, { icon: '💡', text: 'BENUTZEN: Licht an, aufheben' }] },
   verstecken: { goal: 'Verstecker werden zu Möbeln – Sucher prüfen alles, was verdächtig aussieht.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🪴', text: 'VERWANDELN / EINRASTEN: Möbel werden' }, { icon: '🔍', text: 'PRÜFEN: Sucher testet Möbel' }] },
   parcours: { goal: 'Baut Fallen in die Strecke – und schafft es selbst zur Cocktailbar.', controls: [{ icon: '🕹️', text: 'Stick: Teil setzen, laufen' }, { icon: '🧱', text: 'PLATZIEREN: Teil einbauen' }, { icon: '⤴️', text: 'SPRINGEN: länger = höher' }] },
   kart: { goal: 'Drei Runden mit Items aus den ?-Boxen – wer kommt zuerst ins Ziel?', controls: [{ icon: '🕹️', text: 'Stick: lenken' }, { icon: '🏎️', text: 'GAS / BREMSE: halten' }, { icon: '✨', text: 'DRIFT: halten + lenken = Turbo' }] },
   turm: { goal: 'Stapelt euer Gepäck bis zum Gipfelkreuz und haltet den Turm 2 s.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = schneller fallen' }] },
-  igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel?', controls: [{ icon: '🦔', text: '◀ / ▶ / SPRUNG: laufen' }, { icon: '🎯', text: 'Ziel-Pad: in Schussrichtung ziehen' }, { icon: '🔥', text: 'FEUER: abschießen' }] },
+  igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦔', text: '◀ / ▶ / SPRUNG: laufen' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '🪢', text: 'Liane, Schirm, Schaufel: Zug geht weiter' }] },
   smash: { goal: 'Haut die anderen von der Bühne – je höher die Prozente, desto weiter fliegen sie.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Richtung = Schlag' }, { icon: '🥊', text: 'SCHLAG / SPEZIAL: hauen' }, { icon: '🛡️', text: 'SPRUNG / SCHILD: springen, blocken' }] },
   wasser: { goal: 'Werft Wasserbomben auf die anderen – wer am trockensten bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Linker Stick: laufen' }, { icon: '🕹️', text: 'Rechter Stick: zielen, loslassen = Wurf' }, { icon: '💦', text: 'Treffer machen nass' }] },
   stillepost: { goal: 'Schreiben, malen, raten – reihum wandert alles weiter. Am Ende wird gelacht.', controls: [{ icon: '✍️', text: 'Satz schreiben' }, { icon: '🖍️', text: 'Das Bild dazu malen' }, { icon: '🤔', text: 'Bild beschreiben' }] },
@@ -738,6 +738,10 @@ export const TTT = {
   CLOAK_MS: 9000,
   TRACKER_MS: 5000,
   TRAP_R: 8,
+  /** Stromausfall: Abklingzeit pro Verräter für „Licht aus“ */
+  BLACKOUT_COOLDOWN: 20000,
+  /** So viele Räume sind zu Rundenbeginn schon dunkel */
+  DARK_START: 1,
   /** Punkte */
   WIN_POINTS: 3,
   SURVIVE_POINTS: 1,
@@ -749,6 +753,7 @@ export const TTT_SHOP: Record<TttShopItem, { title: string; cost: number; text: 
   trap: { title: 'Bananenschale', cost: 1, text: 'Unsichtbare Falle in eine Tür legen: −1 Herz und ausgerutscht.' },
   cloak: { title: 'Tarnumhang', cost: 1, text: 'Ein paar Sekunden unsichtbar auf dem Fernseher.' },
   radio: { title: 'Fake-Funkspruch', cost: 1, text: 'Im Namen eines anderen etwas „gesehen“ haben ...' },
+  blackout: { title: 'Licht aus', cost: 0, text: 'Sicherung raus: ein Raum wird dunkel. Gratis, aber mit Abklingzeit.' },
 };
 
 export const TTT_ITEMS: Record<TttItemKind, string> = {

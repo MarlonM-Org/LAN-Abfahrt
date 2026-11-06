@@ -792,7 +792,7 @@ export interface EntenState {
 export type TttRole = 'innocent' | 'traitor' | 'detective';
 export type TttWeapon = 'pistol' | 'coconut';
 export type TttItemKind = TttWeapon | 'medkit';
-export type TttShopItem = 'trap' | 'cloak' | 'radio';
+export type TttShopItem = 'trap' | 'cloak' | 'radio' | 'blackout';
 
 /** Öffentlich sichtbare Spielerinfo (unsichtbare Spieler fehlen ganz) */
 export interface TttPlayerPub {
@@ -819,6 +819,19 @@ export interface TttAttack {
   target: string | null;
   /** Ziel wurde dadurch ausgeknockt */
   ko: boolean;
+  /**
+   * Im Dunkeln passiert: nur „BONK!“ am Einschlag (x2/y2), ohne Täter, Ziel, Herkunft und K.O.
+   * (x1/y1 = x2/y2, by/target = null, kind = 'noodle') – der Server reduziert das schon beim Snapshot.
+   */
+  dark?: boolean;
+}
+
+/** Figur in einem dunklen Raum: nur Umriss, keine ID, kein Name, keine Herzen, keine Waffe */
+export interface TttShadow {
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  moving: boolean;
 }
 
 export interface TttBody {
@@ -828,6 +841,12 @@ export interface TttBody {
   /** Rolle erst nach dem Untersuchen sichtbar */
   role: TttRole | null;
   inspectedBy: string | null;
+}
+
+/** Ausgeknockte in dunklen Räumen, die noch niemand bei Licht gesehen hat: nur ein Umriss */
+export interface TttDarkBody {
+  x: number;
+  y: number;
 }
 
 export interface TttRoundResult {
@@ -844,11 +863,19 @@ export interface TttState {
   endsIn: number;
   round: number;
   rounds: number;
+  /** Nur Figuren in beleuchteten Räumen (und ohne Tarnumhang) */
   players: Record<string, TttPlayerPub>;
+  /** Figuren in dunklen Räumen – anonym, nach x sortiert */
+  shadows: TttShadow[];
+  /** Licht pro Raum (Index wie ROOMS) */
+  lights: boolean[];
+  /** Wer im Dunkeln ausgeknockt wurde und noch nicht gefunden ist, zählt hier noch als „im Spiel“ */
   alive: Record<string, boolean>;
   detective: string | null;
   traitorCount: number;
+  /** Gefundene Ausgeknockte (ihr Raum hatte seitdem Licht) */
   bodies: TttBody[];
+  darkBodies: TttDarkBody[];
   items: { id: number; kind: TttItemKind; x: number; y: number }[];
   attacks: TttAttack[];
   /** Laufschrift auf dem TV: Funksprüche, Untersuchungen, Spuren */
@@ -879,6 +906,11 @@ export interface TttPrivate {
   attackReady: boolean;
   /** Steht in einer Tür (für die Falle) */
   inDoor: boolean;
+  /** Eigener Raum (−1 = Tür/Wand) und ob dort gerade Licht ist */
+  room: number;
+  dark: boolean;
+  /** Verräter: ms bis „Licht aus“ wieder geht (0 = bereit) */
+  blackoutIn: number;
   info: { seq: number; text: string } | null;
 }
 
@@ -1151,7 +1183,11 @@ export interface TurmState {
 
 export type IgelWeapon =
   | 'bazooka' | 'grenade' | 'shotgun' | 'airstrike' | 'dynamite' | 'mine'
-  | 'cluster' | 'paddle' | 'holy' | 'punch' | 'teleport' | 'bridge';
+  | 'cluster' | 'paddle' | 'holy' | 'punch' | 'teleport' | 'bridge'
+  | 'rope' | 'parasol' | 'shovel';
+
+/** Themenkarte einer Partie (siehe `IGEL_THEMES` in `shared/igel.ts`) */
+export type IgelThemeId = 'sturm' | 'mond' | 'kisten' | 'spreng' | 'vampir' | 'flut';
 
 /** Terrain-Operation: Krater sprengen (`carve`) oder Fläche aufschütten (`add`, z. B. Surfbrett-Brücke) */
 export type IgelOp = [number, number, number, 'carve' | 'add'];
@@ -1171,6 +1207,10 @@ export interface IgelHog {
   walking: boolean;
   /** Angezeigte HP: Schaden zählt erst in der Settle-Phase Punkt für Punkt herunter (wie bei Worms) */
   shown: number;
+  /** Hängt am Lianen-Seil: Ankerpunkt (x, y) */
+  rope?: [number, number];
+  /** Gleitet am Sonnenschirm */
+  chute?: boolean;
 }
 
 /** Gegenstände auf der Insel: Seeigel-Minen, Gaskartuschen vom Grill, Kisten am Sonnenschirm */
@@ -1192,9 +1232,10 @@ export interface IgelFx {
   /**
    * taunt = Zuschauer-Spruch als Sprechblase über dem Igel `hog`; shot = Wasserstrahl von (x, y) nach (x2, y2);
    * gull = Möwe fliegt über x; crate = Kiste eingesammelt; land = Kiste gelandet; beep = Mine ausgelöst;
-   * holy = Heilige Ananas geworfen; fire = Abschuss
+   * holy = Heilige Ananas geworfen; fire = Abschuss; rope = Seil schießt bis (x2, y2); dig = Schaufel;
+   * quip = Sprecher-Kommentar (`text`, TV zeigt ihn als Laufschrift und sagt ihn an)
    */
-  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt' | 'shot' | 'gull' | 'crate' | 'land' | 'beep' | 'holy' | 'fire';
+  type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt' | 'shot' | 'gull' | 'crate' | 'land' | 'beep' | 'holy' | 'fire' | 'rope' | 'dig' | 'quip';
   x: number;
   y: number;
   r?: number;
@@ -1219,12 +1260,54 @@ export interface IgelSquad {
   members: string[];
 }
 
+/**
+ * Ein Bild der Wiederholung „Schuss des Abends“ (alle 50 ms aufgezeichnet).
+ * h: je Igel [x, y, dir, Zustand (0 ok · 1 Sandburg · 2 baden), Flags (1 fliegt · 2 Seil · 4 Schirm), Anker-x, Anker-y]
+ * p: Geschosse [id, Typ, x, y] · b: Gegenstände [id, Typ, x, y] · o: Anzahl Terrain-Operationen bis hier
+ */
+export interface IgelRecFrame {
+  t: number;
+  h: number[][];
+  p: [number, IgelProjType, number, number][];
+  b: [number, IgelObj['type'], number, number][];
+  o: number;
+  /** Wasserspiegel */
+  w: number;
+}
+
+/** „Schuss des Abends“: bester Treffer der Partie zum Abspielen in Zeitlupe */
+export interface IgelReplay {
+  owner: string;
+  weapon: IgelWeapon;
+  dmg: number;
+  kos: number;
+  /** Terrain-Operationen vor der Aufnahme (Terrain = Seed + ops[0 … ops0)) */
+  ops0: number;
+  frames: IgelRecFrame[];
+  /** Effekte der Aufnahme mit Serverzeit */
+  fx: (IgelFx & { t: number })[];
+  /** Wiedergabe-Tempo (0.5 = halb so schnell) und Dauer der Wiedergabe in ms */
+  rate: number;
+  ms: number;
+  /** Wo der größte Einschlag war (Kamera) */
+  fx0: number;
+  fy0: number;
+}
+
 export interface IgelState {
   /**
-   * Rundlauf (bis 6 Spieler): countdown → aim (Zug) → flight (Geschoss unterwegs) → retreat (Rückzug) → settle → aim … → over
-   * „Alle gleichzeitig“ (ab 7): countdown → aimAll → flightAll → retreatAll → settle → aimAll … → over
+   * Rundlauf (bis 6 Spieler): countdown → aim (Zug) → flight (Geschoss unterwegs) → retreat (Rückzug) → settle → aim … → [replay] → over
+   * „Alle gleichzeitig“ (ab 7): countdown → aimAll → flightAll → retreatAll → settle → aimAll … → [replay] → over
+   * replay = „Schuss des Abends“ läuft am TV (nur wenn es einen nennenswerten Treffer gab)
    */
-  sub: 'countdown' | 'aim' | 'flight' | 'retreat' | 'settle' | 'aimAll' | 'flightAll' | 'retreatAll' | 'over';
+  sub: 'countdown' | 'aim' | 'flight' | 'retreat' | 'settle' | 'aimAll' | 'flightAll' | 'retreatAll' | 'replay' | 'over';
+  /** Themenkarte dieser Partie */
+  theme: IgelThemeId;
+  /** Schwerkraft- und Wind-Faktor der Themenkarte (Zielhilfe am TV, Bots) */
+  grav: number;
+  windMul: number;
+  /** Nur in der Phase `replay`: die Aufnahme des besten Treffers */
+  best: IgelReplay | null;
   /** true = Modus „Alle gleichzeitig“ */
   simul: boolean;
   endsIn: number;

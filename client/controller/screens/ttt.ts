@@ -68,6 +68,7 @@ function buildRoles(s: TttState) {
       <p class="label-left">Verräter (${s.traitorCount}): Knockt alle anderen aus. Im Geheimfach gibt’s Tricks.</p>
       ${det}
       <p class="label-left">ANGRIFF = Poolnudel (oder Wasserpistole/Kokosnuss). BENUTZEN = aufheben/untersuchen.</p>
+      <p class="label-left">💡 Stromausfall: Im Dunkeln zeigt der Fernseher nur Umrisse ohne Namen. Lichtschalter oben links im Raum – BENUTZEN macht Licht. Verräter knipsen es heimlich aus.</p>
     </div>
     </div>
   `);
@@ -82,7 +83,7 @@ function buildPlay() {
   // Das Geheimfach öffnet als Blatt über der linken Hälfte und schließt, sobald der Stick berührt wird.
   const root = el(`
     <div class="lx ttt-lx">
-      <div class="lx-head ttt-top"><span class="timer"></span><span class="hearts"></span><span class="weapon grow"></span></div>
+      <div class="lx-head ttt-top"><span class="timer"></span><span class="hearts"></span><span class="lamp"></span><span class="weapon grow"></span></div>
       <div class="lx-left ttt-stick"><span class="st-label">LAUFEN</span></div>
       <div class="lx-mid">
         <p class="ttt-info"></p>
@@ -115,14 +116,22 @@ function buildPlay() {
   const stashBtn = q<HTMLButtonElement>(root, '.stash-btn');
   stashBtn.addEventListener('click', () => stash.classList.toggle('hidden'));
   const shopBtns: { btn: HTMLButtonElement; item: TttShopItem }[] = [];
+  const roomBtns: HTMLButtonElement[] = [];
+  let pickFor: 'radio' | 'blackout' = 'radio';
   if (p0.role === 'traitor') {
     stash.append(el(`<h2>Verräter-Shop</h2><p class="credits"></p>`));
     for (const item of Object.keys(TTT_SHOP) as TttShopItem[]) {
       const def = TTT_SHOP[item];
-      const b = el(`<button class="small shop-btn">${def.title} (${def.cost})<br/><small>${def.text}</small></button>`).firstElementChild as HTMLButtonElement;
+      const cost = def.cost ? `(${def.cost})` : '(gratis)';
+      const b = el(`<button class="small shop-btn">${def.title} <span class="cd">${cost}</span><br/><small>${def.text}</small></button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => {
-        if (item === 'radio') {
-          q(stash, '.radio-rooms').classList.toggle('hidden');
+        if (item === 'radio' || item === 'blackout') {
+          // Funkspruch und „Licht aus“ brauchen einen Raum
+          const rooms = q(stash, '.pick-rooms');
+          const again = !rooms.classList.contains('hidden') && pickFor === item;
+          pickFor = item;
+          q(rooms, '.pick-title').textContent = item === 'radio' ? 'Wo willst du was „gesehen“ haben?' : 'Wo soll das Licht ausgehen?';
+          rooms.classList.toggle('hidden', again);
           return;
         }
         send('buy', { item });
@@ -131,21 +140,23 @@ function buildPlay() {
       stash.append(b);
       shopBtns.push({ btn: b, item });
     }
-    const rooms = el(`<div class="rooms radio-rooms hidden"></div>`);
+    const rooms = el(`<div class="rooms pick-rooms hidden"><p class="pick-title"></p></div>`);
     ROOMS.forEach((r, i) => {
       const b = el(`<button class="room-btn">${r.name}</button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => {
-        send('buy', { item: 'radio', room: i });
+        send('buy', { item: pickFor, room: i });
+        haptic(10);
         stash.classList.add('hidden');
-        q(stash, '.radio-rooms').classList.add('hidden');
+        q(stash, '.pick-rooms').classList.add('hidden');
       });
       q(rooms, '.rooms').append(b);
+      roomBtns.push(b);
     });
     stash.append(rooms);
   } else if (p0.role === 'detective') {
     stash.append(el(`<h2>Spurensucher</h2><p>Untersuche Ausgeknockte mit BENUTZEN. Nach ${TTT.TRACKER_MS / 1000} s zeigt der Fernseher die Shirt-Farbe des Täters.</p>`));
   } else {
-    stash.append(el(`<h2>Leer.</h2><p>Du bist unschuldig – trau niemandem! Bleib in Gruppen und untersuche Ausgeknockte.</p>`));
+    stash.append(el(`<h2>Leer.</h2><p>Du bist unschuldig – trau niemandem! Bleib in Gruppen, mach überall Licht und untersuche Ausgeknockte.</p>`));
   }
   const close = el(`<button class="secondary small">Zu</button>`).firstElementChild as HTMLButtonElement;
   close.addEventListener('click', () => stash.classList.add('hidden'));
@@ -168,13 +179,21 @@ function buildPlay() {
     const info = q(root, '.ttt-info');
     if (p.cloakLeft > 0) info.textContent = `Unsichtbar: noch ${Math.ceil(p.cloakLeft / 1000)} s`;
     else if (p.info && performance.now() < infoUntil) info.textContent = p.info.text;
-    else info.textContent = p.near ?? 'Lauf durchs Haus ...';
+    else info.textContent = p.near ?? (p.dark ? 'Stockdunkel! Lichtschalter: oben links im Raum.' : 'Lauf durchs Haus ...');
+    const lamp = q(root, '.lamp');
+    lamp.textContent = p.dark ? '🌑 dunkel' : '💡';
+    lamp.classList.toggle('dark', p.dark);
     attack.classList.toggle('cooldown', !p.attackReady);
     attack.textContent = p.weapon === 'pistol' ? 'SPRITZEN' : p.weapon === 'coconut' ? 'WERFEN' : 'ANGRIFF';
     use.disabled = !p.near;
     if (p.role === 'traitor') {
       q(stash, '.credits').textContent = `${p.credits} Credit${p.credits === 1 ? '' : 's'} – +1 pro Ausgeknocktem`;
-      for (const { btn, item } of shopBtns) btn.disabled = p.credits < TTT_SHOP[item].cost || (item === 'trap' && !p.inDoor) || (item === 'cloak' && p.cloakLeft > 0);
+      for (const { btn, item } of shopBtns) {
+        btn.disabled = p.credits < TTT_SHOP[item].cost || (item === 'trap' && !p.inDoor) || (item === 'cloak' && p.cloakLeft > 0) || (item === 'blackout' && p.blackoutIn > 0);
+        if (item === 'blackout') q(btn, '.cd').textContent = p.blackoutIn > 0 ? `(noch ${Math.ceil(p.blackoutIn / 1000)} s)` : '(gratis)';
+      }
+      const lights = ttt()?.lights;
+      roomBtns.forEach((b, i) => (b.disabled = pickFor === 'blackout' && (lights?.[i] === false || p.blackoutIn > 0)));
     }
   };
 }
