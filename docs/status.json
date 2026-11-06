@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T13:25+00:00",
+  "updated": "2026-11-06T14:59+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -12,24 +12,20 @@
       "type": "Balance Board",
       "branch": "feat/balance-kugel",
       "detail": "3D-Verfolgerkamera (Mode 7) hinter der Figur auf der Kugel, Moos-Tempelpfad über dem Abgrund, Minikarte, Absturz = zurück zur Fackel. Plus: Kart/Kugel zeigen von hinten Haare statt Gesicht. Wartet auf Test mit echtem Board."
-    },
-    {
-      "title": "Igel-Krieg Stufe L",
-      "kind": "igel",
-      "type": "Spiel",
-      "branch": "feat/igel-stufe-l",
-      "detail": "Lianen-Seil, Sonnenschirm-Gleiter, Schaufel, Themenkarten, „Schuss des Abends“ als Wiederholung, Igel-Sprüche."
-    },
-    {
-      "title": "Verräter-Redesign „Stromausfall“",
-      "kind": "ttt",
-      "type": "Spiel",
-      "branch": "feat/ttt-stromausfall",
-      "detail": "Sichtbarkeit begrenzt: Lichtschalter pro Raum, Verräter knipsen Licht aus, Silhouetten im Dunkeln, Dunkelheits-Technik der Geisterjagd."
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Verräter-Redesign „Stromausfall“ (Licht pro Raum, Silhouetten im Dunkeln, Verräter-Shop „Licht aus“)",
+      "pr": 90,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Igel-Krieg Stufe L (Lianen-Seil, Sonnenschirm, Schaufel, Themenkarten, Schuss des Abends, Igel-Sprüche)",
+      "pr": 89,
+      "date": "2026-11-06"
+    },
     {
       "title": "Wii Balance Board: Schanzen-Springen + Teppich-Parcours (WebHID am Laptop, Anzeige nur am TV)",
       "pr": 86,
@@ -338,7 +334,7 @@
     },
     "igel": {
       "status": "umgesetzt",
-      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68)"
+      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) – größere Insel offen"
     },
     "ttt": {
       "status": "umgesetzt",
@@ -423,7 +419,7 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Spiel-Review umgesetzt: Phase 0–3 komplett, Phase 4 bis Stufe M, Phase 5 erste vier Spiele – offen: Igel Stufe L, weitere neue Spiele, Verräter „Stromausfall“",
+      "title": "Spiel-Review umgesetzt: Phase 0–4 (Igel bis Stufe L), Verräter „Stromausfall“ – offen: größere Igel-Insel, weitere neue Spiele (Phase 5)",
       "status": "umgesetzt"
     },
     {
