@@ -792,7 +792,7 @@ export interface EntenState {
 export type TttRole = 'innocent' | 'traitor' | 'detective';
 export type TttWeapon = 'pistol' | 'coconut';
 export type TttItemKind = TttWeapon | 'medkit';
-export type TttShopItem = 'trap' | 'cloak' | 'radio';
+export type TttShopItem = 'trap' | 'cloak' | 'radio' | 'blackout';
 
 /** Öffentlich sichtbare Spielerinfo (unsichtbare Spieler fehlen ganz) */
 export interface TttPlayerPub {
@@ -819,6 +819,19 @@ export interface TttAttack {
   target: string | null;
   /** Ziel wurde dadurch ausgeknockt */
   ko: boolean;
+  /**
+   * Im Dunkeln passiert: nur „BONK!“ am Einschlag (x2/y2), ohne Täter, Ziel, Herkunft und K.O.
+   * (x1/y1 = x2/y2, by/target = null, kind = 'noodle') – der Server reduziert das schon beim Snapshot.
+   */
+  dark?: boolean;
+}
+
+/** Figur in einem dunklen Raum: nur Umriss, keine ID, kein Name, keine Herzen, keine Waffe */
+export interface TttShadow {
+  x: number;
+  y: number;
+  dir: 1 | -1;
+  moving: boolean;
 }
 
 export interface TttBody {
@@ -828,6 +841,12 @@ export interface TttBody {
   /** Rolle erst nach dem Untersuchen sichtbar */
   role: TttRole | null;
   inspectedBy: string | null;
+}
+
+/** Ausgeknockte in dunklen Räumen, die noch niemand bei Licht gesehen hat: nur ein Umriss */
+export interface TttDarkBody {
+  x: number;
+  y: number;
 }
 
 export interface TttRoundResult {
@@ -844,11 +863,19 @@ export interface TttState {
   endsIn: number;
   round: number;
   rounds: number;
+  /** Nur Figuren in beleuchteten Räumen (und ohne Tarnumhang) */
   players: Record<string, TttPlayerPub>;
+  /** Figuren in dunklen Räumen – anonym, nach x sortiert */
+  shadows: TttShadow[];
+  /** Licht pro Raum (Index wie ROOMS) */
+  lights: boolean[];
+  /** Wer im Dunkeln ausgeknockt wurde und noch nicht gefunden ist, zählt hier noch als „im Spiel“ */
   alive: Record<string, boolean>;
   detective: string | null;
   traitorCount: number;
+  /** Gefundene Ausgeknockte (ihr Raum hatte seitdem Licht) */
   bodies: TttBody[];
+  darkBodies: TttDarkBody[];
   items: { id: number; kind: TttItemKind; x: number; y: number }[];
   attacks: TttAttack[];
   /** Laufschrift auf dem TV: Funksprüche, Untersuchungen, Spuren */
@@ -879,6 +906,11 @@ export interface TttPrivate {
   attackReady: boolean;
   /** Steht in einer Tür (für die Falle) */
   inDoor: boolean;
+  /** Eigener Raum (−1 = Tür/Wand) und ob dort gerade Licht ist */
+  room: number;
+  dark: boolean;
+  /** Verräter: ms bis „Licht aus“ wieder geht (0 = bereit) */
+  blackoutIn: number;
   info: { seq: number; text: string } | null;
 }
 

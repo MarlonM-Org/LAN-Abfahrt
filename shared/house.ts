@@ -148,3 +148,9 @@ export function nextWaypoint(x: number, y: number, tx: number, ty: number): { x:
   const nearDoor = Math.hypot(x - before.x, y - before.y) < 6;
   return aligned && (nearDoor || (d.vertical ? Math.abs(x - d.cx) < 14 : Math.abs(y - d.cy) < 14)) ? after : before;
 }
+
+/** Lichtschalter eines Raums (Verräter-Stromausfall): oben links an der Wand, von innen erreichbar */
+export function lightSwitch(i: number): { x: number; y: number } {
+  const r = roomInner(i);
+  return { x: r.x + 10, y: r.y + 1 };
+}
