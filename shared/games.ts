@@ -80,6 +80,8 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   schaetz: { title: 'Schätzkönig', icon: '🧮', inspiredBy: 'Wits & Wagers', tagline: 'Keine Ahnung? Egal – schätzen, dann auf die beste Zahl wetten!', minPlayers: 3, orientation: 'portrait' },
   maexchen: { title: 'Mäxchen am Pool', icon: '🎲', inspiredBy: 'Mäxchen', tagline: 'Würfeln, ansagen, bluffen – glaubst du das oder deckst du auf?', minPlayers: 2, orientation: 'portrait' },
   werwars: { title: 'Wer war’s?', icon: '🕵️‍♀️', inspiredBy: "Who's Who", tagline: 'Peinliche Geständnisse, anonym auf dem TV – wer hat das geschrieben?', minPlayers: 3, orientation: 'portrait' },
+  skisprung: { title: 'Schanzen-Springen', icon: '🎿', inspiredBy: 'Wii Fit', tagline: 'Balance Board: Hocke, Absprung, fliegen!', minPlayers: 1, orientation: 'portrait' },
+  teppich: { title: 'Teppich-Parcours', icon: '🧞', tagline: 'Balance Board: Lehnend durch die Wüstenstadt fliegen!', minPlayers: 1, orientation: 'portrait' },
 };
 
 /** „🏎️ Kart-Rennen“ – Titel mit Icon für Listen und Ansagen */
@@ -159,6 +161,8 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   schaetz: { goal: 'Schätzt die Zahl – dann setzt Chips auf die Karte, die am nächsten dran ist, ohne drüber.', controls: [{ icon: '🔢', text: 'Zahl am Handy eintippen' }, { icon: '🪙', text: '2 Chips setzen (außen = ×3/×4)' }, { icon: '👑', text: 'Beste Karte: Autor +3' }] },
   maexchen: { goal: 'Würfelt geheim, sagt einen höheren Wert an – ehrlich oder geblufft. Wer erwischt wird, verliert!', controls: [{ icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
   werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }, { icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
+  skisprung: { goal: 'Auf dem Balance Board: tief in die Hocke, am Tisch hochdrücken – und weit fliegen!', controls: [{ icon: '⚖️', text: 'Anlauf: ruhig in der Mitte' }, { icon: '⤴️', text: 'Am Tisch: schnell aufrichten' }, { icon: '🛫', text: 'Flug: leicht nach vorn lehnen' }] },
+  teppich: { goal: 'Auf dem Balance Board durch die Wüstenstadt fliegen: Juwelen holen, Türmen und Geiern ausweichen.', controls: [{ icon: '⬆️', text: 'Nach hinten lehnen = steigen' }, { icon: '⬇️', text: 'Nach vorn lehnen = sinken' }, { icon: '➡️', text: 'Rechts = schneller, links = bremsen' }] },
 };
 
 /** Übungsfeld-Bedienung aus der Regelkarte (siehe `MINI_HOWTO`): Anzahl Sticks und Knopf-Beschriftungen */
@@ -261,6 +265,10 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   maexchen: 'lang',
   // 1 min schreiben + 12 Antworten à ca. 25 s (ab 7 Spielern eine Antwort pro Spieler)
   werwars: 'mittel',
+  // reihum auf dem Board: Einmessen ≈ 5 s + Balken 2 s + Anlauf 6 s + Flug 4 s + Auswertung 4 s ≈ 20 s; bis 6 Springer zwei Durchgänge
+  skisprung: 'mittel',
+  // reihum: Einmessen + ≈ 35 s Flug + Auswertung ≈ 45 s pro Spieler
+  teppich: 'lang',
 };
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
@@ -874,6 +882,7 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
+  { title: 'Balance Board', kinds: ['skisprung', 'teppich'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'funk'] },
 ];
 

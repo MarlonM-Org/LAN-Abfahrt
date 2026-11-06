@@ -61,7 +61,7 @@ Aktueller Stand (v0.3):
 ## Alle Spiele auf einen Blick
 
 <!-- games:start -->
-_Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) – 54 Spiele. Handy: ↔ = quer halten (Stick + Knöpfe), ↕ = hochkant (Sensor, Listen, Text). Dauer bei 8–12 Spielern: kurz ≤ 2 min, mittel ≤ 4 min, lang > 4 min (`MINI_LENGTH`). Brett: ✓ = kommt im Party-Modus nach einer Brett-Runde dran (lange nur mit „Lange Spiele“), Finale = Finalspiel, – = nur einzeln/Arcade._
+_Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) – 56 Spiele. Handy: ↔ = quer halten (Stick + Knöpfe), ↕ = hochkant (Sensor, Listen, Text). Dauer bei 8–12 Spielern: kurz ≤ 2 min, mittel ≤ 4 min, lang > 4 min (`MINI_LENGTH`). Brett: ✓ = kommt im Party-Modus nach einer Brett-Runde dran (lange nur mit „Lange Spiele“), Finale = Finalspiel, – = nur einzeln/Arcade._
 
 | Spiel | Vorbild | Spieler | Handy | Dauer | Brett |
 |---|---|---|---|---|---|
@@ -107,6 +107,9 @@ _Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) –
 | 🕶️ Spion unter Gästen | à la Hidden in Plain Sight | ab 3 | ↕ hochkant | mittel | ✓ |
 | 🧳 Wer ist der Tourist? | à la Spyfall | ab 4 | ↕ hochkant | lang | – |
 | 🐺 Werwölfe im Ferienhaus |  | ab 6 | ↕ hochkant | lang | – |
+| **Balance Board** | | | | | |
+| 🎿 Schanzen-Springen | à la Wii Fit | ab 1 | ↕ hochkant | mittel | – |
+| 🧞 Teppich-Parcours |  | ab 1 | ↕ hochkant | lang | – |
 | **Partyklassiker** | | | | | |
 | 🗳️ Wer würde eher ...? |  | ab 2 | ↕ hochkant | mittel | – |
 | 🙊 Ich hab noch nie ... |  | ab 2 | ↕ hochkant | mittel | – |
@@ -355,6 +358,19 @@ Wer ausgeschieden ist oder erst nach dem Spielstart dazukommt, starrt nicht mehr
 - **Geister-Aktionen:** In der **Bomben-Arena** werfen Ausgeschiedene alle 8 s eine Wasserbombe auf eine Randkachel (bzw. die Kante der Flut) – Stick verschiebt das Zielkreuz auf der Mini-Karte, Knopf wirft. Im **Sumo-Steg** schicken sie alle 5 s per Knopf eine **Welle** vom Rand quer über den Steg, die jedem, den sie erwischt, einen kleinen Stoß gibt (wer davon ins Wasser fällt, zählt als „geschubst“ für den Geist).
 
 Bots machen beim Testen mit (gelegentliche Emotes, Wetten, Geister-Aktionen): `npm run bots -- 8 --game=sumo`.
+
+## Balance-Board-Spiele (Wii Balance Board)
+
+Zwei Spiele werden **auf einem Wii Balance Board** gespielt – reihum, immer einer steht drauf, die anderen schauen zu (Zuschauer-Leiste mit Emotes am Handy). Sie stehen in der Arcade unter **„Balance Board“** und kommen nie zufällig, auf dem Spielbrett oder im Turnier dran.
+
+**Einrichten (Windows, einmalig):** Einstellungen → Bluetooth & Geräte → Gerät hinzufügen → Bluetooth, dann am Board im Batteriefach den roten **SYNC**-Knopf drücken. Es erscheint als „Nintendo RVL-WBC-01“ – fragt Windows nach einer PIN, leer lassen und „Weiter“. Danach die TV-Seite **am Laptop in Chrome oder Edge** öffnen (`http://localhost:3000/tv.html`), **B** drücken (oder auf die Board-Anzeige oben links klicken) und das Board auswählen. Die Seite liest das Board per **WebHID** aus (`client/host/balanceBoard.ts`: Erweiterung freischalten, Kalibrierung lesen, Berichtsmodus 0x32) und schickt Gewicht + Schwerpunkt mit 30 Hz an den Server (`bb:sample`, nur vom Laptop angenommen). Beim Neuladen verbindet sie sich von selbst. In der Board-Anzeige: **Tarieren** (Board leer) und **Vorn ↔ hinten** (falls das Board andersherum liegt – Power-Knopf zum Spieler). Board liegt quer vor dem TV, Füße links und rechts.
+
+**Ohne Board** (Testen am Laptop): Pfeiltasten lehnen (↑ vorn, ↓ hinten, ← →), **J** = Sprung (kurze Gewichtsspitze). Bots schicken eigene Board-Werte.
+
+Vor jedem Versuch stellt sich der Spieler aufs Board und steht kurz ruhig – das misst sein Gewicht ein (Basis für die Sprung-Erkennung); wer nach 30 s nicht drauf ist, wird übersprungen (VIP/Laptop kann auch selbst überspringen).
+
+- 🎿 **Schanzen-Springen** (ab 1 Spieler, à la Wii Fit) – Seitenansicht einer Großschanze (K 120, HS 140), die Kamera fährt mit. **Anlauf:** in die Hocke, Schwerpunkt ruhig in der Mitte halten (grüner Ring) = weniger Luftwiderstand, mehr Tempo. **Absprung:** am Schanzentisch schnell aufrichten – das Board misst die Gewichtsspitze; je näher an der Kante (±0,4 s), desto kräftiger. **Flug:** leicht nach vorn lehnen, nicht seitlich kippen = mehr Auftrieb. Wer in der letzten halben Sekunde vor der Landung wackelt, stürzt. Wertung wie im Weltcup: 60 Punkte am K-Punkt, ±1,8 pro Meter, dazu Haltungsnote (0–20). Bis 6 Springer zwei Durchgänge (im zweiten springt der Führende zuletzt). Testen: `npm run bots -- 4 --game=skisprung`.
+- 🧞 **Teppich-Parcours** (ab 1 Spieler) – auf einem fliegenden Teppich durch eine Wüstenstadt bei Nacht: Minarette von unten, Gewitterwolken von oben, Geier dazwischen. **Nach hinten lehnen = steigen, nach vorn = sinken, rechts = schneller, links = bremsen.** Treffer machen kurz benommen (langsam), jedes Juwel zieht 1 s von der Zeit ab. Alle fliegen dieselbe Strecke (pro Spiel neu ausgewürfelt), Bestzeit gewinnt. Testen: `npm run bots -- 4 --game=teppich`.
 
 ## Trinkspiel
 

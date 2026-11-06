@@ -188,6 +188,10 @@ export function defaultSongForScene(scene: string): string {
       return 'rennen';
     case 'arena': case 'smash': case 'sumo': case 'bogen': case 'wackel':
       return 'arena';
+    case 'skisprung':
+      return 'gipfelsturm';
+    case 'teppich':
+      return 'zauber';
     case 'wpistole': case 'enten':
       return 'western';
     case 'volley': case 'bowling': case 'darts': case 'golf': case 'boule':
