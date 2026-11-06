@@ -72,6 +72,9 @@ export function installHd(f: HdFactor) {
   const pre = Cam.preRender;
   Cam.preRender = function (this: Phaser.Cameras.Scene2D.Camera) {
     pre.call(this);
+    // Kameras von RenderTextures (DynamicTexture, gehören der System-Szene) malen in Textur-Pixeln –
+    // nicht skalieren, sonst landet z. B. der Radierer der Dunkelheit (Geist, Verräter) bei doppelten Koordinaten
+    if (this.scene?.sys?.settings?.key === '__SYSTEM') return;
     // `matrix` ist in den Typen privat – zur Laufzeit die TransformMatrix der Kamera
     const m = (this as unknown as { matrix: Phaser.GameObjects.Components.TransformMatrix }).matrix.matrix;
     for (let i = 0; i < 6; i++) m[i] *= f;

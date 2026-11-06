@@ -13,7 +13,7 @@ import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
 import { ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
-import { lineFree, nextWaypoint, roomInner } from '../shared/house';
+import { lightSwitch, lineFree, nextWaypoint, roomAt, roomInner } from '../shared/house';
 import { SMASH_STAGES, mainPlatform } from '../shared/smash';
 import { GEIST, inCone, navTarget, roomCenter } from '../shared/geist';
 import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
@@ -118,7 +118,7 @@ export class Bot {
   private aimTarget: number | null = null;
   private lastFire = 0;
   /** Gedächtnis für "Verräter im Ferienhaus" */
-  private ttt = { round: 0, grudges: new Set<string>(), lastAttack: 0, goal: null as { x: number; y: number } | null, stuckX: 0, stuckY: 0, stuckAt: 0 };
+  private ttt = { round: 0, grudges: new Set<string>(), lastAttack: 0, goal: null as { x: number; y: number } | null, stuckX: 0, stuckY: 0, stuckAt: 0, hunt: null as { x: number; y: number; at: number } | null, lightGoal: false };
   /** Versteckspiel: Plan des Verstecker-Bots bzw. Gedächtnis des Sucher-Bots */
   vs = {
     round: 0,
@@ -1390,6 +1390,8 @@ export class Bot {
       mem.round = t.round;
       mem.grudges.clear();
       mem.goal = null;
+      mem.hunt = null;
+      mem.lightGoal = false;
       mem.lastAttack = t.attacks.at(-1)?.seq ?? 0;
     }
     if (!p || t.sub !== 'play' || !p.alive) return;
@@ -1412,6 +1414,7 @@ export class Bot {
       // Ziel wählen
       let target: [string, { x: number; y: number }] | undefined;
       const grudge = visible.filter(([id]) => mem.grudges.has(id)).sort((a, b) => dist(a[1]) - dist(b[1]))[0];
+      const now0 = Date.now();
       if (grudge) target = grudge;
       else if (p.role === 'traitor') {
         const victims = visible.filter(([id]) => !p.partners.includes(id));
@@ -1419,6 +1422,25 @@ export class Bot {
         const late = t.endsIn < TTT.ROUND_MS - 45000;
         const pool = (lonely.length ? lonely : late ? victims : []).sort((a, b) => dist(a[1]) - dist(b[1]));
         if (pool[0] && (dist(pool[0][1]) < 120 || late)) target = pool[0];
+        if (target) mem.hunt = { x: target[1].x, y: target[1].y, at: now0 };
+        // Stromausfall: Opfer in der Nähe → genau dort das Licht ausknipsen
+        if (p.blackoutIn === 0) {
+          const room = target && dist(target[1]) < 90 ? roomAt(target[1].x, target[1].y) : -1;
+          if (room >= 0 && t.lights[room] && Math.random() < 0.4) this.send('buy', { item: 'blackout', room });
+          else if (Math.random() < 0.01) {
+            const lit = t.lights.map((on, i) => (on ? i : -1)).filter((i) => i >= 0);
+            if (lit.length) this.send('buy', { item: 'blackout', room: lit[Math.floor(Math.random() * lit.length)] });
+          }
+        }
+        // Ziel ist im Dunkeln verschwunden: dem nächsten Umriss an der letzten bekannten Stelle nachgehen
+        if (!target && mem.hunt && now0 - mem.hunt.at < 6000) {
+          const h = mem.hunt;
+          const sh = t.shadows.filter((o) => Math.hypot(o.x - me.x, o.y - me.y) > 3).sort((a, b) => Math.hypot(a.x - h.x, a.y - h.y) - Math.hypot(b.x - h.x, b.y - h.y))[0];
+          if (sh && Math.hypot(sh.x - h.x, sh.y - h.y) < 40) {
+            mem.hunt = { x: sh.x, y: sh.y, at: h.at };
+            target = ['?', sh];
+          }
+        }
         if (p.credits > 0) {
           if (p.inDoor && Math.random() < 0.3) this.send('buy', { item: 'trap' });
           else if (target && p.cloakLeft === 0 && dist(target[1]) < 60 && Math.random() < 0.3) this.send('buy', { item: 'cloak' });
@@ -1439,15 +1461,29 @@ export class Bot {
         return;
       }
 
-      // Nichts zu kämpfen: Sachen benutzen oder herumlaufen
-      if (p.near && (/untersuchen|Spur/.test(p.near) || (/aufheben/.test(p.near) && !p.weapon) || (/benutzen/.test(p.near) && p.hp < TTT.HP))) {
+      // Nichts zu kämpfen: Licht anmachen, Sachen benutzen oder herumlaufen
+      if (p.near && /Licht/.test(p.near) && p.role !== 'traitor') {
+        this.send('use');
+        mem.lightGoal = false;
+        mem.goal = null;
+      } else if (p.near && (/untersuchen|Spur/.test(p.near) || (/aufheben/.test(p.near) && !p.weapon) || (/benutzen/.test(p.near) && p.hp < TTT.HP))) {
         this.send('use');
       }
       const wanted = [
         ...t.items.filter((i) => (i.kind === 'medkit' ? p.hp < TTT.HP : !p.weapon)),
         ...t.bodies.filter((b) => !b.role || (p.role === 'detective' && Math.random() < 0.5)),
       ].sort((a, b) => dist(a) - dist(b))[0];
-      if (wanted && dist(wanted) < 160) mem.goal = { x: wanted.x, y: wanted.y };
+      if (wanted && dist(wanted) < 160 && !mem.lightGoal) mem.goal = { x: wanted.x, y: wanted.y };
+      // Unschuldige im Dunkeln suchen den Lichtschalter
+      if (p.role !== 'traitor' && p.dark && p.room >= 0 && !mem.lightGoal && Math.random() < 0.15) {
+        mem.goal = lightSwitch(p.room);
+        mem.goal = { x: mem.goal.x, y: mem.goal.y + 6 };
+        mem.lightGoal = true;
+      }
+      if (mem.lightGoal && mem.goal && t.lights[roomAt(mem.goal.x, mem.goal.y)]) {
+        mem.lightGoal = false;
+        mem.goal = null;
+      }
       const now = Date.now();
       if (now - mem.stuckAt > 1500) {
         const moved = Math.hypot(me.x - mem.stuckX, me.y - mem.stuckY);
@@ -1457,8 +1493,17 @@ export class Bot {
         mem.stuckAt = now;
       }
       if (!mem.goal || dist(mem.goal) < 5) {
-        const r = roomInner(Math.floor(Math.random() * ROOMS.length));
-        mem.goal = { x: r.x + 16 + Math.random() * (r.w - 32), y: r.y + 16 + Math.random() * (r.h - 32) };
+        mem.lightGoal = false;
+        // Ab und zu einen dunklen Raum ansteuern und dort Licht machen
+        const dark = t.lights.map((on, i) => (on ? -1 : i)).filter((i) => i >= 0);
+        if (p.role !== 'traitor' && dark.length && Math.random() < 0.5) {
+          const sw = lightSwitch(dark[Math.floor(Math.random() * dark.length)]);
+          mem.goal = { x: sw.x, y: sw.y + 6 };
+          mem.lightGoal = true;
+        } else {
+          const r = roomInner(Math.floor(Math.random() * ROOMS.length));
+          mem.goal = { x: r.x + 16 + Math.random() * (r.w - 32), y: r.y + 16 + Math.random() * (r.h - 32) };
+        }
       }
       // Gemütlich schlendern – wer jagt, ist schneller
       this.steer(me, nextWaypoint(me.x, me.y, mem.goal.x, mem.goal.y), 0.6, 0.6);

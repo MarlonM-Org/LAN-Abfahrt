@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import type { GameState, TttAttack, TttBody, TttState } from '../../shared/types';
-import { TTT, TTT_ROLES } from '../../shared/games';
+import { ROOMS, TTT, TTT_ROLES } from '../../shared/games';
+import { lightSwitch, roomRect } from '../../shared/house';
 import { WORLD } from '../../shared/flunky';
-import { bananaPeel, coconut, detectiveHat, dizzy, medkit, NOODLE_COLORS, waterPistol } from '../art/ttt';
+import { bananaPeel, coconut, detectiveHat, dizzy, medkit, NOODLE_COLORS, silhouette, waterPistol } from '../art/ttt';
 import type { Pix } from '../art/pix';
 import { addHouse } from './house';
 import { bus, getState, playerById } from './store';
@@ -11,6 +12,7 @@ import { BLUE_INK, Countdown, GOLD, GREEN_INK, INK, NameTags, RED_INK, ensureTex
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { pcol } from './playerColor';
+import { Darkness } from './darkness';
 
 /** Figuren stehen mit den Füßen etwas unter dem Server-Punkt (der ist Körpermitte) */
 const FOOT = 8;
@@ -25,6 +27,20 @@ interface Fig {
   y: number;
   hp: number;
   name: string;
+}
+
+/** Stromausfall: Farbe der Dunkelheit */
+const DARK = 0x05060f;
+
+/** Umriss im Dunkeln: für alle gleich (das echte Shirt würde verraten, wer da läuft) */
+interface ShadowFig {
+  img: Phaser.GameObjects.Image;
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  dir: 1 | -1;
+  moving: boolean;
 }
 
 const ITEM_TEX: Record<string, () => Pix> = { pistol: waterPistol, coconut, medkit };
@@ -49,6 +65,14 @@ export class TttScene extends Phaser.Scene {
   private lastAttack = 0;
   private lastTrap = 0;
   private lastFeed = 0;
+  private dark!: Darkness;
+  private switchG!: Phaser.GameObjects.Graphics;
+  private darkLabels: Phaser.GameObjects.Text[] = [];
+  /** Helligkeit pro Raum (0 = dunkel, 1 = Licht), weich überblendet */
+  private lightLvl: number[] = [];
+  private roomLit: boolean[] = [];
+  private shadows: ShadowFig[] = [];
+  private darkBodies = new Map<string, Phaser.GameObjects.Container>();
 
   constructor() {
     super('ttt');
@@ -71,10 +95,21 @@ export class TttScene extends Phaser.Scene {
     this.lastAttack = t?.attacks.at(-1)?.seq ?? 0;
     this.lastTrap = t?.traps.at(-1)?.seq ?? 0;
     this.lastFeed = 0;
+    this.shadows = [];
+    this.darkBodies.clear();
+    this.roomLit = t?.lights ? [...t.lights] : ROOMS.map(() => true);
+    this.lightLvl = this.roomLit.map((l) => (l ? 1 : 0));
 
     addHouse(this, { ySort: true, labelDepth: 5 });
     // Abendstimmung
     this.add.rectangle(0, 0, WORLD.W, WORLD.H, 0x1a1840, 0.16).setOrigin(0).setDepth(900);
+    // Stromausfall: dunkle Räume liegen unter einer Decke, beleuchtete werden herausradiert
+    this.dark = new Darkness(this, 950);
+    this.switchG = this.add.graphics().setDepth(965);
+    this.darkLabels = ROOMS.map((room, i) => {
+      const r = roomRect(i);
+      return txt(this, r.x + r.w / 2, r.y + 6, `${room.name.toUpperCase()} · DUNKEL`, { color: '#8f86b8', shadow: false }).setDepth(955).setAlpha(0);
+    });
 
     panel(this, 0, 0, WORLD.W, 34).setDepth(1000);
     this.hud = this.add.container(0, 0).setDepth(1001);
@@ -88,11 +123,13 @@ export class TttScene extends Phaser.Scene {
     if (st) this.onState(st);
   }
 
-  update() {
+  update(_t: number, dms: number) {
     const sec = this.countdown.seconds;
     this.timerText.setText(sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : '');
     const t = this.latest;
     if (!t) return;
+    this.updateDarkness(dms);
+    this.updateShadows();
     const specs: { id: string; x: number; y: number; name: string; color: string }[] = [];
     for (const [id, f] of this.figs) {
       const p = t.players[id];
@@ -121,9 +158,12 @@ export class TttScene extends Phaser.Scene {
       this.countdown.set(t.endsIn);
       this.renderOverlay(t);
     }
+    this.syncLights(t);
     this.syncFigures(t);
+    this.syncShadows(t);
     this.syncItems(t);
     this.syncBodies(t);
+    this.syncDarkBodies(t);
     this.playEffects(t);
     this.renderHud(t);
   }
@@ -137,6 +177,12 @@ export class TttScene extends Phaser.Scene {
     for (const b of this.bodies.values()) b.destroy();
     this.bodies.clear();
     this.bodyRole.clear();
+    for (const sh of this.shadows) sh.img.destroy();
+    this.shadows = [];
+    for (const b of this.darkBodies.values()) b.destroy();
+    this.darkBodies.clear();
+    this.roomLit = [...t.lights];
+    this.lightLvl = this.roomLit.map((l) => (l ? 1 : 0));
     this.lastAttack = t.attacks.at(-1)?.seq ?? 0;
     this.lastTrap = t.traps.at(-1)?.seq ?? 0;
   }
@@ -181,9 +227,119 @@ export class TttScene extends Phaser.Scene {
         f.c.destroy();
         this.figs.delete(id);
       } else {
-        // Tarnumhang: einfach weg
+        // Tarnumhang oder dunkler Raum: einfach weg (im Dunkeln läuft stattdessen ein Umriss)
         f.c.setVisible(false);
+        f.hp = -1;
       }
+    }
+  }
+
+  // ---------------------------------------------------------------- Stromausfall
+
+  private syncLights(t: TttState) {
+    t.lights.forEach((on, i) => {
+      if (this.roomLit[i] === on) return;
+      const r = roomRect(i);
+      if (on) {
+        sfx('tick', { x: r.x + r.w / 2, pitch: 1.4 });
+      } else {
+        sfx('crack', { x: r.x + r.w / 2, vol: 0.4, pitch: 0.5 });
+        sfx('powerup', { vol: 0.3, pitch: 0.4, delay: 0.05 });
+      }
+    });
+    this.roomLit = [...t.lights];
+    this.drawSwitches();
+  }
+
+  private drawSwitches() {
+    const g = this.switchG.clear();
+    this.roomLit.forEach((on, i) => {
+      const s = lightSwitch(i);
+      // Schalterplatte mit Kippe (oben = an); im Dunkeln leuchtet ein Punkt, damit man ihn findet
+      g.fillStyle(0x2d1b12).fillRect(s.x - 3, s.y - 4, 7, 9);
+      g.fillStyle(0xf3ead2).fillRect(s.x - 2, s.y - 3, 5, 7);
+      g.fillStyle(0x8a7a5e).fillRect(s.x - 1, on ? s.y - 2 : s.y + 1, 3, 2);
+      if (!on) g.fillStyle(0xffd25e, 1).fillRect(s.x + 3, s.y - 4, 2, 2);
+    });
+  }
+
+  private updateDarkness(dms: number) {
+    const k = Math.min(1, dms / 250);
+    const eraser = this.dark.begin(DARK, 0.9);
+    this.roomLit.forEach((on, i) => {
+      this.lightLvl[i] += ((on ? 1 : 0) - this.lightLvl[i]) * k;
+      const lvl = this.lightLvl[i];
+      if (lvl > 0.01) {
+        const r = roomRect(i);
+        eraser.fillStyle(0xffffff, Math.min(1, lvl)).fillRect(r.x, r.y, r.w, r.h);
+      }
+      this.darkLabels[i]?.setAlpha(0.6 * (1 - lvl));
+    });
+    this.dark.end();
+    // Blinkender Punkt am Schalter dunkler Räume
+    this.switchG.setAlpha(0.85 + Math.sin(this.time.now / 180) * 0.15);
+  }
+
+  /** Umrisse kommen ohne ID: neue Positionen dem nächstgelegenen alten Umriss zuordnen (nur fürs weiche Gleiten) */
+  private syncShadows(t: TttState) {
+    const free = [...this.shadows];
+    const next: ShadowFig[] = [];
+    for (const s of t.shadows) {
+      let best = -1;
+      let bestD = 40;
+      free.forEach((f, i) => {
+        const d = Math.hypot(f.tx - s.x, f.ty - s.y);
+        if (d < bestD) {
+          bestD = d;
+          best = i;
+        }
+      });
+      let f: ShadowFig;
+      if (best >= 0) f = free.splice(best, 1)[0];
+      else f = this.makeShadow(s.x, s.y);
+      f.tx = s.x;
+      f.ty = s.y;
+      f.dir = s.dir;
+      f.moving = s.moving;
+      next.push(f);
+    }
+    for (const f of free) f.img.destroy();
+    this.shadows = next;
+  }
+
+  private makeShadow(x: number, y: number): ShadowFig {
+    const img = this.add.image(x, y + FOOT, ensureTex(this, 'ttt_shadow', silhouette)).setOrigin(0.5, 1);
+    return { img, x, y, tx: x, ty: y, dir: 1, moving: false };
+  }
+
+  private updateShadows() {
+    const now = this.time.now;
+    for (const f of this.shadows) {
+      f.x += (f.tx - f.x) * 0.35;
+      f.y += (f.ty - f.y) * 0.35;
+      // Kein Lauf-Sprite – beim Gehen nur leicht wippen
+      const bob = f.moving ? Math.abs(Math.sin(now / 90 + f.tx)) * 1.5 : 0;
+      f.img.setFlipX(f.dir < 0).setPosition(Math.round(f.x), Math.round(f.y + FOOT - bob)).setDepth(958 + f.y / 1000);
+    }
+  }
+
+  private syncDarkBodies(t: TttState) {
+    const keep = new Set<string>();
+    for (const b of t.darkBodies) {
+      const key = `${b.x},${b.y}`;
+      keep.add(key);
+      if (this.darkBodies.has(key)) continue;
+      const c = this.add.container(b.x, b.y + 4).setDepth(957);
+      c.add(this.add.image(0, -4, ensureTex(this, 'ttt_shadow', silhouette)).setAngle(90));
+      const q = txt(this, 0, -16, '?', { color: '#8f86b8', shadow: false });
+      this.tweens.add({ targets: q, y: -19, duration: 700, yoyo: true, repeat: -1 });
+      c.add(q);
+      this.darkBodies.set(key, c);
+    }
+    for (const [key, c] of this.darkBodies) {
+      if (keep.has(key)) continue;
+      c.destroy();
+      this.darkBodies.delete(key);
     }
   }
 
@@ -259,6 +415,12 @@ export class TttScene extends Phaser.Scene {
   }
 
   private attackFx(a: TttAttack) {
+    if (a.dark) {
+      // Im Dunkeln: kein Schwung, kein Flug, kein Täter – nur ein dumpfes BONK am Einschlag
+      sfx('bonk', { x: a.x2, pitch: 0.8 });
+      this.pop(a.x2, a.y2 - 22, 'BONK!', '#c9c3ff');
+      return;
+    }
     const y1 = a.y1 - 4;
     const y2 = a.y2 - 4;
     if (a.kind === 'noodle') {
@@ -327,7 +489,8 @@ export class TttScene extends Phaser.Scene {
       if (this.feedText.width > 464) this.feedText.setScale(464 / this.feedText.width);
       this.tweens.add({ targets: this.feedText, alpha: { from: 0.2, to: 1 }, duration: 160, repeat: 2 });
     } else if (!f) {
-      this.feedText.setText(t.sub === 'play' ? 'Wer ist der Verräter? Bleibt zusammen!' : '').setColor(INK).setScale(1);
+      this.feedText.setText(t.sub === 'play' ? 'Stromausfall! Macht Licht – im Dunkeln sieht man nur Umrisse.' : '').setColor(INK).setScale(1);
+      if (this.feedText.width > 464) this.feedText.setScale(464 / this.feedText.width);
     }
   }
 
@@ -346,16 +509,17 @@ export class TttScene extends Phaser.Scene {
   private renderOverlay(t: TttState) {
     this.overlay.removeAll(true);
     if (t.sub === 'roles') {
-      const y = this.card(`Runde ${t.round} von ${t.rounds}`, 'Schaut heimlich aufs Handy –\ndort steht eure Rolle!', 150);
-      this.overlay.add(ink(this, WORLD.W / 2, y + 68, `Unter euch: ${t.traitorCount} Verräter`, { color: RED_INK }));
+      const y = this.card(`Runde ${t.round} von ${t.rounds}`, 'Schaut heimlich aufs Handy –\ndort steht eure Rolle!', 176);
+      this.overlay.add(ink(this, WORLD.W / 2, y + 62, `Unter euch: ${t.traitorCount} Verräter`, { color: RED_INK }));
+      this.overlay.add(ink(this, WORLD.W / 2, y + 78, 'Stromausfall: Lichtschalter mit BENUTZEN', { color: '#7a5a3a' }));
       const det = playerById(t.detective);
       if (det) {
-        const f = figure(this, det.look, WORLD.W / 2 - 60, y + 140, 2);
+        const f = figure(this, det.look, WORLD.W / 2 - 60, y + 166, 2);
         f.add(this.add.image(0, -42, ensureTex(this, 'ttt_hat', detectiveHat)).setOrigin(0.5, 1).setScale(2));
         this.overlay.add(f);
-        this.overlay.add(ink(this, WORLD.W / 2 + 20, y + 100, `Detektiv:\n${det.name}`, { color: BLUE_INK }));
+        this.overlay.add(ink(this, WORLD.W / 2 + 20, y + 126, `Detektiv:\n${det.name}`, { color: BLUE_INK }));
       } else {
-        this.overlay.add(ink(this, WORLD.W / 2, y + 96, 'Poolnudeln bereit?\nWasserpistolen liegen im Haus!', { color: '#7a5a3a' }));
+        this.overlay.add(ink(this, WORLD.W / 2, y + 116, 'Poolnudeln bereit?\nWasserpistolen liegen im Haus!', { color: '#7a5a3a' }));
       }
     } else if (t.sub === 'roundEnd' && t.last) {
       const win = t.last.winner === 'traitor';
