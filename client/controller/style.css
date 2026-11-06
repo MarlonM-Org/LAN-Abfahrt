@@ -1277,6 +1277,10 @@ button.gf-vip.armed { background: var(--red); box-shadow: inset 0 3px 0 #e86a5c,
 .gf-intro .gf-ask { margin-top: 8px; }
 .gf-intro .gf-sstat { margin-top: 4px; font-size: 8px; }
 .gf-ended { font-size: 8px; color: var(--red); }
+/* Sehr flach (Chrome Android mit Adressleiste, ~300 px): neutrale Sensor-Zeile weg, damit die Feedback-Karte passt */
+@media (max-height: 330px) {
+  .gf-side .gf-sstat:not(.ok):not(.bad) { display: none; }
+}
 /* Tablet/Laptop hochkant (kein Dreh-Overlay): Bahn oben, Rest darunter */
 :where(html:not(.land)) .lx.gf-lx { grid-template-areas: "head" "left" "right"; grid-template-columns: 1fr; grid-template-rows: auto auto minmax(0, 1fr); overflow: auto; }
 .gf-card { gap: 4px; padding: 8px; }
