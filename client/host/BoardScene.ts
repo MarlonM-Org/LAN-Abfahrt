@@ -144,9 +144,9 @@ export class BoardScene extends Phaser.Scene {
     this.arrow = txt(this, 0, 0, 'v', { color: C.gold }).setDepth(950).setVisible(false);
     this.tweens.add({ targets: this.arrow, y: '+=3', duration: 300, yoyo: true, repeat: -1 });
 
-    // Kamera-Schwenk: folgt der ziehenden Figur (Zoom 1.3) und schwenkt zurück; Tafel, Rangliste und Karten
+    // Kamera-Schwenk: folgt der ziehenden Figur (Zoom 1.15) und schwenkt zurück; Tafel, Rangliste und Karten
     // liegen auf der festen HUD-Kamera (alles, was in `rig.hud()` entsteht)
-    this.rig = new CameraRig(this, { w: WORLD.W, h: WORLD.H, lerp: 0.06 });
+    this.rig = new CameraRig(this, { w: WORLD.W, h: WORLD.H, lerp: 0.1 });
     this.rig.hud(() => {
       panel(this, 60, 0, 360, 58).setDepth(1000);
       this.roundText = ink(this, 72, 9, '', { origin: [0, 0], color: RED_INK }).setDepth(1001);
@@ -806,11 +806,12 @@ export class BoardScene extends Phaser.Scene {
 
     // Kamera fährt mit der Figur mit; am Ziel kurz halten (bei Ereignis oder Bar länger), dann zurück zur Übersicht
     const total = lead + roll.path.length * STEP_MS;
-    this.rig.follow(tok, 1.3);
+    // Zoom nur leicht (1.15): bei 8–12 Zügen hintereinander ist die Kamera fast dauernd unterwegs, das Brett soll lesbar bleiben
+    this.rig.follow(tok, 1.15);
     const last = roll.path[roll.path.length - 1];
     const special = FIELD_TYPES[last] === 'event' || last === b.barField;
     this.time.delayedCall(total, () => {
-      this.rig.hold(special ? 1500 : 700);
+      this.rig.hold(special ? 1100 : 400);
       this.rig.overview();
     });
 
