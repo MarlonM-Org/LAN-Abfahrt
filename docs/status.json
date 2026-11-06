@@ -1,11 +1,24 @@
 {
-  "updated": "2026-11-06T19:28+00:00",
+  "updated": "2026-11-06T19:33+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Bomben-Arena: nicht mehr an Ecken/Kreuzungen hängen bleiben + Mapgröße skaliert mit Spielerzahl (kleiner bei 2–4)"
+    },
+    {
+      "title": "Wasserbomben-Schlacht: feineres Zielen (kurz ziehen = nah treffen) + Spielende, sobald nur noch einer angreifen kann"
+    },
+    {
+      "title": "Regelkarte: Start erst, wenn alle bereit sind oder der VIP startet – kein Timer mehr"
+    },
+    {
+      "title": "Sumo-Steg: Treffer schubsen weiter, Dash etwas kürzer"
+    }
+  ],
   "queue": [],
   "done": [
     {
@@ -384,8 +397,8 @@
       "notes": "Tor-Wiederholung in Zeitlupe, Tick 30 Hz (#83)"
     },
     "sumo": {
-      "status": "umgesetzt",
-      "notes": "Finale-Zoom auf die letzten zwei, Zeitlupe beim letzten Platscher (#84)"
+      "status": "in Arbeit",
+      "notes": "Zu wenig Wirkung beim Treffer, man fällt oft selbst runter → weiter schubsen, Dash etwas kürzer (Risiko bleibt, ist cool)"
     },
     "kugel": {
       "status": "umgesetzt",
@@ -402,6 +415,14 @@
     "kurve": {
       "status": "umgesetzt",
       "notes": "Am Rand durchfahren statt Crash, häufiger Lücken (#97) – „ansonsten gut“"
+    },
+    "arena": {
+      "status": "in Arbeit",
+      "notes": "Bleibt an Ecken und Kreuzungen hängen; Map für 2–4 Spieler zu groß → mit Spielerzahl skalieren, schnell in die Action"
+    },
+    "wasser": {
+      "status": "in Arbeit",
+      "notes": "Zielmarkierung wandert zu schnell weg, kurz ziehen soll nah treffen; einziger Gegner komplett nass → Warten bis Zeitende („kacke“)"
     }
   },
   "general": [
@@ -472,6 +493,10 @@
     {
       "title": "Wii Balance Board am Laptop (WebHID) für eigene Board-Spiele (#86, #87)",
       "status": "umgesetzt"
+    },
+    {
+      "title": "Regelkarte/Lobby: Start erst, wenn alle bereit sind oder der VIP erzwingt – nicht nach Timer",
+      "status": "in Arbeit"
     }
   ]
 }
