@@ -1,10 +1,30 @@
 /**
  * Tests ohne Browser für Minigolf: Schlag-Umrechnung (Zurückziehen, Putter-Schwung) mit synthetischen
- * Eingaben und eine Physik-Probe aller Löcher (Bot-Schläge mit Streuung). Aufruf: `npm run test:golf`
+ * Eingaben, eine Physik-Probe aller Löcher (Bot-Schläge mit Streuung), Ball-gegen-Ball-Stöße und der
+ * Ablauf im Server-Spiel (angestoßen einlochen/ins Wasser, VIP „Nächstes Loch“). Aufruf: `npm run test:golf`
  */
 import { DRAG_DEAD, dragToPutt, swingToPutt } from '../client/controller/golfPutt';
 import type { MotionSample } from '../client/controller/motion';
-import { GOLF, GOLF_HOLES, type GolfBody, golfBotPlan, golfIdealPutt, golfPowerToSpeed, golfRollDist, golfStep, golfWalls } from '../shared/golf';
+import {
+  GOLF,
+  GOLF_HOLES,
+  type GolfBody,
+  golfAimHit,
+  golfBotPlan,
+  golfFreeSpot,
+  golfIdealPutt,
+  golfOnTee,
+  golfPowerFor,
+  golfPowerToSpeed,
+  golfRollDist,
+  golfSkipScore,
+  golfStep,
+  golfWalls,
+  onCourse,
+} from '../shared/golf';
+import { GolfGame } from '../server/golf';
+import type { MiniCtx, MiniResult } from '../server/minigame';
+import type { GolfState } from '../shared/types';
 
 let failed = 0;
 const check = (ok: boolean, msg: string) => {
@@ -132,6 +152,173 @@ for (let hi = 0; hi < GOLF_HOLES.length; hi++) {
   console.log(`  Loch ${hi + 1} ${h.name.padEnd(16)} Par ${h.par}: genau Ø ${avg(res.exact).toFixed(2)} · Bot Ø ${avg(res.bot).toFixed(2)} (Max ${capped}/${runs}, Asse ${res.bot.filter((n) => n === 1).length})`);
   check(avg(res.exact) <= h.par + 1.5, `Loch ${hi + 1}: gut gezielte Schläge schaffen es um Par`);
   check(capped <= runs * 0.25, `Loch ${hi + 1}: Bots bleiben selten am Schlag-Limit hängen`);
+}
+
+// ------------------------------------------------------------------ Ball gegen Ball
+
+console.log('Ball gegen Ball:');
+const body = (x: number, y: number, vx = 0, vy = 0): GolfBody => ({ x, y, vx, vy, tube: 0, tubeV: 0, tubeIdx: 0, lip: 0 });
+{
+  const h = GOLF_HOLES[0];
+  const walls = golfWalls(h);
+  // Gerader Stoß: A rollt mit 300 px/s auf den liegenden B
+  const a = body(100, 143, 300, 0);
+  const b = body(130, 143);
+  let hits = 0;
+  let minGap = Infinity;
+  for (let i = 0; i < 40; i++) {
+    golfStep(a, h, walls, i / 120, 1 / 120, [b], () => hits++);
+    minGap = Math.min(minGap, Math.hypot(a.x - b.x, a.y - b.y));
+  }
+  check(hits >= 1, 'A trifft den liegenden Ball B');
+  check(b.vx > 200 && Math.abs(b.vy) < 1, `B rollt geradeaus weiter (${Math.round(b.vx)} px/s)`);
+  check(Math.abs(a.vx) < 0.25 * b.vx, `A bleibt fast stehen (${Math.round(a.vx)} px/s)`);
+  check(minGap >= 2 * GOLF.BALL_R - 1e-6, `Bälle überlappen nie (min. Abstand ${minGap.toFixed(2)} px)`);
+  const e0 = 300 * 300;
+  const e1 = a.vx * a.vx + a.vy * a.vy + b.vx * b.vx + b.vy * b.vy;
+  check(e1 < e0 && e1 > e0 * 0.6, `etwas Energie geht verloren (${Math.round((e1 / e0) * 100)} %)`);
+  // Schräger Stoß: B weicht zur Seite aus
+  const c = body(100, 145, 300, 0);
+  const d = body(130, 141);
+  for (let i = 0; i < 40; i++) golfStep(c, h, walls, i / 120, 1 / 120, [d]);
+  check(d.vy < -20 && c.vy > 20, 'schräg getroffen: beide Bälle gehen auseinander');
+  // Ball an der Bande: der Stoß schiebt nie in die Wand
+  const e = body(120, 101, 0, -250);
+  const f = body(120, 99.5);
+  for (let i = 0; i < 30; i++) golfStep(e, h, walls, i / 120, 1 / 120, [f]);
+  check(onCourse(h, e.x, e.y) && e.y >= 96 + GOLF.BALL_R - 0.01, 'Ball an der Bande bleibt auf der Bahn');
+  // Zielhilfe
+  const hit = golfAimHit({ x: 100, y: 143 }, 0, 100, [{ x: 140, y: 143 }]);
+  check(!!hit && near(hit.d, 40 - 2 * GOLF.BALL_R, 1e-6) && near(hit.nx, 1, 1e-6), 'Zielhilfe: gerade Linie trifft 6 px vor dem Ball');
+  check(golfAimHit({ x: 100, y: 143 }, 0, 100, [{ x: 140, y: 150 }]) === null, 'Zielhilfe: knapp vorbei = kein Treffer');
+  check(golfAimHit({ x: 100, y: 143 }, 0, 20, [{ x: 140, y: 143 }]) === null, 'Zielhilfe: zu kurz = kein Treffer');
+  // Freie Stelle
+  const spot = golfFreeSpot(h, 150, 143, [{ x: 150, y: 143 }]);
+  check(Math.hypot(spot.x - 150, spot.y - 143) >= 2 * GOLF.BALL_R && onCourse(h, spot.x, spot.y), 'belegte Stelle → nächste freie daneben');
+  check(golfOnTee(h, h.tee) && !golfOnTee(h, { x: h.tee.x + 2, y: h.tee.y }), 'auf dem Abschlag = Geist, daneben nicht');
+  // Wertung bei „Nächstes Loch“
+  check(golfSkipScore(0, 3) === 4 && golfSkipScore(2, 3) === 4 && golfSkipScore(3, 3) === 5 && golfSkipScore(6, 3) === GOLF.MAX_SCORE && golfSkipScore(0, 2) === 3, 'Abbruch-Wertung: Schläge + 2, mind. Par + 1, max. 7');
+}
+
+// ------------------------------------------------------------------ Server-Spiel
+
+console.log('Server-Spiel:');
+interface TestGame {
+  timers: { clear(): void };
+  startHole(i: number): void;
+  step(now: number): boolean;
+  endHole(): void;
+  sub: string;
+  hole: number;
+  balls: Record<string, GolfBody & { strokes: number; done: number; moving: boolean; wait: number }>;
+}
+function makeGame(mode: 'arcade' | 'party' = 'arcade', offline: Record<string, number> = {}) {
+  let finished: MiniResult | null = null;
+  const ctx: MiniCtx = {
+    onChange: () => {},
+    finish: (r) => (finished = r),
+    isConnected: (id) => !(id in offline),
+    offlineMs: (id) => offline[id] ?? 0,
+    nameOf: (id) => id,
+    mode,
+  };
+  const g = new GolfGame(['A', 'B', 'C'], ctx);
+  const t = g as unknown as TestGame;
+  t.timers.clear();
+  return { g, t, finished: () => finished };
+}
+/** Loch starten, sofort spielen (ohne Timer), Bälle hinlegen */
+function setup(t: TestGame, hole: number, at: Record<string, [number, number, number]>) {
+  t.startHole(hole);
+  t.timers.clear();
+  t.sub = 'play';
+  for (const [id, [x, y, s]] of Object.entries(at)) Object.assign(t.balls[id], { x, y, sx: x, sy: y, strokes: s });
+}
+const run = (t: TestGame, ticks: number) => {
+  for (let i = 0; i < ticks; i++) t.step(Date.now());
+};
+const snap = (g: GolfGame) => g.snapshot().state as GolfState;
+{
+  // Angestoßen eingelocht: zählt für den Besitzer, ohne Zusatzschlag
+  const { g, t } = makeGame();
+  const h = GOLF_HOLES[0];
+  setup(t, 0, { A: [h.cup.x - 24, h.cup.y, 1], B: [h.cup.x - 14, h.cup.y, 1] });
+  g.input('A', 'putt', { seq: 1, a: 0, p: golfPowerFor(golfRollDist(95)) });
+  run(t, 120);
+  const st = snap(g);
+  check(st.balls.B.d === 1 && st.scores.B[0] === 1, `B angestoßen eingelocht → zählt mit 1 Schlag (d=${st.balls.B.d}, Karte ${st.scores.B[0]})`);
+  check(st.balls.A.s === 2, 'A hat einen Schlag mehr');
+  check(st.fx.some((f) => f.k === 'knock') && st.fx.some((f) => f.k === 'lucky'), 'TV bekommt „knock“ und „lucky“');
+  g.dispose();
+}
+{
+  // Angestoßen ins Wasser: straffrei zurück an die alte Stelle
+  const { g, t } = makeGame();
+  setup(t, 3, { A: [240, 152, 1], B: [240, 138, 1] });
+  g.input('A', 'putt', { seq: 1, a: -Math.PI / 2, p: 0.25 });
+  let wet = false;
+  for (let i = 0; i < 200; i++) {
+    t.step(Date.now());
+    if (t.balls.B.wait > 0) wet = true;
+  }
+  const st = snap(g);
+  check(wet, 'B wurde ins Wasser gestoßen');
+  // alte Stelle – oder direkt daneben, falls A inzwischen dort liegt
+  check(st.balls.B.s === 1 && Math.hypot(st.balls.B.x - 240, st.balls.B.y - 138) < 2.5, `B straffrei zurück (Schläge ${st.balls.B.s}, ${st.balls.B.x}/${st.balls.B.y})`);
+  const ab = Math.hypot(st.balls.A.x - st.balls.B.x, st.balls.A.y - st.balls.B.y);
+  check(ab >= 2 * GOLF.BALL_R - 0.05, `danach liegt kein Ball auf dem anderen (${ab.toFixed(1)} px)`);
+  g.dispose();
+}
+{
+  // Auf dem Abschlag stören sich die Bälle nicht
+  const { g, t } = makeGame();
+  setup(t, 0, {});
+  g.input('A', 'putt', { seq: 0, a: 0, p: 0.3 });
+  run(t, 90);
+  const st = snap(g);
+  check(st.balls.B.x === GOLF_HOLES[0].tee.x && !st.balls.B.m && st.balls.A.x > 100, 'Abschlag: A rollt durch B und C hindurch');
+  g.dispose();
+}
+{
+  // VIP „Nächstes Loch“: Rest wird gewertet, kurze Scorekarte, dann weiter
+  const { g, t } = makeGame();
+  const h = GOLF_HOLES[0];
+  setup(t, 0, { A: [300, 120, 1], B: [250, 160, 1] });
+  t.balls.A.done = 1;
+  const sk = g.skippable();
+  check(!!sk && !sk.info, `im Spiel überspringbar („${sk?.label}“)`);
+  g.vipAction('next');
+  const st = snap(g);
+  check(st.scores.B[0] === golfSkipScore(1, h.par) && st.scores.C[0] === golfSkipScore(0, h.par), `Wertung: B ${st.scores.B[0]}, C ${st.scores.C[0]} (Par ${h.par})`);
+  check(st.ended === true && st.balls.B.d === 2, 'Loch als vorzeitig beendet markiert');
+  t.endHole();
+  check(snap(g).sub === 'card' && snap(g).endsIn <= GOLF.SKIP_CARD_MS && snap(g).endsIn > 0, 'kurze Scorekarte');
+  g.vipAction('next');
+  check(snap(g).sub === 'tee' && snap(g).hole === 1 && !snap(g).ended, 'VIP-Knopf auf der Scorekarte → Loch 2');
+  g.dispose();
+}
+{
+  // Party-Modus (5 Löcher): nach dem letzten Loch geht’s zum Endstand, nicht zu Loch 6
+  const { g, t } = makeGame('party');
+  setup(t, 4, {});
+  t.endHole();
+  check(g.skippable()?.label === 'Zum Endstand', 'Party: letzte Scorekarte → „Zum Endstand“');
+  g.vipAction('next');
+  check(snap(g).sub === 'over', 'Party: Überspringen beendet das Spiel nach Loch 5');
+  g.dispose();
+}
+
+{
+  // Handy kurz weg (Bildschirm aus): der Computer puttet NICHT gleich für dich – erst nach AUTO_OFFLINE_MS
+  const off: Record<string, number> = { B: 5000, C: GOLF.AUTO_OFFLINE_MS + 1000 };
+  const { g, t } = makeGame('arcade', off);
+  setup(t, 0, {});
+  for (const b of Object.values(t.balls) as unknown as { restSince: number }[]) b.restSince = Date.now() - GOLF.AUTO_MS - 100;
+  run(t, 2);
+  const st = snap(g);
+  check(st.balls.B.s === 0 && !st.balls.B.auto, 'kurz offline (5 s): kein Auto-Schlag');
+  check(st.balls.C.s === 1 && st.balls.C.auto === 1, 'lange offline: Auto-Schlag (und das Handy erfährt es)');
+  g.dispose();
 }
 
 console.log(failed ? `\n${failed} Fehler` : '\nAlles ok');
