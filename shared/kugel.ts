@@ -212,6 +212,8 @@ export interface KugelRun {
   prog: number;
   finished: boolean;
   dns?: boolean;
+  /** Neuer Gesamtrekord / persönliche Bestzeit */
+  rec?: import('./balance').RecordResult;
 }
 
 export interface KugelState extends BalanceTurn {

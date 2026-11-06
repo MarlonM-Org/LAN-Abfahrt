@@ -9,17 +9,20 @@ import { sfx } from './sfx';
 import { say, spokenName } from './speech';
 import { SnapBuffer, lerp, lerpJump } from './interp';
 import { pcol } from './playerColor';
-import { BalanceHud } from './balanceHud';
+import { BalanceHud, RecordPanel, recordLine } from './balanceHud';
 
 /**
  * Tempel-Kugel (Balance Board): Verfolgerkamera hinter der Figur auf der Kugel, wie im Kart (`client/kugel3d/render.ts`).
  * Das Labyrinth kommt aus `kugelCourse(seed)` – derselben Strecke wie am Server; die Blickrichtung (`ang`) berechnet der Server.
  */
+const fmtS = (v: number) => `${v.toFixed(1)} s`;
+
 export class KugelScene extends Phaser.Scene {
   private buf = new SnapBuffer<KugelState>();
   private latest: KugelState | null = null;
   private juice!: Juice;
   private hud!: BalanceHud;
+  private recPanel!: RecordPanel;
   private course: KugelCourse | null = null;
   private cam3d: KugelRenderer | null = null;
   private seed = -1;
@@ -62,6 +65,7 @@ export class KugelScene extends Phaser.Scene {
     this.hint = txt(this, 190, 32, '', { size: 8, color: '#ffd25e' }).setDepth(2901);
     this.board = this.add.container(0, 0).setDepth(2950);
     this.hud = new BalanceHud(this, 392, 190);
+    this.recPanel = new RecordPanel(this);
 
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
@@ -126,6 +130,13 @@ export class KugelScene extends Phaser.Scene {
           sfx('goal');
           this.juice.flash(0xfff1a8, 260);
         } else sfx('lose');
+        if (r.rec) {
+          const isRec = r.rec === 'record';
+          sfx('fanfare', { delay: 0.2 });
+          this.juice.banner(isRec ? 'NEUER REKORD!' : 'BESTZEIT!', `${r.score.toFixed(1)} s`, 3200);
+          say(isRec ? 'Neuer Rekord!' : 'Persönliche Bestzeit!');
+          return;
+        }
         this.juice.banner(r.finished ? `${r.score.toFixed(1)} s` : 'Zeit um!', r.finished ? `${r.time.toFixed(1)} s${r.falls ? ` + ${r.falls}× Absturz` : ''}` : 'Nicht im Ziel', 2600);
         say(r.finished ? `${r.score.toFixed(1).replace('.', ',')} Sekunden` : 'Zeit um!');
       });
@@ -140,6 +151,8 @@ export class KugelScene extends Phaser.Scene {
     const i = st.sub === 'roll' || st.sub === 'done' ? `⏱ ${st.ft.toFixed(1)} s · 🔥 ${st.cp}/${this.course?.checkpoints.length ?? 0} · 💀 ${st.falls}` : '';
     if (this.info.text !== i) this.info.setText(i);
     this.hud.target = null;
+    // Rekorde unter den Bestzeiten dieses Abends (links, nur zwischen den Versuchen)
+    this.recPanel.update(st.records, fmtS, st.sub === 'ready' || st.sub === 'done', 6, 124);
     if (this.time.now > this.hintUntil) {
       const h = st.sub === 'countdown' ? 'Ruhig stehen – gleich rollt die Kugel!' : st.sub === 'roll' && st.ft < 7 ? 'Vorn lehnen = geradeaus · seitlich = lenken' : '';
       if (this.hint.text !== h) this.hint.setText(h);
@@ -173,7 +186,7 @@ export class KugelScene extends Phaser.Scene {
     const st = this.latest;
     const R = this.cam3d;
     if (!st || !R) return;
-    this.hud.update(st);
+    this.hud.update(st, recordLine(st.records, fmtS));
     const smp = this.buf.sample();
     if (!smp) return;
     const { a, b, f } = smp;

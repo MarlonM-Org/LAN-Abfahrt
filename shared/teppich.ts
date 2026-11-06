@@ -116,6 +116,8 @@ export interface TepRun {
   score: number;
   finished: boolean;
   dns?: boolean;
+  /** Neuer Gesamtrekord / persönliche Bestzeit */
+  rec?: import('./balance').RecordResult;
 }
 
 export interface TepState extends BalanceTurn {

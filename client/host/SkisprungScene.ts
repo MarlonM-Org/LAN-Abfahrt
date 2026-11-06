@@ -10,13 +10,14 @@ import { say, spokenName } from './speech';
 import { type Figure, figure } from './textures';
 import { SnapBuffer, lerpJump } from './interp';
 import { clouds, crowd } from './ambient';
-import { BalanceHud } from './balanceHud';
+import { BalanceHud, RecordPanel, recordLine } from './balanceHud';
 
 /**
  * Schanzen-Springen (Balance Board): Seitenansicht der Schanze, die Kamera fährt mit dem Springer mit.
  * Welt in Pixeln: 1 m = SKI.PX px. Die Schanze (Profil aus shared/skisprung.ts) wird einmal als Grafik gezeichnet.
  */
 const PX = SKI.PX;
+const fmtM = (v: number) => `${v.toFixed(1)} m`;
 const MARGIN = 20;
 const TOP = 72 * PX;
 const wx = (m: number) => (m - HILL.X0) * PX + MARGIN;
@@ -65,6 +66,7 @@ export class SkisprungScene extends Phaser.Scene {
   private latest: SkiState | null = null;
   private juice!: Juice;
   private hud!: BalanceHud;
+  private recPanel!: RecordPanel;
   private jumper!: Phaser.GameObjects.Container;
   private skis!: Phaser.GameObjects.Graphics;
   private fig: Figure | null = null;
@@ -124,6 +126,7 @@ export class SkisprungScene extends Phaser.Scene {
     this.distTxt = txt(this, 0, 0, '', { color: '#ffffff' }).setDepth(600);
     this.board = this.add.container(0, 0).setScrollFactor(0).setDepth(2950);
     this.hud = new BalanceHud(this, 404, 210);
+    this.recPanel = new RecordPanel(this);
 
     const fn = (s: GameState) => this.onState(s);
     bus.on('state', fn);
@@ -232,6 +235,16 @@ export class SkisprungScene extends Phaser.Scene {
           say(`Sturz! ${Math.round(j.dist)} Meter.`);
         } else {
           sfx('hit', { pitch: 0.7 });
+          if (j.rec) {
+            // Weitester Sprung aller Zeiten bzw. eigene Bestleistung
+            const isRec = j.rec === 'record';
+            sfx('fanfare', { delay: 0.2 });
+            this.juice.burst(x, y, 'confetti');
+            this.juice.banner(isRec ? 'NEUER REKORD!' : 'BESTLEISTUNG!', `${j.dist.toFixed(1)} m`, 3200);
+            say(isRec ? `Neuer Rekord! ${Math.round(j.dist)} Meter!` : `Persönliche Bestleistung! ${Math.round(j.dist)} Meter!`);
+            this.fans.cheer();
+            return;
+          }
           const big = j.dist >= SKI.K;
           if (big) {
             sfx('cheer');
@@ -257,7 +270,7 @@ export class SkisprungScene extends Phaser.Scene {
     const name = st.active ? tagName(playerById(st.active)?.name ?? '?') : '';
     const t = `🎿 ${st.rounds > 1 ? `Durchgang ${st.round}/${st.rounds} · ` : ''}${name}`;
     if (this.title.text !== t) this.title.setText(t);
-    const rec = st.best ? ` · Rekord ${st.best.dist.toFixed(1)} m` : '';
+    const rec = st.best ? ` · Bester ${st.best.dist.toFixed(1)} m` : '';
     const i = `K ${SKI.K} · HS ${SKI.HS}${rec}`;
     if (this.info.text !== i) this.info.setText(i);
 
@@ -271,6 +284,8 @@ export class SkisprungScene extends Phaser.Scene {
     if (this.time.now < this.hintUntil) hint = this.hint.text;
     else if (this.hint.text !== hint) this.hint.setText(hint).setColor(hint === 'JETZT HOCH!' ? '#ff8a7a' : '#ffd25e');
     this.hud.target = st.sub === 'inrun' || st.sub === 'countdown' ? { x: 0, y: 0, r: 0.5 } : st.sub === 'flight' ? { x: 0, y: SKI.FLIGHT_Y, r: 0.55 } : null;
+
+    this.recPanel.update(st.records, fmtM, st.sub === 'ready' || st.sub === 'landed');
 
     // Zwischenstand (links unten) bzw. Endstand (Mitte)
     const ids = Object.keys(st.points);
@@ -309,7 +324,7 @@ export class SkisprungScene extends Phaser.Scene {
   update() {
     const st = this.latest;
     if (!st) return;
-    this.hud.update(st);
+    this.hud.update(st, recordLine(st.records, fmtM));
     const smp = this.buf.sample();
     if (!smp) return;
     const a = smp.a;
