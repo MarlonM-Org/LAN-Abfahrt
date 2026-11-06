@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T15:48+00:00",
+  "updated": "2026-11-06T16:10+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -11,11 +11,26 @@
       "kind": "lieder",
       "type": "Neues Spiel",
       "branch": "feat/liederraten",
-      "detail": "Genre-Wahl vorab (1 gegen 1: je 4), reihum ein Genre pro Spieler, Song am TV, 4 → 6 → 8 Titel am Handy, Tempo-Punkte. Ton: eingebauter 8-Bit-Soundtrack, eigene MP3s in data/lieder/<Genre>/, Deezer-Hörproben optional (LIEDER_VORSCHAU=deezer). Wartet auf Marlons Entscheidung zur Musikquelle."
+      "detail": "Genre-Wahl vorab (1 gegen 1: je 4), reihum ein Genre pro Spieler, Song am TV, 4 → 6 → 8 Titel am Handy, Tempo-Punkte. Ton: eingebauter 8-Bit-Soundtrack, eigene MP3s in data/lieder/<Genre>/, Deezer-Hörproben optional (LIEDER_VORSCHAU=deezer)."
     }
   ],
   "queue": [],
   "done": [
+    {
+      "title": "Balance Board: Einmessen robust (kurze Funklöcher/Wackeln setzen nicht mehr zurück, spätestens nach 5 s eingemessen) + Messrate (Hz) in der Board-Anzeige",
+      "pr": 95,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Balance Board: kein Gewicht, Anzeige einklappbar · Skispringen mit Schritt-Leiste, Auslauf, Landefahne, Sounds · Tempel-Kugel als Hoverboard (weniger empfindlich)",
+      "pr": 93,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Wii Balance Board unter Windows koppeln (scripts/wii-pair.ps1: Byte-PIN + HID-Dienst)",
+      "pr": 88,
+      "date": "2026-11-06"
+    },
     {
       "title": "Board-Spiele: ewige Bestenliste pro Spieler (Highscore)",
       "pr": 91,
@@ -372,11 +387,11 @@
     },
     "kugel": {
       "status": "umgesetzt",
-      "notes": "3D-Verfolgerkamera hinter der Figur wie im Kart, Hinterkopf mit Haaren, Minikarte, Lenken aus Kamerasicht (#87)"
+      "notes": "Viel zu empfindlich, keine Kurve geschafft → Hoverboard-Steuerung (seitlich drehen, vorn Gas, hinten bremsen), Totzone + feine Kurve, Tempo runter, Pfad breiter (#93)"
     },
     "skisprung": {
-      "status": "in Arbeit",
-      "notes": "„Highscore pro Spieler“: Rekorde-Tafel + Rekord-Ansage (weiteste Weite, über alle Abende)"
+      "status": "umgesetzt",
+      "notes": "Rekorde-Tafel (#91) · Unklar ob vorlehnen oder nur abspringen → 3-Schritt-Leiste + kurze Hinweise · nach Landung nicht stehen bleiben → Auslauf, Abschwung, Fahne · mehr Sound · kein Gewicht anzeigen (#93)"
     },
     "lieder": {
       "status": "in Arbeit",

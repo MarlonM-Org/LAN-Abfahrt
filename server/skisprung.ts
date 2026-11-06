@@ -8,7 +8,7 @@ import { type MiniCtx, groupByScore, shuffle } from './minigame';
  *   Anlauf – Schwerpunkt ruhig in der Mitte = schneller
  *   Tisch  – im richtigen Moment hochdrücken (Gewichtsspitze am Board) = kräftiger Absprung
  *   Flug   – leicht nach vorn lehnen, nicht seitlich kippen = mehr Auftrieb, weniger Bremsen
- *   Landung – wer in der letzten halben Sekunde wackelt, stürzt
+ *   Landung – wer in der letzten halben Sekunde wackelt, stürzt; danach geht's den Auslauf hinunter bis zum Stehen
  * Wertung wie im Weltcup: 60 Punkte am K-Punkt, ±1,8 pro Meter, dazu Haltung (0–20).
  */
 
@@ -78,7 +78,7 @@ export class SkisprungGame extends BalanceTurnGame<SkiState> {
     this.state = {
       sub: 'ready', round: 1, rounds: ids.length <= SKI.TWO_ROUNDS_MAX ? 2 : 1, t: Date.now(),
       records: [], order: [], active: null, board: false, bal: null, calib: 0, endsIn: 0,
-      px: SKI.START_X, py: hillY(SKI.START_X), vx: 0, vy: 0, ang: 0, kmh: 0, q: 0, takeoff: null, dist: 0,
+      px: SKI.START_X, py: hillY(SKI.START_X), vx: 0, vy: 0, ang: 0, kmh: 0, q: 0, takeoff: null, dist: 0, landX: null, stopped: false,
       jumps, points, last: null, best: null,
     };
     this.start();
@@ -119,6 +119,8 @@ export class SkisprungGame extends BalanceTurnGame<SkiState> {
     s.q = 0;
     s.takeoff = null;
     s.dist = 0;
+    s.landX = null;
+    s.stopped = false;
     this.v = 0;
     this.qs = 0.5;
     this.qFlightSum = 0;
@@ -135,6 +137,30 @@ export class SkisprungGame extends BalanceTurnGame<SkiState> {
     const b = this.feed.sample ?? { w: 0, x: 0, y: 0 };
     if (s.sub === 'inrun') this.stepInrun(dt, b.x, b.y);
     else if (s.sub === 'flight') this.stepFlight(dt, b.x, b.y);
+    else if (s.sub === 'landed' && !s.stopped) this.stepOutrun(dt);
+  }
+
+  /** Auslauf: den Hang hinunter, im flachen Teil abbremsen (Stemmbogen), dann stehen bleiben */
+  private stepOutrun(dt: number) {
+    const s = this.state;
+    const fell = !!s.last?.fall;
+    const slope = hillSlope(s.px);
+    let a = G * Math.sin(slope) - (fell ? 0.35 : 0.05) * G * Math.cos(slope) - 0.002 * this.v * this.v;
+    if (s.px > SKI.BRAKE_X) a -= fell ? 3 : 4 + 6 * clamp((s.px - SKI.BRAKE_X) / 40, 0, 1);
+    // Notbremse vor den Zuschauern: so stark, dass er spätestens bei STOP_X steht
+    const left = SKI.STOP_X - s.px;
+    if (left > 0 && this.v > 0) a = Math.min(a, -(this.v * this.v) / (2 * left));
+    this.v = Math.max(0, this.v + a * dt);
+    s.px = Math.min(SKI.STOP_X, s.px + this.v * Math.cos(slope) * dt);
+    s.py = hillY(s.px);
+    s.ang = -slope;
+    s.kmh = Math.round(this.v * 3.6 * 10) / 10;
+    if (this.v < 0.4 || s.px >= SKI.STOP_X) {
+      this.v = 0;
+      s.kmh = 0;
+      s.stopped = true;
+      this.endRun(SKI.STOPPED_MS);
+    }
   }
 
   private stepInrun(dt: number, bx: number, by: number) {
@@ -235,9 +261,13 @@ export class SkisprungGame extends BalanceTurnGame<SkiState> {
     s.dist = dist;
     if (!fall && (!s.best || dist > s.best.dist)) s.best = { id, dist };
     s.sub = 'landed';
+    s.landX = s.px;
+    // Weiter den Hang hinunter: Tempo entlang des Hangs (ein Sturz bremst kräftig)
+    const sl = hillSlope(s.px);
+    const along = s.vx * Math.cos(sl) - s.vy * Math.sin(sl);
+    this.v = Math.max(4, along) * (fall ? 0.45 : 0.9);
     s.vx = s.vy = 0;
     this.ctx.log?.('skisprung', { p: id, n: Math.round(dist) });
-    this.endRun(SKI.LANDED_MS);
   }
 
   protected roundDone() {

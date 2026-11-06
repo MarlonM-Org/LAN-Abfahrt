@@ -11,6 +11,7 @@ import { type Figure, figure } from './textures';
 import { SnapBuffer, lerpJump } from './interp';
 import { clouds, crowd } from './ambient';
 import { BalanceHud, RecordPanel, recordLine } from './balanceHud';
+import { pcol } from './playerColor';
 
 /**
  * Schanzen-Springen (Balance Board): Seitenansicht der Schanze, die Kamera fährt mit dem Springer mit.
@@ -59,7 +60,15 @@ interface Run {
   id: string | null;
   sub: string;
   landedSeen: boolean;
+  stoppedSeen: boolean;
 }
+
+/** Die drei Schritte eines Sprungs – oben als Leiste, der aktuelle leuchtet */
+const STEPS: [string, string][] = [
+  ['inrun', '1 ANLAUF: ruhig mittig'],
+  ['takeoff', '2 TISCH: abspringen'],
+  ['flight', '3 FLUG: leicht vorn'],
+];
 
 export class SkisprungScene extends Phaser.Scene {
   private buf = new SnapBuffer<SkiState>();
@@ -77,10 +86,17 @@ export class SkisprungScene extends Phaser.Scene {
   private distTxt!: Phaser.GameObjects.Text;
   private board!: Phaser.GameObjects.Container;
   private boardKey = '';
-  private run: Run = { id: null, sub: '', landedSeen: false };
+  private run: Run = { id: null, sub: '', landedSeen: false, stoppedSeen: false };
   private fans!: { cheer(): void };
   private camX = 0;
   private camY = 0;
+  private steps: Phaser.GameObjects.Text[] = [];
+  private flag!: Phaser.GameObjects.Container;
+  private flagLabel!: Phaser.GameObjects.Text;
+  private flagCloth!: Phaser.GameObjects.Graphics;
+  /** Nächster Zeitpunkt für Fahrgeräusch/Schneespur */
+  private swishAt = 0;
+  private stopAnim = 0;
 
   constructor() {
     super('skisprung');
@@ -92,8 +108,10 @@ export class SkisprungScene extends Phaser.Scene {
     this.fig = null;
     this.figId = null;
     this.boardKey = '';
-    this.run = { id: null, sub: '', landedSeen: false };
+    this.run = { id: null, sub: '', landedSeen: false, stoppedSeen: false };
     this.hintUntil = 0;
+    this.swishAt = 0;
+    this.stopAnim = 0;
     this.juice = new Juice(this, { depth: 2500, clock: this.buf, hud: this.add.container(0, 0).setScrollFactor(0).setDepth(5000) });
     const cam = this.cameras.main;
     cam.setBounds(0, 0, WORLD_W, WORLD_H);
@@ -124,6 +142,11 @@ export class SkisprungScene extends Phaser.Scene {
     this.info = txt(this, 472, 4, '', { origin: [1, 0], color: '#bcd3ff' }).setScrollFactor(0).setDepth(2901);
     this.hint = txt(this, 240, 34, '', { size: 16, color: '#ffd25e' }).setScrollFactor(0).setDepth(2901);
     this.distTxt = txt(this, 0, 0, '', { color: '#ffffff' }).setDepth(600);
+    this.steps = STEPS.map(([, label], i) => txt(this, 96 + i * 144, 62, label, { color: '#8d9bb8' }).setScrollFactor(0).setDepth(2901).setScale(0.75));
+    // Landefahne (Stange + Tuch in Spielerfarbe + Weite)
+    this.flagCloth = this.add.graphics();
+    this.flagLabel = txt(this, 0, -34, '', { color: '#ffffff' }).setScale(0.75);
+    this.flag = this.add.container(0, 0, [this.flagCloth, this.flagLabel]).setDepth(450).setVisible(false);
     this.board = this.add.container(0, 0).setScrollFactor(0).setDepth(2950);
     this.hud = new BalanceHud(this, 404, 210);
     this.recPanel = new RecordPanel(this);
@@ -205,6 +228,8 @@ export class SkisprungScene extends Phaser.Scene {
     if (st.active !== r.id) {
       r.id = st.active;
       r.landedSeen = false;
+      r.stoppedSeen = false;
+      this.flag.setVisible(false);
       if (st.active) {
         const name = playerById(st.active)?.name;
         say(`${spokenName(name)} ist dran.`);
@@ -213,11 +238,21 @@ export class SkisprungScene extends Phaser.Scene {
     if (st.sub === r.sub) return;
     const prev = r.sub;
     r.sub = st.sub;
-    if (st.sub === 'inrun') sfx('whoosh', { vol: 0.6 });
+    if (st.sub === 'countdown') sfx('whistle', { vol: 0.5 });
+    if (st.sub === 'inrun') {
+      sfx('go');
+      sfx('whoosh', { vol: 0.6, delay: 0.1 });
+    }
     if (st.sub === 'flight' && prev === 'inrun') {
       this.buf.after(st.t, () => {
         sfx('jump', { pitch: 0.8 + (st.takeoff === null ? 0 : 0.4) });
-        if (st.takeoff !== null && Math.abs(st.takeoff) < 0.12) this.flashHint('PERFEKTER ABSPRUNG!');
+        sfx('whoosh', { pitch: 0.7, vol: 0.8 });
+        if (st.takeoff === null) this.flashHint('Kein Absprung!', '#ff8a7a');
+        else if (Math.abs(st.takeoff) < 0.12) {
+          this.flashHint('PERFEKT!');
+          sfx('powerup', { vol: 0.6 });
+          this.fans.cheer();
+        } else this.flashHint(st.takeoff < 0 ? 'Etwas zu früh' : 'Etwas zu spät', '#ffd25e');
       });
     }
     if (st.sub === 'landed' && st.last && !r.landedSeen) {
@@ -227,6 +262,7 @@ export class SkisprungScene extends Phaser.Scene {
         const x = wx(this.latest?.px ?? 0);
         const y = wy(hillY(this.latest?.px ?? 0));
         this.juice.burst(x, y, 'puff', j.fall ? 24 : 14);
+        this.plantFlag(st);
         if (j.fall) {
           sfx('crack');
           sfx('bonk', { delay: 0.1 });
@@ -259,11 +295,26 @@ export class SkisprungScene extends Phaser.Scene {
     if (st.sub === 'over') sfx('fanfare');
   }
 
+  /** Fahne an der Landestelle aufstellen */
+  private plantFlag(st: SkiState) {
+    if (st.landX === null || !st.last) return;
+    const c = pcol(st.active);
+    const g = this.flagCloth;
+    g.clear();
+    g.fillStyle(0x5e3518, 1).fillRect(-1, -26, 2, 26);
+    g.fillStyle(st.last.fall ? 0x8d9bb8 : c.num, 1).fillTriangle(1, -26, 15, -21, 1, -16);
+    g.lineStyle(1, 0x1d2e22, 1).strokeTriangle(1, -26, 15, -21, 1, -16);
+    this.flagLabel.setText(`${st.last.dist.toFixed(1)} m`);
+    this.flag.setPosition(wx(st.landX), wy(hillY(st.landX)) + 2).setVisible(true).setScale(1, 0.1);
+    this.tweens.add({ targets: this.flag, scaleY: 1, duration: 260, ease: 'Back.Out' });
+    sfx('pop', { delay: 0.15 });
+  }
+
   private hintUntil = 0;
   /** Kurzer Zuruf statt des normalen Hinweises */
-  private flashHint(text: string) {
-    this.hintUntil = this.time.now + 1200;
-    this.hint.setText(text).setColor('#9ad65a');
+  private flashHint(text: string, color = '#9ad65a') {
+    this.hintUntil = this.time.now + 1400;
+    this.hint.setText(text).setColor(color);
   }
 
   private renderHud(st: SkiState) {
@@ -275,17 +326,30 @@ export class SkisprungScene extends Phaser.Scene {
     if (this.info.text !== i) this.info.setText(i);
 
     let hint = '';
-    if (st.sub === 'countdown') hint = 'In die Hocke!';
-    else if (st.sub === 'inrun') {
-      const v = Math.max(1, st.kmh / 3.6);
-      const toEdge = -st.px / v;
-      hint = toEdge < 0.45 && st.takeoff === null ? 'JETZT HOCH!' : 'Ruhig in der Mitte!';
-    } else if (st.sub === 'flight') hint = st.q < 0.4 ? 'Gerade halten!' : 'Leicht nach vorn!';
+    let step = '';
+    const v = Math.max(1, st.kmh / 3.6);
+    const nowJump = st.sub === 'inrun' && -st.px / v < 0.45 && st.takeoff === null;
+    if (st.sub === 'countdown') {
+      hint = 'Hocke – ruhig mittig!';
+      step = 'inrun';
+    } else if (st.sub === 'inrun') {
+      hint = nowJump ? 'JETZT ABSPRINGEN!' : 'Mittig – noch nicht!';
+      step = nowJump ? 'takeoff' : 'inrun';
+    } else if (st.sub === 'flight') {
+      hint = st.q < 0.4 ? 'Nicht kippen!' : 'Leicht nach vorn!';
+      step = 'flight';
+    } else if (st.sub === 'landed') hint = st.last?.fall || st.stopped ? '' : 'Gelandet!';
+    if (nowJump && this.hint.text !== 'JETZT ABSPRINGEN!' && this.time.now >= this.hintUntil) sfx('tick', { pitch: 1.6 });
     if (this.time.now < this.hintUntil) hint = this.hint.text;
-    else if (this.hint.text !== hint) this.hint.setText(hint).setColor(hint === 'JETZT HOCH!' ? '#ff8a7a' : '#ffd25e');
+    else if (this.hint.text !== hint) this.hint.setText(hint).setColor(nowJump ? '#ff8a7a' : '#ffd25e');
+    const showSteps = st.sub === 'countdown' || st.sub === 'inrun' || st.sub === 'flight';
+    this.steps.forEach((t, i) => {
+      const on = STEPS[i][0] === step;
+      t.setVisible(showSteps).setColor(on ? '#ffd25e' : '#8d9bb8').setScale(on ? 0.85 : 0.75);
+    });
     this.hud.target = st.sub === 'inrun' || st.sub === 'countdown' ? { x: 0, y: 0, r: 0.5 } : st.sub === 'flight' ? { x: 0, y: SKI.FLIGHT_Y, r: 0.55 } : null;
 
-    this.recPanel.update(st.records, fmtM, st.sub === 'ready' || st.sub === 'landed');
+    this.recPanel.update(st.records, fmtM, st.sub === 'ready' || (st.sub === 'landed' && st.stopped));
 
     // Zwischenstand (links unten) bzw. Endstand (Mitte)
     const ids = Object.keys(st.points);
@@ -340,24 +404,57 @@ export class SkisprungScene extends Phaser.Scene {
     this.jumper.setPosition(x, y).setVisible(!!st.active && sub !== 'ready' && sub !== 'over');
     const flying = sub === 'flight';
     const fallen = sub === 'landed' && !!st.last?.fall;
-    this.jumper.setRotation(fallen ? 1.3 : -ang);
+    const outrun = sub === 'landed' && !b.stopped;
+    this.jumper.setRotation(fallen ? (b.stopped ? 1.45 : 1.3 + Math.sin(this.time.now / 90) * 0.15) : -ang);
+    // Fahrgeräusch + Schneespur (Anlauf, Auslauf) bzw. Wind (Flug) – lauter, je schneller
+    const now = this.time.now;
+    if ((sub === 'inrun' || outrun || flying) && b.kmh > 8 && now >= this.swishAt) {
+      const k = Math.min(1, b.kmh / 95);
+      this.swishAt = now + (flying ? 420 : 300 - 140 * k);
+      sfx('whoosh', { vol: (flying ? 0.25 : 0.18) + 0.3 * k, pitch: flying ? 0.55 : 0.8 + 0.6 * k });
+      if (!flying) this.juice.burst(x - 8, y, 'puff', outrun ? 4 : 2);
+    }
+    // Abschwingen im Auslauf: Schnee-Fontäne, kurz in die Knie, dann aufrichten und jubeln
+    if (sub === 'landed' && b.stopped && this.run.id === st.active && !this.run.stoppedSeen) {
+      this.run.stoppedSeen = true;
+      this.stopAnim = now;
+      this.juice.burst(x + 10, y - 2, 'puff', 22);
+      sfx('whoosh', { pitch: 1.4, vol: 0.9 });
+      if (!st.last?.fall) {
+        sfx('cheer', { delay: 0.25 });
+        this.fans.cheer();
+      }
+    }
     // Ski: im Anlauf parallel, im Flug als V
     const sk = this.skis;
     sk.clear();
     sk.lineStyle(2, 0x2d64a8, 1);
-    if (flying) {
+    const stopT = b.stopped ? (now - this.stopAnim) / 1000 : -1;
+    if (b.stopped && !fallen) {
+      // Quer gestellte Ski (Abschwung) – von der Seite kurz und breit
+      sk.lineBetween(-5, 0, 7, 0);
+      sk.lineBetween(-4, 2, 8, 2);
+    } else if (flying) {
       sk.lineBetween(-8, 0, 13, -4);
       sk.lineBetween(-8, 1, 13, 4);
     } else sk.lineBetween(-10, 0, 13, 0);
     const img = this.fig?.getData('img') as Phaser.GameObjects.Image | undefined;
     if (img) {
       // Hocke im Anlauf, gestreckt im Flug (nach vorn gelegt)
-      img.setScale(0.9, sub === 'inrun' || sub === 'countdown' ? 0.68 : 0.9);
-      img.setAngle(flying ? 55 : sub === 'landed' && !fallen ? 0 : 20);
+      if (stopT >= 0 && !fallen) {
+        // in die Knie (Abschwung), dann aufrichten und kleiner Jubel-Hüpfer
+        const dip = stopT < 0.35 ? Math.sin((stopT / 0.35) * Math.PI) : 0;
+        const hop = stopT > 0.5 && stopT < 1.1 ? Math.sin(((stopT - 0.5) / 0.6) * Math.PI) : 0;
+        img.setScale(0.9, 0.9 - 0.25 * dip).setAngle(-18 * dip).setY(-1 - 6 * hop);
+      } else {
+        img.setY(-1);
+        img.setScale(0.9, sub === 'inrun' || sub === 'countdown' ? 0.68 : outrun && !fallen ? 0.78 : 0.9);
+        img.setAngle(flying ? 55 : sub === 'landed' && !fallen ? 8 : 20);
+      }
     }
 
     // Weite neben dem Springer
-    const showDist = flying || sub === 'landed';
+    const showDist = flying || (sub === 'landed' && !this.flag.visible);
     this.distTxt.setVisible(showDist && b.dist > 0);
     if (showDist) this.distTxt.setText(`${b.dist.toFixed(1)} m`).setPosition(x, y - 30);
 

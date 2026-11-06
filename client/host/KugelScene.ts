@@ -154,7 +154,7 @@ export class KugelScene extends Phaser.Scene {
     // Rekorde unter den Bestzeiten dieses Abends (links, nur zwischen den Versuchen)
     this.recPanel.update(st.records, fmtS, st.sub === 'ready' || st.sub === 'done', 6, 124);
     if (this.time.now > this.hintUntil) {
-      const h = st.sub === 'countdown' ? 'Ruhig stehen – gleich rollt die Kugel!' : st.sub === 'roll' && st.ft < 7 ? 'Vorn lehnen = geradeaus · seitlich = lenken' : '';
+      const h = st.sub === 'countdown' ? 'Ruhig stehen – gleich rollt die Kugel!' : st.sub === 'roll' && st.ft < 9 ? 'Wie ein Hoverboard: vorn = Gas · seitlich = drehen · hinten = bremsen' : '';
       if (this.hint.text !== h) this.hint.setText(h);
     }
 
