@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T21:29+00:00",
+  "updated": "2026-11-06T22:27+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -8,6 +8,11 @@
   "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Wasserbomben-Schlacht verständlich gemacht: schwebende Schilder über Eimer, Schlauch, Handtuch und Pistole (pulsieren, wenn man sie braucht), Hecken/Liegen sichtbar als Deckung mit „GEBLOCKT!“, Sonne trocknet sichtbar, Legende zum Start + Aufwärmrunde mit Tour; Handy zeigt Bomben/Nässe groß und Hinweise mit Richtungspfeil",
+      "pr": 107,
+      "date": "2026-11-06"
+    },
     {
       "title": "Strand-Volleyball: ◀ ▶ lassen sich rüberrutschen (Richtung folgt dem Daumen), größerer Ball, kompakteres Feld mit 1,25×-Zoom am TV, schwebenderer Ball und Landepunkt-Ring im Sand",
       "pr": 103,
@@ -449,7 +454,7 @@
     },
     "wasser": {
       "status": "umgesetzt",
-      "notes": "Zielweite 6 + 154 × Stick² (kürzester Wurf ≈ 6 statt 32 px); Klatschnasse werden nach 5 s zum Handtuch getragen statt ewig zu stehen; Seite weg → sofort Ende (#100) – offen: lieber „klatschnass = verloren“ im 1 gegen 1?"
+      "notes": "Modus unklar (Trocknen, Auffüllen, Deckung) → Schilder, Deckungs-Schild + „GEBLOCKT!“, Sonnen-Dampf, Legende, Aufwärmrunde mit Tour, Handy-Hinweise mit Pfeilen (#107) · vorher: feineres Zielen, Hintragen zum Handtuch (#100)"
     },
     "volley": {
       "status": "umgesetzt",
