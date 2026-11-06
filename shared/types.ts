@@ -552,9 +552,12 @@ export interface ArenaState {
   endsIn: number;
   round: number;
   winRounds: number;
-  /** COLS × ROWS Zeichen, siehe ArenaCell in shared/arena.ts */
+  /** Feldgröße in Kacheln inkl. Rand (hängt von der Spielerzahl ab, steht pro Spiel fest – `ARENA_SIZES`) */
+  cols: number;
+  rows: number;
+  /** cols × rows Zeichen, siehe ArenaCell in shared/arena.ts */
   grid: string;
-  /** Anzahl bereits gefluteter Zellen (Index in FLOOD_ORDER) */
+  /** Anzahl bereits gefluteter Zellen (Index in `arenaGeo(cols, rows).flood`) */
   flood: number;
   floodActive: boolean;
   bombs: { id: number; x: number; y: number; fuse: number; owner: string; range: number }[];

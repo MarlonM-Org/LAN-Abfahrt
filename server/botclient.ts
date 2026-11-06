@@ -4,7 +4,7 @@
  */
 import { io, type Socket } from 'socket.io-client';
 import type { ArenaState, GameLive, GameMeta, GameState, IgelState, IgelWeapon, KurveState, ParcoursState, PrivateState, SmashFighter, SmashState, TttState, TurmLane } from '../shared/types';
-import { ARENA, type ArenaCell, DIRS, FLOOD_ORDER, blastCells, cellIdx } from '../shared/arena';
+import { ARENA, type ArenaCell, DIRS, arenaGeo, blastCells } from '../shared/arena';
 import { BASE_SOLIDS, PARCOURS, PART_DEFS, type Rect, canPlace, overlaps, partRect, snap } from '../shared/parcours';
 import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTerrain, isTool, ropeAnchor, sameSide, simulateBazooka, surfaceY } from '../shared/igel';
 import { randomLook } from '../shared/avatar';
@@ -309,8 +309,11 @@ export class Bot {
   private arenaThink(st: ArenaState) {
     const me = st.players[this.id];
     if (!me?.alive) return;
-    const W = ARENA.COLS;
-    const cellAt = (x: number, y: number): ArenaCell => (x < 0 || y < 0 || x >= W || y >= ARENA.ROWS ? '#' : (st.grid[cellIdx(x, y)] as ArenaCell));
+    // Feldgröße hängt von der Spielerzahl ab (kommt im Snapshot mit)
+    const geo = arenaGeo(st.cols, st.rows);
+    const W = geo.cols;
+    const cellIdx = (x: number, y: number) => geo.idx(x, y);
+    const cellAt = (x: number, y: number): ArenaCell => (x < 0 || y < 0 || x >= W || y >= geo.rows ? '#' : (st.grid[cellIdx(x, y)] as ArenaCell));
     const bombCells = new Set(st.bombs.map((b) => cellIdx(b.x, b.y)));
     const bombAt = (x: number, y: number) => bombCells.has(cellIdx(x, y));
     const mx = Math.round(me.x);
@@ -334,7 +337,7 @@ export class Bot {
     for (const b of bombs) for (const c of blastCells(cellAt, bombAt, b.x, b.y, b.range)) mark(cellIdx(c.x, c.y), b.t);
     const floodIn = st.floodActive ? 0 : st.endsIn;
     if (floodIn < 6000) {
-      for (let j = st.flood; j < Math.min(FLOOD_ORDER.length, st.flood + 40); j++) mark(FLOOD_ORDER[j], floodIn + (j - st.flood) * ARENA.FLOOD_STEP_MS);
+      for (let j = st.flood; j < Math.min(geo.flood.length, st.flood + 40); j++) mark(geo.flood[j], floodIn + (j - st.flood) * ARENA.FLOOD_STEP_MS);
     }
 
     const walk = (x: number, y: number) => cellAt(x, y) === '.' && (!bombAt(x, y) || cellIdx(x, y) === myIdx);
@@ -3471,7 +3474,8 @@ const afbWrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
  * Auto-Fußball-Bot: fährt zu einem Punkt hinter dem Ball (auf der Linie Ball → gegnerisches Tor)
  * und schiebt dann durch. Steht er vor dem Ball, fährt er außen herum. Pro Team verteidigt ein Bot
  * (der dem eigenen Tor am nächsten ist), sobald der Ball in der eigenen Hälfte ist; weitere Bots
- * halten Abstand und warten auf Abpraller.
+ * halten Abstand und warten auf Abpraller. Gelenkt wird wie am Handy absolut: der Stick zeigt
+ * (in TV-Richtung) aufs Ziel, der Server dreht das Auto dorthin – auch beim Rückwärtsfahren.
  */
 function afbBot(bot: Bot, st: AfbState) {
   let mem = afbBotMem.get(bot);
@@ -3481,7 +3485,7 @@ function afbBot(bot: Bot, st: AfbState) {
   if (st.sub === 'over') {
     if (!mem.idle) {
       mem.idle = true;
-      bot.send('steer', { x: 0, gas: false, brake: false, boost: false });
+      bot.send('steer', { x: 0, y: 0, gas: false, brake: false, boost: false });
     }
     return;
   }
@@ -3495,7 +3499,7 @@ function afbBot(bot: Bot, st: AfbState) {
   if (st.sub === 'countdown') {
     mem.idle = false;
     mem.stuckSince = 0;
-    bot.send('steer', { x: 0, gas: true, brake: false, boost: false });
+    bot.send('steer', { x: 0, y: 0, gas: true, brake: false, boost: false });
     return;
   }
 
@@ -3565,30 +3569,28 @@ function afbBot(bot: Bot, st: AfbState) {
   const dy = ty - me.y;
   const dist = Math.hypot(dx, dy);
   const diff = afbWrap(Math.atan2(dy, dx) - me.a);
-  let steer = afbClamp(diff * 2.2 + mem.slop, -1, 1);
+  // Stick zeigt aufs Ziel (mit etwas eigener Ungenauigkeit); der Server lenkt, auch rückwärts, mit der Schnauze dorthin
+  let aim: number | null = Math.atan2(dy, dx) + mem.slop;
   let gas = true;
   let brake = false;
   let boost = false;
   if (now < mem.reverseUntil) {
     gas = false;
     brake = true;
-    steer = -Math.sign(diff) || 1;
   } else if (park && dist < 12) {
     gas = false;
-    steer = 0;
+    aim = null;
   } else if (Math.abs(diff) > 2.1 && dist < 60) {
     // Ziel liegt hinter uns und nah: rückwärts drehen
     gas = false;
     brake = true;
-    steer = -Math.sign(diff);
   } else if (Math.abs(diff) > 1.3 && mem.speed > 55) {
-    // scharfe Kurve: Bremse in voller Fahrt = Drift
+    // scharfe Kurve: Bremse in voller Fahrt + Stick in die neue Richtung = Drift-Wende
     gas = false;
     brake = true;
   } else {
     const ballDist = Math.hypot(bx - me.x, by - me.y);
     boost = me.b > 8 && Math.abs(diff) < 0.3 && ((pushing && ballDist < 70) || (dist > 150 && me.b > 45));
-    if (pushing && ballDist < reach + 10 && Math.abs(diff) < 0.35 && me.hc === 0 && Math.random() < 0.3) bot.send('hop');
   }
   // Festgefahren? Kurz zurücksetzen
   if (gas && mem.speed < 6) {
@@ -3599,7 +3601,9 @@ function afbBot(bot: Bot, st: AfbState) {
     }
   } else mem.stuckSince = 0;
   mem.idle = false;
-  bot.send('steer', { x: Math.round(steer * 100) / 100, gas, brake, boost });
+  const sx = aim === null ? 0 : Math.round(Math.cos(aim) * 100) / 100;
+  const sy = aim === null ? 0 : Math.round(Math.sin(aim) * 100) / 100;
+  bot.send('steer', { x: sx, y: sy, gas, brake, boost });
 }
 
 // ------------------------------------------------------------------ Kings Cup
