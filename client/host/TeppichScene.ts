@@ -10,12 +10,13 @@ import { say, spokenName } from './speech';
 import { type Figure, figure } from './textures';
 import { SnapBuffer, lerpJump } from './interp';
 import { twinkle } from './ambient';
-import { BalanceHud } from './balanceHud';
+import { BalanceHud, RecordPanel, recordLine } from './balanceHud';
 
 /**
  * Teppich-Parcours (Balance Board): Seitenansicht einer Wüstenstadt bei Nacht. Die Kamera scrollt mit dem Teppich
  * (er sitzt bei `TEP.SCREEN_X`), Hindernisse und Juwelen kommen aus `tepCourse(seed)` – derselben Strecke wie am Server.
  */
+const fmtS = (v: number) => `${v.toFixed(1)} s`;
 const W = 480;
 const H = 270;
 
@@ -91,6 +92,7 @@ export class TeppichScene extends Phaser.Scene {
   private latest: TepState | null = null;
   private juice!: Juice;
   private hud!: BalanceHud;
+  private recPanel!: RecordPanel;
   private course: TepCourse | null = null;
   private seed = -1;
   private courseLayer!: Phaser.GameObjects.Container;
@@ -155,6 +157,7 @@ export class TeppichScene extends Phaser.Scene {
     this.progress = this.add.graphics().setScrollFactor(0).setDepth(2901);
     this.board = this.add.container(0, 0).setScrollFactor(0).setDepth(2950);
     this.hud = new BalanceHud(this, 404, 210);
+    this.recPanel = new RecordPanel(this);
     ensureTex(this, 'tep_bird0', () => vulture(0));
     ensureTex(this, 'tep_bird1', () => vulture(1));
 
@@ -262,6 +265,13 @@ export class TeppichScene extends Phaser.Scene {
           sfx('goal');
           this.juice.burst(st.x, st.y, 'confetti');
         } else sfx('lose');
+        if (r.rec) {
+          const isRec = r.rec === 'record';
+          sfx('fanfare', { delay: 0.2 });
+          this.juice.banner(isRec ? 'NEUER REKORD!' : 'BESTZEIT!', `${r.score.toFixed(2)} s`, 3200);
+          say(isRec ? 'Neuer Rekord!' : 'Persönliche Bestzeit!');
+          return;
+        }
         this.juice.banner(r.finished ? `${r.score.toFixed(2)} s` : 'Zeit um!', `${r.time.toFixed(2)} s − ${r.gems} 💎 · ${r.hits} Treffer`, 2600);
         say(r.finished ? `${r.score.toFixed(1).replace('.', ',')} Sekunden` : 'Zeit um!');
       });
@@ -276,6 +286,7 @@ export class TeppichScene extends Phaser.Scene {
     const i = st.sub === 'fly' || st.sub === 'done' ? `⏱ ${st.ft.toFixed(1)} s · 💎 ${st.got.length} · 💥 ${st.hits}` : '';
     if (this.info.text !== i) this.info.setText(i);
     this.hud.target = null;
+    this.recPanel.update(st.records, fmtS, st.sub === 'ready' || st.sub === 'done', 6, 34);
 
     const ids = Object.keys(st.points);
     const ranked = ids.filter((id) => st.runs[id]).sort((a, b) => st.runs[a].score - st.runs[b].score);
@@ -314,7 +325,7 @@ export class TeppichScene extends Phaser.Scene {
   update() {
     const st = this.latest;
     if (!st) return;
-    this.hud.update(st);
+    this.hud.update(st, recordLine(st.records, fmtS));
     const smp = this.buf.sample();
     if (!smp) return;
     const { a, b, f } = smp;

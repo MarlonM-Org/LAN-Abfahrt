@@ -1,4 +1,4 @@
-import { BB, type BalanceSample, type BalanceTurn, liveOf, parseSample } from '../shared/balance';
+import { BB, type BalanceKind, type BalanceSample, type BalanceTurn, liveOf, parseSample } from '../shared/balance';
 import type { MiniKind, MiniSnapshot, SkipInfo } from '../shared/types';
 import { possessive } from '../shared/players';
 import { type MiniCtx, type MiniGame, Timers } from './minigame';
@@ -140,8 +140,14 @@ export abstract class BalanceTurnGame<S extends BalanceTurn & { sub: string }> i
     this.nextTurn();
   }
 
+  /** Bestenliste neu laden (am Anfang jedes Zugs und nach einem neuen Rekord) */
+  protected refreshRecords() {
+    this.state.records = this.ctx.records?.(this.kind as BalanceKind) ?? [];
+  }
+
   protected nextTurn() {
     const s = this.state;
+    this.refreshRecords();
     let next: string | undefined;
     while ((next = this.queue.shift())) {
       if (this.ctx.isConnected(next) && !this.ctx.isGone?.(next)) break;

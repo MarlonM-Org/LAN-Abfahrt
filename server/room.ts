@@ -67,7 +67,8 @@ import { SprintGame } from './sprint';
 import { SkisprungGame } from './skisprung';
 import { TeppichGame } from './teppich';
 import { KugelGame } from './kugel';
-import { parseSample } from '../shared/balance';
+import { type BalanceKind, isBalanceKind, parseSample } from '../shared/balance';
+import { Records } from './records';
 import { TttGame } from './ttt';
 import { WweGame } from './wwe';
 import { FliegerGame } from './flieger';
@@ -182,6 +183,8 @@ export class Room {
   private bots: Bot[] = [];
   /** Ewige Tabelle (data/arcade.json) */
   private leaderboard = new Leaderboard();
+  /** Bestleistungen der Board-Spiele (Weite, Zeiten) über alle Abende */
+  private records = new Records();
   /** Leaderboard des Abends (nur im Speicher) */
   private session = new SessionBoard();
   /** Lobby: Leaderboard des Abends groß auf dem TV zeigen (VIP-Handy oder Laptop-Taste L) */
@@ -781,6 +784,11 @@ export class Room {
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
       teams: this.miniTeams,
       log: (type, data) => this.fx.push(type, data, kind),
+      record: (k: BalanceKind, id, value, detail) => {
+        if (!isBalanceKind(k) || (this.players.get(id)?.isBot && !process.env.RECORDS_INCLUDE_BOTS)) return null;
+        return this.records.submit(k, this.nameOf(id), value, detail);
+      },
+      records: (k: BalanceKind) => this.records.top(k, 5),
     };
     switch (kind) {
       case 'flunky':

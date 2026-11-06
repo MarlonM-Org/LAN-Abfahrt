@@ -1,21 +1,18 @@
 {
-  "updated": "2026-11-06T14:59+00:00",
+  "updated": "2026-11-06T15:01+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Wii Balance Board: Tempel-Kugel",
-      "kind": "kugel",
-      "type": "Balance Board",
-      "branch": "feat/balance-kugel",
-      "detail": "3D-Verfolgerkamera (Mode 7) hinter der Figur auf der Kugel, Moos-Tempelpfad über dem Abgrund, Minikarte, Absturz = zurück zur Fackel. Plus: Kart/Kugel zeigen von hinten Haare statt Gesicht. Wartet auf Test mit echtem Board."
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Board-Spiele: ewige Bestenliste pro Spieler (Highscore)",
+      "pr": 91,
+      "date": "2026-11-06"
+    },
     {
       "title": "Verräter-Redesign „Stromausfall“ (Licht pro Raum, Silhouetten im Dunkeln, Verräter-Shop „Licht aus“)",
       "pr": 90,
@@ -24,6 +21,11 @@
     {
       "title": "Igel-Krieg Stufe L (Lianen-Seil, Sonnenschirm, Schaufel, Themenkarten, Schuss des Abends, Igel-Sprüche)",
       "pr": 89,
+      "date": "2026-11-06"
+    },
+    {
+      "title": "Wii Balance Board: Tempel-Kugel in 3D (Verfolgerkamera, Minikarte) + Rückansicht der Figuren (Haare statt Gesicht, auch im Kart)",
+      "pr": 87,
       "date": "2026-11-06"
     },
     {
@@ -309,8 +311,8 @@
   ],
   "feedback": {
     "kart": {
-      "status": "in Arbeit",
-      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert · TV-Regie in der Draufsicht: Zweikämpfe, Zielfoto (#84) · Rückansicht: von hinten sieht man Haare statt Gesicht (Glatze: glatte Haut)"
+      "status": "umgesetzt",
+      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert · TV-Regie in der Draufsicht: Zweikämpfe, Zielfoto (#84) · Rückansicht: Haare statt Gesicht, Glatze glatt (#87)"
     },
     "enten": {
       "status": "positiv",
@@ -361,8 +363,12 @@
       "notes": "Finale-Zoom auf die letzten zwei, Zeitlupe beim letzten Platscher (#84)"
     },
     "kugel": {
+      "status": "umgesetzt",
+      "notes": "3D-Verfolgerkamera hinter der Figur wie im Kart, Hinterkopf mit Haaren, Minikarte, Lenken aus Kamerasicht (#87)"
+    },
+    "skisprung": {
       "status": "in Arbeit",
-      "notes": "3D-Verfolgerkamera hinter der Figur wie im Kart, Hinterkopf mit Haaren, Minikarte, Lenken aus Kamerasicht"
+      "notes": "„Highscore pro Spieler“: Rekorde-Tafel + Rekord-Ansage (weiteste Weite, über alle Abende)"
     }
   },
   "general": [
@@ -431,8 +437,8 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Wii Balance Board am Laptop (WebHID) für eigene Board-Spiele",
-      "status": "in Arbeit"
+      "title": "Wii Balance Board am Laptop (WebHID) für eigene Board-Spiele (#86, #87)",
+      "status": "umgesetzt"
     }
   ]
 }

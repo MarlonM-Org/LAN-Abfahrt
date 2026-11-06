@@ -39,6 +39,10 @@ export interface MiniCtx {
    * `n` = Menge (Standard 1), `o` = zweiter Beteiligter. Typen siehe `FxEvent` in shared/types.ts.
    */
   log?(type: string, data?: { p?: string; n?: number; o?: string }): void;
+  /** Board-Spiele: Leistung melden (Weite/Zeit) → neuer Rekord / persönliche Bestleistung / nichts; Bots zählen nicht */
+  record?(kind: import('../shared/balance').BalanceKind, id: string, value: number, detail?: string): import('../shared/balance').RecordResult | null;
+  /** Board-Spiele: Top-Liste der ewigen Bestenliste */
+  records?(kind: import('../shared/balance').BalanceKind): import('../shared/balance').BoardRecord[];
 }
 
 export interface MiniGame {

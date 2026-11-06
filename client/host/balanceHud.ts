@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import type { BalanceTurn } from '../../shared/balance';
+import type { BalanceTurn, BoardRecord } from '../../shared/balance';
 import { playerById } from './store';
-import { tagName, txt } from './ui';
+import { INK, RED_INK, ink, panel, tagName, txt } from './ui';
 
 /**
  * Board-Anzeige für die Balance-Board-Spiele: Draufsicht aufs Board mit dem Schwerpunkt als Punkt und der
@@ -15,6 +15,7 @@ export class BalanceHud {
   private card: Phaser.GameObjects.Container;
   private cardTitle: Phaser.GameObjects.Text;
   private cardSub: Phaser.GameObjects.Text;
+  private cardRec: Phaser.GameObjects.Text;
   private bar: Phaser.GameObjects.Graphics;
   private dot = { x: 0, y: 0 };
   /** Zielzone (Schwerpunkt), null = keine */
@@ -37,13 +38,14 @@ export class BalanceHud {
     const bg = scene.add.rectangle(0, 0, 360, 96, 0x141c30, 0.93).setStrokeStyle(2, 0xa0c8ff, 0.8);
     this.cardTitle = txt(scene, 0, -38, '', { size: 16, color: '#ffd25e' });
     this.cardSub = txt(scene, 0, -10, '', { size: 8, wrap: 330 });
+    this.cardRec = txt(scene, 0, 14, '', { size: 8, color: '#ffd25e', wrap: 340 });
     this.bar = scene.add.graphics();
-    this.card.add([bg, this.cardTitle, this.cardSub, this.bar]);
+    this.card.add([bg, this.cardTitle, this.cardSub, this.cardRec, this.bar]);
     this.card.setVisible(false);
   }
 
   /** Jeden Frame: Punkt weich nachziehen, Karte zeigen/verstecken */
-  update(st: BalanceTurn & { sub: string }) {
+  update(st: BalanceTurn & { sub: string }, recLine = '') {
     const b = st.bal;
     const tx = b ? b.x : 0;
     const ty = b ? b.y : 0;
@@ -80,6 +82,7 @@ export class BalanceHud {
           ? 'Ruhig stehen … Gewicht wird eingemessen'
           : `Stell dich aufs Balance Board!  (${Math.ceil(st.endsIn / 1000)} s)`;
       if (this.cardSub.text !== sub) this.cardSub.setText(sub);
+      if (this.cardRec.text !== recLine) this.cardRec.setText(recLine);
       this.bar.clear();
       this.bar.fillStyle(0x2a3550, 1).fillRect(-120, 34, 240, 8);
       this.bar.fillStyle(0x3fbf5a, 1).fillRect(-120, 34, 240 * st.calib, 8);
@@ -90,3 +93,37 @@ export class BalanceHud {
     this.c.setVisible(v);
   }
 }
+
+/**
+ * Ewige Bestenliste (Top 5, `state.records`) als Tafel am Bildschirmrand – gezeigt, solange gewartet wird oder
+ * ein Ergebnis steht (vor/nach einem Versuch). Baut nur neu, wenn sich die Liste ändert.
+ */
+export class RecordPanel {
+  private c: Phaser.GameObjects.Container;
+  private key = '';
+
+  constructor(
+    private scene: Phaser.Scene,
+    depth = 2940,
+  ) {
+    this.c = scene.add.container(0, 0).setDepth(depth).setScrollFactor(0);
+  }
+
+  update(rows: BoardRecord[], fmt: (v: number) => string, show: boolean, x = 6, y = 34, w = 128) {
+    const key = JSON.stringify([show, rows, x, y]);
+    if (key === this.key) return;
+    this.key = key;
+    this.c.removeAll(true);
+    if (!show || !rows.length) return;
+    const h = 22 + rows.length * 12;
+    this.c.add(panel(this.scene, x, y, w, h));
+    this.c.add(ink(this.scene, x + w / 2, y + 6, '🏆 Rekorde', { color: RED_INK }));
+    rows.forEach((r, i) => {
+      this.c.add(ink(this.scene, x + 6, y + 20 + i * 12, `${i + 1}.${tagName(r.name).slice(0, 5)}`, { origin: [0, 0], color: INK }));
+      this.c.add(ink(this.scene, x + w - 6, y + 20 + i * 12, fmt(r.value), { origin: [1, 0], color: INK }));
+    });
+  }
+}
+
+/** „Rekord: Lena 142.5 m“ für die Aufruf-Karte (leer, wenn es noch keinen gibt) */
+export const recordLine = (rows: BoardRecord[], fmt: (v: number) => string) => (rows[0] ? `🏆 Rekord: ${tagName(rows[0].name)} ${fmt(rows[0].value)}` : '');

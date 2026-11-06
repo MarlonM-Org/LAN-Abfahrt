@@ -48,6 +48,19 @@ export const BB = {
 /** Minispiele, die das Balance Board brauchen (nicht im Zufall, nicht auf dem Spielbrett, nicht im Turnier) */
 export const BALANCE_KINDS = ['skisprung', 'teppich', 'kugel'] as const;
 export type BalanceKind = (typeof BALANCE_KINDS)[number];
+/** Bestleistung pro Spieler und Spiel: Schanzen-Springen = weiteste Sprungweite (höher), Teppich/Kugel = Bestzeit (niedriger) */
+export const RECORD_DIR: Record<BalanceKind, 'high' | 'low'> = { skisprung: 'high', teppich: 'low', kugel: 'low' };
+
+/** Ein Eintrag der ewigen Bestenliste */
+export interface BoardRecord {
+  name: string;
+  value: number;
+  detail?: string;
+}
+
+/** Ergebnis einer Rekord-Prüfung: neuer Gesamtrekord oder nur persönliche Bestleistung (sonst `null`) */
+export type RecordResult = 'record' | 'pb';
+
 export const isBalanceKind = (k: string | undefined | null): k is BalanceKind => !!k && (BALANCE_KINDS as readonly string[]).includes(k);
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -95,6 +108,8 @@ export function seeded(seed: number) {
 
 /** Gemeinsamer Teil beider Board-Spiele: wer ist dran, wie weit ist das Einmessen? */
 export interface BalanceTurn {
+  /** Ewige Bestenliste dieses Spiels (Top 5, alle Abende) */
+  records: BoardRecord[];
   /** Reihenfolge der aktuellen Runde */
   order: string[];
   /** Wer gerade auf dem Board steht (bzw. stehen soll) */
