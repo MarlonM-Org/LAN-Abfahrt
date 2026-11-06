@@ -1,17 +1,18 @@
 {
-  "updated": "2026-11-06T19:20+00:00",
+  "updated": "2026-11-06T19:28+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Kurven-Duell: am Rand durchfahren (rechts raus → links rein) + häufiger Lücken in der Spur"
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Kurven-Duell: offene Ränder (rechts raus → links rein, oben/unten genauso) + Lücken alle 1–2 s statt 1,5–3 s; Power-up „Durch Wände“ entfällt",
+      "pr": 97,
+      "date": "2026-11-06"
+    },
     {
       "title": "Neues Spiel: Guess the Song (Liederraten à la SongPop) – Genre-Wahl vorab, reihum ein Genre pro Spieler, 4 → 6 → 8 Titel, Ton aus Soundtrack/eigenen MP3s/Deezer-Hörproben",
       "pr": 96,
@@ -399,8 +400,8 @@
       "notes": "Liederraten mit Genre-Wahl (1 gegen 1: je 4), 4 → 6 → 8 Antworten, umbenannt in „Guess the Song“ (#96). Musikquelle: eigene gekaufte MP3s in data/lieder/ oder Deezer-Hörproben (LIEDER_VORSCHAU=deezer, nicht-kommerziell) – Spotify/YouTube/Amazon/iTunes lizenzmäßig nicht nutzbar."
     },
     "kurve": {
-      "status": "in Arbeit",
-      "notes": "Am Rand durchfahren statt Crash, etwas häufiger Lücken – „ansonsten gut“"
+      "status": "umgesetzt",
+      "notes": "Am Rand durchfahren statt Crash, häufiger Lücken (#97) – „ansonsten gut“"
     }
   },
   "general": [
