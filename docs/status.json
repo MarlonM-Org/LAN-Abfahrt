@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-06T19:37+00:00",
+  "updated": "2026-11-06T19:38+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -20,6 +20,9 @@
     },
     {
       "title": "Auto-Fußball: Joystick lenkt absolut (Stick links = Auto fährt nach links, mit Kurve), Hüpfer entfernt, größere Knöpfe rechts (iPhone 12 Pro)"
+    },
+    {
+      "title": "Strand-Volleyball: Daumen von LINKS nach RECHTS ziehen wechselt die Richtung; größerer Ball / kompakteres Feld"
     }
   ],
   "queue": [
@@ -428,6 +431,10 @@
     "wasser": {
       "status": "in Arbeit",
       "notes": "Zielmarkierung wandert zu schnell weg, kurz ziehen soll nah treffen; einziger Gegner komplett nass → Warten bis Zeitende („kacke“)"
+    },
+    "volley": {
+      "status": "in Arbeit",
+      "notes": "Rüberziehen von links nach rechts bleibt links hängen → Richtung folgt dem Daumen; zu schwer: Ball zu klein, Feld zu groß"
     }
   },
   "general": [
