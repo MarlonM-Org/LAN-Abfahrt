@@ -1,11 +1,15 @@
 {
-  "updated": "2026-11-07T13:55+00:00",
+  "updated": "2026-11-07T14:20+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Arcade-Ansicht sortieren (Handy + Laptop): „Getestet zuerst“ (Standard: Spiele mit Feedback oben, Rest darunter), A–Z, Kategorien wie bisher"
+    }
+  ],
   "queue": [],
   "done": [
     {
@@ -468,10 +472,6 @@
     "golf": {
       "status": "umgesetzt",
       "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
-    },
-    "wolfrunde": {
-      "status": "umgesetzt",
-      "notes": "Wunsch: echter Erzähler statt automatischer Phasen, nur Karten auslosen, wenig Text; Erzähler sieht alle Karten und markiert Tote (auch wiederbeleben), Laptop/TV zeigt keine Rollen (#109)"
     }
   },
   "general": [

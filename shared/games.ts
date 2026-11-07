@@ -897,6 +897,39 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'] },
 ];
 
+/**
+ * Sortierung der Arcade-Übersicht (Handy-Lobby + Laptop-Auswahl, jedes Gerät merkt sich seine Wahl):
+ * `getestet` (Standard) = Spiele mit Feedback von Marlon oben, der Rest darunter (je A–Z); `az` = alle alphabetisch;
+ * `kategorie` = klassisch nach `ARCADE_GROUPS`. Welche Spiele getestet sind, schickt der Server (`GameMeta.reviewed`).
+ */
+export type ArcadeSort = 'getestet' | 'az' | 'kategorie';
+export const ARCADE_SORTS: { id: ArcadeSort; label: string }[] = [
+  { id: 'getestet', label: 'Getestet zuerst' },
+  { id: 'az', label: 'A–Z' },
+  { id: 'kategorie', label: 'Kategorien' },
+];
+/** localStorage-Schlüssel für die gemerkte Sortierung (pro Gerät) */
+export const ARCADE_SORT_KEY = 'lanabfahrt.arcadeSort';
+export const arcadeSortOf = (v: unknown): ArcadeSort => (v === 'az' || v === 'kategorie' ? v : 'getestet');
+
+/** Jedes Arcade-Spiel genau einmal (in Kategorie-Reihenfolge) */
+export const ARCADE_KINDS: MiniKind[] = [...new Set(ARCADE_GROUPS.flatMap((g) => g.kinds))];
+
+const byTitle = (a: MiniKind, b: MiniKind) => MINI_INFO[a].title.localeCompare(MINI_INFO[b].title, 'de');
+
+/** Abschnitte der Arcade-Übersicht für eine Sortierung (leere Abschnitte fallen weg) */
+export function arcadeSections(sort: ArcadeSort, reviewed: readonly MiniKind[] = []): { title: string; kinds: MiniKind[] }[] {
+  if (sort === 'kategorie') return ARCADE_GROUPS;
+  const all = [...ARCADE_KINDS].sort(byTitle);
+  if (sort === 'az') return [{ title: 'A–Z', kinds: all }];
+  const tested = all.filter((k) => reviewed.includes(k));
+  const fresh = all.filter((k) => !reviewed.includes(k));
+  return [
+    { title: `✅ Schon getestet (${tested.length})`, kinds: tested },
+    { title: `🆕 Noch nicht getestet (${fresh.length})`, kinds: fresh },
+  ].filter((s) => s.kinds.length);
+}
+
 /** Turnier: vorgefertigte Playlists (laufen nacheinander, Gesamtwertung mit `arcadePoints`) */
 export interface TurnierPlaylist {
   id: string;

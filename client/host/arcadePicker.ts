@@ -6,7 +6,7 @@
  */
 import type { Socket } from 'socket.io-client';
 import type { GameState, MiniKind } from '../../shared/types';
-import { ARCADE_GROUPS, MINI_INFO, TURNIER_PLAYLISTS, fitsPlayers, miniInspired } from '../../shared/games';
+import { ARCADE_SORTS, ARCADE_SORT_KEY, type ArcadeSort, MINI_INFO, TURNIER_PLAYLISTS, arcadeSections, arcadeSortOf, fitsPlayers, miniInspired } from '../../shared/games';
 import { bus, getState } from './store';
 import { isMusicMenuOpen } from './musicMenu';
 
@@ -29,6 +29,9 @@ const CSS = `
 #ap-panel .tile .vt { position: absolute; top: 0.4vh; right: 0.4vh; padding: 0.2vh 0.5vh; font-size: 1vh; color: #fff4d6; background: #a8342a; }
 #ap-panel .tile:hover:not(:disabled), #ap-panel .tile:focus { background: #f7c948; outline: 0.3vh solid #a8342a; outline-offset: -0.3vh; }
 #ap-panel button:disabled { opacity: 0.35; cursor: default; filter: grayscale(0.7); }
+#ap-panel .sort { display: flex; gap: 0.8vh; align-items: center; margin: 1.6vh 0 0; font-size: 1.05vh; color: #7a5a3a; }
+#ap-panel .sort button { padding: 0.7vh 1.1vh; font-size: 1.05vh; }
+#ap-panel .sort button.on { background: #a8342a; color: #fff4d6; border-color: #5e3518; }
 #ap-panel .tour { display: flex; flex-wrap: wrap; gap: 1vh; }
 #ap-panel .tour button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4vh; padding: 1vh 1.2vh; font-size: 1.05vh; text-align: left; }
 #ap-panel .tour .tn { color: #a8342a; }
@@ -83,28 +86,75 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
   }
   groups.append(tourHead, tour);
 
-  const tiles = new Map<MiniKind, { btn: HTMLButtonElement; vt: HTMLElement }>();
-  for (const g of ARCADE_GROUPS) {
-    const h = document.createElement('h4');
-    h.textContent = g.title;
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-    for (const kind of g.kinds) {
-      const mi = MINI_INFO[kind];
-      const b = document.createElement('button');
-      b.className = 'tile';
-      b.dataset.kind = kind;
-      const range = mi.maxPlayers ? `${mi.minPlayers}–${mi.maxPlayers} Spieler` : `ab ${mi.minPlayers} Spieler`;
-      b.innerHTML = `<span class="ic"></span><span class="t"></span><span class="insp"></span><span class="pl">${range}</span><span class="vt" hidden></span>${mi.orientation === 'landscape' ? '<span class="or" title="Handy quer halten">↔</span>' : ''}`;
-      (b.querySelector('.ic') as HTMLElement).textContent = mi.icon;
-      (b.querySelector('.t') as HTMLElement).textContent = mi.title;
-      (b.querySelector('.insp') as HTMLElement).textContent = miniInspired(kind);
-      b.addEventListener('click', () => start(kind));
-      grid.append(b);
-      tiles.set(kind, { btn: b, vt: b.querySelector('.vt') as HTMLElement });
+  // Sortierung: Getestet zuerst (Standard) · A–Z · Kategorien – am Laptop gemerkt
+  const loadSort = () => {
+    try {
+      return arcadeSortOf(localStorage.getItem(ARCADE_SORT_KEY));
+    } catch {
+      return arcadeSortOf(null);
     }
-    groups.append(h, grid);
+  };
+  let sort: ArcadeSort = loadSort();
+  const sortRow = document.createElement('div');
+  sortRow.className = 'sort';
+  sortRow.append('Sortieren:');
+  const sortBtns = ARCADE_SORTS.map((o) => {
+    const b = document.createElement('button');
+    b.textContent = o.label;
+    b.addEventListener('click', () => {
+      sort = o.id;
+      try {
+        localStorage.setItem(ARCADE_SORT_KEY, sort);
+      } catch {
+        /* egal */
+      }
+      build();
+      render();
+    });
+    sortRow.append(b);
+    return { id: o.id, b };
+  });
+  const sections = document.createElement('div');
+  groups.append(sortRow, sections);
+
+  const tiles = new Map<MiniKind, { btn: HTMLButtonElement; vt: HTMLElement }>();
+  let builtKey = '';
+  /** Kacheln neu aufbauen – nur wenn sich Sortierung oder die Liste der getesteten Spiele ändert */
+  function build(s: GameState | null = getState()) {
+    const reviewed = s?.reviewed ?? [];
+    const key = `${sort}:${sort === 'getestet' ? reviewed.join(',') : ''}`;
+    if (key === builtKey) return;
+    builtKey = key;
+    for (const t of sortBtns) t.b.classList.toggle('on', t.id === sort);
+    tiles.clear();
+    sections.innerHTML = '';
+    const list = arcadeSections(sort, reviewed);
+    for (const g of list) {
+      if (list.length > 1) {
+        const h = document.createElement('h4');
+        h.textContent = g.title;
+        sections.append(h);
+      }
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      for (const kind of g.kinds) {
+        const mi = MINI_INFO[kind];
+        const b = document.createElement('button');
+        b.className = 'tile';
+        b.dataset.kind = kind;
+        const range = mi.maxPlayers ? `${mi.minPlayers}–${mi.maxPlayers} Spieler` : `ab ${mi.minPlayers} Spieler`;
+        b.innerHTML = `<span class="ic"></span><span class="t"></span><span class="insp"></span><span class="pl">${range}</span><span class="vt" hidden></span>${mi.orientation === 'landscape' ? '<span class="or" title="Handy quer halten">↔</span>' : ''}`;
+        (b.querySelector('.ic') as HTMLElement).textContent = mi.icon;
+        (b.querySelector('.t') as HTMLElement).textContent = mi.title;
+        (b.querySelector('.insp') as HTMLElement).textContent = miniInspired(kind);
+        b.addEventListener('click', () => start(kind));
+        grid.append(b);
+        tiles.set(kind, { btn: b, vt: b.querySelector('.vt') as HTMLElement });
+      }
+      sections.append(grid);
+    }
   }
+  build();
 
   const start = (what: string) =>
     socket.timeout(3000).emit('host:start', what, (err: unknown, r?: { ok: boolean; msg?: string }) => {
@@ -119,6 +169,7 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
 
   function render(s: GameState | null = getState()) {
     if (panel.hidden) return;
+    build(s);
     const n = s?.players.filter((p) => p.connected && !p.removed).length ?? 0;
     const lobby = (s?.phase ?? 'lobby') === 'lobby';
     const counts = new Map<MiniKind, number>();

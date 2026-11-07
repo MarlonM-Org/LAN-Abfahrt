@@ -2331,6 +2331,8 @@ export interface GameMeta {
   timeOfDay: number;
   /** Abend-Statistik: „Titel des Abends“ aus dem Ereignisprotokoll (server/fx.ts) – ändert sich nur nach einem Spiel */
   evening?: EveningStats;
+  /** Spiele mit Feedback von Marlon (`docs/status.json`) – Arcade-Sortierung „Getestet zuerst“ (`arcadeSections()`) */
+  reviewed: MiniKind[];
 }
 
 /** Antwort auf `host:hello`: darf diese TV-Seite den Laptop steuern, und läuft sie über den Online-Tunnel? */

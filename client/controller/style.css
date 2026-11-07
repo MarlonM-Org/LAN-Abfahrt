@@ -1511,6 +1511,9 @@ button.wr-win-liebe { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, in
 .vote-toggle { font-size: 9px; }
 .vote-toggle.on { background: var(--green); box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
 .vote-actions button { font-size: 8px; padding: 10px 4px; line-height: 1.6; }
+/* Arcade-Sortierung: Getestet zuerst · A–Z · Kategorien */
+.arcade-sort .mode-tab { font-size: 8px; padding: 10px 2px; line-height: 1.5; }
+.arcade-area { display: flex; flex-direction: column; gap: 10px; }
 .arcade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .arcade-tile { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 6px; font-size: 8px; line-height: 1.5; min-height: 78px; position: relative; }
 .arcade-tile .ic { font-size: 22px; line-height: 1.1; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; }
