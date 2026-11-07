@@ -80,6 +80,7 @@ import { StillepostGame } from './stillepost';
 import { isLaptop, viaProxy } from './net';
 import { TouristGame } from './tourist';
 import { WerwolfGame } from './werwolf';
+import { WolfrundeGame } from './wolfrunde';
 import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
@@ -1053,6 +1054,8 @@ export class Room {
         return new AutoballGame(ids, ctx);
       case 'werwolf':
         return new WerwolfGame(ids, ctx);
+      case 'wolfrunde':
+        return new WolfrundeGame(ids, ctx);
       case 'pixel':
         return new PixelGame(ids, ctx);
       case 'wpistole':

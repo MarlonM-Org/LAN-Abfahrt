@@ -5,6 +5,7 @@ import type { GrillState } from './grill';
 import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
+import type { WrPrivate, WrState } from './wolfrunde';
 import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
@@ -78,6 +79,7 @@ export type MiniKind =
   | 'golf'
   | 'autoball'
   | 'werwolf'
+  | 'wolfrunde'
   | 'spion'
   | 'pixel'
   | 'wpistole'
@@ -2281,6 +2283,7 @@ export type MiniSnapshot =
   | { kind: 'golf'; state: GolfState }
   | { kind: 'autoball'; state: AfbState }
   | { kind: 'werwolf'; state: WolfState }
+  | { kind: 'wolfrunde'; state: WrState }
   | { kind: 'pixel'; state: PixelState }
   | { kind: 'wpistole'; state: WpistoleState }
   | { kind: 'zauber'; state: ZauberState }
@@ -2471,6 +2474,7 @@ export type PrivateState =
   | { kind: 'tourist'; state: TourPrivate }
   | { kind: 'sprueche'; state: SpruechePrivate }
   | { kind: 'werwolf'; state: WolfPrivate }
+  | { kind: 'wolfrunde'; state: WrPrivate }
   | { kind: 'pixel'; state: PixelPrivate }
   | { kind: 'spion'; state: SpionPrivate }
   | { kind: 'funk'; state: FunkPrivate }
