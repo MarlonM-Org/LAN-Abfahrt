@@ -917,17 +917,26 @@ export const ARCADE_KINDS: MiniKind[] = [...new Set(ARCADE_GROUPS.flatMap((g) =>
 
 const byTitle = (a: MiniKind, b: MiniKind) => MINI_INFO[a].title.localeCompare(MINI_INFO[b].title, 'de');
 
-/** Abschnitte der Arcade-Übersicht für eine Sortierung (leere Abschnitte fallen weg) */
-export function arcadeSections(sort: ArcadeSort, reviewed: readonly MiniKind[] = []): { title: string; kinds: MiniKind[] }[] {
-  if (sort === 'kategorie') return ARCADE_GROUPS;
-  const all = [...ARCADE_KINDS].sort(byTitle);
-  if (sort === 'az') return [{ title: 'A–Z', kinds: all }];
-  const tested = all.filter((k) => reviewed.includes(k));
-  const fresh = all.filter((k) => !reviewed.includes(k));
-  return [
-    { title: `✅ Schon getestet (${tested.length})`, kinds: tested },
-    { title: `🆕 Noch nicht getestet (${fresh.length})`, kinds: fresh },
-  ].filter((s) => s.kinds.length);
+/**
+ * Abschnitte der Arcade-Übersicht für eine Sortierung (leere Abschnitte fallen weg). Favoriten (☆ am Gerät gemerkt,
+ * `client/favorites.ts`) stehen in jeder Sortierung ganz oben – und tauchen darunter nicht noch einmal auf.
+ */
+export function arcadeSections(sort: ArcadeSort, reviewed: readonly MiniKind[] = [], favorites: readonly MiniKind[] = []): { title: string; kinds: MiniKind[] }[] {
+  const favs = [...ARCADE_KINDS].filter((k) => favorites.includes(k)).sort(byTitle);
+  const rest = (kinds: readonly MiniKind[]) => kinds.filter((k) => !favs.includes(k));
+  const all = rest(ARCADE_KINDS).sort(byTitle);
+  let sections: { title: string; kinds: MiniKind[] }[];
+  if (sort === 'kategorie') sections = ARCADE_GROUPS.map((g) => ({ title: g.title, kinds: rest(g.kinds) }));
+  else if (sort === 'az') sections = [{ title: 'A–Z', kinds: all }];
+  else {
+    const tested = all.filter((k) => reviewed.includes(k));
+    const fresh = all.filter((k) => !reviewed.includes(k));
+    sections = [
+      { title: `✅ Schon getestet (${tested.length})`, kinds: tested },
+      { title: `🆕 Noch nicht getestet (${fresh.length})`, kinds: fresh },
+    ];
+  }
+  return [{ title: `⭐ Favoriten (${favs.length})`, kinds: favs }, ...sections].filter((s) => s.kinds.length);
 }
 
 /** Turnier: vorgefertigte Playlists (laufen nacheinander, Gesamtwertung mit `arcadePoints`) */

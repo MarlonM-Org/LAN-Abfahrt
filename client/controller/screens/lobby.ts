@@ -4,6 +4,7 @@ import { ARCADE_GROUPS, ARCADE_SORTS, ARCADE_SORT_KEY, type ArcadeSort, DATE_KIN
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, myColor, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
+import { loadFavorites, toggleFavorite } from '../../favorites';
 import { sessionPanel } from './leaderboard';
 
 /** VIP-Schalter im Party-Modus: auch lange Minispiele (> 4 min) aufs Brett – bleibt bis zum Neuladen */
@@ -388,7 +389,7 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
   let top: HTMLButtonElement | null = null;
   let fav: HTMLButtonElement | null = null;
   if (vip && voteOpen) {
-    const row = el(`<div class="bot-row vote-actions"><button class="small">Meiste Stimmen starten</button><button class="small secondary">Zufall aus Favoriten</button></div>`);
+    const row = el(`<div class="bot-row vote-actions"><button class="small">Meiste Stimmen starten</button><button class="small secondary">Zufall aus Stimmen</button></div>`);
     [top, fav] = [...row.querySelectorAll('button')] as HTMLButtonElement[];
     top.addEventListener('click', () => socket.emit('vip:start', { mode: 'top' }));
     fav.addEventListener('click', () => socket.emit('vip:start', { mode: 'favorites' }));
@@ -398,6 +399,8 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
 
   // Sortierung: Getestet zuerst (Standard) · A–Z · Kategorien – pro Handy gemerkt
   let sort: ArcadeSort = arcadeSortOf(readSort());
+  /** Favoriten dieses Handys (nur der VIP kann sie setzen, gelten in jeder Sortierung ganz oben) */
+  let favs = vip ? loadFavorites() : [];
   let builtKey = '';
   let lastN = store.state?.players.filter((p) => p.connected && !p.removed).length ?? 0;
   const tabs = el(`<div class="mode-tabs three arcade-sort"></div>`);
@@ -418,7 +421,7 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
   /** Kacheln (neu) aufbauen – nur wenn sich Sortierung oder die Liste der getesteten Spiele ändert */
   const build = () => {
     const reviewed = store.state?.reviewed ?? [];
-    const key = `${sort}:${sort === 'getestet' ? reviewed.join(',') : ''}`;
+    const key = `${sort}:${sort === 'getestet' ? reviewed.join(',') : ''}:${favs.join(',')}`;
     if (key === builtKey) return;
     builtKey = key;
     for (const t of tabBtns) {
@@ -432,7 +435,7 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
     }
     tiles.length = 0;
     areaEl.innerHTML = '';
-    const sections = arcadeSections(sort, reviewed);
+    const sections = arcadeSections(sort, reviewed, favs);
     for (const g of sections) {
       if (sections.length > 1) areaEl.append(el(`<h2>${escapeHtml(g.title)}</h2>`));
       const grid = el(`<div class="arcade-grid"></div>`);
@@ -445,7 +448,20 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
         b.addEventListener('click', () => (vip ? socket.emit('vip:start', { mode: kind }) : socket.emit('arcade:vote', kind)));
         // Gleich richtig ausgrauen (der Lobby-Updater übernimmt ab dem nächsten Durchlauf, inkl. „max. x Spieler“)
         b.disabled = !fitsPlayers(kind, lastN);
-        q(grid, '.arcade-grid').append(b);
+        if (vip) {
+          // VIP: ☆ oben links = Favorit an/aus (eigener Knopf neben der Kachel – geht auch, wenn sie ausgegraut ist)
+          const wrap = document.createElement('div');
+          wrap.className = 'tile-wrap';
+          const fav = favs.includes(kind);
+          const star = el(`<button class="fav-star${fav ? ' on' : ''}" aria-label="${fav ? 'Favorit entfernen' : 'Als Favorit merken'}">${fav ? '★' : '☆'}</button>`).firstElementChild as HTMLButtonElement;
+          star.addEventListener('click', () => {
+            favs = toggleFavorite(kind, favs);
+            toast(favs.includes(kind) ? `⭐ ${info.title} gemerkt` : `${info.title} ist kein Favorit mehr`);
+            build();
+          });
+          wrap.append(b, star);
+          q(grid, '.arcade-grid').append(wrap);
+        } else q(grid, '.arcade-grid').append(b);
         gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
         tiles.push({ kind, btn: b, votes: q(b, '.votes'), key: '' });
       }
