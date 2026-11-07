@@ -1,6 +1,6 @@
 import type { Look, MiniKind } from '../../../shared/types';
 import { BEARDS, HAIRS, HAIR_STYLES, SHIRTS, SKINS, randomLook } from '../../../shared/avatar';
-import { ARCADE_GROUPS, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, TURNIER_CUSTOM, TURNIER_KINDS, TURNIER_PLAYLISTS, fitsPlayers, miniInspired } from '../../../shared/games';
+import { ARCADE_GROUPS, ARCADE_SORTS, ARCADE_SORT_KEY, type ArcadeSort, DATE_KINDS, DRINK_KINDS, MINI_INFO, PARTY_KINDS, PARTY_ROUND_OPTIONS, TURNIER_CUSTOM, TURNIER_KINDS, TURNIER_PLAYLISTS, arcadeSections, arcadeSortOf, fitsPlayers, miniInspired } from '../../../shared/games';
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, myColor, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
@@ -364,6 +364,22 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   };
 }
 
+/** Gemerkte Arcade-Sortierung dieses Handys (privater Modus/gesperrter Speicher → Standard) */
+function readSort(): string | null {
+  try {
+    return localStorage.getItem(ARCADE_SORT_KEY);
+  } catch {
+    return null;
+  }
+}
+function writeSort(v: ArcadeSort) {
+  try {
+    localStorage.setItem(ARCADE_SORT_KEY, v);
+  } catch {
+    /* egal – gilt dann nur bis zum Neuladen */
+  }
+}
+
 /**
  * Arcade-Übersicht als Kacheln (Icon, Titel, „à la …“, Stimmen).
  * VIP: Tippen startet das Spiel. Andere (nur bei „Alle dürfen wählen“): Tippen = Stimme (nochmal = zurückziehen).
@@ -379,24 +395,67 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
     menu.append(row);
   }
   const tiles: { kind: MiniKind; btn: HTMLButtonElement; votes: HTMLElement; key: string }[] = [];
-  for (const g of ARCADE_GROUPS) {
-    menu.append(el(`<h2>${escapeHtml(g.title)}</h2>`));
-    const grid = el(`<div class="arcade-grid"></div>`);
-    for (const kind of g.kinds) {
-      const info = MINI_INFO[kind];
-      const insp = miniInspired(kind);
-      const b = el(
-        `<button class="secondary arcade-tile"><span class="ic">${info.icon}</span><span class="t">${escapeHtml(info.title)}${info.orientation === 'landscape' ? ' <b class="or-mark" title="Handy quer halten">↔</b>' : ''}</span>${insp ? `<small class="insp">${escapeHtml(insp)}</small>` : ''}<span class="votes"></span></button>`,
-      ).firstElementChild as HTMLButtonElement;
-      b.addEventListener('click', () => (vip ? socket.emit('vip:start', { mode: kind }) : socket.emit('arcade:vote', kind)));
-      q(grid, '.arcade-grid').append(b);
-      gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
-      tiles.push({ kind, btn: b, votes: q(b, '.votes'), key: '' });
-    }
-    menu.append(grid);
-  }
 
-  return (n: number) => {
+  // Sortierung: Getestet zuerst (Standard) · A–Z · Kategorien – pro Handy gemerkt
+  let sort: ArcadeSort = arcadeSortOf(readSort());
+  let builtKey = '';
+  let lastN = store.state?.players.filter((p) => p.connected && !p.removed).length ?? 0;
+  const tabs = el(`<div class="mode-tabs three arcade-sort"></div>`);
+  const tabBtns = ARCADE_SORTS.map((o) => {
+    const b = el(`<button class="mode-tab small">${escapeHtml(o.label)}</button>`).firstElementChild as HTMLButtonElement;
+    b.addEventListener('click', () => {
+      sort = o.id;
+      writeSort(sort);
+      build();
+    });
+    q(tabs, '.arcade-sort').append(b);
+    return { id: o.id, b };
+  });
+  const area = el(`<div class="arcade-area"></div>`);
+  menu.append(tabs, area);
+  const areaEl = q(area, '.arcade-area');
+
+  /** Kacheln (neu) aufbauen – nur wenn sich Sortierung oder die Liste der getesteten Spiele ändert */
+  const build = () => {
+    const reviewed = store.state?.reviewed ?? [];
+    const key = `${sort}:${sort === 'getestet' ? reviewed.join(',') : ''}`;
+    if (key === builtKey) return;
+    builtKey = key;
+    for (const t of tabBtns) {
+      t.b.classList.toggle('active', t.id === sort);
+      t.b.classList.toggle('secondary', t.id !== sort);
+    }
+    // Alte Kacheln aus der Spielerzahl-Sperre (gated) nehmen, bevor die neuen dazukommen
+    for (const t of tiles) {
+      const i = gated.findIndex((g) => g.btn === t.btn);
+      if (i >= 0) gated.splice(i, 1);
+    }
+    tiles.length = 0;
+    areaEl.innerHTML = '';
+    const sections = arcadeSections(sort, reviewed);
+    for (const g of sections) {
+      if (sections.length > 1) areaEl.append(el(`<h2>${escapeHtml(g.title)}</h2>`));
+      const grid = el(`<div class="arcade-grid"></div>`);
+      for (const kind of g.kinds) {
+        const info = MINI_INFO[kind];
+        const insp = miniInspired(kind);
+        const b = el(
+          `<button class="secondary arcade-tile"><span class="ic">${info.icon}</span><span class="t">${escapeHtml(info.title)}${info.orientation === 'landscape' ? ' <b class="or-mark" title="Handy quer halten">↔</b>' : ''}</span>${insp ? `<small class="insp">${escapeHtml(insp)}</small>` : ''}<span class="votes"></span></button>`,
+        ).firstElementChild as HTMLButtonElement;
+        b.addEventListener('click', () => (vip ? socket.emit('vip:start', { mode: kind }) : socket.emit('arcade:vote', kind)));
+        // Gleich richtig ausgrauen (der Lobby-Updater übernimmt ab dem nächsten Durchlauf, inkl. „max. x Spieler“)
+        b.disabled = !fitsPlayers(kind, lastN);
+        q(grid, '.arcade-grid').append(b);
+        gated.push({ btn: b, min: info.minPlayers, max: info.maxPlayers, hint: info.maxPlayers ? `max. ${info.maxPlayers} Spieler` : undefined });
+        tiles.push({ kind, btn: b, votes: q(b, '.votes'), key: '' });
+      }
+      areaEl.append(grid);
+    }
+    refreshVotes();
+  };
+
+  /** Stimmen (Zahl + Avatare) an den Kacheln */
+  const refreshVotes = () => {
     const st = store.state;
     const votes = st?.arcadeVote?.votes ?? {};
     const byKind = new Map<MiniKind, string[]>();
@@ -416,6 +475,14 @@ function arcadeTiles(menu: HTMLElement, vip: boolean, voteOpen: boolean, gated: 
         if (p) t.votes.append(avatarCanvas(1, p.look));
       }
     }
+    return byKind;
+  };
+  build();
+
+  return (n: number) => {
+    lastN = n;
+    build();
+    const byKind = refreshVotes();
     if (top && fav) {
       const fitting = [...byKind].filter(([k]) => fitsPlayers(k, n));
       const best = Math.max(0, ...fitting.map(([, ids]) => ids.length));

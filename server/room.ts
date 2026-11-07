@@ -81,6 +81,7 @@ import { isLaptop, viaProxy } from './net';
 import { TouristGame } from './tourist';
 import { WerwolfGame } from './werwolf';
 import { WolfrundeGame } from './wolfrunde';
+import { reviewedKinds } from './reviewed';
 import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
@@ -1831,6 +1832,7 @@ export class Room {
       // Party: Tageszeit vom Brett (Runde 1 morgens … Finale nachts), sonst echte Uhrzeit
       timeOfDay: this.board?.state.timeOfDay ?? clockTimeOfDay(new Date(now)),
       evening: this.fx.stats([...this.players.keys()]),
+      reviewed: reviewedKinds(now),
     };
   }
 

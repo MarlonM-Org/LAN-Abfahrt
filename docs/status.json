@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-07T13:55+00:00",
+  "updated": "2026-11-07T14:35+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -8,6 +8,11 @@
   "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Arcade-Ansicht sortierbar (Handy + Laptop): „Getestet zuerst“ (Standard: Spiele mit Feedback oben, Rest darunter), A–Z oder Kategorien wie bisher – jedes Gerät merkt sich die Wahl",
+      "pr": 110,
+      "date": "2026-11-07"
+    },
     {
       "title": "Neues Spiel: Werwolf mit Erzähler (à la Düsterwald) – VIP wählt den Erzähler per Dropdown, Erzähler stellt den Stapel zusammen (Werwölfe, Seher, Hexe, Jäger, Amor, Mädchen, Dieb, Dorfbewohner) und teilt aus; jeder sieht nur seine Karte, nur der Erzähler alle + 💀/↺ pro Spieler; TV zeigt keine Karten (erst am Ende)",
       "pr": 109,
@@ -468,10 +473,6 @@
     "golf": {
       "status": "umgesetzt",
       "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
-    },
-    "wolfrunde": {
-      "status": "umgesetzt",
-      "notes": "Wunsch: echter Erzähler statt automatischer Phasen, nur Karten auslosen, wenig Text; Erzähler sieht alle Karten und markiert Tote (auch wiederbeleben), Laptop/TV zeigt keine Rollen (#109)"
     }
   },
   "general": [
@@ -549,6 +550,10 @@
     },
     {
       "title": "Übungsfeld auf der Regelkarte passt nicht zur echten Steuerung, zu gequetscht → echte Aufwärmphase mit richtiger Steuerung (#105)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Arcade-Ansicht filtern/sortieren: getestete Spiele oben, A–Z, Kategorien (#110)",
       "status": "umgesetzt"
     }
   ]
