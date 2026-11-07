@@ -1512,6 +1512,16 @@ button.wr-win-liebe { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, in
 .vote-toggle.on { background: var(--green); box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
 .vote-actions button { font-size: 8px; padding: 10px 4px; line-height: 1.6; }
 /* Arcade-Sortierung: Getestet zuerst · A–Z · Kategorien */
+/* Favoriten-Stern (nur VIP): eigener Knopf oben links über der Kachel */
+.tile-wrap { position: relative; display: flex; }
+.tile-wrap > .arcade-tile { flex: 1; min-width: 0; }
+button.fav-star {
+  position: absolute; top: 0; left: 0; z-index: 1; width: 34px; height: 34px; padding: 0;
+  font-size: 18px; line-height: 1; font-family: system-ui, sans-serif; color: var(--wood-dark); text-shadow: none;
+  background: transparent; border: none; box-shadow: none;
+}
+button.fav-star.on { color: #e0a20f; text-shadow: 1px 1px 0 var(--wood-darker); }
+button.fav-star:active { transform: scale(1.2); box-shadow: none; }
 .arcade-sort .mode-tab { font-size: 8px; padding: 10px 2px; line-height: 1.5; }
 .arcade-area { display: flex; flex-direction: column; gap: 10px; }
 .arcade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

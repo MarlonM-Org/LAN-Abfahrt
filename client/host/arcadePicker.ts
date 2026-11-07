@@ -9,6 +9,7 @@ import type { GameState, MiniKind } from '../../shared/types';
 import { ARCADE_SORTS, ARCADE_SORT_KEY, type ArcadeSort, MINI_INFO, TURNIER_PLAYLISTS, arcadeSections, arcadeSortOf, fitsPlayers, miniInspired } from '../../shared/games';
 import { bus, getState } from './store';
 import { isMusicMenuOpen } from './musicMenu';
+import { loadFavorites, toggleFavorite } from '../favorites';
 
 const CSS = `
 #ap-panel { position: fixed; inset: 4vh 4vw; z-index: 30; overflow: auto; padding: 2vh 2.4vh; font: 1.3vh 'Press Start 2P', monospace; line-height: 1.5; color: #3d2414; background: #f7e4b5; border: 0.5vh solid #8d5629; box-shadow: 0 0 0 0.3vh #2d1b12, 0 1vh 0 rgba(0,0,0,0.3); }
@@ -32,6 +33,11 @@ const CSS = `
 #ap-panel .sort { display: flex; gap: 0.8vh; align-items: center; margin: 1.6vh 0 0; font-size: 1.05vh; color: #7a5a3a; }
 #ap-panel .sort button { padding: 0.7vh 1.1vh; font-size: 1.05vh; }
 #ap-panel .sort button.on { background: #a8342a; color: #fff4d6; border-color: #5e3518; }
+#ap-panel .tw { position: relative; display: flex; }
+#ap-panel .tw > .tile { flex: 1; min-width: 0; }
+#ap-panel .fav { position: absolute; bottom: 0.3vh; right: 0.3vh; padding: 0 0.4vh; font-size: 2vh; line-height: 1.3; color: #8d5629; background: transparent; border: none; font-family: system-ui, sans-serif; }
+#ap-panel .fav.on { color: #e0a20f; text-shadow: 0.12vh 0.12vh 0 #5e3518; }
+#ap-panel .fav:hover { transform: scale(1.2); }
 #ap-panel .tour { display: flex; flex-wrap: wrap; gap: 1vh; }
 #ap-panel .tour button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.4vh; padding: 1vh 1.2vh; font-size: 1.05vh; text-align: left; }
 #ap-panel .tour .tn { color: #a8342a; }
@@ -57,7 +63,7 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
       <h3>Arcade – Spiel wählen</h3>
       <button class="act" data-act="random">Zufall</button>
       <button class="act" data-act="top">Meiste Stimmen</button>
-      <span class="hint">Pfeile + Enter = starten · A/Esc = schließen</span>
+      <span class="hint">Pfeile + Enter = starten · F = Favorit ☆ · A/Esc = schließen</span>
     </div>
     <div class="info hint"></div>
     <div class="msg"></div>
@@ -118,17 +124,21 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
   groups.append(sortRow, sections);
 
   const tiles = new Map<MiniKind, { btn: HTMLButtonElement; vt: HTMLElement }>();
+  /** Favoriten des Laptops (☆ an der Kachel oder Taste F) – nur im Browser gemerkt, stehen in jeder Sortierung oben */
+  let favs = loadFavorites();
   let builtKey = '';
   /** Kacheln neu aufbauen – nur wenn sich Sortierung oder die Liste der getesteten Spiele ändert */
   function build(s: GameState | null = getState()) {
     const reviewed = s?.reviewed ?? [];
-    const key = `${sort}:${sort === 'getestet' ? reviewed.join(',') : ''}`;
+    const key = `${sort}:${sort === 'getestet' ? reviewed.join(',') : ''}:${favs.join(',')}`;
     if (key === builtKey) return;
     builtKey = key;
+    // Fokus (Pfeiltasten-Auswahl) überlebt den Neuaufbau
+    const focused = (document.activeElement as HTMLElement | null)?.dataset?.kind;
     for (const t of sortBtns) t.b.classList.toggle('on', t.id === sort);
     tiles.clear();
     sections.innerHTML = '';
-    const list = arcadeSections(sort, reviewed);
+    const list = arcadeSections(sort, reviewed, favs);
     for (const g of list) {
       if (list.length > 1) {
         const h = document.createElement('h4');
@@ -148,11 +158,33 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
         (b.querySelector('.t') as HTMLElement).textContent = mi.title;
         (b.querySelector('.insp') as HTMLElement).textContent = miniInspired(kind);
         b.addEventListener('click', () => start(kind));
-        grid.append(b);
+        const wrap = document.createElement('div');
+        wrap.className = 'tw';
+        const star = document.createElement('button');
+        const on = favs.includes(kind);
+        star.className = `fav${on ? ' on' : ''}`;
+        star.textContent = on ? '★' : '☆';
+        star.title = on ? 'Favorit entfernen (F)' : 'Als Favorit merken (F)';
+        star.tabIndex = -1;
+        star.addEventListener('click', () => toggleFav(kind));
+        wrap.append(b, star);
+        grid.append(wrap);
         tiles.set(kind, { btn: b, vt: b.querySelector('.vt') as HTMLElement });
       }
       sections.append(grid);
     }
+    if (focused && tiles.has(focused as MiniKind)) {
+      const b = tiles.get(focused as MiniKind)!.btn;
+      b.focus();
+      b.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function toggleFav(kind: MiniKind) {
+    favs = toggleFavorite(kind, favs);
+    msg.textContent = favs.includes(kind) ? `⭐ ${MINI_INFO[kind].title} gemerkt` : `${MINI_INFO[kind].title} ist kein Favorit mehr`;
+    build();
+    render();
   }
   build();
 
@@ -254,6 +286,10 @@ export function installArcadePicker(socket: Socket, say: (text: string) => void)
       const dirs: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
       if (e.key === 'Escape') toggle(false);
       else if (dirs[e.key]) moveFocus(...dirs[e.key]);
+      else if ((e.key === 'f' || e.key === 'F') && !e.repeat) {
+        const k = (document.activeElement as HTMLElement | null)?.dataset?.kind as MiniKind | undefined;
+        if (k && tiles.has(k)) toggleFav(k);
+      }
       else if (e.key === 'Enter' || e.key === ' ') {
         const k = (document.activeElement as HTMLElement | null)?.dataset?.kind;
         if (k) start(k);
