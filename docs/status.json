@@ -10,7 +10,7 @@
   "done": [
     {
       "title": "Arcade-Favoriten: VIP (☆ an der Kachel) und Laptop (☆ oder Taste F) merken Spiele als ⭐ Favorit – stehen in jeder Sortierung ganz oben; gespeichert nur im Browser des Geräts",
-      "pr": null,
+      "pr": 111,
       "date": "2026-11-07"
     },
     {
@@ -562,7 +562,7 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Favoriten in der Arcade markieren (VIP + Laptop, pro Gerät im Browser gemerkt)",
+      "title": "Favoriten in der Arcade markieren (VIP + Laptop, pro Gerät im Browser gemerkt) (#111)",
       "status": "umgesetzt"
     }
   ]
