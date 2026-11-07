@@ -176,7 +176,7 @@ export function defaultSongForScene(scene: string): string {
       return 'gipfelsturm';
     case 'wwe': case 'nhie': case 'hilo': case 'bomb': case 'kingscup': case 'stillepost': case 'sprueche':
       return 'bar';
-    case 'geist': case 'fangen': case 'werwolf':
+    case 'geist': case 'fangen': case 'werwolf': case 'wolfrunde':
       return 'spooky';
     case 'murder': case 'ttt': case 'tourist': case 'verstecken': case 'suess': case 'spion':
       return 'krimi';

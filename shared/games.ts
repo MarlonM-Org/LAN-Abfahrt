@@ -76,6 +76,8 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   suess: { title: 'Süßigkeiten-Klau', icon: '🍬', inspiredBy: 'Animal Crossing: Sweet Day', tagline: 'Plündert die Minibar – aber je voller die Taschen, desto langsamer!', minPlayers: 3 , orientation: 'landscape' },
   umzug: { title: 'Umzugschaos', icon: '📦', inspiredBy: 'Moving Out', tagline: 'Sofa, Kühlschrank, Gartenzwerg – alles in den Laster, bevor der Vermieter klingelt!', minPlayers: 2, orientation: 'landscape' },
   werwolf: { title: 'Werwölfe im Ferienhaus', icon: '🐺', tagline: 'Vollmond über dem Ferienhaus – wer von euch hat Fell unterm Shirt?', minPlayers: 6 , orientation: 'portrait' },
+  // Erzähler + mindestens 4 Karten (WR_MIN_CARDS)
+  wolfrunde: { title: 'Werwolf mit Erzähler', icon: '🌕', inspiredBy: 'Die Werwölfe von Düsterwald', tagline: 'Einer erzählt – alle anderen ziehen eine geheime Karte.', minPlayers: 5, orientation: 'portrait' },
   funk: { title: 'Funkfrequenz', icon: '📻', inspiredBy: 'Wavelength', tagline: 'Ein Hinweis, zwei Pole – trefft ihr die geheime Frequenz?', minPlayers: 4, orientation: 'portrait' },
   schaetz: { title: 'Schätzkönig', icon: '🧮', inspiredBy: 'Wits & Wagers', tagline: 'Keine Ahnung? Egal – schätzen, dann auf die beste Zahl wetten!', minPlayers: 3, orientation: 'portrait' },
   lieder: { title: 'Guess the Song', icon: '🎶', inspiredBy: 'SongPop', tagline: 'Der Song läuft – tipp den richtigen Titel, bevor die anderen es tun!', minPlayers: 2, orientation: 'portrait' },
@@ -155,6 +157,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   koffer: { goal: 'Packt den Kofferraum voll – was über die Kante hängt, fällt raus.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = rein damit' }] },
   suess: { goal: 'Plündert die Minibar und bringt die Beute ins Versteck – der Wächter jagt euch!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🍬', text: 'ABLEGEN / SPRINT: Beute, Tempo' }, { icon: '🐢', text: 'Volle Taschen = langsam' }] },
   umzug: { goal: 'Alles muss in den Laster, bevor der Vermieter klingelt!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '📦', text: 'GREIFEN: halten = tragen' }, { icon: '💨', text: 'SPRINT: ohne Teil (sonst werfen)' }] },
+  wolfrunde: { goal: 'Ein Erzähler leitet die Runde – dein Handy zeigt dir nur deine eigene Karte.', controls: [{ icon: '🎙️', text: 'VIP wählt den Erzähler' }, { icon: '🃏', text: 'Karte ansehen, Handy weglegen' }, { icon: '💀', text: 'Erzähler markiert die Toten' }] },
   werwolf: { goal: 'Dorf gegen Werwölfe: Findet die Wölfe, bevor sie euch fressen.', controls: [{ icon: '🃏', text: 'Rolle geheim (verdeckte Karte)' }, { icon: '🌙', text: 'Nachts: alle tippen jemanden an' }, { icon: '🗳️', text: 'Tags: diskutieren, abstimmen' }] },
   funk: { goal: 'Nur der Funker kennt das Ziel und gibt laut einen Hinweis – sein Team trifft die Frequenz!', controls: [{ icon: '📻', text: 'Schieber: Frequenz einstellen' }, { icon: '🃏', text: 'Funker: Ziel geheim (halten)' }, { icon: '↔️', text: 'Gegner: links/rechts wetten' }] },
   schaetz: { goal: 'Schätzt die Zahl – dann setzt Chips auf die Karte, die am nächsten dran ist, ohne drüber.', controls: [{ icon: '🔢', text: 'Zahl am Handy eintippen' }, { icon: '🪙', text: '2 Chips setzen (außen = ×3/×4)' }, { icon: '👑', text: 'Beste Karte: Autor +3' }] },
@@ -184,7 +187,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
@@ -254,6 +257,8 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   // bis 5 Runden à 15–60 s (Flut beendet jede Runde)
   wackel: 'mittel',
   werwolf: 'lang',
+  // offen: so lange der Erzähler erzählt – meist 15–30 min
+  wolfrunde: 'lang',
   // 8–12 Spieler: ab 9 Spielern 8 Runden (sonst 6) à Intro 5 s + Hinweis ≤ 30 s + Drehen ≤ 45 s + Wette ≤ 15 s + Auflösung 9 s
   // = ≤ 104 s, realistisch ≈ 60 s → 6–8 min (max. 14 min); früher Schluss erst bei 10 Punkten
   funk: 'lang',
@@ -887,7 +892,7 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess', 'wackel'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug'] },
-  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf'] },
+  { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf', 'wolfrunde'] },
   { title: 'Balance Board', kinds: ['skisprung', 'teppich', 'kugel'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'] },
 ];

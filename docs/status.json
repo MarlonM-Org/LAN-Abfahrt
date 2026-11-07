@@ -1,11 +1,15 @@
 {
-  "updated": "2026-11-06T22:27+00:00",
+  "updated": "2026-11-07T13:40+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Neues Spiel: Werwolf mit Erzähler (à la Düsterwald) – VIP wählt den Erzähler per Dropdown, Erzähler stellt den Stapel zusammen (Werwölfe, Seher, Hexe, Jäger, Amor, Mädchen, Dieb, Dorfbewohner) und teilt aus; jeder sieht nur seine Karte, nur der Erzähler alle + 💀/↺ pro Spieler; TV ohne Karten – fertig auf Branch claude/gallant-gauss-xjgbhj, noch kein PR"
+    }
+  ],
   "queue": [],
   "done": [
     {
@@ -463,6 +467,10 @@
     "golf": {
       "status": "umgesetzt",
       "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
+    },
+    "wolfrunde": {
+      "status": "in Arbeit",
+      "notes": "Wunsch: echter Erzähler statt automatischer Phasen, nur Karten auslosen, wenig Text; Erzähler sieht alle Karten und markiert Tote (auch wiederbeleben), Laptop/TV zeigt keine Rollen"
     }
   },
   "general": [

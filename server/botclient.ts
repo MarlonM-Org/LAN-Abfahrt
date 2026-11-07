@@ -55,6 +55,7 @@ import type { AngelnState } from '../shared/angeln';
 import { KOFFER, type KofferCar, kofferCellOffsets, kofferSnapX } from '../shared/koffer';
 import { CANDY_KINDS, STASH_TILES, SUESS, type SuessState, distAt as suessDistAt, isWalk as suessWalk, stepAlong as suessStep, suessBfs, tileCenter as suessCenter, tileOf as suessTile } from '../shared/suess';
 import { funkBot } from './funkbot';
+import { wolfrundeBot } from './wolfrundebot';
 import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
 import { liederBot } from './liederbot';
@@ -1334,6 +1335,8 @@ export class Bot {
     if (m.kind === 'tourist') tourBot(this, m.state);
 
     if (m.kind === 'werwolf') wolfBot(this, m.state);
+
+    if (m.kind === 'wolfrunde') wolfrundeBot(this, m.state, !!me?.isVip);
 
     if (m.kind === 'pixel') pixBot(this, m.state);
 

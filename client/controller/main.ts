@@ -52,6 +52,7 @@ import { pickDarts } from './screens/darts';
 import { pickGolf } from './screens/golf';
 import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
+import { pickWolfrunde } from './screens/wolfrunde';
 import { pickWerwars } from './screens/werwars';
 import { pickIntro } from './screens/intro';
 import { WARM_PREFIX, pickWarmup, syncWarmup } from './warmup';
@@ -383,6 +384,8 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickAutoball(m.state);
     case 'werwolf':
       return pickWerwolf(m.state);
+    case 'wolfrunde':
+      return pickWolfrunde(m.state, vip);
     case 'pixel':
       return pickPixel(m.state, vip);
     case 'wpistole':

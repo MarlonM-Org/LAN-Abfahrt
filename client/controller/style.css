@@ -1356,6 +1356,63 @@ button.gf-vip.armed { background: var(--red); box-shadow: inset 0 3px 0 #e86a5c,
 .ww-allroles, .ww-rolerow { width: 100%; }
 .ww-rolerow { display: flex; justify-content: space-between; gap: 8px; font-size: 9px; padding: 3px 0; border-bottom: 1px dashed var(--paper-dark); }
 
+/* ---------------------------------------------------------------- Werwolf mit Erzähler */
+.wr-panel { gap: 10px; }
+.wr-pick { display: flex; flex-direction: column; gap: 6px; text-align: left; color: var(--ink); }
+.wr-select {
+  width: 100%; font: inherit; font-size: 12px; color: var(--ink);
+  padding: 12px 34px 12px 10px; border: 3px solid var(--wood-dark); border-radius: 0;
+  background: var(--paper-light) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M0 0h12L6 8z' fill='%233d2414'/></svg>") no-repeat right 10px center;
+  box-shadow: inset 0 2px 0 var(--paper-dark);
+  -webkit-appearance: none; appearance: none;
+}
+.wr-count { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; align-items: center; color: var(--ink); }
+.wr-count button { min-width: 44px; font-size: 14px; padding: 8px 0; }
+.wr-count b { min-width: 30px; text-align: center; font-size: 16px; font-weight: normal; color: var(--red); }
+.wr-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wr-chip { font-size: 9px; padding: 12px 4px; }
+.wr-chip.on { background: var(--green); border-color: #1f5a22; box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
+.wr-sum { font-size: 9px; line-height: 1.7; color: var(--ink); }
+.wr-deal { font-size: 13px; padding: 18px 8px; }
+
+/* Übersicht des Erzählers: alle Karten, 💀 pro Spieler */
+.wr-book { display: flex; flex-direction: column; gap: 10px; }
+.wr-head { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.wr-head b { font-weight: normal; color: var(--red); font-size: 10px; }
+.wr-head .wr-phase { text-align: center; font-size: 9px; color: var(--ink-soft); }
+button.wr-time { padding: 10px 10px; font-size: 10px; background: #f2a33a; box-shadow: inset 0 3px 0 #ffd27a, inset 0 -4px 0 #c06a1f, 0 3px 0 var(--outline); }
+button.wr-time.night { background: #26304f; color: #d6dcff; border-color: #0b1030; box-shadow: inset 0 3px 0 #3b4a7a, inset 0 -4px 0 #151b33, 0 3px 0 var(--outline); }
+.wr-wake { font-size: 9px; line-height: 1.8; text-align: left; color: var(--ink); background: var(--paper-light); border: 2px dashed var(--wood-dark); padding: 6px 8px; }
+.wr-rest { font-size: 8px; line-height: 1.7; text-align: left; color: var(--pink); }
+.wr-list { display: flex; flex-direction: column; gap: 6px; }
+.wr-row { display: grid; grid-template-columns: 36px 1fr 56px; gap: 8px; align-items: center; padding: 4px 6px; background: var(--paper-light); border: 3px solid var(--wood-dark); }
+.wr-av canvas { width: 24px; height: auto; }
+.wr-row .wr-who { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.wr-row .wr-who b { font-weight: normal; font-size: 10px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wr-role { font-style: normal; font-size: 9px; }
+button.wr-skull { width: 56px; height: 48px; padding: 0; font-size: 24px; line-height: 1; font-family: system-ui, sans-serif; color: var(--ink); text-shadow: none; background: var(--paper); border-color: var(--wood-dark); box-shadow: inset 0 3px 0 #fff, inset 0 -3px 0 var(--paper-dark), 0 3px 0 var(--wood-darker); }
+button.wr-skull.revive { font-size: 22px; color: #fff4d6; background: var(--green); border-color: #1f5a22; box-shadow: inset 0 3px 0 #7fd47f, inset 0 -4px 0 #2f7d32, 0 3px 0 var(--outline); }
+.wr-row.dead { background: #d9cdb3; border-style: dashed; }
+.wr-row.dead .wr-who b { text-decoration: line-through; color: var(--ink-soft); }
+.wr-row.dead .wr-role { color: var(--ink-soft); }
+.wr-row.dead canvas { filter: grayscale(1); opacity: 0.6; }
+.wr-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.wr-foot button { font-size: 9px; padding: 12px 4px; }
+.wr-endpick { gap: 8px; }
+button.wr-win { font-size: 11px; padding: 14px 6px; }
+button.wr-win-dorf { background: #2d64a8; box-shadow: inset 0 3px 0 #7fbcf0, inset 0 -4px 0 #1f4a80, 0 3px 0 var(--outline); }
+button.wr-win-wolf { background: var(--red); box-shadow: inset 0 3px 0 #e86a5c, inset 0 -4px 0 #8a2419, 0 3px 0 var(--outline); }
+button.wr-win-liebe { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, inset 0 -4px 0 #b0306a, 0 3px 0 var(--outline); }
+
+/* Eigene Karte: dunkel (leuchtet nachts nicht), sieht bei allen gleich aus */
+.wr-me { flex: 1; }
+.wr-me .ww-card { flex: 1; }
+.wr-big { font-size: 44px !important; line-height: 1.2 !important; font-family: system-ui, sans-serif; }
+.wr-steal { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 4px; }
+.wr-steal span { font-size: 9px; }
+.wr-steal button { font-size: 9px; padding: 10px 4px; }
+.wr-hint { color: #b9c3ff; font-size: 9px; }
+
 /* ---------------------------------------------------------------- Pixel-Galerie */
 .px-theme { color: var(--red); }
 .px-canvas {
