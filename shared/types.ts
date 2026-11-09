@@ -6,6 +6,7 @@ import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
 import type { WrPrivate, WrState } from './wolfrunde';
+import type { LexPrivate, LexState } from './lexikon';
 import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
@@ -94,6 +95,7 @@ export type MiniKind =
   | 'lieder'
   | 'maexchen'
   | 'werwars'
+  | 'lexikon'
   | 'skisprung'
   | 'teppich'
   | 'kugel';
@@ -2298,6 +2300,7 @@ export type MiniSnapshot =
   | { kind: 'lieder'; state: LiederState }
   | { kind: 'maexchen'; state: MaexState }
   | { kind: 'werwars'; state: WerwarsState }
+  | { kind: 'lexikon'; state: LexState }
   | { kind: 'skisprung'; state: SkiState }
   | { kind: 'teppich'; state: TepState }
   | { kind: 'kugel'; state: KugelState };
@@ -2484,6 +2487,7 @@ export type PrivateState =
   | { kind: 'lieder'; state: LiederPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
+  | { kind: 'lexikon'; state: LexPrivate }
   | { kind: 'board'; state: BoardPrivate }
   | null;
 

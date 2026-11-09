@@ -92,6 +92,7 @@ import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { FunkGame } from './funk';
 import { SchaetzGame } from './schaetz';
+import { LexikonGame } from './lexikon';
 import { LiederGame } from './lieder';
 import { liederTon } from './liederton';
 import { MaexGame } from './maexchen';
@@ -1075,6 +1076,8 @@ export class Room {
         return new FunkGame(ids, ctx);
       case 'schaetz':
         return new SchaetzGame(ids, ctx);
+      case 'lexikon':
+        return new LexikonGame(ids, ctx);
       case 'lieder':
         return new LiederGame(ids, ctx, liederTon);
       case 'maexchen':

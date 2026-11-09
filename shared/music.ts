@@ -168,6 +168,7 @@ export function defaultSongForScene(scene: string): string {
     case 'flunky': case 'grill':
       return 'poolparty';
     case 'schaetz':
+    case 'lexikon':
     case 'pixel':
       return 'strandpromenade';
     case 'sprint': case 'tidy': case 'kurve': case 'koffer': case 'umzug':
