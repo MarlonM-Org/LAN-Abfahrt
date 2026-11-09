@@ -205,7 +205,7 @@ export function defaultSongForScene(scene: string): string {
     case 'maexchen':
       return 'poolparty';
     case 'werwars':
-      return 'bar';
+      return 'party';
     case 'maler':
       return 'party';
     // Guess the Song: läuft nur bei der Genre-Wahl – in den Runden spielt die Szene selbst (Hintergrundmusik geduckt)
