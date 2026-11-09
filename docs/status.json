@@ -23,18 +23,10 @@
     }
   ],
   "queue": [
-    {
-      "title": "Neues Spiel: Strandkorb-Scharade (à la Heads Up) – Begriff am Handy, Kippen = erraten/überspringen, Teams"
-    },
-    {
-      "title": "Neues Spiel: Geheimcode am Pool (à la Codenames) – 5 × 5 Wörter am TV, nur die Chefs sehen die Farbkarte"
-    },
-    {
-      "title": "Neues Spiel: Kofferbombe entschärfen (à la Keep Talking) – einer sieht die Bombe, die anderen je eine Handbuch-Seite"
-    },
-    {
-      "title": "Neues Spiel: Urlaubs-Wahnsinn (à la WarioWare) – 5-Sekunden-Mikrospiele am Handy, alle gleichzeitig, 3 Leben"
-    }
+    "Neues Spiel: Strandkorb-Scharade (à la Heads Up) – Begriff am Handy, Kippen = erraten/überspringen, Teams",
+    "Neues Spiel: Geheimcode am Pool (à la Codenames) – 5 × 5 Wörter am TV, nur die Chefs sehen die Farbkarte",
+    "Neues Spiel: Kofferbombe entschärfen (à la Keep Talking) – einer sieht die Bombe, die anderen je eine Handbuch-Seite",
+    "Neues Spiel: Urlaubs-Wahnsinn (à la WarioWare) – 5-Sekunden-Mikrospiele am Handy, alle gleichzeitig, 3 Leben"
   ],
   "done": [
     {
