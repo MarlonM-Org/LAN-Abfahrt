@@ -12,6 +12,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run test:records` – Tests ohne Browser für die ewigen Bestleistungen der Board-Spiele (`server/records.ts`)
 - `npm run test:lieder` – Tests ohne Browser für Guess the Song (Genres/Runden, Dateien → Genre, Deezer-Trefferwahl, kompletter Rundenablauf)
 - `npm run test:wolfrunde` – Tests ohne Browser für Werwolf mit Erzähler (Stapel-Regeln, Geheimhaltung: TV ohne Karten, jeder nur seine, Erzähler alle; Dieb, Totenkopf, Ergebnis)
+- `npm run test:lexikon` – Tests ohne Browser fürs Lügen-Lexikon (Einträge: Dubletten, Lücke, Wahrheit kurz, Haus-Lügen ≠ Wahrheit; unscharfer Vergleich „zu nah an der Wahrheit“; Ablauf mit Abweisen, Zusammenfassen, Auffüllen, Punkten, kein Eintrag doppelt pro Abend)
 - `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen), MIDI-Parser und alle eingebauten Songs (Offline-Rendern: Pegel, Länge, stumme Kanäle, Szenen-Zuordnung); `npm run render:music -- <ordner>` schreibt sie als WAV
 
 ## Architektur-Regeln

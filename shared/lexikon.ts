@@ -5,7 +5,7 @@
  */
 
 export const LEXIKON = {
-  /** Spielbrett (`ctx.mode === 'party'`): eine einzige Frage, ohne Verdopplung */
+  /** Spielbrett (`ctx.onBoard`): eine einzige Frage, ohne Verdopplung */
   PARTY_ROUNDS: 1,
   /** Schreiben und Tippen ohne Zeitlimit – geht weiter, wenn alle fertig sind (VIP/Laptop können überspringen) */
   WRITE_MS: null as number | null,

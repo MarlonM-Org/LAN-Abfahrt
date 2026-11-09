@@ -32,6 +32,8 @@ export interface MiniCtx {
   /** Spielerfarbe des Abends (Index in `PLAYER_COLORS`, `shared/players.ts`) */
   colorOf?(id: string): number | undefined;
   mode: import('../shared/types').GameMode;
+  /** Läuft als Minispiel auf dem Spielbrett (nicht als Einzelspiel aus der Lobby, auch wenn `mode` dort 'party' ist) */
+  onBoard?: boolean;
   /** Vom Spielbrett vorgegebene Teams (2 gegen 2, 1 gegen 3) – Team-Spiele übernehmen sie über `splitTeams()` */
   teams?: MiniTeams | null;
   /**

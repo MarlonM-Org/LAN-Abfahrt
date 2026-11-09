@@ -929,6 +929,7 @@ export class Room {
       lookOf: (id) => this.players.get(id)?.look,
       colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
+      onBoard: !!this.board,
       teams: opts?.teams ?? null,
       warmTeams: opts?.warmTeams ?? null,
       ...(practice ? { practice: true } : {}),

@@ -58,6 +58,7 @@ import { funkBot } from './funkbot';
 import { wolfrundeBot } from './wolfrundebot';
 import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
+import { lexikonBot } from './lexikonbot';
 import { liederBot } from './liederbot';
 
 export interface BotOptions {
@@ -1346,6 +1347,7 @@ export class Bot {
 
     if (m.kind === 'funk') funkBot(this, m.state);
     if (m.kind === 'schaetz') schaetzBot(this, m.state);
+    if (m.kind === 'lexikon') lexikonBot(this, m.state, !!me?.isVip);
     if (m.kind === 'lieder') liederBot(this, m.state);
     if (m.kind === 'maexchen') maexBot(this, m.state, () => (this.state?.mini?.kind === 'maexchen' ? this.state.mini.state : null));
     if (m.kind === 'werwars') werwarsBot(this, m.state, !!me?.isVip);

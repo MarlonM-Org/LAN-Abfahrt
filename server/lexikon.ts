@@ -79,7 +79,8 @@ export class LexikonGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    const rounds = ctx.mode === 'party' ? LEXIKON.PARTY_ROUNDS : lexRounds(ids.length);
+    // Auf dem Spielbrett nur eine Frage – als Einzelspiel (auch aus der Party-Lobby) der volle Rundenplan
+    const rounds = ctx.onBoard ? LEXIKON.PARTY_ROUNDS : lexRounds(ids.length);
     this.plan = lexPick(rounds);
     this.entry = this.plan[0];
     const zero = () => Object.fromEntries(ids.map((id) => [id, 0]));

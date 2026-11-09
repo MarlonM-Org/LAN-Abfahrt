@@ -78,10 +78,10 @@ const STOP_WORDS = new Set(['der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'ei
 }
 
 // ---------------------------------------------------------------- Ablauf mit Schein-Spielern
-function setup(n: number, mode: MiniCtx['mode'] = 'arcade') {
+function setup(n: number, mode: MiniCtx['mode'] = 'arcade', onBoard = false) {
   const ids = Array.from({ length: n }, (_, i) => `p${i}`);
   const out: { result: MiniResult | null } = { result: null };
-  const g = new LexikonGame(ids, { onChange: () => undefined, finish: (r) => (out.result = r), isConnected: () => true, nameOf: (id) => id, mode });
+  const g = new LexikonGame(ids, { onChange: () => undefined, finish: (r) => (out.result = r), isConnected: () => true, nameOf: (id) => id, mode, onBoard });
   const st = () => g.snapshot().state as LexState;
   const pv = (id: string) => (g.privateFor(id) as { state: LexPrivate }).state;
   const entry = () => LEX_ENTRIES.find((e) => e.q === st().prompt)!;
@@ -255,7 +255,8 @@ await (async () => {
     t12.g.dispose();
   }
   {
-    const tp = setup(5, 'party');
+    eq('Einzelspiel aus der Party-Lobby: voller Rundenplan', setup(5, 'party').st().rounds, lexRounds(5));
+    const tp = setup(5, 'party', true);
     eq('Spielbrett: eine Frage, kein Faktor', [tp.st().rounds, tp.st().mult], [1, 1]);
     while (tp.st().sub !== 'over') tp.g.skip();
     eq('Spielbrett: nach der Wahrheit direkt zur Auswertung', tp.st().sub, 'over');
