@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T14:26+00:00",
+  "updated": "2026-11-09T14:50+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -7,10 +7,10 @@
   },
   "inProgress": [
     {
-      "title": "Neues Spiel: Montagsmaler live (à la skribbl.io) – einer malt am Handy, Striche erscheinen live am TV, alle anderen raten per Tastatur, Buchstaben-Hinweise, unscharfer Wortvergleich"
+      "title": "Neues Spiel: Montagsmaler live (à la skribbl.io) – einer malt am Handy live auf den TV, alle tippen um die Wette; Buchstaben-Hinweise, Tippfehler-tolerant, 330+ Begriffe – fertig auf Branch claude/nifty-hawking-cmp17d, noch kein PR"
     },
     {
-      "title": "Neues Spiel: Strand-Band (Rhythmus-Party) – eingebauter Song, jedes Handy ein Instrument mit eigener Notenspur, TV-Bühne mit wippenden Avataren und Gruppen-Combo"
+      "title": "Neues Spiel: Strand-Band – jedes Handy ein Instrument (Schlagzeug, Melodie, Bass, Ukulele, Shaker), die Band groovt gemeinsam auf der TV-Bühne; wer danebenhaut, wird leiser – fertig auf Branch claude/nifty-hawking-cmp17d, noch kein PR"
     },
     {
       "title": "Neues Spiel: Sektkorken – Daumen auf den Korken, schütteln (ohne Sensor: reiben), loslassen = PLOPP! Wer zu lange im Roten bleibt, dem platzt die Flasche; 3 Durchgänge, bester Wurf zählt, fürs Brett – fertig auf Branch claude/nifty-hawking-cmp17d, noch kein PR"
@@ -19,7 +19,7 @@
       "title": "Neues Spiel: Lügen-Lexikon (à la Fibbage) – seltsames echtes Wort/Fakt mit Lücke, alle schreiben eine Fälschung, dann auf die Wahrheit tippen; Punkte für Wahrheit + Reingefallene"
     },
     {
-      "title": "Igel-Krieg: größere Insel (720–960 breit) mit Kamera-Mitfahrt und Minikarte – letzter offener Punkt aus Stufe M"
+      "title": "Igel-Krieg: größere Insel – ab 6 Spielern bis 960 px breit, mit eigener TV-Kamera und Minikarte – fertig auf Branch claude/nifty-hawking-cmp17d, noch kein PR"
     }
   ],
   "queue": [
@@ -447,7 +447,7 @@
     },
     "igel": {
       "status": "umgesetzt",
-      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) – größere Insel offen"
+      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern (fertig, noch kein PR)"
     },
     "ttt": {
       "status": "umgesetzt",
@@ -590,6 +590,10 @@
     {
       "title": "Favoriten in der Arcade markieren (VIP + Laptop, pro Gerät im Browser gemerkt) (#111)",
       "status": "umgesetzt"
+    },
+    {
+      "title": "VIP-Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers → jetzt kompakt „n offline“ direkt neben „Abbrechen“, Kopfzeile macht Platz (auch Kart, Parcours, Aufwärmrunde) – PR #113 offen",
+      "status": "in Arbeit"
     }
   ]
 }
