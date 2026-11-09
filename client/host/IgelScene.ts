@@ -8,7 +8,7 @@ import { coconut, hedgehog, paintCrater, paintIslandSky, paintTerrain, sandcastl
 import { playerColor } from '../../shared/players';
 import { bus, getState, playerById } from './store';
 import { pcol } from './playerColor';
-import { GOLD, background, ensureTex, ink, panel, txt } from './ui';
+import { GOLD, ensureTex, ink, panel, txt } from './ui';
 import type { IgelAim, IgelObj, IgelProjType, IgelWeapon } from '../../shared/types';
 import { aimPath, applyOp, isThrown, squadOf } from '../../shared/igel';
 import { Pix } from '../art/pix';
@@ -23,13 +23,23 @@ const lookKey = (l: Look) => `${l.hair}_${l.hairStyle}_${l.shirt}`;
 /** Spielerfarbe des Abends (Fallback: Reihenfolge im Spiel) */
 const colorOf = (st: IgelState, id: string) => pcol(id, Math.max(0, st.teams.indexOf(id))).hex;
 const colorNum = (s: string) => parseInt(s.slice(1), 16);
-/** Kamera: Zoom auf den aktiven Igel / das Geschoss, Überblick in der Settle-Phase */
+/** Kamera: Zoom auf den aktiven Igel / das Geschoss, Überblick (ganze Insel bzw. alle Igel) in der Settle-Phase */
 const ZOOM_NEAR = 1.5;
-const CAM_PAN_MS = 600;
 /** So lange bleibt die Kamera nach dem Einschlag auf dem Krater stehen */
 const CAM_HOLD_MS = 300;
+/** Über der Welt (y < 0) darf so viel Himmel ins Bild – z. B. wenn ein Geschoss hoch hinaus fliegt */
+const CAM_SKY = 40;
+/** Beim Herauszoomen (breite Insel) bleibt unten so viel vom zusätzlichen Platz Meer, der Rest wird Himmel */
+const CAM_SEA = 0.3;
 /** Wolken ziehen mit wind × 40 px/s */
 const CLOUD_SPEED = 40;
+/** Minikarte am TV (nur auf breiten Inseln): Textur in 1/4 Auflösung, angezeigt in 1/8 (bei Render ×2 pixelgenau) */
+const MAP_RES = 4;
+const MAP_SCALE = 0.5;
+const MAP_KEY = 'igel_minimap';
+/** Rand der Kulisse rund ums Bild (Bildschirmwackeln) */
+const BG_PAD = 12;
+const clamp = Phaser.Math.Clamp;
 
 type CamMode = 'overview' | 'hog' | 'proj' | 'hold';
 
@@ -39,6 +49,8 @@ interface HogView {
   /** Sonnenschirm-Gleiter über dem Igel */
   umb: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
+  /** Team-Fähnchen neben der HP-Zahl */
+  flag: Phaser.GameObjects.Rectangle | null;
   x: number;
   y: number;
   state: string;
@@ -46,11 +58,15 @@ interface HogView {
 }
 
 /**
- * TV-Ansicht für Igel-Krieg. Das Terrain wird lokal aus Seed + Kraterliste nachgebaut
+ * TV-Ansicht für Igel-Krieg. Das Terrain wird lokal aus Seed + Breite + Kraterliste nachgebaut
  * und in eine Canvas-Textur gemalt – neue Krater werden nur noch hineingestanzt.
+ * Breite Inseln (ab 6 Spielern bis 960 px): eigene Kamera (folgt Igel/Geschoss, zoomt für den Überblick heraus),
+ * Kulisse in Bildschirm-Koordinaten (`bgLayer`) und eine Minikarte oben rechts.
  */
 export class IgelScene extends Phaser.Scene {
   private seed = -1;
+  /** Inselbreite der laufenden Partie */
+  private w: number = IGEL.W;
   private mask: Mask | null = null;
   private applied = 0;
   private tex: Phaser.Textures.CanvasTexture | null = null;
@@ -75,9 +91,24 @@ export class IgelScene extends Phaser.Scene {
   private camTurn = -1;
   private camHoldUntil = 0;
   private followProj = -1;
+  /** Kamera: aktueller Stand und Ziel (Bildmitte + Zoom) – wird jedes Bild weich nachgezogen und an die Insel geklemmt */
+  private view = { x: IGEL.W / 2, y: IGEL.H / 2, z: 1 };
+  private viewGoal = { x: IGEL.W / 2, y: IGEL.H / 2, z: 1, rate: 4 };
+  /** Kulisse in Bildschirm-Koordinaten (Himmel, Wolken, Horizont, Möwen, Tageszeit, Mondnacht) – gleicht Zoom und Schwenk aus */
+  private bgLayer!: Phaser.GameObjects.Container;
+  private midSky!: Phaser.GameObjects.TileSprite;
+  private cloudDrift = 0;
+  /** Minikarte am TV (breite Inseln) */
+  private mapBox!: Phaser.GameObjects.Container;
+  private mapG: Phaser.GameObjects.Graphics | null = null;
+  private mapTex: Phaser.Textures.CanvasTexture | null = null;
+  private mapRect = { x: 0, y: 0, w: 0, h: 0, k: 1 };
+  private mapDirty = false;
+  /** Schriftgröße in der Welt gegen den Zoom ausgleichen (HP-Zahlen, Sprechblasen, Schadenszahlen bleiben lesbar) */
+  private ls = 1;
   private clouds!: Phaser.GameObjects.TileSprite;
   private specks: { r: Phaser.GameObjects.Rectangle; x: number; y: number; ph: number }[] = [];
-  private bubbles: { t: Phaser.GameObjects.Text; hog: number; until: number }[] = [];
+  private bubbles: { t: Phaser.GameObjects.Text; hog: number; until: number; born: number }[] = [];
   private windG!: Phaser.GameObjects.Graphics;
   private juice!: Juice;
   private objViews = new Map<number, { img: Phaser.GameObjects.Image; chute: Phaser.GameObjects.Image | null; x: number; y: number; type: IgelObj['type'] }>();
@@ -109,6 +140,7 @@ export class IgelScene extends Phaser.Scene {
 
   create() {
     this.seed = -1;
+    this.w = IGEL.W;
     this.mask = null;
     this.applied = 0;
     this.tex = null;
@@ -124,6 +156,13 @@ export class IgelScene extends Phaser.Scene {
     this.camTurn = -1;
     this.camHoldUntil = 0;
     this.followProj = -1;
+    this.view = { x: IGEL.W / 2, y: IGEL.H / 2, z: 1 };
+    this.viewGoal = { x: IGEL.W / 2, y: IGEL.H / 2, z: 1, rate: 4 };
+    this.cloudDrift = 0;
+    this.ls = 1;
+    this.mapG = null;
+    this.mapTex = null;
+    this.mapDirty = false;
     this.specks = [];
     this.bubbles = [];
     this.hudBuilding = false;
@@ -139,29 +178,41 @@ export class IgelScene extends Phaser.Scene {
     this.rp = null;
     this.rpSeed = -1;
 
-    // Kameras: Hauptkamera für die Welt (Zoom/Schwenk), HUD-Kamera fix darüber.
+    // Kameras: Hauptkamera für die Welt (Zoom/Schwenk, eigene Steuerung in applyView()), HUD-Kamera fix darüber.
     // Alles, was neu in die Szene kommt, sieht die HUD-Kamera nicht – außer beim HUD-Aufbau.
     const main = this.cameras.main;
-    main.setBounds(0, 0, IGEL.W, IGEL.H).setZoom(1).centerOn(IGEL.W / 2, IGEL.H / 2);
+    main.stopFollow();
+    main.removeBounds().setZoom(1).centerOn(IGEL.W / 2, IGEL.H / 2);
     this.hudCam = this.cameras.add(0, 0, IGEL.W, IGEL.H);
     const onAdded = (go: Phaser.GameObjects.GameObject) => {
       if (!this.hudBuilding) this.hudCam.ignore(go);
     };
     this.events.on(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
 
-    // Parallax: Himmel (fern), Wolken, ferne Inseln (mittel) – laufen der Kamera (Schwenk/Zoom) langsamer hinterher
-    background(this, 'igelsky', IGEL.W, IGEL.H, (p) => paintIslandSky(p, 9, 'far')).setScrollFactor(0.15);
-    this.clouds = this.add.tileSprite(0, 6, IGEL.W, 96, ensureTex(this, 'igel_clouds', () => this.cloudStrip())).setOrigin(0, 0).setDepth(-900).setAlpha(0.85).setScrollFactor(0.3);
-    background(this, 'igelsea', IGEL.W, IGEL.H, (p) => paintIslandSky(p, 9, 'mid')).setDepth(-880).setScrollFactor(0.45);
-    gulls(this, { n: 2, y: [30, 110], depth: -870, scroll: 0.6 });
+    // Kulisse in Bildschirm-Koordinaten: die Ebene gleicht Zoom und Schwenk aus (layoutBg) und füllt so immer das Bild –
+    // auch über (y < 0) und neben der Welt beim Herauszoomen. Parallax über die Kachel-Verschiebung von Wolken und Horizont.
+    // Kacheln mit BG_PAD Rand (Bildschirmwackeln deckt sonst einen Streifen auf), oben Himmelfarbe, unten Meer
+    this.bgLayer = this.add.container(0, 0).setDepth(-900).setScrollFactor(0);
+    const skyKey = ensureTex(this, 'igel_sky', () => {
+      const p = new Pix(IGEL.W, IGEL.H);
+      paintIslandSky(p, 9, 'far');
+      return p;
+    });
+    const above = this.add.rectangle(-BG_PAD, -BG_PAD, IGEL.W + 2 * BG_PAD, BG_PAD, 0x7ec8f2).setOrigin(0, 0);
+    const sky = this.add.tileSprite(-BG_PAD, 0, IGEL.W + 2 * BG_PAD, IGEL.H, skyKey).setOrigin(0, 0);
+    sky.tilePositionX = -BG_PAD;
+    const below = this.add.rectangle(-BG_PAD, IGEL.H - 1, IGEL.W + 2 * BG_PAD, BG_PAD + 1, 0x5fb3e3).setOrigin(0, 0);
+    this.clouds = this.add.tileSprite(-BG_PAD, 6, IGEL.W + 2 * BG_PAD, 96, ensureTex(this, 'igel_clouds', () => this.cloudStrip())).setOrigin(0, 0).setAlpha(0.85);
+    const seaKey = ensureTex(this, 'igel_horizon', () => {
+      const p = new Pix(IGEL.W, IGEL.H);
+      paintIslandSky(p, 9, 'mid');
+      return p;
+    });
+    this.midSky = this.add.tileSprite(-BG_PAD, 0, IGEL.W + 2 * BG_PAD, IGEL.H, seaKey).setOrigin(0, 0);
+    this.bgLayer.add([above, sky, below, this.clouds, this.midSky]);
+    gulls(this, { n: 2, y: [30, 110], layer: this.bgLayer });
     // Tageszeit nur auf Himmel und Horizont (Insel, Igel und HUD bleiben unberührt)
-    daylight(this, { depth: -860, strength: 0.7, w: IGEL.W, h: IGEL.H });
-    for (let i = 0; i < 18; i++) {
-      const x = Math.random() * IGEL.W;
-      const y = 30 + Math.random() * 170;
-      const r = this.add.rectangle(x, y, i % 3 ? 2 : 3, 1, i % 3 ? 0xf3e2b0 : 0x7cc46a).setDepth(5).setAlpha(0);
-      this.specks.push({ r, x, y, ph: Math.random() * Math.PI * 2 });
-    }
+    daylight(this, { strength: 0.7, w: IGEL.W, h: IGEL.H, layer: this.bgLayer });
     this.ropeG = this.add.graphics().setDepth(9);
     this.aimG = this.add.graphics().setDepth(25);
     this.waterG = this.add.graphics().setDepth(30);
@@ -176,8 +227,9 @@ export class IgelScene extends Phaser.Scene {
     this.rpBg = panel(this, 50, 26, 380, 42, 'dark').setDepth(1005).setVisible(false);
     this.rpTitle = txt(this, IGEL.W / 2, 31, '', { size: 16, color: GOLD }).setDepth(1006);
     this.rpSub = txt(this, IGEL.W / 2, 52, '', { size: 8 }).setDepth(1006);
+    this.mapBox = this.add.container(0, 0).setDepth(1002).setVisible(false);
     this.hudBuilding = false;
-    main.ignore([this.hud, this.banner, this.bannerSub, this.windG, this.quipText, this.themeCard, this.rpBg, this.rpTitle, this.rpSub]);
+    main.ignore([this.hud, this.banner, this.bannerSub, this.windG, this.quipText, this.themeCard, this.rpBg, this.rpTitle, this.rpSub, this.mapBox]);
     // Partikel/Töne aus dem gemeinsamen Baukasten (Emitter landen nur in der Welt-Kamera)
     this.juice = new Juice(this, { depth: 41 });
 
@@ -187,6 +239,7 @@ export class IgelScene extends Phaser.Scene {
       bus.off('state', fn);
       this.events.off(Phaser.Scenes.Events.ADDED_TO_SCENE, onAdded);
       if (this.textures.exists(REPLAY_KEY)) this.textures.remove(REPLAY_KEY);
+      if (this.textures.exists(MAP_KEY)) this.textures.remove(MAP_KEY);
     });
     const s = getState();
     if (s) this.onState(s);
@@ -203,26 +256,41 @@ export class IgelScene extends Phaser.Scene {
     this.aimCache.clear();
     if (this.textures.exists(TERRAIN_KEY)) this.textures.remove(TERRAIN_KEY);
     this.seed = st.seed;
-    this.mask = genTerrain(st.seed);
+    this.w = st.w ?? IGEL.W;
+    this.mask = genTerrain(st.seed, this.w);
     this.applied = 0;
-    this.tex = this.textures.createCanvas(TERRAIN_KEY, IGEL.W, IGEL.H)!;
+    this.tex = this.textures.createCanvas(TERRAIN_KEY, this.w, IGEL.H)!;
     const ctx = this.tex.getContext();
-    const img = ctx.createImageData(IGEL.W, IGEL.H);
+    const img = ctx.createImageData(this.w, IGEL.H);
     paintTerrain(img, this.mask);
     ctx.putImageData(img, 0, 0);
     paintDecor(ctx, st.seed, this.mask);
     this.tex.refresh();
     this.terrainImg = this.add.image(0, 0, TERRAIN_KEY).setOrigin(0, 0).setDepth(0);
-    // Mondnacht: Himmel abdunkeln, Mond und Sterne (über Himmel/Horizont, unter der Insel)
+    // Mondnacht: Himmel abdunkeln, Mond und Sterne (in der Kulisse: über Himmel/Horizont, unter der Insel)
     for (const o of this.night) o.destroy();
     this.night = [];
     if (st.theme === 'mond') {
-      this.night.push(this.add.rectangle(0, 0, IGEL.W, IGEL.H, 0x141c48, 0.5).setOrigin(0, 0).setDepth(-855).setScrollFactor(0));
-      this.night.push(this.add.circle(400, 40, 13, 0xfff4d6).setDepth(-854).setScrollFactor(0.1));
-      this.night.push(this.add.circle(394, 36, 11, 0x141c48, 0.5).setDepth(-853).setScrollFactor(0.1));
+      this.night.push(this.add.rectangle(-IGEL.W / 2, -IGEL.H / 2, IGEL.W * 2, IGEL.H * 2, 0x141c48, 0.5).setOrigin(0, 0));
+      this.night.push(this.add.circle(400, 40, 13, 0xfff4d6));
+      this.night.push(this.add.circle(394, 36, 11, 0x141c48, 0.5));
       const r = seeded(st.seed ^ 0x57a2);
-      for (let i = 0; i < 28; i++) this.night.push(this.add.rectangle(Math.floor(r() * IGEL.W), Math.floor(r() * 120), 1, 1, 0xfff4d6, 0.4 + r() * 0.6).setDepth(-854).setScrollFactor(0.12));
+      for (let i = 0; i < 28; i++) this.night.push(this.add.rectangle(Math.floor(r() * IGEL.W), Math.floor(r() * 120), 1, 1, 0xfff4d6, 0.4 + r() * 0.6));
+      this.bgLayer.add(this.night);
     }
+    // Sandkörner/Blätter im Wind über die ganze Insel
+    for (const p of this.specks) p.r.destroy();
+    this.specks = [];
+    for (let i = 0, n = Math.round((18 * this.w) / IGEL.W); i < n; i++) {
+      const x = Math.random() * this.w;
+      const y = 30 + Math.random() * 170;
+      const r = this.add.rectangle(x, y, i % 3 ? 2 : 3, 1, i % 3 ? 0xf3e2b0 : 0x7cc46a).setDepth(5).setAlpha(0);
+      this.specks.push({ r, x, y, ph: Math.random() * Math.PI * 2 });
+    }
+    this.buildMiniMap();
+    // Neue Partie: Kamera sofort auf die ganze Insel
+    this.view = { x: this.w / 2, y: IGEL.H / 2, z: this.zMin() };
+    this.viewGoal = { ...this.view, rate: 3 };
     // Effekte von vor dem Szenenstart nicht nochmal abspielen
     this.lastFx = st.fx.length ? st.fx[st.fx.length - 1].seq : 0;
   }
@@ -231,6 +299,111 @@ export class IgelScene extends Phaser.Scene {
   private applyCraters(st: IgelState) {
     if (!this.mask || !this.tex || this.applied >= st.ops.length) return;
     this.applied = stampOps(this.mask, this.tex, st.ops, this.applied, st.ops.length);
+    this.mapDirty = true;
+  }
+
+  // ---------------------------------------------------------------- Minikarte (TV)
+
+  /** Minikarte oben rechts – nur auf breiten Inseln, die nicht mehr ganz ins Bild passen */
+  private buildMiniMap() {
+    this.mapBox.removeAll(true);
+    this.mapG = null;
+    if (this.textures.exists(MAP_KEY)) this.textures.remove(MAP_KEY);
+    this.mapTex = null;
+    this.mapBox.setVisible(false);
+    if (this.w <= IGEL.W || !this.mask) return;
+    const tw = Math.ceil(this.w / MAP_RES);
+    const th = Math.ceil(IGEL.H / MAP_RES);
+    this.mapTex = this.textures.createCanvas(MAP_KEY, tw, th)!;
+    const mw = tw * MAP_SCALE;
+    const mh = th * MAP_SCALE;
+    const x0 = IGEL.W - 4 - mw;
+    const y0 = 25;
+    this.mapRect = { x: x0, y: y0, w: mw, h: mh, k: mw / this.w };
+    this.hudBuilding = true;
+    try {
+      this.mapBox.add(this.add.rectangle(x0 - 2, y0 - 2, mw + 4, mh + 4, 0x2d1b12).setOrigin(0, 0));
+      this.mapBox.add(this.add.rectangle(x0, y0, mw, mh, 0xa9dcf6).setOrigin(0, 0));
+      this.mapBox.add(this.add.image(x0, y0, MAP_KEY).setOrigin(0, 0).setScale(MAP_SCALE));
+      this.mapG = this.add.graphics();
+      this.mapBox.add(this.mapG);
+    } finally {
+      this.hudBuilding = false;
+    }
+    this.mapDirty = true;
+  }
+
+  /** Terrain der Minikarte neu malen (nach Kratern): Mehrheit fester Pixel je Kachel, Gras an der Oberkante */
+  private paintMiniMap() {
+    const m = this.mask;
+    const tex = this.mapTex;
+    if (!m || !tex) return;
+    this.mapDirty = false;
+    const tw = tex.width;
+    const th = tex.height;
+    const solid = new Uint8Array(tw * th);
+    for (let j = 0; j < th; j++) {
+      for (let i = 0; i < tw; i++) {
+        let n = 0;
+        for (let dy = 0; dy < MAP_RES; dy++) {
+          const y = j * MAP_RES + dy;
+          if (y >= IGEL.H) continue;
+          for (let dx = 0; dx < MAP_RES; dx++) {
+            const x = i * MAP_RES + dx;
+            if (x < m.w && m[y * m.w + x]) n++;
+          }
+        }
+        solid[j * tw + i] = n * 2 >= MAP_RES * MAP_RES ? 1 : 0;
+      }
+    }
+    const ctx = tex.getContext();
+    const img = ctx.createImageData(tw, th);
+    for (let k = 0; k < tw * th; k++) {
+      if (!solid[k]) continue;
+      const top = k < tw || !solid[k - tw];
+      img.data.set(top ? [95, 164, 55, 255] : [201, 154, 94, 255], k * 4);
+    }
+    ctx.putImageData(img, 0, 0);
+    tex.refresh();
+  }
+
+  /** Minikarte: Wasser, Kisten, Igel (Spielerfarbe, der Aktive blinkt weiß), Geschosse und der Bildausschnitt */
+  private drawMiniMap(st: IgelState, time: number) {
+    const g = this.mapG;
+    const show = !!g && !this.rp && st.sub !== 'over' && st.sub !== 'replay';
+    this.mapBox.setVisible(show);
+    if (!g || !show) return;
+    if (this.mapDirty) this.paintMiniMap();
+    const { x: x0, y: y0, w: mw, h: mh, k } = this.mapRect;
+    const X = (x: number) => x0 + clamp(x, 0, this.w) * k;
+    const Y = (y: number) => y0 + clamp(y, 0, IGEL.H) * k;
+    g.clear();
+    g.fillStyle(0x3784c2, 0.85).fillRect(x0, Y(this.waterY), mw, y0 + mh - Y(this.waterY));
+    for (const o of st.objs) if (o.type === 'crate') g.fillStyle(0xa5602a).fillRect(Math.round(X(o.x)) - 1, Math.round(Y(o.y)) - 2, 2, 2);
+    for (const h of st.hogs) {
+      if (h.state === 'drowned') continue;
+      const v = this.hogs.get(h.id);
+      const x = Math.round(X(v ? v.x : h.x));
+      const y = Math.round(Y((v ? v.y : h.y) - 4));
+      if (h.state === 'dead') {
+        g.fillStyle(0xf1d49a).fillRect(x - 1, y, 2, 2);
+        continue;
+      }
+      const active = !st.simul && h.id === st.activeHog;
+      g.fillStyle(active && Math.floor(time / 250) % 2 ? 0xfdf7ea : 0x2d1b12).fillRect(x - 2, y - 2, 5, 5);
+      g.fillStyle(colorNum(colorOf(st, h.owner))).fillRect(x - 1, y - 1, 3, 3);
+    }
+    for (const p of st.projs) {
+      const v = this.projs.get(p.id);
+      g.fillStyle(0x2d1b12).fillRect(Math.round(X(v ? v.x : p.x)) - 1, Math.round(Y(v ? v.y : p.y)) - 1, 2, 2);
+    }
+    // Bildausschnitt der Kamera
+    const wv = this.cameras.main.worldView;
+    const vx0 = X(wv.x);
+    const vx1 = X(wv.right);
+    const vy0 = Y(wv.y);
+    const vy1 = Y(wv.bottom);
+    g.lineStyle(1, 0xfdf7ea, 0.9).strokeRect(vx0 + 0.5, vy0 + 0.5, Math.max(2, vx1 - vx0 - 1), Math.max(2, vy1 - vy0 - 1));
   }
 
   // ---------------------------------------------------------------- Zustand
@@ -253,8 +426,9 @@ export class IgelScene extends Phaser.Scene {
         const c = this.add.container(h.x, h.y, [umb, spr, label]).setDepth(10);
         // Spieler-Teams: kleines Fähnchen in Teamfarbe links neben der HP-Zahl
         const sq = squadOf(st, h.owner);
-        if (sq >= 0) c.add(this.add.rectangle(-17, -24, 4, 6, colorNum(st.squads![sq].color)).setStrokeStyle(1, 0x2d1b12));
-        v = { c, spr, umb, label, x: h.x, y: h.y, state: 'ok', look };
+        const flag = sq >= 0 ? this.add.rectangle(-17, -24, 4, 6, colorNum(st.squads![sq].color)).setStrokeStyle(1, 0x2d1b12).setOrigin(0.5, 0) : null;
+        if (flag) c.add(flag);
+        v = { c, spr, umb, label, flag, x: h.x, y: h.y, state: 'ok', look };
         this.hogs.set(h.id, v);
       }
       if (h.state !== v.state) {
@@ -278,7 +452,6 @@ export class IgelScene extends Phaser.Scene {
       if (!alive.has(id)) {
         if (this.followProj === id) {
           // Kurz auf dem Krater stehen bleiben
-          this.cameras.main.stopFollow();
           this.followProj = -1;
           this.camMode = 'hold';
           this.camHoldUntil = this.time.now + CAM_HOLD_MS;
@@ -293,12 +466,8 @@ export class IgelScene extends Phaser.Scene {
       const img = this.add.image(p.x, p.y, ensureTex(this, texKey, make)).setDepth(20);
       this.projs.set(p.id, { img, x: p.x, y: p.y });
       // Simultan: Überblick behalten statt einem Geschoss zu folgen; Splitter nicht verfolgen
-      if (this.followProj === -1 && !st.simul && p.type !== 'frag') {
-        // Kamera folgt dem Geschoss
-        const cam = this.cameras.main;
-        cam.panEffect.reset();
-        cam.zoomTo(ZOOM_NEAR, 250, 'Sine.easeOut', true);
-        cam.startFollow(img, true, 0.25, 0.25);
+      if (this.followProj === -1 && !st.simul && p.type !== 'frag' && p.type !== 'dynamite') {
+        // Kamera folgt dem Geschoss (updateCamera) – dem Böller nicht, da läuft man ja gerade weg
         this.followProj = p.id;
         this.camMode = 'proj';
       }
@@ -528,7 +697,7 @@ export class IgelScene extends Phaser.Scene {
         this.juice.burst(f.x, f.y - 4, 'smoke', 6 * k);
         this.juice.burst(f.x, f.y, 'sand', 12 * k);
         if (r >= 12) {
-          const word = txt(this, f.x, f.y - r - 6, r >= 40 ? 'HALLELUJA!' : Math.random() < 0.5 ? 'BUMM!' : 'KRAWUMM!', { color: GOLD }).setDepth(42);
+          const word = txt(this, f.x, f.y - r - 6, r >= 40 ? 'HALLELUJA!' : Math.random() < 0.5 ? 'BUMM!' : 'KRAWUMM!', { color: GOLD }).setDepth(42).setScale(this.ls);
           this.tweens.add({ targets: word, y: word.y - 12, alpha: 0, duration: 800, delay: 150, onComplete: () => word.destroy() });
         }
         if (r >= 40) {
@@ -538,11 +707,11 @@ export class IgelScene extends Phaser.Scene {
           this.juice.shake(3);
           this.juice.burst(f.x, f.y, 'confetti', 30);
         } else this.juice.shake(r >= 25 ? 2 : 1);
-        sfx('boom', { x: f.x, vol: r >= 40 ? 1.3 : r < 12 ? 0.55 : 0.9, pitch: r >= 40 ? 0.7 : r < 12 ? 1.4 : 1 });
+        sfx('boom', { x: this.sx(f.x), vol: r >= 40 ? 1.3 : r < 12 ? 0.55 : 0.9, pitch: r >= 40 ? 0.7 : r < 12 ? 1.4 : 1 });
         break;
       }
       case 'fire':
-        sfx('whoosh', { x: f.x });
+        sfx('whoosh', { x: this.sx(f.x) });
         break;
       case 'holy':
         sfx('fanfare');
@@ -556,39 +725,39 @@ export class IgelScene extends Phaser.Scene {
         const line = this.add.line(0, 0, f.x, f.y, x2, y2, 0x93d3f3).setOrigin(0, 0).setLineWidth(2).setDepth(38);
         this.tweens.add({ targets: line, alpha: 0, duration: 350, onComplete: () => line.destroy() });
         this.juice.burst(x2, y2, 'splash', 8);
-        sfx('shoot', { x: f.x });
+        sfx('shoot', { x: this.sx(f.x) });
         break;
       }
       case 'gull': {
-        // Möwe fliegt über das Ziel und lässt die Bomben fallen
+        // Möwe fliegt über das Ziel und lässt die Bomben fallen (auf breiten Inseln nur ein Stück um das Ziel herum)
         const dir = f.text === 'l' ? -1 : 1;
-        const bird = this.add.image(dir > 0 ? -20 : IGEL.W + 20, f.y, ensureTex(this, 'igel_gull_0', () => gullPix(0))).setDepth(36).setFlipX(dir < 0);
+        const bird = this.add.image(f.x - dir * 160, f.y, ensureTex(this, 'igel_gull_0', () => gullPix(0))).setDepth(36).setFlipX(dir < 0);
         let fr = 0;
         const flap = this.time.addEvent({ delay: 140, loop: true, callback: () => bird.setTexture(ensureTex(this, `igel_gull_${(fr = 1 - fr)}`, () => gullPix(fr))) });
-        this.tweens.add({ targets: bird, x: dir > 0 ? IGEL.W + 20 : -20, duration: 1800, onComplete: () => (flap.remove(), bird.destroy()) });
-        sfx('whistle', { x: f.x, pitch: 1.4 });
-        const t = txt(this, f.x, 30, 'MÖWEN!', { color: '#fff4d6' }).setDepth(42);
+        this.tweens.add({ targets: bird, x: f.x + dir * 420, duration: 1800, onComplete: () => (flap.remove(), bird.destroy()) });
+        sfx('whistle', { x: this.sx(f.x), pitch: 1.4 });
+        const t = txt(this, f.x, 30, 'MÖWEN!', { color: '#fff4d6' }).setDepth(42).setScale(this.ls);
         this.tweens.add({ targets: t, y: 22, alpha: 0, duration: 1100, onComplete: () => t.destroy() });
         break;
       }
       case 'land':
         this.juice.burst(f.x, f.y, 'sand', 8);
-        sfx('bonk', { x: f.x, vol: 0.7 });
+        sfx('bonk', { x: this.sx(f.x), vol: 0.7 });
         break;
       case 'crate': {
         this.juice.burst(f.x, f.y + 8, 'wood', 10);
         this.juice.burst(f.x, f.y + 8, 'spark', 8);
-        const t = txt(this, f.x, f.y, f.text ?? '', { color: f.text?.includes('HP') ? '#9ad65a' : GOLD }).setDepth(43);
+        const t = txt(this, f.x, f.y, f.text ?? '', { color: f.text?.includes('HP') ? '#9ad65a' : GOLD }).setDepth(43).setScale(this.ls);
         this.tweens.add({ targets: t, y: t.y - 16, duration: 1200, ease: 'Quad.out' });
         this.tweens.add({ targets: t, alpha: 0, duration: 400, delay: 1000, onComplete: () => t.destroy() });
-        sfx('powerup', { x: f.x });
+        sfx('powerup', { x: this.sx(f.x) });
         break;
       }
       case 'beep': {
-        const t = txt(this, f.x, f.y - 4, f.text ?? 'PIEP!', { color: '#ff6b5a' }).setDepth(43);
+        const t = txt(this, f.x, f.y - 4, f.text ?? 'PIEP!', { color: '#ff6b5a' }).setDepth(43).setScale(this.ls);
         this.tweens.add({ targets: t, y: t.y - 8, alpha: 0, duration: 700, onComplete: () => t.destroy() });
-        sfx('tick', { x: f.x, pitch: 2 });
-        sfx('tick', { x: f.x, pitch: 2, delay: 0.25 });
+        sfx('tick', { x: this.sx(f.x), pitch: 2 });
+        sfx('tick', { x: this.sx(f.x), pitch: 2, delay: 0.25 });
         break;
       }
       case 'rope': {
@@ -597,52 +766,52 @@ export class IgelScene extends Phaser.Scene {
         const y2 = f.y2 ?? f.y;
         const line = this.add.line(0, 0, f.x, f.y, x2, y2, 0x5fa437).setOrigin(0, 0).setLineWidth(1.5).setDepth(9);
         this.tweens.add({ targets: line, alpha: 0, duration: f.text === 'miss' ? 450 : 200, onComplete: () => line.destroy() });
-        sfx(f.text === 'miss' ? 'whoosh' : 'catch', { x: x2, vol: 0.6, pitch: 1.3 });
+        sfx(f.text === 'miss' ? 'whoosh' : 'catch', { x: this.sx(x2), vol: 0.6, pitch: 1.3 });
         if (f.text !== 'miss') this.juice.burst(x2, y2, 'sand', 4);
         break;
       }
       case 'dig':
         this.juice.burst(f.x, f.y, 'sand', 14);
-        sfx('crack', { x: f.x, vol: 0.5, pitch: 0.8 });
+        sfx('crack', { x: this.sx(f.x), vol: 0.5, pitch: 0.8 });
         break;
       case 'quip':
         this.showQuip(f.text ?? '');
         break;
       case 'dmg': {
         const heal = f.text?.startsWith('+');
-        const t = txt(this, f.x, f.y - 8, f.text ?? '', { color: heal ? '#9ad65a' : '#ff6b5a' }).setDepth(43);
+        const t = txt(this, f.x, f.y - 8, f.text ?? '', { color: heal ? '#9ad65a' : '#ff6b5a' }).setDepth(43).setScale(this.ls);
         this.tweens.add({ targets: t, y: t.y - 18, duration: 1100, ease: 'Quad.out' });
         this.tweens.add({ targets: t, alpha: 0, duration: 400, delay: 900, onComplete: () => t.destroy() });
-        if (heal) sfx('powerup', { x: f.x, vol: 0.4, pitch: 1.5 });
-        else sfx('hit', { x: f.x, vol: 0.6 });
+        if (heal) sfx('powerup', { x: this.sx(f.x), vol: 0.4, pitch: 1.5 });
+        else sfx('hit', { x: this.sx(f.x), vol: 0.6 });
         break;
       }
       case 'splash': {
         this.juice.burst(f.x, f.y, 'splash', f.text ? 18 : 10);
-        sfx('splash', { x: f.x, vol: f.text ? 1 : 0.6 });
+        sfx('splash', { x: this.sx(f.x), vol: f.text ? 1 : 0.6 });
         for (let i = 0; i < 7; i++) {
           const drop = this.add.circle(f.x, f.y, 2, 0xbfe9ff).setDepth(41);
           this.tweens.add({ targets: drop, x: f.x + (i - 3) * 5, y: f.y - 14 - Math.random() * 10, duration: 220, ease: 'Quad.out', onComplete: () => this.tweens.add({ targets: drop, y: f.y + 4, alpha: 0, duration: 280, ease: 'Quad.in', onComplete: () => drop.destroy() }) });
         }
         if (f.text) {
-          const t = txt(this, f.x, f.y - 26, f.text, { color: '#bfe9ff' }).setDepth(42);
+          const t = txt(this, f.x, f.y - 26, f.text, { color: '#bfe9ff' }).setDepth(42).setScale(this.ls);
           this.tweens.add({ targets: t, y: t.y - 10, alpha: 0, duration: 1200, delay: 300, onComplete: () => t.destroy() });
         }
         break;
       }
       case 'pow': {
-        const t = txt(this, f.x, f.y - 8, f.text ?? 'POW!', { color: GOLD }).setDepth(42).setScale(0.4);
-        this.tweens.add({ targets: t, scale: 1.2, duration: 160, yoyo: true, hold: 300, onComplete: () => t.destroy() });
+        const t = txt(this, f.x, f.y - 8, f.text ?? 'POW!', { color: GOLD }).setDepth(42).setScale(0.4 * this.ls);
+        this.tweens.add({ targets: t, scale: 1.2 * this.ls, duration: 160, yoyo: true, hold: 300, onComplete: () => t.destroy() });
         const what = f.text ?? '';
         if (what.startsWith('Surf')) {
-          sfx('pop', { x: f.x });
+          sfx('pop', { x: this.sx(f.x) });
           this.juice.burst(f.x, f.y + 8, 'sand', 8);
-        } else if (what.startsWith('Zisch')) sfx('crack', { x: f.x, vol: 0.6 });
+        } else if (what.startsWith('Zisch')) sfx('crack', { x: this.sx(f.x), vol: 0.6 });
         else if (what === 'KRACKS') {
           this.juice.burst(f.x, f.y + 6, 'wood', 12);
-          sfx('crack', { x: f.x });
+          sfx('crack', { x: this.sx(f.x) });
         } else {
-          sfx('hitHard', { x: f.x });
+          sfx('hitHard', { x: this.sx(f.x) });
           this.juice.burst(f.x, f.y, 'spark', 8);
         }
         break;
@@ -653,14 +822,14 @@ export class IgelScene extends Phaser.Scene {
           const sp = this.add.rectangle(f.x, f.y, 2, 2, i % 2 ? 0xf07aa8 : 0xfff3c4).setDepth(41);
           this.tweens.add({ targets: sp, x: f.x + Math.cos(a) * 14, y: f.y + Math.sin(a) * 14, alpha: 0, duration: 500, onComplete: () => sp.destroy() });
         }
-        sfx('powerup', { x: f.x, pitch: 1.6, vol: 0.6 });
+        sfx('powerup', { x: this.sx(f.x), pitch: 1.6, vol: 0.6 });
         break;
       }
       case 'ko': {
-        const t = txt(this, f.x, f.y - 6, f.text ?? 'K.O.', { color: '#fff4d6' }).setDepth(42);
+        const t = txt(this, f.x, f.y - 6, f.text ?? 'K.O.', { color: '#fff4d6' }).setDepth(42).setScale(this.ls);
         this.tweens.add({ targets: t, y: t.y - 14, alpha: 0, duration: 1500, onComplete: () => t.destroy() });
         this.juice.burst(f.x, f.y, 'puff', 10);
-        sfx('ko', { x: f.x });
+        sfx('ko', { x: this.sx(f.x) });
         break;
       }
       case 'water':
@@ -672,10 +841,10 @@ export class IgelScene extends Phaser.Scene {
         // Pro Igel nur eine Blase – ein neuer Spruch ersetzt den alten
         for (const b of this.bubbles.filter((b) => b.hog === f.hog)) b.t.destroy();
         this.bubbles = this.bubbles.filter((b) => b.hog !== f.hog);
-        const t = ink(this, f.x, f.y - 30, f.text, { origin: [0.5, 1] }).setBackgroundColor('#fff6dc').setPadding(3, 2, 3, 2).setDepth(45).setScale(0.3);
-        this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.out' });
-        this.bubbles.push({ t, hog: f.hog, until: this.time.now + IGEL.TAUNT_SHOW_MS });
-        sfx('pop', { x: f.x, vol: 0.4, pitch: 1.3 });
+        const t = ink(this, f.x, f.y - 22 - 8 * this.ls, f.text, { origin: [0.5, 1] }).setBackgroundColor('#fff6dc').setPadding(3, 2, 3, 2).setDepth(45).setScale(0.3 * this.ls);
+        this.tweens.add({ targets: t, scale: this.ls, duration: 160, ease: 'Back.out' });
+        this.bubbles.push({ t, hog: f.hog, until: this.time.now + IGEL.TAUNT_SHOW_MS, born: this.time.now });
+        sfx('pop', { x: this.sx(f.x), vol: 0.4, pitch: 1.3 });
         break;
       }
     }
@@ -703,9 +872,11 @@ export class IgelScene extends Phaser.Scene {
     this.speak(`Themenkarte: ${th.name}! ${th.text}`, true);
   }
 
-  /** Sprecher-Kommentar: Laufschrift unter dem HUD + Ansage */
+  /** Sprecher-Kommentar: Laufschrift unter dem HUD + Ansage (neben der Minikarte, falls es eine gibt) */
   private showQuip(text: string) {
     if (!text) return;
+    const mapW = this.mapG ? IGEL.W - this.mapRect.x : 0;
+    this.quipText.setX((IGEL.W - mapW) / 2).setWordWrapWidth(IGEL.W - mapW - 16);
     this.quipText.setText(text).setVisible(true).setScale(0.4);
     this.tweens.add({ targets: this.quipText, scale: 1, duration: 180, ease: 'Back.out' });
     this.quipUntil = this.time.now + 2800;
@@ -739,10 +910,10 @@ export class IgelScene extends Phaser.Scene {
     this.themeCard.setVisible(false);
     // Terrain wie vor dem Schuss: Seed + die ersten ops0 Operationen (gleiche Bemalung wie live)
     if (this.textures.exists(REPLAY_KEY)) this.textures.remove(REPLAY_KEY);
-    const mask = genTerrain(st.seed);
-    const tex = this.textures.createCanvas(REPLAY_KEY, IGEL.W, IGEL.H)!;
+    const mask = genTerrain(st.seed, this.w);
+    const tex = this.textures.createCanvas(REPLAY_KEY, this.w, IGEL.H)!;
     const ctx = tex.getContext();
-    const img0 = ctx.createImageData(IGEL.W, IGEL.H);
+    const img0 = ctx.createImageData(this.w, IGEL.H);
     paintTerrain(img0, mask);
     ctx.putImageData(img0, 0, 0);
     paintDecor(ctx, st.seed, mask);
@@ -756,14 +927,16 @@ export class IgelScene extends Phaser.Scene {
     const t1 = best.frames[best.frames.length - 1].t;
     buf.replay(t0, t1, best.rate);
     const g = this.add.graphics().setDepth(9);
-    const owner = st.hogs.find((h) => h.owner === best.owner);
-    this.rp = { best, buf, mask, tex, img, applied, hogs: new Map(), projs: new Map(), objs: new Map(), g, fxIdx: 0, camX: owner?.x ?? best.fx0, camY: (owner?.y ?? best.fy0) - 10 };
+    // Kamera startet beim Schützen (sein Igel im ersten Bild der Aufnahme)
+    const f0 = best.frames[0];
+    const own = st.hogs.findIndex((h, i) => h.owner === best.owner && f0.h[i]?.[3] === 0);
+    const camX = own >= 0 ? f0.h[own][0] : best.fx0;
+    const camY = own >= 0 ? f0.h[own][1] - 10 : best.fy0;
+    this.rp = { best, buf, mask, tex, img, applied, hogs: new Map(), projs: new Map(), objs: new Map(), g, fxIdx: 0, camX, camY };
     // Effekte (Partikel, Tweens) laufen im selben Tempo mit
     this.juice.slowMo(best.rate, best.ms + 200);
-    const cam = this.cameras.main;
-    cam.stopFollow();
-    cam.panEffect.reset();
-    cam.zoomTo(1.4, 500, 'Sine.easeInOut', true);
+    this.setGoal({ x: camX, y: camY, z: 1.4 }, 4);
+    this.mapBox.setVisible(false);
     const name = playerById(best.owner)?.name ?? '?';
     const extra = [`${best.dmg} Schaden`, best.kos ? `${best.kos} K.O.` : '', WEAPONS[best.weapon]?.short ?? ''].filter(Boolean).join(' · ');
     this.rpBg.setVisible(true);
@@ -856,7 +1029,7 @@ export class IgelScene extends Phaser.Scene {
     const ty = follow ? follow.y : rp.best.fy0;
     rp.camX += (tx - rp.camX) * 0.08;
     rp.camY += (ty - rp.camY) * 0.08;
-    this.cameras.main.centerOn(rp.camX, rp.camY);
+    this.setGoal({ x: rp.camX, y: rp.camY, z: 1.4 }, this.view.z > 1.35 ? 20 : 4);
   }
 
   private latestIgel(): IgelState | null {
@@ -891,63 +1064,160 @@ export class IgelScene extends Phaser.Scene {
     this.rpBg.setVisible(false);
     this.rpTitle.setText('');
     this.rpSub.setText('');
-    const cam = this.cameras.main;
-    cam.pan(IGEL.W / 2, IGEL.H / 2, 500, 'Sine.easeInOut', true);
-    cam.zoomTo(1, 500, 'Sine.easeInOut', true);
     this.camMode = 'overview';
   }
 
   // ---------------------------------------------------------------- Kamera
 
+  /** Kleinster Zoom: die ganze Inselbreite im Bild (480 → 1, 960 → 0,5) */
+  private zMin() {
+    return Math.min(1, IGEL.W / this.w);
+  }
+
+  private setGoal(g: { x: number; y: number; z: number }, rate: number) {
+    this.viewGoal = { x: g.x, y: g.y, z: g.z, rate };
+  }
+
+  /** Kamera-Ziel, das alle Punkte (Igel-Fußpunkte) mit Rand zeigt – Zoom zwischen ganzer Insel und `zMax` */
+  private fit(pts: { x: number; y: number }[], zMax = 1, pad = 36) {
+    if (!pts.length) return { x: this.w / 2, y: IGEL.H / 2, z: this.zMin() };
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const p of pts) {
+      x0 = Math.min(x0, p.x);
+      x1 = Math.max(x1, p.x);
+      y0 = Math.min(y0, p.y);
+      y1 = Math.max(y1, p.y);
+    }
+    // oben Platz für Igel, HP-Zahl und Sprechblase
+    x0 -= pad;
+    x1 += pad;
+    y0 -= pad + 24;
+    y1 += pad * 0.5;
+    const z = clamp(Math.min(IGEL.W / (x1 - x0), IGEL.H / (y1 - y0)), this.zMin(), zMax);
+    return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z };
+  }
+
+  /** Lebende Igel (geglättete Anzeige-Position) */
+  private alivePts(st: IgelState) {
+    const pts: { x: number; y: number }[] = [];
+    for (const h of st.hogs) {
+      const v = this.hogs.get(h.id);
+      if (v && h.state === 'ok') pts.push({ x: v.x, y: v.y });
+    }
+    return pts;
+  }
+
+  /**
+   * Weich zum Ziel, dann an die Insel klemmen: seitlich nie über den Inselrand, oben etwas Himmel (CAM_SKY),
+   * unten beim Herauszoomen ein Streifen Meer – Himmel und Horizont füllt die Kulisse (layoutBg).
+   */
+  private applyView(dt: number) {
+    const v = this.view;
+    const g = this.viewGoal;
+    const k = 1 - Math.exp(-dt * g.rate);
+    v.z += (g.z - v.z) * k;
+    v.x += (g.x - v.x) * k;
+    v.y += (g.y - v.y) * k;
+    v.z = clamp(v.z, this.zMin(), 2);
+    const vw = IGEL.W / v.z;
+    const vh = IGEL.H / v.z;
+    v.x = vw >= this.w ? this.w / 2 : clamp(v.x, vw / 2, this.w - vw / 2);
+    const yMax = IGEL.H + Math.max(0, vh - IGEL.H) * CAM_SEA - vh / 2;
+    v.y = clamp(v.y, Math.min(yMax, vh / 2 - CAM_SKY), yMax);
+    this.cameras.main.setZoom(v.z).centerOn(v.x, v.y);
+    // Schrift in der Welt: bei Zoom < 1 hochskalieren (bei ganzzahligem Gesamtmaßstab bleibt sie pixelscharf)
+    this.ls = clamp(1 / v.z, 1, 2);
+  }
+
+  /** Kulisse bildfüllend halten (Ebene in Bildschirm-Koordinaten) + Parallax über die Kachel-Verschiebung */
+  private layoutBg() {
+    const z = this.view.z;
+    this.bgLayer.setPosition(IGEL.W / 2 - IGEL.W / 2 / z, IGEL.H / 2 - IGEL.H / 2 / z).setScale(1 / z);
+    const off = this.view.x - this.w / 2;
+    this.midSky.tilePositionX = off * 0.45 - BG_PAD;
+    this.clouds.tilePositionX = this.cloudDrift + off * 0.3 - BG_PAD;
+  }
+
+  /** Stereo-Position eines Geräuschs: Welt-x → Bildschirm-x (0–480) */
+  private sx(x: number) {
+    const wv = this.cameras.main.worldView;
+    return wv.width > 0 ? ((x - wv.x) / wv.width) * IGEL.W : x;
+  }
+
+  /**
+   * Kamera-Regie (live): Rundlauf – Schwenk + Zoom auf den aktiven Igel, dem Geschoss folgen, kurz auf dem Krater halten,
+   * dann Überblick; „Alle gleichzeitig“ – alle lebenden Igel (und fliegenden Geschosse) im Bild, zoomt mit, wenn es leerer wird.
+   */
   private updateCamera(st: IgelState) {
     if (this.rp) return;
-    const cam = this.cameras.main;
-    // Alle gleichzeitig: immer die ganze Insel im Blick
     if (st.simul) {
-      if (this.camMode !== 'overview') {
-        this.camMode = 'overview';
-        cam.stopFollow();
-        cam.panEffect.reset();
-        cam.pan(IGEL.W / 2, IGEL.H / 2, 500, 'Sine.easeInOut', true);
-        cam.zoomTo(1, 500, 'Sine.easeInOut', true);
+      this.camMode = 'overview';
+      const pts = this.alivePts(st);
+      if (st.sub === 'aimAll') {
+        // Möwen-Ziele mit ins Bild
+        for (const a of Object.values(st.aims)) if (a.tx !== undefined) pts.push({ x: a.tx, y: this.mask ? surfaceY(this.mask, a.tx) : IGEL.H / 2 });
+      } else if (st.sub === 'flightAll') {
+        for (const p of this.projs.values()) pts.push({ x: p.x, y: clamp(p.y, 60, IGEL.H) });
       }
+      this.setGoal(this.fit(pts, 1), 2.5);
       return;
     }
     const ah = st.activeHog !== null ? this.hogs.get(st.activeHog) : undefined;
+    const ahOk = !!ah && st.activeHog !== null && st.hogs[st.activeHog]?.state === 'ok';
     // Zugbeginn: Schwenk + Zoom auf den aktiven Igel, Banner „<Name> ist dran“
     if (st.sub === 'aim' && st.turn !== this.camTurn && ah) {
       this.camTurn = st.turn;
       this.camMode = 'hog';
       this.followProj = -1;
-      cam.stopFollow();
-      const target = ah;
-      cam.pan(target.x, target.y - 16, CAM_PAN_MS, 'Sine.easeInOut', true, (_c: Phaser.Cameras.Scene2D.Camera, progress: number) => {
-        if (progress === 1 && this.camMode === 'hog') cam.startFollow(target.c, true, 0.1, 0.1, 0, 16);
-      });
-      cam.zoomTo(ZOOM_NEAR, CAM_PAN_MS, 'Sine.easeInOut', true);
       const name = st.active ? (playerById(st.active)?.name ?? '?') : '?';
       const ahs = st.hogs[st.activeHog!];
       // Team-Modus: wer schon raus ist, steuert den Igel eines Mitspielers
       const sub = ahs && st.active && ahs.owner !== st.active ? `mit ${playerById(ahs.owner)?.name ?? '?'}s Igel` : '';
       this.showBanner(`${name} ist dran`, sub, 1400);
       sfx('select');
+    }
+    if (this.camMode === 'proj') {
+      const p = this.projs.get(this.followProj);
+      if (p) {
+        this.setGoal({ x: p.x, y: p.y, z: ZOOM_NEAR }, 9);
+        return;
+      }
+      this.camMode = 'hold';
+      this.camHoldUntil = this.time.now + CAM_HOLD_MS;
+    }
+    if (this.camMode === 'hold' && this.time.now < this.camHoldUntil) return;
+    // Noch etwas unterwegs (Splitter, Möwen-Eier)? Alle Geschosse im Bild behalten
+    const flying = [...this.projs.values()];
+    if (st.sub === 'flight' && flying.length) {
+      this.camMode = 'hold';
+      this.setGoal(this.fit(flying.map((p) => ({ x: p.x, y: clamp(p.y, 60, IGEL.H) })), 1.2, 30), 5);
       return;
     }
-    if (this.camMode === 'proj') return;
-    if (this.camMode === 'hold' && this.time.now < this.camHoldUntil) return;
-    const want: CamMode = st.sub === 'aim' || st.sub === 'retreat' || st.sub === 'flight' ? 'hog' : 'overview';
-    if (want === this.camMode) return;
+    const want: CamMode = (st.sub === 'aim' || st.sub === 'retreat' || st.sub === 'flight') && ahOk ? 'hog' : 'overview';
     this.camMode = want;
-    cam.stopFollow();
-    cam.panEffect.reset();
     if (want === 'hog' && ah) {
-      // Rückzug (nach Einschlag, Teleport oder Schlag): wieder dem eigenen Igel folgen
-      cam.zoomTo(ZOOM_NEAR, 300, 'Sine.easeOut', true);
-      cam.startFollow(ah.c, true, 0.12, 0.12, 0, 16);
+      const goal = { x: ah.x, y: ah.y - 16, z: ZOOM_NEAR };
+      const aim = st.sub === 'aim' ? st.aim : null;
+      if (aim && aim.tx !== undefined && WEAPONS[st.weapon].aim === 'map') {
+        // Möwen-Luftschlag: Igel und Fadenkreuz zusammen ins Bild
+        this.setGoal(this.fit([{ x: ah.x, y: ah.y }, { x: aim.tx, y: ah.y }], ZOOM_NEAR, 50), 4);
+        return;
+      }
+      // Wurfwaffen: Kamera schaut ein Stück in Zielrichtung
+      if (aim && isThrown(st.weapon)) goal.x += Math.cos(aim.angle) * (16 + 40 * aim.power);
+      // Böller gelegt: beim Weglaufen den Böller mit im Bild behalten
+      const dyn = st.sub === 'retreat' ? st.projs.find((p) => p.type === 'dynamite') : undefined;
+      if (dyn) {
+        this.setGoal(this.fit([{ x: ah.x, y: ah.y }, { x: dyn.x, y: dyn.y }], ZOOM_NEAR, 50), 5);
+        return;
+      }
+      this.setGoal(goal, 5);
     } else {
-      // Settle/Ende: Überblick über die ganze Insel
-      cam.pan(IGEL.W / 2, IGEL.H / 2, 500, 'Sine.easeInOut', true);
-      cam.zoomTo(1, 500, 'Sine.easeInOut', true);
+      // Settle/Countdown/Ende: alle lebenden Igel (bei 480 ist das die ganze Insel)
+      this.setGoal(this.fit(this.alivePts(st), 1), 3);
     }
   }
 
@@ -996,8 +1266,8 @@ export class IgelScene extends Phaser.Scene {
       for (let i = 2; i < n; i++) {
         if (i % 3 === 0) continue;
         const [p0, p1] = [c.pts[i - 1], c.pts[i]];
-        g.lineStyle(4, 0x2d1b12, 0.6).lineBetween(p0.x, p0.y, p1.x, p1.y);
-        g.lineStyle(2, pathCol, 1).lineBetween(p0.x, p0.y, p1.x, p1.y);
+        g.lineStyle(4 * this.ls, 0x2d1b12, 0.6).lineBetween(p0.x, p0.y, p1.x, p1.y);
+        g.lineStyle(2 * this.ls, pathCol, 1).lineBetween(p0.x, p0.y, p1.x, p1.y);
       }
       // Kurzer Kraftpfeil am Igel, die Flugbahn zeigt den Rest
       if (col === null) {
@@ -1027,11 +1297,11 @@ export class IgelScene extends Phaser.Scene {
     const dt = Math.min(0.1, delta / 1000);
 
     // Wind: Wolkenebene und ein paar Sandkörner/Blätter ziehen mit
-    this.clouds.tilePositionX -= st.wind * CLOUD_SPEED * dt;
+    this.cloudDrift -= st.wind * CLOUD_SPEED * dt;
     for (const p of this.specks) {
       p.x += st.wind * CLOUD_SPEED * 2.2 * dt;
-      if (p.x > IGEL.W + 4) p.x -= IGEL.W + 8;
-      if (p.x < -4) p.x += IGEL.W + 8;
+      if (p.x > this.w + 4) p.x -= this.w + 8;
+      if (p.x < -4) p.x += this.w + 8;
       p.r.setPosition(Math.round(p.x), Math.round(p.y + Math.sin(time / 300 + p.ph) * 3)).setAlpha(Math.min(0.9, Math.abs(st.wind) * 1.2));
     }
 
@@ -1041,6 +1311,8 @@ export class IgelScene extends Phaser.Scene {
     }
     if (this.rp) {
       this.updateReplay(time);
+      this.applyView(dt);
+      this.layoutBg();
       return;
     }
 
@@ -1063,9 +1335,27 @@ export class IgelScene extends Phaser.Scene {
       }
       v.umb.setVisible(h.state === 'ok' && !!h.chute).setAngle(Math.sin(time / 300) * 6);
       v.c.setDepth(h.id === st.activeHog ? 12 : 10);
+      // HP-Zahl und Team-Fähnchen gegen den Zoom ausgleichen (Unterkante bleibt über dem Igel)
+      v.label.setScale(this.ls).setY(-16 - 8 * this.ls);
+      v.flag?.setScale(this.ls).setPosition(-9 - 8 * this.ls, -16 - 8 * this.ls);
+    }
+
+    // Geschosse
+    for (const p of st.projs) {
+      const v = this.projs.get(p.id);
+      if (!v) continue;
+      v.x += (p.x - v.x) * 0.6;
+      v.y += (p.y - v.y) * 0.6;
+      v.img.setPosition(Math.round(v.x), Math.round(v.y));
+      if (p.type === 'bazooka' || p.type === 'frag') v.img.setAngle(time * 0.8);
+      else if (p.type === 'cluster' || p.type === 'holy') v.img.setAngle(time * 0.4);
+      else if (p.type === 'dynamite') v.img.setAlpha(0.75 + Math.sin(time / 60) * 0.25);
     }
 
     this.updateCamera(st);
+    this.applyView(dt);
+    this.layoutBg();
+    this.drawMiniMap(st, time);
 
     // Sprechblasen der Zuschauer folgen ihrem Igel
     this.bubbles = this.bubbles.filter((b) => {
@@ -1076,7 +1366,8 @@ export class IgelScene extends Phaser.Scene {
       }
       const hs = st.hogs[b.hog];
       const drowned = hs?.state === 'drowned';
-      b.t.setPosition(Math.round(drowned ? b.t.x : v.x), Math.round(drowned ? this.waterY - 12 : v.y - 30));
+      if (time > b.born + 170) b.t.setScale(this.ls);
+      b.t.setPosition(Math.round(drowned ? b.t.x : v.x), Math.round(drowned ? this.waterY - 12 : v.y - 22 - 8 * this.ls));
       return true;
     });
 
@@ -1088,10 +1379,10 @@ export class IgelScene extends Phaser.Scene {
       const bob = Math.sin(time / 160) * 2;
       const ctrl = st.active ?? ahs.owner;
       const col = colorNum(colorOf(st, ctrl));
-      const ty = ah.y - 34 + bob;
+      const ty = ah.y - 26 - 8 * this.ls + bob;
       this.aimG.fillStyle(0x2d1b12).fillTriangle(ah.x - 5, ty - 1, ah.x + 5, ty - 1, ah.x, ty + 6);
       this.aimG.fillStyle(col).fillTriangle(ah.x - 3, ty, ah.x + 3, ty, ah.x, ty + 4);
-      this.activeName.setText(playerById(ctrl)?.name ?? '').setPosition(Math.round(ah.x), Math.round(ty - 12)).setColor(colorOf(st, ctrl)).setVisible(true);
+      this.activeName.setText(playerById(ctrl)?.name ?? '').setScale(this.ls).setPosition(Math.round(ah.x), Math.round(ty - 4 - 8 * this.ls)).setColor(colorOf(st, ctrl)).setVisible(true);
       if (st.sub === 'aim' && st.aim) this.drawAim(st, ahs.id, ah.x, ah.y, st.weapon, st.aim, null, time);
     } else this.activeName.setVisible(false);
     if (st.simul && st.sub === 'aimAll') {
@@ -1102,25 +1393,15 @@ export class IgelScene extends Phaser.Scene {
         const col = colorNum(colorOf(st, h.owner));
         if (aim) this.drawAim(st, h.id, v.x, v.y, st.weapons[h.owner] ?? 'bazooka', aim, col, time);
         if (st.locked.includes(h.owner)) {
-          // Häkchen: dieser Igel ist bereit
+          // Häkchen: dieser Igel ist bereit (wächst beim Herauszoomen mit, wie die HP-Zahl)
+          const s = this.ls;
           const x = Math.round(v.x);
-          const y = Math.round(v.y - 32);
-          this.aimG.fillStyle(0x2d1b12).fillRect(x - 5, y - 1, 11, 9);
-          this.aimG.fillStyle(0x46b04a).fillRect(x - 4, y, 9, 7);
-          this.aimG.fillStyle(0xfdf7ea).fillRect(x - 3, y + 3, 2, 2).fillRect(x - 1, y + 4, 2, 2).fillRect(x + 1, y + 2, 2, 2).fillRect(x + 2, y + 1, 2, 2);
+          const y = Math.round(v.y - 15 - 17 * s);
+          this.aimG.fillStyle(0x2d1b12).fillRect(x - 5 * s, y - s, 11 * s, 9 * s);
+          this.aimG.fillStyle(0x46b04a).fillRect(x - 4 * s, y, 9 * s, 7 * s);
+          this.aimG.fillStyle(0xfdf7ea).fillRect(x - 3 * s, y + 3 * s, 2 * s, 2 * s).fillRect(x - s, y + 4 * s, 2 * s, 2 * s).fillRect(x + s, y + 2 * s, 2 * s, 2 * s).fillRect(x + 2 * s, y + s, 2 * s, 2 * s);
         }
       }
-    }
-    // Geschosse
-    for (const p of st.projs) {
-      const v = this.projs.get(p.id);
-      if (!v) continue;
-      v.x += (p.x - v.x) * 0.6;
-      v.y += (p.y - v.y) * 0.6;
-      v.img.setPosition(Math.round(v.x), Math.round(v.y));
-      if (p.type === 'bazooka' || p.type === 'frag') v.img.setAngle(time * 0.8);
-      else if (p.type === 'cluster' || p.type === 'holy') v.img.setAngle(time * 0.4);
-      else if (p.type === 'dynamite') v.img.setAlpha(0.75 + Math.sin(time / 60) * 0.25);
     }
 
     // Gegenstände (fallen weich nach, Kisten schweben am Schirm, ausgelöste Minen blinken)
@@ -1140,19 +1421,20 @@ export class IgelScene extends Phaser.Scene {
     for (const r of this.rings) {
       r.img.x += r.vx * (1 / 60);
       r.img.y = this.waterY + Math.sin(time / 300 + r.img.x / 20) * 1.5;
-      if (r.img.x < -20 || r.img.x > IGEL.W + 20) r.img.setVisible(false);
+      if (r.img.x < -20 || r.img.x > this.w + 20) r.img.setVisible(false);
     }
   }
 
-  /** Wasser (steigt im Sudden Death; `k` = wie schnell der Spiegel nachzieht) */
+  /** Wasser über die ganze Inselbreite (steigt im Sudden Death; `k` = wie schnell der Spiegel nachzieht) – reicht beim Herauszoomen bis unten ins Bild */
   private drawWater(target: number, time: number, k: number) {
     this.waterY += (target - this.waterY) * k;
     const wy = this.waterY;
     const g = this.waterG;
+    const deep = IGEL.H * 2;
     g.clear();
-    g.fillStyle(0x3784c2, 0.82).fillRect(0, wy + 2, IGEL.W, IGEL.H - wy);
-    g.fillStyle(0x2b6ba6, 0.5).fillRect(0, wy + 12, IGEL.W, IGEL.H - wy);
-    for (let x = 0; x < IGEL.W; x += 3) {
+    g.fillStyle(0x3784c2, 0.82).fillRect(-8, wy + 2, this.w + 16, deep - wy);
+    g.fillStyle(0x2b6ba6, 0.5).fillRect(-8, wy + 12, this.w + 16, deep - wy);
+    for (let x = -6; x < this.w + 6; x += 3) {
       const off = Math.round(Math.sin(x / 11 + time / 400) * 1.5 + Math.sin(x / 5 + time / 260) * 0.7);
       g.fillStyle(0x4aa2dc, 0.9).fillRect(x, wy + off, 3, 3);
       g.fillStyle(0xeaf8ff, 0.95).fillRect(x, wy + off - 1, 3, 1);
@@ -1292,7 +1574,7 @@ function stampOps(mask: Mask, tex: Phaser.Textures.CanvasTexture, ops: IgelOp[],
     const pad = kind === 'add' ? 1 : 4;
     const x0 = Math.max(0, Math.floor(cx - r - pad));
     const y0 = Math.max(0, Math.floor(cy - r - pad));
-    const x1 = Math.min(IGEL.W, Math.ceil(cx + r + pad));
+    const x1 = Math.min(mask.w, Math.ceil(cx + r + pad));
     const y1 = Math.min(IGEL.H, Math.ceil(cy + r + pad));
     if (x1 <= x0 || y1 <= y0) continue;
     const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0);
@@ -1304,19 +1586,20 @@ function stampOps(mask: Mask, tex: Phaser.Textures.CanvasTexture, ops: IgelOp[],
   return i;
 }
 
-/** Palmen und Sonnenschirm direkt ins Terrain malen (gehen bei Explosionen mit kaputt) */
+/** Palmen und Sonnenschirm direkt ins Terrain malen (gehen bei Explosionen mit kaputt) – 3 je 480 px Inselbreite */
 function paintDecor(ctx: CanvasRenderingContext2D, seed: number, m: Mask) {
   const r = seeded(seed ^ 0x5eed);
   const used: number[] = [];
   const items = [() => O.palm(6), () => O.palm(11), () => O.umbrella(C.red), () => O.umbrella(C.blue)];
+  const k = m.w / IGEL.W;
   let placed = 0;
-  for (let tries = 0; tries < 60 && placed < 3; tries++) {
-    const x = 30 + Math.floor(r() * (IGEL.W - 60));
+  for (let tries = 0; tries < 60 * k && placed < Math.round(3 * k); tries++) {
+    const x = 30 + Math.floor(r() * (m.w - 60));
     const sy = surfaceY(m, x);
     if (sy > IGEL.WATER_Y - 22 || sy < 60 || used.some((u) => Math.abs(u - x) < 70)) continue;
     if (Math.abs(surfaceY(m, x - 6) - surfaceY(m, x + 6)) > 6) continue;
     // Nur auf festem Boden (nicht auf schwebenden Felsen oder über Höhlen)
-    if (![6, 14, 24, 34].every((dy) => m[(sy + dy) * IGEL.W + x] === 1)) continue;
+    if (![6, 14, 24, 34].every((dy) => m[(sy + dy) * m.w + x] === 1)) continue;
     const pix = items[Math.floor(r() * items.length)]();
     ctx.drawImage(pix.canvas, Math.round(x - pix.w / 2), sy - pix.h + 3);
     used.push(x);
@@ -1331,7 +1614,7 @@ function paintPlank(img: ImageData, ox: number, oy: number, cx: number, cy: numb
     for (let i = 0; i < img.width; i++) {
       const x = ox + i;
       const y = oy + j;
-      if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > r + 0.01 || !mask[y * IGEL.W + x]) continue;
+      if (Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > r + 0.01 || !mask[y * mask.w + x]) continue;
       const k = (j * img.width + i) * 4;
       if (d[k + 3] > 0 && !(d[k] === 0xff && d[k + 1] === 0xd2) && !(d[k] === 0xe0 && d[k + 1] === 0x50) && !(d[k] === 0xa8 && d[k + 1] === 0x34)) continue;
       const dy = y + 0.5 - cy;

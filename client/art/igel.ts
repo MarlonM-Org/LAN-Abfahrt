@@ -120,11 +120,15 @@ export function paintIslandSky(p: Pix, seed: number, layer: BgLayer = 'all') {
     }
   }
   if (!L.mid) return;
-  // Ferne Inseln am Horizont
+  // Ferne Inseln am Horizont – nahtlos kachelbar (breite Inseln schwenken die Ebene als TileSprite):
+  // was über den Rand ragt, wird auf der anderen Seite noch einmal gemalt
   for (let i = 0; i < 3; i++) {
     const cx = r() * W;
-    p.ellipse(cx, 214, 30 + r() * 30, 12, '#8fb8c9');
-    p.vline(cx, 196, 12, '#7aa3b5').ellipse(cx + 2, 196, 6, 2, '#7aa3b5');
+    const rx = 30 + r() * 30;
+    for (const dx of [-W, 0, W]) {
+      p.ellipse(cx + dx, 214, rx, 12, '#8fb8c9');
+      p.vline(cx + dx, 196, 12, '#7aa3b5').ellipse(cx + dx + 2, 196, 6, 2, '#7aa3b5');
+    }
   }
   // Meer weit hinten
   p.rect(0, 212, W, H - 212, '#5fb3e3');
@@ -162,9 +166,10 @@ const hash = (x: number, y: number) => {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 };
 
-/** Malt die Inselmaske in ein ImageData (Gras oben, Sand am Strand, Erde mit Steinen innen). */
+/** Malt die Inselmaske in ein ImageData gleicher Breite (Gras oben, Sand am Strand, Erde mit Steinen innen). */
 export function paintTerrain(img: ImageData, m: Mask) {
-  const { W, H } = IGEL;
+  const W = m.w;
+  const { H } = IGEL;
   const d = img.data;
   for (let x = 0; x < W; x++) {
     let depth = 0;
@@ -205,7 +210,7 @@ export function paintTerrain(img: ImageData, m: Mask) {
 
 /** Nach einem Krater: Pixel im Bereich neu setzen (weg = transparent, Rand = angekokelt) */
 export function paintCrater(img: ImageData, ox: number, oy: number, m: Mask, cx: number, cy: number, r: number) {
-  const { W } = IGEL;
+  const W = m.w;
   const d = img.data;
   const w = img.width;
   const h = img.height;

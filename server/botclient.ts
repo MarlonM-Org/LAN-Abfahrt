@@ -1952,7 +1952,7 @@ async function igelTool(bot: Bot, st: IgelState, hogId: number, still: () => Ige
   const ammo = st.ammo[bot.id];
   if (!hog || !ammo) return;
   const foe = st.hogs.filter((h) => h.state === 'ok' && !sameSide(st, h.owner, bot.id)).sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
-  const toward: 1 | -1 = foe ? (foe.x >= hog.x ? 1 : -1) : hog.x < 240 ? 1 : -1;
+  const toward: 1 | -1 = foe ? (foe.x >= hog.x ? 1 : -1) : hog.x < st.w / 2 ? 1 : -1;
   const mask = igelMask(st);
   // Liane nur, wenn über dem Igel etwas zum Festhaken ist
   const ropeAngles: number[] = [];
@@ -2014,7 +2014,7 @@ async function igelWalk(bot: Bot, st: IgelState, hog: IgelState['hogs'][number])
     .filter((o) => o.type === 'crate' && !o.chute && Math.abs(o.x - hog.x) < 80 && Math.abs(o.y - hog.y) < 16)
     .sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
   const foe = st.hogs.filter((h) => h.state === 'ok' && !sameSide(st, h.owner, bot.id)).sort((a, b) => Math.abs(a.x - hog.x) - Math.abs(b.x - hog.x))[0];
-  const dir = crate ? (crate.x > hog.x ? 1 : -1) : foe ? (foe.x > hog.x ? 1 : -1) : hog.x < 240 ? 1 : -1;
+  const dir = crate ? (crate.x > hog.x ? 1 : -1) : foe ? (foe.x > hog.x ? 1 : -1) : hog.x < st.w / 2 ? 1 : -1;
   // Nur laufen, wenn der Weg nicht ins Meer oder einen Abgrund führt
   const dist = crate ? Math.abs(crate.x - hog.x) + 4 : 24;
   let safe = true;
@@ -2052,8 +2052,9 @@ async function igelShoot(bot: Bot, plan: IgelPlan) {
 let terrainCache: { seed: number; n: number; mask: Mask } | null = null;
 
 function igelMask(st: IgelState): Mask {
-  if (!terrainCache || terrainCache.seed !== st.seed || terrainCache.n > st.ops.length) {
-    terrainCache = { seed: st.seed, n: st.ops.length, mask: buildTerrain(st.seed, st.ops) };
+  const w = st.w;
+  if (!terrainCache || terrainCache.seed !== st.seed || terrainCache.mask.w !== w || terrainCache.n > st.ops.length) {
+    terrainCache = { seed: st.seed, n: st.ops.length, mask: buildTerrain(st.seed, st.ops, w) };
   }
   for (; terrainCache.n < st.ops.length; terrainCache.n++) applyOp(terrainCache.mask, st.ops[terrainCache.n]);
   return terrainCache.mask;
@@ -2075,7 +2076,7 @@ export function planIgelShot(st: IgelState, me: string, hogId: number, force?: I
     const w = pool[Math.floor(Math.random() * pool.length)] ?? 'bazooka';
     const toward = near ? (near.x >= hog.x ? 0 : Math.PI) : 0;
     const angle = toward + (toward ? 0.5 : -0.5) + rand(-0.3, 0.3);
-    return { weapon: w, angle, power: rand(0.35, 0.8), tx: w === 'airstrike' ? Math.round(near?.x ?? 240) : undefined };
+    return { weapon: w, angle, power: rand(0.35, 0.8), tx: w === 'airstrike' ? Math.round(near?.x ?? st.w / 2) : undefined };
   }
   if (!force && near && Math.abs(near.x - hog.x) < PUNCH.REACH - 2 && Math.abs(near.y - hog.y) < 10) {
     return { weapon: 'punch', angle: near.x >= hog.x ? -0.3 : Math.PI + 0.3, power: 0.5 };
