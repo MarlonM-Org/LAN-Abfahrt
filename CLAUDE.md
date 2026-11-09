@@ -14,6 +14,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run test:wolfrunde` – Tests ohne Browser für Werwolf mit Erzähler (Stapel-Regeln, Geheimhaltung: TV ohne Karten, jeder nur seine, Erzähler alle; Dieb, Totenkopf, Ergebnis)
 - `npm run test:band` – Tests ohne Browser für die Strand-Band (jede Instrumentenspur jedes Songs spielbar und hörbar im Song, Besetzung, Ablauf mit Groove und Band-Bonus)
 - `npm run test:maler` – Tests ohne Browser für Montagsmaler live (Wortliste ohne Dubletten, unscharfer Vergleich, Hinweise, Strich-Ops/Schlüsselbild/Neuabgleich, Wort nie im Snapshot, kompletter Ablauf)
+- `npm run test:lexikon` – Tests ohne Browser fürs Lügen-Lexikon (Einträge: Dubletten, Lücke, Wahrheit kurz, Haus-Lügen ≠ Wahrheit; unscharfer Vergleich „zu nah an der Wahrheit“; Ablauf mit Abweisen, Zusammenfassen, Auffüllen, Punkten, kein Eintrag doppelt pro Abend)
 - `npm run test:music` – Tests ohne Browser für Tonhöhenerkennung (Einsingen), MIDI-Parser und alle eingebauten Songs (Offline-Rendern: Pegel, Länge, stumme Kanäle, Szenen-Zuordnung); `npm run render:music -- <ordner>` schreibt sie als WAV
 
 ## Architektur-Regeln

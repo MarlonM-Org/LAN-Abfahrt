@@ -45,6 +45,7 @@ import { pickSuess } from './screens/suess';
 import { pickUmzug } from './screens/umzug';
 import { pickWackel } from './screens/wackel';
 import { pickSchaetz } from './screens/schaetz';
+import { pickLexikon } from './screens/lexikon';
 import { pickLieder } from './screens/lieder';
 import { pickMaexchen } from './screens/maexchen';
 import { pickBogen } from './screens/bogen';
@@ -419,6 +420,8 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickKugel(m.state);
     case 'schaetz':
       return pickSchaetz(m.state, vip);
+    case 'lexikon':
+      return pickLexikon(m.state, vip);
     case 'lieder':
       return pickLieder(m.state, vip);
     case 'maexchen':
