@@ -1078,9 +1078,12 @@ export class IgelScene extends Phaser.Scene {
     this.viewGoal = { x: g.x, y: g.y, z: g.z, rate };
   }
 
-  /** Kamera-Ziel, das alle Punkte (Igel-Fußpunkte) mit Rand zeigt – Zoom zwischen ganzer Insel und `zMax` */
+  /**
+   * Kamera-Ziel, das alle Punkte (Igel-Fußpunkte) mit Rand zeigt – Zoom zwischen ganzer Insel und `zMax`.
+   * Überblick (`zMax` ≤ 1): unten verankert (Meer und Flut im Bild) – bei Zoom 1 genau die Welt 0–270 wie früher.
+   */
   private fit(pts: { x: number; y: number }[], zMax = 1, pad = 36) {
-    if (!pts.length) return { x: this.w / 2, y: IGEL.H / 2, z: this.zMin() };
+    if (!pts.length) return { x: this.w / 2, y: IGEL.H * 2, z: this.zMin() };
     let x0 = Infinity;
     let x1 = -Infinity;
     let y0 = Infinity;
@@ -1097,7 +1100,7 @@ export class IgelScene extends Phaser.Scene {
     y0 -= pad + 24;
     y1 += pad * 0.5;
     const z = clamp(Math.min(IGEL.W / (x1 - x0), IGEL.H / (y1 - y0)), this.zMin(), zMax);
-    return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, z };
+    return { x: (x0 + x1) / 2, y: zMax <= 1 ? IGEL.H * 2 : (y0 + y1) / 2, z };
   }
 
   /** Lebende Igel (geglättete Anzeige-Position) */

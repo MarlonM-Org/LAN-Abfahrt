@@ -36,7 +36,7 @@ export function pickIgel(s: IgelState): Screen {
       : 'Wenn du dran bist: laufen, Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER.';
     const th = IGEL_THEMES[s.theme];
     const card = th ? `Themenkarte ${th.icon} ${th.name}: ${th.text} ` : '';
-    return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
+    return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der ${s.w > IGEL.W ? 'großen ' : ''}Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
   }
   if (s.sub === 'replay') return ['ig-over-replay', message('Schuss des Abends!', 'Die Wiederholung läuft am Fernseher.')];
   if (s.sub === 'over') {
