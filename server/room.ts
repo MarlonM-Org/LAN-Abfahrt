@@ -51,6 +51,7 @@ import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
 import { RhythmGame } from './rhythm';
+import { BandGame } from './band';
 import { WrapGame } from './wrap';
 import { StarsGame } from './stars';
 import { Board, type PartySave, partyResumeInfo, resumeSave } from './board';
@@ -929,6 +930,7 @@ export class Room {
       lookOf: (id) => this.players.get(id)?.look,
       colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
+      board: !!this.board,
       teams: opts?.teams ?? null,
       warmTeams: opts?.warmTeams ?? null,
       ...(practice ? { practice: true } : {}),
@@ -1084,6 +1086,8 @@ export class Room {
         return new MaexGame(ids, ctx);
       case 'werwars':
         return new WerwarsGame(ids, ctx, this.werwarsQ.all);
+      case 'band':
+        return new BandGame(ids, ctx);
     }
   }
 

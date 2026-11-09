@@ -87,6 +87,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   skisprung: { title: 'Schanzen-Springen', icon: '🎿', inspiredBy: 'Wii Fit', tagline: 'Balance Board: Hocke, Absprung, fliegen!', minPlayers: 1, orientation: 'any' },
   teppich: { title: 'Teppich-Parcours', icon: '🧞', tagline: 'Balance Board: Lehnend durch die Wüstenstadt fliegen!', minPlayers: 1, orientation: 'any' },
   kugel: { title: 'Tempel-Kugel', icon: '🔮', inspiredBy: 'Marble Madness', tagline: 'Balance Board: Kugel über den Abgrund lehnen!', minPlayers: 1, orientation: 'any' },
+  band: { title: 'Strand-Band', icon: '🎸', inspiredBy: 'Rock Band', tagline: 'Jedes Handy ein Instrument – bleibt im Takt, dann tobt der Strand!', minPlayers: 2, orientation: 'portrait' },
 };
 
 /** „🏎️ Kart-Rennen“ – Titel mit Icon für Listen und Ansagen */
@@ -169,6 +170,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   skisprung: { goal: 'Auf dem Balance Board: im Anlauf ruhig in der Mitte stehen, bei „JETZT ABSPRINGEN!“ einmal kräftig hochdrücken, im Flug leicht nach vorn lehnen – und weit fliegen!', controls: [{ icon: '⚖️', text: '1 Anlauf: ruhig mittig, nicht lehnen' }, { icon: '⤴️', text: '2 Am Tisch: einmal abspringen' }, { icon: '🛫', text: '3 Flug: leicht nach vorn lehnen' }] },
   teppich: { goal: 'Auf dem Balance Board durch die Wüstenstadt fliegen: Juwelen holen, Türmen und Geiern ausweichen.', controls: [{ icon: '⬆️', text: 'Nach hinten lehnen = steigen' }, { icon: '⬇️', text: 'Nach vorn lehnen = sinken' }, { icon: '➡️', text: 'Rechts = schneller, links = bremsen' }] },
   kugel: { goal: 'Auf dem Balance Board die Kugel über den schmalen, moosigen Tempelpfad ins Ziel lehnen – ohne in den Abgrund zu rollen.', controls: [{ icon: '⬆️', text: 'Vorn lehnen = Gas' }, { icon: '↪️', text: 'Seitlich = drehen (Hoverboard)' }, { icon: '🛑', text: 'Hinten lehnen = bremsen' }] },
+  band: { goal: 'Jedes Handy ist ein Instrument: Tippt eure Noten im Takt – zusammen groovt die Band!', controls: [{ icon: '🎸', text: 'Instrument wählen (★ = leicht)' }, { icon: '👆', text: 'Tippen, wenn die Note ankommt' }, { icon: '✋', text: 'Lange Noten gedrückt halten' }] },
 };
 
 /**
@@ -189,7 +191,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'band'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
@@ -281,6 +283,8 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   teppich: 'lang',
   // reihum: Einmessen + ≈ 30–50 s Rollen (je Absturz +4 s) + Auswertung ≈ 50 s pro Spieler
   kugel: 'lang',
+  // Instrument wählen ≤ 25 s + Einzähler + Song ≈ 60 s + Schluss ≈ 1,5 min
+  band: 'kurz',
 };
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
@@ -889,13 +893,13 @@ const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'R
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele und ohne Date-Night-Kapitel) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'band'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess', 'wackel'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'sekt', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
-  { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug'] },
+  { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug', 'band'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf', 'wolfrunde'] },
   { title: 'Balance Board', kinds: ['skisprung', 'teppich', 'kugel'] },
   { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'] },

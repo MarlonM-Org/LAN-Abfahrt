@@ -162,6 +162,11 @@ export interface PlayOptions {
   mute?: Partial<Record<'lead' | 'bass' | 'harmony' | 'drums', boolean>>;
   /** Metronom-Klick auf jeden Schlag */
   click?: boolean;
+  /**
+   * Eigene Ausgänge pro Song-Teil statt `musicBus` (z. B. Strand-Band: jede Spur einzeln leiser/dumpfer).
+   * Fehlende Teile gehen wie bisher auf den Musik-Bus.
+   */
+  out?: Partial<Record<'lead' | 'bass' | 'harmony' | 'kick' | 'snare' | 'hat', AudioNode>>;
   /** Wird für jeden geplanten Schritt aufgerufen (Schritt, AudioContext-Zeit) */
   onStep?: (step: number, time: number) => void;
   onEnd?: () => void;
@@ -254,23 +259,25 @@ export class SongPlayer {
     }
   }
 
-  private channel(ch: MelodicChannel, step: number, time: number, stepDur: number) {
+  private channel(ch: MelodicChannel, step: number, time: number, stepDur: number, out: AudioNode = this.synth.musicBus) {
     for (const n of ch.notes) {
       if (n.step !== step) continue;
-      this.synth.tone(midiHz(n.midi), time, n.len * stepDur, ch.wave, ch.volume, this.synth.musicBus, ch.env);
+      this.synth.tone(midiHz(n.midi), time, n.len * stepDur, ch.wave, ch.volume, out, ch.env);
     }
   }
 
   private playStep(song: Song, s: number, time: number, stepDur: number) {
     const m = this.opts.mute ?? {};
-    if (!m.bass) this.channel(song.bass, s, time, stepDur);
-    if (!m.harmony) this.channel(song.harmony, s, time, stepDur);
-    if (!m.lead) this.channel(song.lead, s, time, stepDur);
+    const o = this.opts.out ?? {};
+    const bus = this.synth.musicBus;
+    if (!m.bass) this.channel(song.bass, s, time, stepDur, o.bass);
+    if (!m.harmony) this.channel(song.harmony, s, time, stepDur, o.harmony);
+    if (!m.lead) this.channel(song.lead, s, time, stepDur, o.lead);
     if (!m.drums) {
       const d = song.drums;
-      if (d.kick.includes(s)) this.synth.kick(time, this.synth.musicBus, 0.35 * d.volume);
-      if (d.snare.includes(s)) this.synth.snare(time, this.synth.musicBus, 0.12 * d.volume);
-      if (d.hat.includes(s)) this.synth.hat(time, this.synth.musicBus, 0.05 * d.volume);
+      if (d.kick.includes(s)) this.synth.kick(time, o.kick ?? bus, 0.35 * d.volume);
+      if (d.snare.includes(s)) this.synth.snare(time, o.snare ?? bus, 0.12 * d.volume);
+      if (d.hat.includes(s)) this.synth.hat(time, o.hat ?? bus, 0.05 * d.volume);
     }
     if (this.opts.click && s % 4 === 0) this.synth.click(time, s % STEPS_PER_BAR === 0);
   }
