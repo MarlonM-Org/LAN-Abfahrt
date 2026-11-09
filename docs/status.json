@@ -1,12 +1,41 @@
 {
-  "updated": "2026-11-09T13:27+00:00",
+  "updated": "2026-11-09T13:28+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
-  "queue": [],
+  "inProgress": [
+    {
+      "title": "Neues Spiel: Montagsmaler live (à la skribbl.io) – einer malt am Handy, Striche erscheinen live am TV, alle anderen raten per Tastatur, Buchstaben-Hinweise, unscharfer Wortvergleich"
+    },
+    {
+      "title": "Neues Spiel: Strand-Band (Rhythmus-Party) – eingebauter Song, jedes Handy ein Instrument mit eigener Notenspur, TV-Bühne mit wippenden Avataren und Gruppen-Combo"
+    },
+    {
+      "title": "Neues Spiel: Sektkorken (fürs Spielbrett) – alle schütteln gleichzeitig, Druck aufbauen, auf „PLOPP!“ loslassen, zu viel Druck = Flasche platzt; ohne Sensor reiben"
+    },
+    {
+      "title": "Neues Spiel: Lügen-Lexikon (à la Fibbage) – seltsames echtes Wort/Fakt mit Lücke, alle schreiben eine Fälschung, dann auf die Wahrheit tippen; Punkte für Wahrheit + Reingefallene"
+    },
+    {
+      "title": "Igel-Krieg: größere Insel (720–960 breit) mit Kamera-Mitfahrt und Minikarte – letzter offener Punkt aus Stufe M"
+    }
+  ],
+  "queue": [
+    {
+      "title": "Neues Spiel: Strandkorb-Scharade (à la Heads Up) – Begriff am Handy, Kippen = erraten/überspringen, Teams"
+    },
+    {
+      "title": "Neues Spiel: Geheimcode am Pool (à la Codenames) – 5 × 5 Wörter am TV, nur die Chefs sehen die Farbkarte"
+    },
+    {
+      "title": "Neues Spiel: Kofferbombe entschärfen (à la Keep Talking) – einer sieht die Bombe, die anderen je eine Handbuch-Seite"
+    },
+    {
+      "title": "Neues Spiel: Urlaubs-Wahnsinn (à la WarioWare) – 5-Sekunden-Mikrospiele am Handy, alle gleichzeitig, 3 Leben"
+    }
+  ],
   "done": [
     {
       "title": "Fallen-Parcours: Teil wird nicht mehr beim ersten Joystick-Tipp eingebaut (der ganze Platzier-Bildschirm wirkte als PLATZIEREN-Knopf) – jetzt baut nur der grüne Knopf ein, grau wenn's dort nicht passt",
