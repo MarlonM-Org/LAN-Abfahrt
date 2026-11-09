@@ -16,6 +16,7 @@ import type { TepState } from './teppich';
 import type { KugelState } from './kugel';
 import type { SuessState } from './suess';
 import type { UmzugState } from './umzug';
+import type { SektState } from './sekt';
 
 export interface Look {
   skin: number;
@@ -56,6 +57,7 @@ export type MiniKind =
   | 'sup' | 'tidy'
   | 'flieger' | 'kurve' | 'arena'
   | 'bowling'
+  | 'sekt'
   | 'enten'
   | 'ttt'
   | 'verstecken'
@@ -2260,6 +2262,7 @@ export type MiniSnapshot =
   | { kind: 'kurve'; state: KurveState }
   | { kind: 'arena'; state: ArenaState }
   | { kind: 'bowling'; state: BowlingState }
+  | { kind: 'sekt'; state: SektState }
   | { kind: 'enten'; state: EntenState }
   | { kind: 'ttt'; state: TttState }
   | { kind: 'verstecken'; state: VerstState }

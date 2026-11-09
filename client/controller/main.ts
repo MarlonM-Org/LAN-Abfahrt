@@ -17,6 +17,7 @@ import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
 import { pickBowling } from './screens/bowling';
+import { pickSekt } from './screens/sekt';
 import { pickBoule } from './screens/boule';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
@@ -338,6 +339,8 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickArena(m.state);
     case 'bowling':
       return pickBowling(m.state);
+    case 'sekt':
+      return pickSekt(m.state);
     case 'enten':
       return pickEnten(m.state);
     case 'ttt':

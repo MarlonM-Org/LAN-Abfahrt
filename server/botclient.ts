@@ -59,6 +59,7 @@ import { wolfrundeBot } from './wolfrundebot';
 import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
 import { liederBot } from './liederbot';
+import { sektBot } from './sektbot';
 
 export interface BotOptions {
   url: string;
@@ -1313,6 +1314,8 @@ export class Bot {
     if (m.kind === 'bogen') bogenBot(this, m.state);
 
     if (m.kind === 'angeln') angelBot(this, m.state);
+
+    if (m.kind === 'sekt') sektBot(this, m.state);
 
     if (m.kind === 'suess') suessBot(this, m.state);
 
