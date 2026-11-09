@@ -269,7 +269,7 @@ function pickScreen(): Screen {
 
   switch (s.phase) {
     case 'lobby':
-      return [`lobby-${vip}-${s.mode}-${s.mode === 'arcade' ? `${s.arcadeVote ? 'vote' : ''}${JSON.stringify(s.leaderboard.map((e) => e.points))}` : ''}`, () => buildLobby(vip, () => ((store.editing = true), render()))];
+      return [`lobby-${vip}-${s.mode}-${s.mode === 'arcade' && s.arcadeVote ? 'vote' : ''}`, () => buildLobby(vip, () => ((store.editing = true), render()))];
     case 'board':
       return s.board ? withPrefix('b', pickBoard(s.board)) : ['wait', message('Warte ...')];
     case 'results':

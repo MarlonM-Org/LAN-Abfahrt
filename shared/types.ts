@@ -2405,8 +2405,8 @@ export interface SessionRow {
   prevRank: number | null;
   /** Punkte aus dem zuletzt gewerteten Spiel (null = war nicht dabei) */
   last: number | null;
-  /** online · offline (Handy weg) · removed (entfernt bzw. nicht mehr in der Runde) – Punkte bleiben */
-  status: 'online' | 'offline' | 'removed';
+  /** online · offline (Handy kurz weg). Wer ganz weg ist (entfernt / Frist abgelaufen), steht nicht in der Tabelle. */
+  status: 'online' | 'offline';
   bot?: boolean;
 }
 

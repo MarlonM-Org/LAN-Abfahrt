@@ -146,6 +146,8 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   const gated: { btn: HTMLButtonElement; min: number; max?: number; hint?: string }[] = [];
   /** Arcade-Kacheln + Abstimmung: wird im Updater aufgefrischt */
   let arcadeUpdate: ((n: number) => void) | null = null;
+  /** Ewige Tabelle (Arcade): folgt Spielerliste und Punkten */
+  let lbUpdate: (() => void) | null = null;
   if (mode === 'date') q(root, '.q-panel').classList.add('hidden');
 
   if (vip) {
@@ -189,7 +191,9 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
       menu.append(el(`<div class="center"><h2>Arcade</h2><p>Warte, bis der VIP ein Spiel startet ...</p></div>`));
     }
     if (vip || voteOpen) arcadeUpdate = arcadeTiles(menu, vip, voteOpen, gated);
-    menu.append(leaderboardPanel());
+    const lb = leaderboardPanel();
+    lbUpdate = lb.update;
+    menu.append(lb.root);
     if (vip) {
       const reset = el(`<button class="secondary small">Leaderboard zurücksetzen</button>`).firstElementChild as HTMLButtonElement;
       reset.textContent = 'Ewige Tabelle zurücksetzen';
@@ -349,6 +353,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
         ? `${st?.customNhieCount ?? 0} eigene Aussagen · ${st?.customQuestionCount ?? 0} eigene Fragen`
         : `${st?.customPostCount ?? 0} eigene Startsätze · ${st?.customQuipCount ?? 0} eigene Sprüche-Fragen · ${st?.customWerwarsCount ?? 0} eigene Wer-war’s-Fragen`;
     arcadeUpdate?.(n);
+    lbUpdate?.();
     ses.update();
     if (tvBtn) tvBtn.textContent = st?.showBoard ? 'TV: Lobby zeigen' : 'Auf dem TV zeigen';
     if (resetSes) resetSes.disabled = !st?.session.games;
@@ -572,25 +577,35 @@ function turnierCustom(menu: HTMLElement, gated: { btn: HTMLButtonElement; min: 
   };
 }
 
-/** Leaderboard + eigene Punkte pro Spiel */
+/**
+ * Ewige Tabelle (alle Abende) – nur mit den Spielern, die gerade in der Runde sind (Platz unter ihnen),
+ * dazu die eigenen Punkte pro Spiel. Frischt sich über `update()` auf, ohne den Screen neu zu bauen.
+ */
 function leaderboardPanel() {
-  const list = store.state?.leaderboard ?? [];
-  const mine = list.find((e) => e.name === store.name);
-  const rows = list
-    .slice(0, 10)
-    .map((e, i) => `<tr class="${e.name === store.name ? 'me' : ''}"><td>${i + 1}.</td><td>${escapeHtml(e.name)}</td><td>${e.points}</td><td>${e.wins}</td></tr>`)
-    .join('');
-  const per = mine
-    ? Object.entries(mine.perGame)
-        .sort((a, b) => (b[1]?.points ?? 0) - (a[1]?.points ?? 0))
-        .map(([k, g]) => `<tr><td>${MINI_INFO[k as MiniKind] ? `${MINI_INFO[k as MiniKind].icon} ${escapeHtml(MINI_INFO[k as MiniKind].title)}` : escapeHtml(k)}</td><td>${g!.points}</td><td>${g!.plays}x</td></tr>`)
-        .join('')
-    : '';
-  return el(`
-    <div class="panel">
-      <p class="label-left">Ewige Tabelle (alle Abende · Punkte · Siege)</p>
-      ${rows ? `<table class="lb"><tbody>${rows}</tbody></table>` : '<p>Noch keine Punkte – spielt los!</p>'}
-      ${mine ? `<p class="label-left">Deine Punkte pro Spiel</p><table class="lb"><tbody>${per}</tbody></table>` : ''}
-    </div>
-  `);
+  const root = el(`<div class="panel"><p class="label-left">Ewige Tabelle (alle Abende · wer da ist · Punkte · Siege)</p><div class="lb-body"></div></div>`).firstElementChild as HTMLElement;
+  const body = q(root, '.lb-body');
+  let key = '';
+  const update = () => {
+    const here = new Set((store.state?.players ?? []).filter((p) => !p.removed).map((p) => p.name));
+    const list = (store.state?.leaderboard ?? []).filter((e) => here.has(e.name));
+    const mine = list.find((e) => e.name === store.name);
+    const k = JSON.stringify([store.name, list]);
+    if (k === key) return;
+    key = k;
+    const rows = list
+      .slice(0, 12)
+      .map((e, i) => `<tr class="${e.name === store.name ? 'me' : ''}"><td>${i + 1}.</td><td>${escapeHtml(e.name)}</td><td>${e.points}</td><td>${e.wins}</td></tr>`)
+      .join('');
+    const per = mine
+      ? Object.entries(mine.perGame)
+          .sort((a, b) => (b[1]?.points ?? 0) - (a[1]?.points ?? 0))
+          .map(([k, g]) => `<tr><td>${MINI_INFO[k as MiniKind] ? `${MINI_INFO[k as MiniKind].icon} ${escapeHtml(MINI_INFO[k as MiniKind].title)}` : escapeHtml(k)}</td><td>${g!.points}</td><td>${g!.plays}x</td></tr>`)
+          .join('')
+      : '';
+    body.innerHTML =
+      (rows ? `<table class="lb"><tbody>${rows}</tbody></table>` : '<p>Noch keine Punkte – spielt los!</p>') +
+      (mine ? `<p class="label-left">Deine Punkte pro Spiel</p><table class="lb"><tbody>${per}</tbody></table>` : '');
+  };
+  update();
+  return { root, update };
 }

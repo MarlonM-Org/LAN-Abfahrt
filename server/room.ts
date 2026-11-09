@@ -1636,7 +1636,7 @@ export class Room {
   /** Siegerehrung: Endstand des Turniers (Podest in ResultsScene) */
   private turnierFinal(): ResultsState {
     const t = this.turnier!;
-    const rows = this.turnierBoard.rows(this.present()).filter((r) => r.status !== 'removed');
+    const rows = this.turnierBoard.rows(this.present());
     const winners = rows.filter((r) => r.rank === 1).map((r) => r.name);
     const subtitle = !winners.length
       ? 'Niemand mehr da – trotzdem danke fürs Mitspielen!'

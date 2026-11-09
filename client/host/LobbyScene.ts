@@ -7,7 +7,7 @@ import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintGrass, paintPath } from '../art/ground';
 import { bus, getState, joinUrlOf } from './store';
-import { ensurePortrait, figure } from './textures';
+import { figure } from './textures';
 import { INK, RED_INK, background, ensureTex, ink, nameTag, panel, prop } from './ui';
 import { drawSessionBoard } from './sessionBoard';
 import { daylight, gulls, sway } from './ambient';
@@ -15,6 +15,9 @@ import { daylight, gulls, sway } from './ambient';
 /** Bis 8 Spieler: 2 Reihen à 4; ab 9 Spielern: 2 Reihen à 6 im Zickzack (Platz für 12) */
 const SLOTS = 8;
 const SLOTS_MAX = 12;
+
+/** Punkte unter den Namen: Spitzenreiter golden */
+const GOLD_INK = '#c98a10';
 
 /** So viele Zeichen (8 px, Festbreite) passen auf das Schild unten (316 px breit) */
 const URL_CHARS = 38;
@@ -101,36 +104,39 @@ export class LobbyScene extends Phaser.Scene {
     if (url !== this.renderedUrl) this.renderQr(url);
 
     this.subtitle.setText(s.mode === 'date' ? '~ Date Night ~' : s.mode === 'drink' ? '~ Trinkspiel ~' : s.mode === 'arcade' ? '~ Arcade ~' : s.mode === 'turnier' ? '~ Turnier ~' : '~ Urlaubs-Edition ~').setColor(s.mode === 'date' ? '#b0306a' : s.mode === 'drink' ? '#c06a1f' : INK);
-    const n = s.players.filter((p) => p.connected).length;
+    const n = s.players.filter((p) => p.connected && !p.removed).length;
     const offMin = (p: GameState['players'][number]) => Math.floor((p.offlineMs ?? 0) / 60_000);
     this.hintText.setText(
       s.showBoard ? 'Leaderboard des Abends (L / VIP-Handy)' : n < 2 ? 'Scannt den QR-Code – mind. 2 Spieler!' : s.mode === 'arcade' && s.arcadeVote ? this.voteHint(s) : s.mode === 'turnier' ? 'Der VIP wählt am Handy eine Playlist!' : 'Der VIP wählt am Handy ein Spiel!',
     );
 
-    // Arcade: Leaderboard des Abends, sobald heute gespielt wurde – vorher die ewige Tabelle
-    const sessionBoard = s.showBoard || ((s.mode === 'arcade' || s.mode === 'turnier') && s.session.games > 0);
+    // Startseite = die Spieler, die gerade da sind. Das Leaderboard des Abends (nur Anwesende) gibt es auf Wunsch
+    // (L / VIP-Handy); in Arcade/Turnier stehen die Punkte von heute klein unter den Namen.
+    const players = s.players.filter((p) => !p.removed);
+    const scored = (s.mode === 'arcade' || s.mode === 'turnier') && s.session.rows.some((r) => r.points > 0);
+    const scores = scored ? new Map(s.session.rows.map((r) => [r.id, r])) : null;
     const key =
       s.mode +
-      s.players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') +
-      (sessionBoard ? `S${s.showBoard}${JSON.stringify(s.session)}` : s.mode === 'arcade' ? JSON.stringify(s.leaderboard) : '');
+      players.map((p) => `${p.id}${p.connected}${p.isVip}${p.name}${JSON.stringify(p.look)}${p.connected ? '' : offMin(p)}`).join('|') +
+      (s.showBoard ? `S${JSON.stringify(s.session)}` : scores ? `P${s.session.rows.map((r) => `${r.id}:${r.rank}:${r.points}`).join('|')}` : '');
     if (key === this.renderedPlayers) return;
     this.renderedPlayers = key;
 
     this.playerLayer.removeAll(true);
-    if (sessionBoard) {
+    if (s.showBoard) {
       drawSessionBoard(this, this.playerLayer, s.session, { x: 150, y: 46, w: 316, maxBottom: 228 }, { title: s.session.games ? undefined : 'LEADERBOARD HEUTE · NOCH LEER' });
       return;
     }
-    if (s.mode === 'arcade' || s.mode === 'turnier') return this.renderLeaderboard(s);
-    const wide = s.players.length > SLOTS;
+    const wide = players.length > SLOTS;
     for (let i = 0; i < (wide ? SLOTS_MAX : SLOTS); i++) {
-      const p = s.players[i];
+      const p = players[i];
       const cols = wide ? 6 : 4;
       const col = i % cols;
       const row = Math.floor(i / cols);
-      // Breit: Spalten abwechselnd versetzt, damit sich die Namensschilder nicht überlappen
+      // Breit: Spalten abwechselnd versetzt, damit sich die Namensschilder nicht überlappen.
+      // Unterste Reihe so hoch, dass „offline“/Punkte unter dem Namen noch über dem Adress-Schild stehen.
       const x = wide ? 178 + col * 52 : 196 + col * 74 + (row % 2) * 18;
-      const y = wide ? 112 + row * 84 + (col % 2) * 16 : 120 + row * 88;
+      const y = wide ? 106 + row * 82 + (col % 2) * 16 : 114 + row * 86;
       if (!p) {
         const ghost = this.add.ellipse(x, y - 2, 22, 7, 0x000000, 0.12);
         this.playerLayer.add(ghost);
@@ -145,28 +151,12 @@ export class LobbyScene extends Phaser.Scene {
       if (p.isVip) this.playerLayer.add(this.crown(x, y - 59));
       // Offline: grau + Hinweis (nach ein paar Minuten fliegt er automatisch raus)
       if (!p.connected) this.playerLayer.add(ink(this, x, y + 19, offMin(p) ? `offline ${offMin(p)}m` : 'offline', { color: RED_INK }));
+      else if (scores) {
+        const r = scores.get(p.id);
+        const lead = r?.rank === 1 && r.points > 0;
+        this.playerLayer.add(ink(this, x, y + 19, `${r?.points ?? 0} Pkt`, { color: lead ? GOLD_INK : INK }));
+      }
     }
-  }
-
-  private renderLeaderboard(s: GameState) {
-    const x = 160, y = 50, w = 306;
-    // Bis zu 12 Einträge (Lobby-Maximum); ab 9 enger, damit die Tafel über der Adresse endet
-    const rows = s.leaderboard.slice(0, 12);
-    const rowH = rows.length > 8 ? 12 : 18;
-    this.playerLayer.add(panel(this, x, y, w, 30 + Math.max(1, rows.length) * rowH));
-    this.playerLayer.add(ink(this, x + w / 2, y + 9, 'ARCADE-LEADERBOARD', { color: RED_INK }));
-    this.playerLayer.add(ink(this, x + w - 70, y + 20, 'Pkt', { color: '#7a5a3a' }));
-    this.playerLayer.add(ink(this, x + w - 30, y + 20, 'Siege', { color: '#7a5a3a' }));
-    if (!rows.length) this.playerLayer.add(ink(this, x + w / 2, y + 32, 'Noch keine Punkte – los geht’s!'));
-    rows.forEach((e, i) => {
-      const ry = y + 32 + i * rowH;
-      const p = s.players.find((pl) => pl.name === e.name && pl.connected);
-      this.playerLayer.add(ink(this, x + 14, ry, `${i + 1}.`, { origin: [0, 0], color: i === 0 ? '#c98a10' : INK }));
-      if (p) this.playerLayer.add(this.add.image(x + 42, ry + 12, ensurePortrait(this, p.look)).setOrigin(0.5, 1));
-      this.playerLayer.add(ink(this, x + 54, ry, e.name.slice(0, 12), { origin: [0, 0], color: p ? INK : '#7a5a3a' }));
-      this.playerLayer.add(ink(this, x + w - 70, ry, String(e.points)));
-      this.playerLayer.add(ink(this, x + w - 30, ry, String(e.wins)));
-    });
   }
 
   /** Arcade-Abstimmung: meistgewünschtes Spiel in der Fußzeile */

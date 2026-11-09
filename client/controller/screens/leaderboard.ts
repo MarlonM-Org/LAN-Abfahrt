@@ -16,7 +16,7 @@ export function moveMark(r: SessionRow, games = store.state?.session.games ?? 0)
   return '<span class="lb-same">–</span>';
 }
 
-const statusMark = (r: SessionRow) => (r.status === 'removed' ? ' <small class="lb-off">(weg)</small>' : r.status === 'offline' ? ' <small class="lb-off">(offline)</small>' : '');
+const statusMark = (r: SessionRow) => (r.status === 'offline' ? ' <small class="lb-off">(offline)</small>' : '');
 
 /** Komplette Tabelle als HTML. `withSeries`: zusätzliche Spalte für die laufende Serie. */
 export function sessionTableHtml(s: SessionState, withSeries = !!s.series && s.series.round > 1 && s.games > s.series.round): string {
