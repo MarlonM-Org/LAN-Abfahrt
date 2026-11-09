@@ -1155,10 +1155,18 @@ textarea.sp-input {
 .pl-tag { font-size: 7px; color: var(--red); font-weight: normal; }
 button.pl-kick { padding: 6px 6px; font-size: 7px; white-space: nowrap; }
 .pl-fab {
-  position: fixed; left: 10px; top: max(10px, env(safe-area-inset-top)); z-index: 8;
-  padding: 6px 8px; font-size: 7px; background: var(--paper-light); color: var(--red); text-shadow: none;
-  border: 2px solid var(--wood-dark); box-shadow: 0 2px 0 var(--wood-darker);
+  /* oben rechts direkt links neben „Abbrechen“ (gleiche Höhe) – in dem Streifen, den #app/.lx-head dafür freihalten */
+  position: fixed; top: calc(var(--pl-top-off, 0px) + 6px + env(safe-area-inset-top, 0px)); right: calc(96px + env(safe-area-inset-right, 0px)); z-index: 30;
+  margin: 0; padding: 4px 8px; font-size: 7px; background: var(--paper-light); color: var(--red); text-shadow: none;
+  border: 2px solid var(--red); box-shadow: none;
 }
+.pl-fab::before { content: '●'; margin-right: 4px; }
+html.pl-on #app:has(> .abort) .lx-head { padding-right: 184px; }
+/* Spiele, die „Abbrechen“ woanders hinlegen, bekommen den Knopf ebenfalls direkt daneben (oben rechts liegen dort KIPPEN/ITEM bzw. die Punkte) */
+body:has(#app .pcq) .pl-fab { right: auto; left: calc(50% + 48px); top: calc(var(--pl-top-off, 0px) + 4px + env(safe-area-inset-top, 0px)); }
+body:has(#app .k3) .pl-fab { right: auto; left: calc(50% + 50px); top: calc(var(--pl-top-off, 0px) + 6px + env(safe-area-inset-top, 0px)); }
+:where(html.land) body:has(#app .k3:not(.k3-nosplit)) .pl-fab { top: calc(var(--pl-top-off, 0px) + 13px + env(safe-area-inset-top, 0px)); left: calc(50% - 181px); transform: translateX(-100%); }
+:where(html:not(.land)) body:has(#app .k3) .pl-fab { top: calc(var(--pl-top-off, 0px) + 46%); }
 .pl-sheet { position: fixed; inset: 0; z-index: 9; background: rgba(45, 27, 18, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .pl-sheet .panel { width: 100%; max-width: 420px; max-height: 85vh; overflow: auto; }
 /* ---------------------------------------------------------------- Grill-Chaos (quer: Stick · Bestellungen/„Du trägst“ · NEHMEN/AKTION) */
