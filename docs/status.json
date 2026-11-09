@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T13:34+00:00",
+  "updated": "2026-11-09T13:35+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -8,6 +8,11 @@
   "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Fallen-Parcours: Teil wird nicht mehr beim ersten Joystick-Tipp eingebaut (der ganze Platzier-Bildschirm wirkte als PLATZIEREN-Knopf) – jetzt baut nur der grüne Knopf ein, grau wenn's dort nicht passt",
+      "pr": 112,
+      "date": "2026-11-09"
+    },
     {
       "title": "Arcade-Favoriten: VIP (☆ an der Kachel) und Laptop (☆ oder Taste F) merken Spiele als ⭐ Favorit – stehen in jeder Sortierung ganz oben; gespeichert nur im Browser des Geräts",
       "pr": 111,
@@ -405,7 +410,7 @@
     },
     "parcours": {
       "status": "umgesetzt",
-      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer; ab 9 Spielern laufen jetzt alle 12 (#43)"
+      "notes": "„Nur 4 Sekunden zum Platzieren“: jeder Tipp auf den Joystick baute das Teil sofort ein → behoben, nur noch PLATZIEREN baut ein (#112) · vorher: kein Zeitlimit (AFK nach 60 s), alles quer, bis 12 Läufer (#43)"
     },
     "turm": {
       "status": "umgesetzt",
@@ -566,7 +571,7 @@
       "status": "umgesetzt"
     },
     {
-      "title": "VIP-Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers → jetzt kompakt „n offline“ direkt neben „Abbrechen“, Kopfzeile macht Platz (auch Kart, Parcours, Aufwärmrunde) – PR offen",
+      "title": "VIP-Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers → jetzt kompakt „n offline“ direkt neben „Abbrechen“, Kopfzeile macht Platz (auch Kart, Parcours, Aufwärmrunde) – PR #113 offen",
       "status": "in Arbeit"
     }
   ]
