@@ -18,6 +18,7 @@ import type { BandState } from './band';
 import type { SuessState } from './suess';
 import type { UmzugState } from './umzug';
 import type { SektState } from './sekt';
+import type { MalerPrivate, MalerState } from './maler';
 
 export interface Look {
   skin: number;
@@ -100,7 +101,8 @@ export type MiniKind =
   | 'skisprung'
   | 'teppich'
   | 'kugel'
-  | 'band';
+  | 'band'
+  | 'maler';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade' | 'turnier';
 
@@ -2308,7 +2310,8 @@ export type MiniSnapshot =
   | { kind: 'skisprung'; state: SkiState }
   | { kind: 'teppich'; state: TepState }
   | { kind: 'kugel'; state: KugelState }
-  | { kind: 'band'; state: BandState };
+  | { kind: 'band'; state: BandState }
+  | { kind: 'maler'; state: MalerState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -2492,6 +2495,7 @@ export type PrivateState =
   | { kind: 'lieder'; state: LiederPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
+  | { kind: 'maler'; state: MalerPrivate }
   | { kind: 'board'; state: BoardPrivate }
   | null;
 

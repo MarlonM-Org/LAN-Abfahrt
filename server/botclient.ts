@@ -61,6 +61,7 @@ import { schaetzBot } from './schaetzbot';
 import { liederBot } from './liederbot';
 import { sektBot } from './sektbot';
 import { bandBot } from './bandbot';
+import { malerBot } from './malerbot';
 
 export interface BotOptions {
   url: string;
@@ -1354,6 +1355,7 @@ export class Bot {
     if (m.kind === 'band') bandBot(this, m.state);
     if (m.kind === 'maexchen') maexBot(this, m.state, () => (this.state?.mini?.kind === 'maexchen' ? this.state.mini.state : null));
     if (m.kind === 'werwars') werwarsBot(this, m.state, !!me?.isVip);
+    if (m.kind === 'maler') malerBot(this, m.state);
 
     if (m.kind === 'murder') {
       const ms = m.state;

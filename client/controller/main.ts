@@ -55,6 +55,7 @@ import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { pickWolfrunde } from './screens/wolfrunde';
 import { pickWerwars } from './screens/werwars';
+import { pickMaler } from './screens/maler';
 import { pickIntro } from './screens/intro';
 import { WARM_PREFIX, pickWarmup, syncWarmup } from './warmup';
 import { buildKicked, initVipPlayersButton } from './players';
@@ -426,6 +427,8 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickWerwars(m.state, vip);
     case 'band':
       return pickBand(m.state);
+    case 'maler':
+      return pickMaler(m.state);
   }
   return outdatedScreen();
 }

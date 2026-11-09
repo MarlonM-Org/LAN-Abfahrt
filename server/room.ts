@@ -98,6 +98,7 @@ import { LiederGame } from './lieder';
 import { liederTon } from './liederton';
 import { MaexGame } from './maexchen';
 import { WerwarsGame } from './werwars';
+import { MalerGame } from './maler';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 import { EmoteFeed } from './spectator';
 import { FxLog } from './fx';
@@ -1088,6 +1089,8 @@ export class Room {
         return new WerwarsGame(ids, ctx, this.werwarsQ.all);
       case 'band':
         return new BandGame(ids, ctx);
+      case 'maler':
+        return new MalerGame(ids, ctx);
     }
   }
 
