@@ -35,6 +35,7 @@ import {
   igelSquadCount,
   igelSuddenMs,
   igelTurnMs,
+  igelWidth,
   isSolid,
   isTool,
   launch,
@@ -132,12 +133,15 @@ type ShotResult = 'flight' | 'retreat' | 'long' | 'again' | null;
  *   aimAll (alle zielen 15 s) → flightAll (alle Geschosse zugleich) → retreatAll (3 s Rückzug) → settle.
  * - 12 Waffen, Kisten am Sonnenschirm, Gaskartuschen und Seeigel-Minen auf der Insel.
  * Zugzeit, HP und Sudden Death skalieren mit der Spielerzahl, der Wind driftet, die Flut steigt pro voller Runde,
- * Schaden zählt am Zugende herunter. Das Terrain liegt hier als Bitmaske; übertragen werden nur Seed + Operationsliste.
+ * Schaden zählt am Zugende herunter. Das Terrain liegt hier als Bitmaske; übertragen werden nur Seed + Breite + Operationsliste.
+ * Die Insel wächst ab 6 Spielern mit (`igelWidth()`: 560 … 960 px) – Spawns, Kartuschen, Minen und Kisten verteilen sich mit.
  */
 export class IgelGame implements MiniGame {
   readonly kind = 'igel' as const;
   private timers = new Timers();
   private seed = Math.floor(Math.random() * 2 ** 31);
+  /** Inselbreite (nach Spielerzahl) */
+  private w: number;
   private mask: Mask;
   private ops: IgelOp[] = [];
   private water: number = IGEL.WATER_Y;
@@ -205,8 +209,13 @@ export class IgelGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    this.mask = genTerrain(this.seed);
     const n = ids.length;
+    // Zum Testen mit wenigen Spielern: IGEL_W=960 npm run dev
+    const forcedW = Number(process.env.IGEL_W);
+    this.w = forcedW ? clamp(Math.round(forcedW / 40) * 40, IGEL.W, IGEL.W_MAX) : igelWidth(n);
+    this.mask = genTerrain(this.seed, this.w);
+    /** Mengen (Kartuschen, Minen, Kisten) wachsen mit der Inselbreite */
+    const area = this.w / IGEL.W;
     // Themenkarte: zufällig pro Partie (zum Testen: IGEL_THEME=mond npm run dev)
     const forced = process.env.IGEL_THEME as IgelThemeId | undefined;
     this.theme = forced && forced in IGEL_THEMES ? forced : pick(IGEL_THEME_IDS);
@@ -245,21 +254,21 @@ export class IgelGame implements MiniGame {
       if (this.theme === 'spreng') this.ammo[id].dynamite = 2;
     }
     for (const s of this.sides) (this.memberPtr[s] = 0), (this.hogPtr[s] = 0);
-    // Spawnpunkte: abwechselnd nach Spieler, damit die Igel (und Teams) gemischt stehen
-    const spots = this.spawnSpots(this.teams.length * perPlayer, [], 34);
+    // Spawnpunkte: abwechselnd nach Spieler, damit die Igel (und Teams) gemischt stehen – Abstand wächst mit der Insel
+    const spots = this.spawnSpots(this.teams.length * perPlayer, [], 34 * area);
     let k = 0;
     for (let i = 0; i < perPlayer; i++) {
       for (const owner of this.teams) {
         const s = spots[k++];
-        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < IGEL.W / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, walkDir: 0, shownAcc: 0, anchor: null, climb: 0 });
+        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < this.w / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, walkDir: 0, shownAcc: 0, anchor: null, climb: 0 });
       }
     }
     // Umgebung: Gaskartuschen vom Grill und scharfe Seeigel-Minen – nicht direkt neben einem Igel
     const avoid = spots.slice(0, this.hogs.length);
     const more = this.theme === 'spreng' ? 2 : 1;
-    const nB = randInt(BARREL.MIN, BARREL.MAX) * more;
-    const nM = randInt(MINE.START_MIN, MINE.START_MAX) * more;
-    const objSpots = this.spawnSpots(nB + nM, avoid, 44, true);
+    const nB = Math.round(randInt(BARREL.MIN, BARREL.MAX) * more * area);
+    const nM = Math.round(randInt(MINE.START_MIN, MINE.START_MAX) * more * area);
+    const objSpots = this.spawnSpots(nB + nM, avoid, 44 * Math.sqrt(area), true);
     objSpots.forEach((s, i) => this.addObj(i < nB ? 'barrel' : 'mine', s.x, s.y, { armed: true }));
     this.timers.every(TICK_MS, () => this.tick());
     this.timers.later(IGEL.COUNTDOWN_MS, () => this.nextCycle());
@@ -268,7 +277,7 @@ export class IgelGame implements MiniGame {
   /** Flache Stellen auf der Insel, möglichst weit auseinander (und weg von `avoid`) */
   private spawnSpots(n: number, avoid: { x: number }[], spread: number, strict = false) {
     const cands: { x: number; y: number }[] = [];
-    for (let x = 10; x < IGEL.W - 10; x += 2) {
+    for (let x = 10; x < this.w - 10; x += 2) {
       const sy = surfaceY(this.mask, x);
       if (sy > this.water - 16 || sy < 30) continue;
       if (Math.abs(surfaceY(this.mask, x - 3) - surfaceY(this.mask, x + 3)) > 8) continue;
@@ -284,7 +293,7 @@ export class IgelGame implements MiniGame {
       }
       if (out.length >= n) break;
     }
-    if (!strict) while (out.length < n) out.push({ x: 60 + Math.random() * (IGEL.W - 120), y: 20 });
+    if (!strict) while (out.length < n) out.push({ x: 60 + Math.random() * (this.w - 120), y: 20 });
     return out;
   }
 
@@ -465,13 +474,13 @@ export class IgelGame implements MiniGame {
     const roundDone = this.simul || (nextIdx >= 0 && nextIdx <= this.sidePtr);
     if (!this.suddenDeath && now - this.startedAt >= this.suddenMs) {
       this.suddenDeath = true;
-      this.addFx({ type: 'water', x: IGEL.W / 2, y: 90, text: 'SUDDEN DEATH – Flut!' });
+      this.addFx({ type: 'water', x: this.w / 2, y: 90, text: 'SUDDEN DEATH – Flut!' });
     } else if (this.suddenDeath && roundDone) {
       // Flut steigt pro voller Runde (fair: jeder war seitdem einmal dran) – bei vielen Seiten etwas mehr
       const alive = this.sides.filter((s) => this.sideAlive(s)).length;
       const rise = Math.round(IGEL.WATER_RISE * clamp((this.simul ? this.ids.length / 2 : alive) / 4, 1, 2));
       this.water = Math.max(60, this.water - rise);
-      this.addFx({ type: 'water', x: IGEL.W / 2, y: 90, text: 'Die Flut steigt!' });
+      this.addFx({ type: 'water', x: this.w / 2, y: 90, text: 'Die Flut steigt!' });
       for (const h of this.hogs) if (h.state !== 'drowned' && h.y - 3 > this.water) this.drown(h);
     }
     for (const side of this.sides) {
@@ -490,7 +499,8 @@ export class IgelGame implements MiniGame {
   /** 30 % pro Zug/Runde: Kiste am Sonnenschirm (zufällige Waffe oder +25 HP) */
   private maybeDropCrate() {
     const rain = this.theme === 'kisten';
-    if (this.objs.filter((o) => o.type === 'crate').length >= (rain ? CRATE.MAX * 2 : CRATE.MAX) || Math.random() >= (rain ? 1 : CRATE.CHANCE)) return;
+    const max = Math.round(CRATE.MAX * (this.w / IGEL.W));
+    if (this.objs.filter((o) => o.type === 'crate').length >= (rain ? max * 2 : max) || Math.random() >= (rain ? 1 : CRATE.CHANCE)) return;
     // Kistenregen: manchmal gleich zwei
     if (rain && Math.random() < 0.4) this.dropCrate();
     this.dropCrate();
@@ -498,7 +508,7 @@ export class IgelGame implements MiniGame {
 
   private dropCrate() {
     for (let tries = 0; tries < 30; tries++) {
-      const x = 20 + Math.random() * (IGEL.W - 40);
+      const x = 20 + Math.random() * (this.w - 40);
       const sy = surfaceY(this.mask, x);
       if (sy > this.water - 12 || sy < 24) continue;
       const loot: Obj['loot'] = Math.random() < 0.3 ? 'hp' : CRATE_LOOT[Math.floor(Math.random() * CRATE_LOOT.length)];
@@ -643,7 +653,7 @@ export class IgelGame implements MiniGame {
 
   private walkStep(h: Hog, dir: -1 | 1): boolean {
     const nx = Math.round(h.x) + dir;
-    if (nx < 3 || nx > IGEL.W - 3) return false;
+    if (nx < 3 || nx > this.w - 3) return false;
     const y0 = Math.round(h.y);
     let ny: number | null = null;
     for (let up = 0; up <= 3; up++) {
@@ -687,7 +697,7 @@ export class IgelGame implements MiniGame {
       } else h.vy = Math.min(420, h.vy + IGEL.GRAVITY * this.grav * dt);
       const nx = h.x + h.vx * dt;
       if (bodyHits(this.mask, nx, h.y)) h.vx = -h.vx * 0.35;
-      else h.x = clamp(nx, -40, IGEL.W + 40);
+      else h.x = clamp(nx, -40, this.w + 40);
       const ny = h.y + h.vy * dt;
       if (bodyHits(this.mask, h.x, ny)) {
         if (h.vy > 0) {
@@ -732,7 +742,7 @@ export class IgelGame implements MiniGame {
     h.anchor = null;
     h.chute = false;
     h.y = this.water;
-    h.x = clamp(h.x, 4, IGEL.W - 4);
+    h.x = clamp(h.x, 4, this.w - 4);
     this.addFx({ type: 'splash', x: h.x, y: this.water, text: wasAlive ? 'PLATSCH!' : undefined });
     if (wasAlive && Math.random() < 0.6) this.quip(h, 'drown');
     if (!this.simul && h.id === this.activeHog && this.sub === 'aim') this.toSettle();
@@ -793,9 +803,9 @@ export class IgelGame implements MiniGame {
   }
 
   private offWorld(p: Proj) {
-    if (p.y > this.water || p.x < -60 || p.x > IGEL.W + 60 || p.y > IGEL.H) {
+    if (p.y > this.water || p.x < -60 || p.x > this.w + 60 || p.y > IGEL.H) {
       this.projs = this.projs.filter((q) => q !== p);
-      if (p.x > -10 && p.x < IGEL.W + 10) this.addFx({ type: 'splash', x: p.x, y: this.water });
+      if (p.x > -10 && p.x < this.w + 10) this.addFx({ type: 'splash', x: p.x, y: this.water });
       return true;
     }
     return false;
@@ -874,7 +884,7 @@ export class IgelGame implements MiniGame {
         const max = o.chute ? CRATE.FALL : 320;
         o.vy = Math.min(max, o.vy + IGEL.GRAVITY * this.grav * dt);
         // Der Sonnenschirm treibt mit dem Wind
-        if (o.chute) o.x = clamp(o.x + this.wind * this.windMul * 12 * dt, 6, IGEL.W - 6);
+        if (o.chute) o.x = clamp(o.x + this.wind * this.windMul * 12 * dt, 6, this.w - 6);
         const target = o.y + o.vy * dt;
         let y = o.y;
         while (y < target) {
@@ -1075,7 +1085,7 @@ export class IgelGame implements MiniGame {
   private readAim(pl: Record<string, unknown>): IgelAim | null {
     if (pl.tx !== undefined && pl.tx !== null) {
       const tx = Number(pl.tx);
-      return Number.isFinite(tx) ? { angle: 0, power: 0, tx: Math.round(clamp(tx, 0, IGEL.W)) } : null;
+      return Number.isFinite(tx) ? { angle: 0, power: 0, tx: Math.round(clamp(tx, 0, this.w)) } : null;
     }
     const angle = Number(pl.angle);
     const power = Number(pl.power);
@@ -1092,7 +1102,7 @@ export class IgelGame implements MiniGame {
     const tx = Number(pl.tx);
     if (kind === 'map' && !Number.isFinite(tx)) return null;
     if ((kind === 'drag' || kind === 'dir') && (!Number.isFinite(angle) || !Number.isFinite(power))) return null;
-    return { weapon: w, angle: Number.isFinite(angle) ? angle : 0, power: Number.isFinite(power) ? clamp(power, 0, 1) : 0, tx: Number.isFinite(tx) ? clamp(tx, 6, IGEL.W - 6) : 0, fuse: this.fuseOf[id] };
+    return { weapon: w, angle: Number.isFinite(angle) ? angle : 0, power: Number.isFinite(power) ? clamp(power, 0, 1) : 0, tx: Number.isFinite(tx) ? clamp(tx, 6, this.w - 6) : 0, fuse: this.fuseOf[id] };
   }
 
   /** Rundlauf: Schuss sofort ausführen und in die passende Phase wechseln */
@@ -1166,7 +1176,7 @@ export class IgelGame implements MiniGame {
         for (let d = 0; d < SHOTGUN.RANGE; d += 1) {
           x += dx;
           y += dy;
-          if (x < 0 || x > IGEL.W || y < 0 || y > this.water) break;
+          if (x < 0 || x > this.w || y < 0 || y > this.water) break;
           if (isSolid(this.mask, x, y) || this.hogs.some((o) => o !== h && o.state === 'ok' && Math.hypot(o.x - x, o.y - 4 - y) < 4) || this.objs.some((o) => o.type === 'barrel' && Math.hypot(o.x - x, o.y - 4 - y) < 4)) {
             hit = true;
             break;
@@ -1178,7 +1188,7 @@ export class IgelGame implements MiniGame {
         return 'again';
       }
       case 'airstrike': {
-        const tx = clamp(shot.tx, 6, IGEL.W - 6);
+        const tx = clamp(shot.tx, 6, this.w - 6);
         this.addFx({ type: 'gull', x: tx, y: 12, text: tx >= h.x ? 'r' : 'l' });
         for (let i = 0; i < AIRSTRIKE.N; i++) {
           const x = tx + (i - (AIRSTRIKE.N - 1) / 2) * AIRSTRIKE.SPREAD;
@@ -1191,10 +1201,10 @@ export class IgelGame implements MiniGame {
         this.addFx({ type: 'pow', x: h.x + h.dir * 5, y: h.y - 14, text: 'Zisch ...' });
         return 'long';
       case 'mine':
-        this.addObj('mine', clamp(h.x + h.dir * 8, 4, IGEL.W - 4), h.y - 2, { armed: false, armAt: Date.now() + MINE.ARM_MS, owner });
+        this.addObj('mine', clamp(h.x + h.dir * 8, 4, this.w - 4), h.y - 2, { armed: false, armAt: Date.now() + MINE.ARM_MS, owner });
         return 'retreat';
       case 'bridge': {
-        const ops = plankOps(h.x, h.y, angle);
+        const ops = plankOps(h.x, h.y, angle, this.w);
         if (!ops.length) return null;
         for (const op of ops) {
           applyOp(this.mask, op);
@@ -1205,7 +1215,7 @@ export class IgelGame implements MiniGame {
         return 'retreat';
       }
       case 'teleport': {
-        const tx = Math.round(clamp(h.x + Math.cos(angle) * power * IGEL.TELE_RANGE, 6, IGEL.W - 6));
+        const tx = Math.round(clamp(h.x + Math.cos(angle) * power * IGEL.TELE_RANGE, 6, this.w - 6));
         let ty = Math.round(clamp(cy + Math.sin(angle) * power * IGEL.TELE_RANGE, 14, this.water - 10));
         let found: number | null = null;
         for (let dy = 0; dy < 140; dy++) {
@@ -1331,7 +1341,7 @@ export class IgelGame implements MiniGame {
       }
       case 'shovel': {
         if (h.flying || !Number.isFinite(angle)) return;
-        const ops = shovelOps(h.x, cy, angle);
+        const ops = shovelOps(h.x, cy, angle, this.w);
         if (!ops.length) return;
         for (const op of ops) {
           applyOp(this.mask, op);
@@ -1401,7 +1411,7 @@ export class IgelGame implements MiniGame {
         if (bodyHits(this.mask, h.x, h.y)) this.unstick(h);
         continue;
       }
-      h.x = clamp(nx, 2, IGEL.W - 2);
+      h.x = clamp(nx, 2, this.w - 2);
       h.y = ny;
     }
     const sp = Math.hypot(h.vx, h.vy);
@@ -1422,7 +1432,7 @@ export class IgelGame implements MiniGame {
 
   /** Sprecher-Kommentar (TV sagt ihn an) */
   private comment(text: string) {
-    this.addFx({ type: 'quip', x: IGEL.W / 2, y: 40, text });
+    this.addFx({ type: 'quip', x: this.w / 2, y: 40, text });
   }
 
   // ---------------------------------------------------------------- „Schuss des Abends“
@@ -1524,7 +1534,7 @@ export class IgelGame implements MiniGame {
       fx: rec.fx.filter((f) => f.t >= from && f.t <= to),
       rate: REPLAY.RATE,
       ms: Math.round((to - from) / REPLAY.RATE),
-      fx0: big ? big.x : IGEL.W / 2,
+      fx0: big ? big.x : this.w / 2,
       fy0: big ? big.y : IGEL.H / 2,
       score: top.score,
     };
@@ -1601,6 +1611,7 @@ export class IgelGame implements MiniGame {
         simul: this.simul,
         endsIn: timed ? Math.max(0, this.deadline - now) : 0,
         seed: this.seed,
+        w: this.w,
         ops: this.ops,
         water: this.water,
         wind: this.wind,

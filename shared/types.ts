@@ -1326,8 +1326,10 @@ export interface IgelState {
   /** true = Modus „Alle gleichzeitig“ */
   simul: boolean;
   endsIn: number;
-  /** Terrain = genTerrain(seed) + alle Operationen in Reihenfolge */
+  /** Terrain = genTerrain(seed, w) + alle Operationen in Reihenfolge */
   seed: number;
+  /** Inselbreite in Welt-Pixeln (480 bis 5 Spieler, dann mit der Spielerzahl bis 960 – `igelWidth()`); Höhe bleibt 270 */
+  w: number;
   ops: IgelOp[];
   water: number;
   /** −1 … 1, positiv = nach rechts */
