@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
-import type { PlayerColor } from '../../shared/players';
+import { type PlayerColor, possessive } from '../../shared/players';
 import { SEKT, type SektPlayer, type SektPop, type SektState, type SektSt, fmtM } from '../../shared/sekt';
 import { SEKT_TV, bottlePix, corkPix, flagPix, paintSektWorld, pegPix, postPix, thumbPix } from '../art/sekt';
 import * as O from '../art/objects';
@@ -35,6 +35,7 @@ interface Bottle {
   cork: Phaser.GameObjects.Image;
   thumb: Phaser.GameObjects.Image;
   best: Phaser.GameObjects.Text;
+  bestText: string;
   label: Phaser.GameObjects.Text;
   pips: Phaser.GameObjects.Rectangle[];
   variant: Variant;
@@ -215,8 +216,11 @@ export class SektScene extends Phaser.Scene {
         b.st = p.st;
         if (p.st === 'wait' || p.st === 'in') this.setVariant(b, 'closed');
       }
-      b.best.setText(p.best > 0 ? mText(p.best, slotW) : '–');
-      fitText(b.best, slotW - 5, 0.55);
+      const bestText = p.best > 0 ? mText(p.best, slotW) : '–';
+      if (b.bestText !== bestText) {
+        b.bestText = bestText;
+        fitText(b.best.setText(bestText), slotW - 5, 0.55);
+      }
       b.pips.forEach((r, j) => {
         const m = p.throws[j];
         const played = j < st.round - (st.sub === 'countdown' || st.sub === 'shake' ? 1 : 0);
@@ -245,7 +249,7 @@ export class SektScene extends Phaser.Scene {
     // Auftritt
     box.setScale(0.2).setAlpha(0);
     this.tweens.add({ targets: box, scale: 1, alpha: 1, duration: 380, delay: p.slot * 60, ease: 'Back.Out' });
-    return { id, x, k, slotW, color, box, glass, cork, thumb, best, label, pips, variant: 'closed', st: p.st, pv: 0, p };
+    return { id, x, k, slotW, color, box, glass, cork, thumb, best, bestText: '–', label, pips, variant: 'closed', st: p.st, pv: 0, p };
   }
 
   private bottleTex(hex: string, v: Variant) {
@@ -314,7 +318,7 @@ export class SektScene extends Phaser.Scene {
       b.label.setText('PENG').setColor('#ff8a7a');
       if (this.time.now - this.burstSaid > 4000) {
         this.burstSaid = this.time.now;
-        say(`Peng! ${spokenName(playerById(pop.pid)?.name)}s Flasche ist geplatzt!`);
+        say(`Peng! ${possessive(spokenName(playerById(pop.pid)?.name))} Flasche ist geplatzt!`);
       }
       return;
     }

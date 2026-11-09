@@ -100,11 +100,11 @@ export class SektGame implements MiniGame {
     if (p.st !== 'in') return;
     const gain = SEKT.GAIN * p.s * (1 - SEKT.STIFF * p.p);
     p.p = clamp(p.p + (gain - SEKT.DECAY) * dt, 0, 1);
-    if (p.p >= 1) return this.pop(id, p, now, false, true);
+    if (p.p >= 1) return this.pop(id, p, false, true);
     if (p.p > this.red) p.dangerMs += dtMs;
     else p.dangerMs = Math.max(0, p.dangerMs - 2 * dtMs);
     p.danger = clamp(p.dangerMs / SEKT.BURST_MS, 0, 1);
-    if (p.dangerMs >= SEKT.BURST_MS) this.pop(id, p, now, false, true);
+    if (p.dangerMs >= SEKT.BURST_MS) this.pop(id, p, false, true);
   }
 
   /** Wer ist in diesem Durchgang fertig (oder offline ohne Korken)? */
@@ -113,7 +113,7 @@ export class SektGame implements MiniGame {
   }
 
   /** PLOPP (oder PENG) – Weite steht sofort fest */
-  private pop(id: string, p: P, _now: number, auto: boolean, burst = false) {
+  private pop(id: string, p: P, auto: boolean, burst = false) {
     if (p.st !== 'in') return;
     const pressure = p.p;
     let m = 0;
@@ -140,7 +140,7 @@ export class SektGame implements MiniGame {
   /** Zeit um: wer noch hält, dessen Korken knallt jetzt – dann die Weiten-Schau */
   private timeUp(now: number) {
     for (const [id, p] of this.players) {
-      if (p.st === 'in') this.pop(id, p, now, true);
+      if (p.st === 'in') this.pop(id, p, true);
       else if (p.st === 'wait') p.throws[this.round - 1] = 0;
     }
     this.sub = 'show';
@@ -166,7 +166,7 @@ export class SektGame implements MiniGame {
         }
       } else if (p.st === 'in') {
         // Loslassen = PLOPP – auch versehentlich. Ohne Druck (oder vor dem Start) einfach wieder ohne Korken.
-        if (this.sub === 'shake' && p.p >= SEKT.MIN_POP) this.pop(id, p, now, false);
+        if (this.sub === 'shake' && p.p >= SEKT.MIN_POP) this.pop(id, p, false);
         else {
           p.st = 'wait';
           p.p = 0;

@@ -477,7 +477,7 @@ function ensureStyle() {
 .sk-meter i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #7fd4ff, #2f74f0); transition: width 90ms linear; }
 .sk-ok { min-height: 14px; font-size: 8px; color: var(--ink-soft); }
 .sk-ok.on { color: #2f7d32; }
-.sk-pad { flex: 1; min-height: 28vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px; text-align: center; touch-action: none; cursor: pointer;
+.sk-pad { flex: 1; min-height: 28vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px; text-align: center; touch-action: none; -webkit-touch-callout: none; cursor: pointer;
   color: #fff4d6; text-shadow: 1px 1px 0 var(--outline); border: 3px solid var(--outline);
   background: #c98a4a radial-gradient(circle at 20% 30%, #a96c34 0 2px, transparent 3px) 0 0 / 14px 14px;
   box-shadow: inset 0 5px 0 #e2ab6a, inset 0 -7px 0 #8d5629, 0 3px 0 var(--outline); }
