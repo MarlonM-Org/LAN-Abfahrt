@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T13:28+00:00",
+  "updated": "2026-11-09T14:26+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -13,7 +13,7 @@
       "title": "Neues Spiel: Strand-Band (Rhythmus-Party) – eingebauter Song, jedes Handy ein Instrument mit eigener Notenspur, TV-Bühne mit wippenden Avataren und Gruppen-Combo"
     },
     {
-      "title": "Neues Spiel: Sektkorken (fürs Spielbrett) – alle schütteln gleichzeitig, Druck aufbauen, auf „PLOPP!“ loslassen, zu viel Druck = Flasche platzt; ohne Sensor reiben"
+      "title": "Neues Spiel: Sektkorken – Daumen auf den Korken, schütteln (ohne Sensor: reiben), loslassen = PLOPP! Wer zu lange im Roten bleibt, dem platzt die Flasche; 3 Durchgänge, bester Wurf zählt, fürs Brett – fertig auf Branch claude/nifty-hawking-cmp17d, noch kein PR"
     },
     {
       "title": "Neues Spiel: Lügen-Lexikon (à la Fibbage) – seltsames echtes Wort/Fakt mit Lücke, alle schreiben eine Fälschung, dann auf die Wahrheit tippen; Punkte für Wahrheit + Reingefallene"
