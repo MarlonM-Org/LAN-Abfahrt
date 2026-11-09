@@ -200,7 +200,14 @@ export class BandScene extends Phaser.Scene {
     const sorted = [...st.order].sort((a, b) => STAGE_RANK.indexOf(st.players[a].inst) - STAGE_RANK.indexOf(st.players[b].inst) || st.order.indexOf(a) - st.order.indexOf(b));
     const key = sorted.map((id) => `${id}:${st.players[id].inst}`).join(',');
     if (key === this.layoutKey) {
-      for (const m of this.members.values()) m.check.setVisible(st.sub === 'pick' && st.players[m.id]?.ready);
+      for (const m of this.members.values()) {
+        const on = st.sub === 'pick' && !!st.players[m.id]?.ready;
+        if (on && !m.check.visible) {
+          sfx('pop', { x: m.x, pitch: 1.2 });
+          this.tweens.add({ targets: m.check, scale: { from: 3, to: 2 }, duration: 220, ease: 'Back.out' });
+        }
+        m.check.setVisible(on);
+      }
       return;
     }
     this.layoutKey = key;

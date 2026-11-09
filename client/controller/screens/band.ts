@@ -116,7 +116,9 @@ function buildPlay(s: BandState, inst: BandInst) {
   const startAt = s.startAt;
   /** 0 offen, 1 Kopf getroffen (Halten läuft), 2 erledigt */
   const judged = new Uint8Array(notes.length);
-  const songNow = () => performance.now() - toLocalPerf(startAt);
+  const songNow = (at = performance.now()) => at - toLocalPerf(startAt);
+  /** Zeitpunkt der Berührung selbst (nicht erst, wenn der Handler drankommt – ein Bild Ruckeln wären 16 ms) */
+  const when = (e: Event) => (Math.abs(e.timeStamp - performance.now()) < 500 ? e.timeStamp : performance.now());
 
   // Neu aufgebaut mitten im Song (WLAN-Aussetzer): Vergangenes zählt der Server ohnehin als verpasst
   const t0 = songNow();
@@ -190,8 +192,8 @@ function buildPlay(s: BandState, inst: BandInst) {
     else feedback(early ? 'ZU FRÜH' : 'DANEBEN', '#ff8a7a', lane);
   };
 
-  const tap = (lane: number, pointer: string) => {
-    const now = songNow();
+  const tap = (lane: number, pointer: string, at = performance.now()) => {
+    const now = songNow(at);
     flash[lane] = performance.now();
     haptic('tick');
     // Nächste offene Note dieser Bahn (Fenster um die kalibrierte Zeit)
@@ -225,8 +227,8 @@ function buildPlay(s: BandState, inst: BandInst) {
     send('hold', { i: h.i, ok });
   };
 
-  const release = (pointer: string) => {
-    const now = songNow();
+  const release = (pointer: string, at = performance.now()) => {
+    const now = songNow(at);
     for (const [lane, h] of [...holds]) {
       if (h.pointer !== pointer) continue;
       const n = notes[h.i];
@@ -249,12 +251,12 @@ function buildPlay(s: BandState, inst: BandInst) {
     b.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       b.classList.add('down');
-      tap(lane, `p${e.pointerId}`);
+      tap(lane, `p${e.pointerId}`, when(e));
       capture(b, e.pointerId);
     });
     const up = (e: PointerEvent) => {
       b.classList.remove('down');
-      release(`p${e.pointerId}`);
+      release(`p${e.pointerId}`, when(e));
     };
     b.addEventListener('pointerup', up);
     b.addEventListener('pointercancel', up);
@@ -264,10 +266,10 @@ function buildPlay(s: BandState, inst: BandInst) {
     e.preventDefault();
     const r = canvas.getBoundingClientRect();
     const lane = Math.max(0, Math.min(lanes - 1, Math.floor(((e.clientX - r.left) / r.width) * lanes)));
-    tap(lane, `p${e.pointerId}`);
+    tap(lane, `p${e.pointerId}`, when(e));
     capture(canvas, e.pointerId);
   });
-  const canvasUp = (e: PointerEvent) => release(`p${e.pointerId}`);
+  const canvasUp = (e: PointerEvent) => release(`p${e.pointerId}`, when(e));
   canvas.addEventListener('pointerup', canvasUp);
   canvas.addEventListener('pointercancel', canvasUp);
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -283,8 +285,8 @@ function buildPlay(s: BandState, inst: BandInst) {
     const lane = laneOfKey(e.key);
     if (lane < 0) return;
     e.preventDefault();
-    if (e.type === 'keydown' && !e.repeat) tap(lane, `k${lane}`);
-    if (e.type === 'keyup') release(`k${lane}`);
+    if (e.type === 'keydown' && !e.repeat) tap(lane, `k${lane}`, when(e));
+    if (e.type === 'keyup') release(`k${lane}`, when(e));
   };
   window.addEventListener('keydown', onKey);
   window.addEventListener('keyup', onKey);

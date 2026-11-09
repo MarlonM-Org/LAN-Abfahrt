@@ -41,7 +41,9 @@ export class BandGame implements MiniGame {
     private ctx: MiniCtx,
   ) {
     const pool = BAND_SONGS.filter((s) => s !== lastSong && bandSong(s));
-    const id = pool[Math.floor(Math.random() * pool.length)] ?? BAND_SONGS[0];
+    // Zum Testen ein fester Song: BAND_SONG=western npx tsx server/index.ts
+    const forced = process.env.BAND_SONG;
+    const id = forced && bandSong(forced) ? forced : (pool[Math.floor(Math.random() * pool.length)] ?? BAND_SONGS[0]);
     lastSong = id;
     this.song = bandSong(id)!;
     const order = shuffle(ids);
@@ -240,7 +242,7 @@ export class BandGame implements MiniGame {
     const groove = s.bestGroove === 1 ? '1 Takt' : `${s.bestGroove} Takte`;
     const flavor = s.bandAcc >= 85 ? 'Der Strand tobt – Zugabe!' : s.bandAcc >= 70 ? 'Solider Auftritt – die Möwen wippen mit.' : 'Na ja … die Möwen sind weggeflogen.';
     // Band-Bonus (Münzen gibt es nur auf dem Spielbrett – im Arcade-Modus nur die Ansage)
-    const subtitle = !bonus ? flavor : coinsOn ? `${groove} im Groove – +${bonus} Münzen für alle!` : `${groove} am Stück im Groove – ${s.bandAcc} % getroffen!`;
+    const subtitle = !bonus ? flavor : coinsOn ? `${groove} im Groove – +${bonus} Münzen für alle!` : `${groove} im Groove · ${s.bandAcc} % getroffen!`;
     this.ctx.finish({
       groups,
       details,
