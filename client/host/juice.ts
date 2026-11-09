@@ -17,7 +17,7 @@ import Phaser from 'phaser';
 import { ensureTex, txt } from './ui';
 import { type SfxName, type SfxOpts, sfx } from './sfx';
 
-export type BurstPreset = 'puff' | 'sand' | 'splash' | 'confetti' | 'spark' | 'smoke' | 'wood' | 'fire';
+export type BurstPreset = 'puff' | 'sand' | 'splash' | 'confetti' | 'spark' | 'smoke' | 'wood' | 'fire' | 'foam';
 export type FloatStyle = 'dmg' | 'heal' | 'gold' | 'info' | 'water';
 
 export interface JuiceOpts {
@@ -70,6 +70,11 @@ const PRESETS: Record<BurstPreset, { tex: string; n: number; cfg: Cfg }> = {
   wood: {
     tex: 'jx_bit', n: 10,
     cfg: { speed: { min: 50, max: 120 }, angle: { min: 200, max: 340 }, lifespan: { min: 500, max: 850 }, gravityY: 380, rotate: { min: 0, max: 360 }, tint: [0x8d5629, 0xa5602a, 0xc98a4a, 0x5e3518] },
+  },
+  /** Sekt-Schaum: Fontäne nach oben, weiß-golden */
+  foam: {
+    tex: 'jx_dot', n: 16,
+    cfg: { speed: { min: 45, max: 135 }, angle: { min: 245, max: 295 }, lifespan: { min: 500, max: 900 }, gravityY: 320, scale: { start: 1.15, end: 0.35 }, alpha: { start: 1, end: 0.25 }, tint: [0xffffff, 0xfff6d8, 0xf6e7a8, 0xfdf7ea, 0xf2d27a] },
   },
   fire: {
     tex: 'jx_dot', n: 12,

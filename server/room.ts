@@ -86,6 +86,7 @@ import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
+import { SektGame } from './sekt';
 import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
@@ -999,6 +1000,8 @@ export class Room {
         return new ArenaGame(ids, ctx);
       case 'bowling':
         return new BowlingGame(ids, ctx);
+      case 'sekt':
+        return new SektGame(ids, ctx);
       case 'enten':
         return new EntenGame(ids, ctx);
       case 'ttt':
