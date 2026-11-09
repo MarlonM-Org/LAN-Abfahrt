@@ -1,17 +1,18 @@
 {
-  "updated": "2026-11-09T13:26+00:00",
+  "updated": "2026-11-09T13:27+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "title": "Fallen-Parcours: Teil wurde beim ersten Joystick-Tipp sofort eingebaut (ganzer Bildschirm wirkte als PLATZIEREN-Knopf) – behoben auf Branch claude/fervent-curie-48qphm, noch kein PR"
-    }
-  ],
+  "inProgress": [],
   "queue": [],
   "done": [
+    {
+      "title": "Fallen-Parcours: Teil wird nicht mehr beim ersten Joystick-Tipp eingebaut (der ganze Platzier-Bildschirm wirkte als PLATZIEREN-Knopf) – jetzt baut nur der grüne Knopf ein, grau wenn's dort nicht passt",
+      "pr": 112,
+      "date": "2026-11-09"
+    },
     {
       "title": "Arcade-Favoriten: VIP (☆ an der Kachel) und Laptop (☆ oder Taste F) merken Spiele als ⭐ Favorit – stehen in jeder Sortierung ganz oben; gespeichert nur im Browser des Geräts",
       "pr": 111,
@@ -408,8 +409,8 @@
       "notes": "„Entenschießen mit Neigen – sehr cool“"
     },
     "parcours": {
-      "status": "in Arbeit",
-      "notes": "„Nur 4 Sekunden zum Platzieren“: Bug – jeder Tipp auf den Joystick hat das Teil sofort an der Startstelle eingebaut. Behoben, PLATZIEREN ist jetzt wieder nur der grüne Knopf (grau, wenn's dort nicht passt). Davor: kein Zeitlimit (AFK nach 60 s), alles quer, bis 12 Läufer (#43)"
+      "status": "umgesetzt",
+      "notes": "„Nur 4 Sekunden zum Platzieren“: jeder Tipp auf den Joystick baute das Teil sofort ein → behoben, nur noch PLATZIEREN baut ein (#112) · vorher: kein Zeitlimit (AFK nach 60 s), alles quer, bis 12 Läufer (#43)"
     },
     "turm": {
       "status": "umgesetzt",
