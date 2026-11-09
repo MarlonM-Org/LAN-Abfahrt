@@ -62,6 +62,7 @@ import { onRotate, syncOrientation } from './orientation';
 import { attachSpectator } from './spectator';
 import { pickFunk } from './screens/funk';
 import { pickKugel, pickSkisprung, pickTeppich } from './screens/balance';
+import { pickBand } from './screens/band';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -420,6 +421,8 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickMaexchen(m.state);
     case 'werwars':
       return pickWerwars(m.state, vip);
+    case 'band':
+      return pickBand(m.state);
   }
   return outdatedScreen();
 }

@@ -169,6 +169,8 @@ export function defaultSongForScene(scene: string): string {
       return 'poolparty';
     case 'schaetz':
     case 'pixel':
+    // Strand-Band: nur bei der Instrument-Wahl – im Song spielt die Szene selbst (Hintergrundmusik geduckt)
+    case 'band':
       return 'strandpromenade';
     case 'sprint': case 'tidy': case 'kurve': case 'koffer': case 'umzug':
       return 'pixel-arcade';
