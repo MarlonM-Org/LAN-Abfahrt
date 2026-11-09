@@ -603,10 +603,10 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 
 /* Platzieren + Laufen im gemeinsamen Querlayout .lx (Stick links per stickZone, Knöpfe rechts) */
 .lx.pc-lx { --lx-l: 40%; --lx-r: 32%; }
-.lx.pc-place .lx-right { grid-template-rows: auto minmax(0, 1fr); grid-auto-rows: auto; }
+.lx.pc-lx-place .lx-right { grid-template-rows: auto minmax(0, 1fr); grid-auto-rows: auto; }
 .lx.pc-lx .pc-pts { color: var(--red); }
 .lx.pc-lx .pc-dot { width: 8px; height: 8px; margin-right: 4px; }
-.lx.pc-run .pc-run-hint { align-self: center; }
+.lx.pc-lx-run .pc-run-hint { align-self: center; }
 
 /* Warten/Wertung */
 .pcq-wait .pcq-body { grid-template-columns: 1fr; }

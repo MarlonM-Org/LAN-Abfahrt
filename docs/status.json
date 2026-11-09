@@ -1,11 +1,15 @@
 {
-  "updated": "2026-11-07T15:05+00:00",
+  "updated": "2026-11-09T13:26+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "title": "Fallen-Parcours: Teil wurde beim ersten Joystick-Tipp sofort eingebaut (ganzer Bildschirm wirkte als PLATZIEREN-Knopf) – behoben auf Branch claude/fervent-curie-48qphm, noch kein PR"
+    }
+  ],
   "queue": [],
   "done": [
     {
@@ -404,8 +408,8 @@
       "notes": "„Entenschießen mit Neigen – sehr cool“"
     },
     "parcours": {
-      "status": "umgesetzt",
-      "notes": "Kein Zeitlimit mehr (AFK nach 60 s), Auswahl/Platzieren/Laufen alles quer; ab 9 Spielern laufen jetzt alle 12 (#43)"
+      "status": "in Arbeit",
+      "notes": "„Nur 4 Sekunden zum Platzieren“: Bug – jeder Tipp auf den Joystick hat das Teil sofort an der Startstelle eingebaut. Behoben, PLATZIEREN ist jetzt wieder nur der grüne Knopf (grau, wenn's dort nicht passt). Davor: kein Zeitlimit (AFK nach 60 s), alles quer, bis 12 Läufer (#43)"
     },
     "turm": {
       "status": "umgesetzt",

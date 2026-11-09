@@ -29,12 +29,14 @@ function partIcon(type: PartType, maxW = 84) {
 /**
  * Gemeinsames Querlayout `.lx` für die Daumen-Phasen (Platzieren, Laufen): Kopf · Stick links ·
  * Infos Mitte · Knöpfe rechts – wie die anderen Quer-Spiele.
+ * Die Modus-Klasse heißt bewusst `pc-lx-<mode>`: Hieße sie wie ein Knopf (z. B. `pc-place`), fände
+ * `q(root, '.pc-place')` das ganze Layout statt des Knopfs – dann baute jeder Stick-Tipp das Teil sofort ein.
  */
 function lxFrame(s: ParcoursState, mode: string, left: string, mid: string, right: string) {
   const id = store.playerId!;
   const color = hex(P.COLORS[s.colors[id] ?? 0]);
   const root = el(`
-    <div class="lx pc-lx pc-${mode}">
+    <div class="lx pc-lx pc-lx-${mode}">
       <div class="lx-head">
         <span class="lx-tag"><i class="pc-dot" style="background:${color}"></i>Runde ${Math.max(1, s.round)}/${s.rounds}</span>
         <span class="pc-pts">${s.points[id] ?? 0}/${s.target} P</span>
