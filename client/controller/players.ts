@@ -96,8 +96,10 @@ export function buildKicked(onRejoin: () => void) {
 // ---------------------------------------------------------------- VIP während des Spiels
 
 /**
- * Während eines Spiels: kleiner Knopf „Spieler“ für den VIP, sobald jemand offline ist.
- * Liegt außerhalb von #app (eigenes DOM), damit Screen-Wechsel ihn nicht stören.
+ * Während eines Spiels: kleiner Knopf „n offline“ für den VIP, sobald jemand offline ist.
+ * Liegt außerhalb von #app (eigenes DOM), damit Screen-Wechsel ihn nicht stören. Er sitzt oben rechts
+ * direkt links neben „Abbrechen“ (gleiche Bedingung: VIP, nicht Lobby) – `html.pl-on` reserviert dafür
+ * Platz in der Kopfzeile, damit er nichts verdeckt.
  */
 export function initVipPlayersButton() {
   const btn = el(`<button class="pl-fab hidden"></button>`).firstElementChild as HTMLButtonElement;
@@ -124,8 +126,11 @@ export function initVipPlayersButton() {
     const inGame = !!s && s.phase !== 'lobby' && store.joined && vip && !store.editing;
     const players = visiblePlayers();
     const offline = players.filter((p) => !p.connected);
-    btn.classList.toggle('hidden', !inGame || !offline.length);
-    btn.textContent = `Spieler (${offline.length} offline)`;
+    const show = inGame && offline.length > 0;
+    btn.classList.toggle('hidden', !show);
+    document.documentElement.classList.toggle('pl-on', show);
+    btn.textContent = `${offline.length} offline`;
+    btn.setAttribute('aria-label', `Spieler verwalten – ${offline.length} offline`);
     if (!inGame || (!offline.length && open)) open = false;
     sheet.classList.toggle('hidden', !open);
     if (!open) return;
