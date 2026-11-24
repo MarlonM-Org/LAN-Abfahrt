@@ -26,6 +26,7 @@ import { golfBot } from './golfbot';
 import { spionBot } from './spionbot';
 import { maexBot } from './maexchenbot';
 import { werwarsBot } from './werwarsbot';
+import { busBotTipp } from '../shared/busfahrer';
 import { WACKEL, type WackelPlatform, type WackelState, wackelPlatformUnder, wackelStage, wackelSurfaceY } from '../shared/wackel';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
@@ -968,11 +969,12 @@ export class Bot {
         this.send('answer', { have: Math.random() < 0.45 });
       });
     }
-    if (m.kind === 'hilo' && m.state.sub === 'guess' && !m.state.guessed.includes(this.id)) {
-      const card = m.state.card;
-      this.once(`hilo-${m.state.round}`, async () => {
-        await sleep(rand(800, 3000));
-        this.send('guess', { dir: card < 8 ? 'higher' : card > 8 ? 'lower' : Math.random() < 0.5 ? 'higher' : 'lower' });
+    // Busfahrer: meist die wahrscheinlichste Antwort, ab und zu aus dem Bauch heraus
+    if (m.kind === 'hilo' && m.state.sub === 'guess' && m.state.sips[this.id] !== undefined && !m.state.chosen.includes(this.id)) {
+      const st = m.state;
+      this.once(`hilo-${st.round}`, async () => {
+        await sleep(rand(800, 3500));
+        this.send('guess', { round: st.round, tipp: busBotTipp(st.fragen[st.step], st.cards, st.options) });
       });
     }
     if (m.kind === 'bomb' && m.state.sub === 'pass' && m.state.holder === this.id) {
