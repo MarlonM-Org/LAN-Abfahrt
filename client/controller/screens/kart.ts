@@ -30,9 +30,6 @@ export const tilt = { on: false, center: 0, roll: 0, smooth: 0, lastSample: 0, u
 /** „So fährst du“ nur einmal pro Rennen */
 let introFor = 0;
 
-// iOS: Pinch-Zoom-Gesten im Spiel unterbinden
-document.addEventListener('gesturestart', (e) => e.preventDefault());
-
 /** Rückmeldung (Android: Vibration, iPhone: Klick + Rand-Blitz) – auch von Auto-Fußball genutzt */
 export const vibrate = (pattern: number | number[]) => haptic(pattern);
 
