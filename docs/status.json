@@ -1,52 +1,11 @@
 {
-  "updated": "2026-11-24T17:00+00:00",
+  "updated": "2026-11-24T19:30+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "type": "in Arbeit · Marlon/Claude",
-      "kind": "kart",
-      "title": "Kart-Rennen: Gas rastet ein, Hand frei für Drift und Item (entschieden)",
-      "detail": "GAS rastet ein, BREMSE löst, eigene Knöpfe DRIFT und ITEM rechts, Bots angepasst, Aufwärm-Hinweis. Dateien: server/kart.ts, client/controller/screens/kart.ts, scripts/bots.ts, shared/games.ts (HOWTO).",
-      "branch": "claude/ecstatic-goodall-rlrs70-kart",
-      "since": "2026-11-24"
-    },
-    {
-      "type": "in Arbeit · Marlon/Claude",
-      "kind": null,
-      "title": "Handy-Browser-Zoom blocken (entschieden)",
-      "detail": "touch-action, iOS-Gesten und Doppeltipp blocken, Zoom-Erkennung mit Overlay, Android-Vollbild. Dateien: client/index.html, client/controller/main.ts, style.css, neues zoom.ts.",
-      "branch": "claude/ecstatic-goodall-rlrs70-zoom",
-      "since": "2026-11-24"
-    },
-    {
-      "type": "in Arbeit · Marlon/Claude",
-      "kind": null,
-      "title": "UX-Branch vom 5.11.: Rosinen picken, Rest verwerfen (entschieden)",
-      "detail": "Rosinen aus claude/practical-wozniak-2dsd2e einzeln gegen main prüfen und frisch übernehmen (Parcours, Verräter, Sumo, Bogen, Smash, Bot-Stärke, Flunkyball, Handy quer). Kart und Auto-Fußball bleiben unangetastet.",
-      "branch": "claude/ecstatic-goodall-rlrs70-ux",
-      "since": "2026-11-24"
-    },
-    {
-      "type": "in Arbeit · Marlon/Claude",
-      "kind": null,
-      "title": "VIP am Laptop jederzeit wechseln",
-      "detail": "Spieler-Panel am Laptop: „Zum VIP machen“, host:vip am Server, Handys aktualisieren sofort. Dateien: server/room.ts, client/host/playersPanel.ts, hostControls.ts.",
-      "branch": "claude/ecstatic-goodall-rlrs70-vip",
-      "since": "2026-11-24"
-    },
-    {
-      "type": "in Arbeit · Marlon/Claude",
-      "kind": null,
-      "title": "Musik-Werkstatt (/musik.html) aufräumen: Übersicht, Kopie, Bearbeiten, Speichern",
-      "detail": "Stufe 1–3: Übersicht „Wo läuft was“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt. Dateien: client/musik/, client/musik.html, server/music.ts, shared/music.ts.",
-      "branch": "claude/ecstatic-goodall-rlrs70-musik",
-      "since": "2026-11-24"
-    }
-  ],
+  "inProgress": [],
   "queue": [
     {
       "area": "Spielbrett",
@@ -80,74 +39,16 @@
       "prio": 2
     },
     {
-      "area": "Spiel",
+      "area": "Handy",
       "prio": 3,
-      "size": "M–L",
-      "kind": "kart",
-      "title": "Kart-Rennen: Gas rastet ein, Hand frei für Drift und Item (entschieden)",
-      "detail": "Marlon (24.11.): SNES-Look bleibt. Hauptproblem: Driften geht praktisch nicht, weil man dafür GAS oder den Stick loslassen muss. Lautstärketasten gehen nicht (Browser geben sie nicht weiter). Entscheidung: GAS rastet ein – einmal am Start GAS drücken, dann gibt das Kart dauerhaft Gas; BREMSE beendet das automatische Gas (und bremst/fährt rückwärts wie bisher); danach muss man GAS wieder selbst drücken, um es neu einzurasten. So ist der rechte Daumen frei für DRIFT und ITEM.",
-      "steps": [
-        "Server (kart.ts): Eingabe-Flag „autoGas“ pro Spieler – GAS-Tap setzt es, BREMSE löscht es; Gas gilt, solange autoGas oder GAS gehalten. Bots nutzen dasselbe.",
-        "Handy (screens/kart.ts, Querlayout): GAS zeigt eingerastet an (leuchtet, Label „GAS ●“), BREMSE wie bisher; rechts daneben große eigene Knöpfe DRIFT (halten = Drift, loslassen = Mini-Turbo, Funken blau → orange) und ITEM – kein Hochrutschen über GAS mehr; input-reset löst alles.",
-        "Aufwärmrunde: Hinweis-Animation „GAS antippen → fährt von allein · DRIFT halten in der Kurve“ (visuell, Text-Diät), 3-2-1 statt 8 s Countdown.",
-        "Danach prüfen: Lenkgefühl/Streckenbreite, Handy-Ansicht nur noch optional, Tribünen-Zuschauer für fertige Fahrer (2 Bananen), Grand-Prix „Nochmal“ über 3 Strecken."
-      ]
-    },
-    {
-      "area": "Handy",
-      "prio": 4,
-      "size": "S",
-      "kind": null,
-      "title": "Handy-Browser-Zoom blocken (entschieden)",
-      "detail": "Marlon (24.11.): Zoom technisch blocken, für iPhone und Android. „Zum Home-Bildschirm“ fällt weg (wechselnde Tunnel-Adresse). Umsetzung: touch-action: none auf allen Spielflächen und auf body, sobald ein Spiel-Screen aktiv ist; iOS-Gesten (gesturestart/gesturechange/gestureend) und Doppeltipp per preventDefault abfangen; Zwei-Finger-Touches im Querlayout nur an Stick/Knöpfe durchreichen; dazu als Netz: visualViewport.scale > 1 erkennen → Overlay „Zoom zurücksetzen“ (zwei Finger zusammenziehen) mit Viewport-Reset-Trick; Android zusätzlich Fullscreen-API beim ersten Tipp. Testen mit Playwright-Touch-Gesten und echtem iPhone/Android."
-    },
-    {
-      "area": "Handy",
-      "prio": 5,
       "size": "M",
       "kind": null,
       "title": "Usability-Pass Handy-UI: Knöpfe sichtbarer, einheitlich, leicht bedienbar",
       "detail": "Marlon: Der durchsichtige Abbrechen-Knopf oben ist im Spiel okay, aber allgemein sollen Knöpfe und Bedienelemente besser sichtbar und nutzbar werden. Vorgehen: Bestandsaufnahme aller Screens (Screenshots per Playwright in iPhone-Größe), dann Styleguide in style.css: Mindestgröße 48 px, Kontrast ≥ 4,5:1, klare Primär/Sekundär/Gefahr-Knöpfe, gedrückt-Zustand + Haptik überall, Abbrechen/Zurück außerhalb des Spiels als deutlicher Knopf, Lobby/VIP-Menü/Ergebnis zuerst; Spiel-Screens behalten die zurückhaltende Kopfzeile."
     },
     {
-      "area": "Qualität",
-      "size": "S–M",
-      "kind": null,
-      "title": "UX-Branch vom 5.11.: Rosinen picken, Rest verwerfen (entschieden)",
-      "detail": "Branch claude/practical-wozniak-2dsd2e (2 Commits, 33 Dateien) nicht wholesale mergen – Auto-Fußball ist seit #99 anders gelöst, die Umbenennungen (Entenjagd, Wort-Bombe, Cockpit-Chaos, Unsichtbar-Fangen) widersprechen der „à la“-Regel, die Kart-Lenkung kollidiert mit dem Einrast-Gas. Einzeln gegen main prüfen und frisch übernehmen, danach Branch löschen.",
-      "steps": [
-        "Übernehmen: Parcours-Sprunghilfe (kurzer Tipp springt, Coyote 150 ms, Puffer 180 ms, „Aufgeben“/„Aussetzen“), Verräter-Türen-Hilfe, Sumo-Rempler-Puffer, Sprung-Puffer in Bogen und Smash während Dash/Angriff.",
-        "Übernehmen: Bot-Stärke leicht/normal/profi (VIP-Knopf, --skill) mit menschlicher Reaktionszeit, Flunkyball-Wurf per Schwung/Wischen und Schütteln, Abstieg über Hindernis klettern, Paddel-Duell-Bojen.",
-        "Übernehmen: Handy quer – iOS-Schriftvergrößerung aus, Infospalte skaliert automatisch, Igel-Minikarte in schmalen Spalten (prüfen, ob #45/#79 das schon abdecken).",
-        "Verwerfen: Auto-Fußball-Stick, Kart-Lenkkennlinie, Spiel-Umbenennungen, Status-Dateien."
-      ],
-      "prio": 6
-    },
-    {
-      "area": "Laptop",
-      "prio": 7,
-      "size": "S",
-      "kind": null,
-      "title": "VIP am Laptop jederzeit wechseln",
-      "detail": "Im Spieler-Panel (Taste P / Knopf „Spieler“ am TV) pro Spieler „👑 Zum VIP machen“, nur für isLaptop()-Verbindungen (nie über den Tunnel). Server: host:vip <id> → Room setzt VIP um, informiert alle (meta), Handy des neuen VIP zeigt sofort die VIP-Knöpfe, altes Handy verliert sie; auch mitten im Spiel und wenn der alte VIP offline ist. Bonus: VIP am Handy freiwillig übergeben."
-    },
-    {
-      "area": "Musik",
-      "prio": 8,
-      "size": "M",
-      "kind": null,
-      "title": "Musik-Werkstatt (/musik.html) aufräumen: Übersicht, Kopie, Bearbeiten, Speichern",
-      "detail": "Marlons Anforderungen (24.11.): Hauptzweck ist, eingebaute Songs anzupassen. Es muss leicht zu sehen sein, wo welcher Song aktiv ist; leicht, eine Kopie eines Songs anzulegen und zu bearbeiten; leicht, einen Song direkt zu bearbeiten; speichern und sofort damit arbeiten. Klang und Komponierhilfen fehlen bisher nicht – die Werkstatt war nur zu unübersichtlich, um sie zu benutzen. Heute: Piano-Roll, Schlagzeug-Raster, BPM/Swing, Undo, Vorlagen, Einsingen, MIDI, Szenen-Zuordnung – alles auf einer Seite.",
-      "steps": [
-        "Stufe 1 · Übersicht „Wo läuft was“: Startseite der Werkstatt als Szenen-Liste (Lobby, Spielbrett, Ergebnis, jedes Spiel) mit aktivem Song, Herkunft (eingebaut/eigen/Stil) und ▶ Anhören; von dort pro Szene „Song wechseln“, „Kopie anlegen & bearbeiten“, „Direkt bearbeiten“.",
-        "Stufe 2 · Bearbeiten ohne Umwege: Eingebaute Songs direkt bearbeitbar (gespeichert als Überschreibung unter gleichem Namen, „Original wiederherstellen“ bleibt), Kopie bekommt automatisch Namen + Zuordnung zur Szene, Speichern = sofort aktiv am TV (music:songs/assign gibt es schon) mit Bestätigung „läuft jetzt in Kart“.",
-        "Stufe 3 · Editor entrümpeln: nur Piano-Roll, Schlagzeug, Play/Loop/BPM sichtbar; Einsingen, MIDI, Hüllkurven, Export in ein Mehr-Menü; Brotkrumen „Kart · Turbo-Runde (Kopie)“, klarer Zurück-Weg zur Übersicht; Playwright-Screenshots als Abnahme.",
-        "Später (erst wenn gewünscht): Klang (Instrumente, Effekte), Komponierhilfen (Akkorde, Abschnitte), Tastatur-Spielen, Handy-Ansicht."
-      ]
-    },
-    {
       "area": "Neue Spiele",
-      "prio": 9,
+      "prio": 4,
       "size": "je S–M",
       "kind": null,
       "title": "Review-Phase 5: weitere neue Spiele",
@@ -168,7 +69,7 @@
       "kind": null,
       "title": "Highlights & Replays am TV (freigegeben)",
       "detail": "Der TV puffert die letzten 6 s an Snapshots (SnapBuffer gibt es schon, Auto-Fußball hat die Tor-Wiederholung bereits) und spielt K.O., letzten Treffer, Zieleinlauf oder Rauswurf in Zeitlupe nochmal ab – mit Banner, Sprecher und Zoom auf den Moment. Reihenfolge: Smash (K.O.), Bogen (letzter Treffer), Igel (Volltreffer/Selbsttreffer), Kart (Zieleinlauf, Überholen auf der Linie), Sumo (letzter Rauswurf), Wasserbomben, Bomben-Arena. Reine Client-Arbeit, der Server meldet nur den Moment über ctx.log(). Am Ende des Abends „Best of“: die 5 besten Momente nacheinander vor der Siegerehrung.",
-      "prio": 10
+      "prio": 5
     },
     {
       "area": "Handy",
@@ -176,7 +77,7 @@
       "kind": null,
       "title": "Onboarding für neue Gäste (freigegeben)",
       "detail": "Beim ersten Beitritt eines Geräts (localStorage leer) ein 60-s-Tutorial am Handy, visuell statt Text: Stick kreisen lassen, Knopf drücken, Handy kippen und schütteln (Sensor-Erlaubnis gleich mitnehmen), quer halten üben – jede Station mit Häkchen und Haptik; der TV zeigt, wer gerade übt. Überspringbar, über das Spieler-Menü jederzeit wieder aufrufbar. Zusammen mit dem Zoom-Check aus der Zoom-Karte.",
-      "prio": 11
+      "prio": 6
     },
     {
       "area": "Qualität",
@@ -184,7 +85,7 @@
       "kind": null,
       "title": "Lasttest 12 Handys + Netz-Robustheit (freigegeben)",
       "detail": "Bots über echtes WLAN statt localhost (zweiter Rechner oder Handys als Bot-Clients), 12 Spieler in Bomben-Arena, Smash, Kart, Igel und einer Party: Paketgrößen und -raten messen (Review-Werte als Vergleich: Arena ≈ 6 KB/Snapshot bei 20 Hz), Reconnect-Szenarien (Bildschirm aus, App-Wechsel, WLAN-Loch 2 s / 10 s / 60 s) automatisiert mit Playwright, CPU/Speicher des Servers über 2 Stunden; Ergebnis als Tabelle in docs/, gefundene Hänger als eigene Tickets.",
-      "prio": 12
+      "prio": 7
     },
     {
       "area": "Alle Spiele",
@@ -192,11 +93,11 @@
       "kind": null,
       "title": "Farbenblind-Modus in allen Ausführungen (freigegeben)",
       "detail": "Marlon: „gerne in allen Ausführungen“. Einstellung am Handy pro Spieler und am TV (VIP/Laptop): Deuteranopie (Rot-Grün, häufigste Form), Protanopie, Tritanopie (Blau-Gelb) und Hoher Kontrast/Graustufen. Umsetzung: (1) die 12 Spielerfarben bekommen je Modus eine geprüfte Alternativ-Palette (Abstand mit Simulations-Matrizen prüfen, Skript in scripts/), (2) Farbe nie allein: Spieler-Symbol (▲ ● ■ ◆ …) zusätzlich auf Ring, Namensschild, Spur, Fadenkreuz, Ball und HUD-Porträt, Teams mit Muster (Streifen/Punkte) statt nur Farbe, (3) Spiel-Signale (Rot = Gefahr, Grün = bereit) immer mit Symbol/Blinken, (4) TV-Vorschau zum Ausprobieren in der Lobby, (5) Playwright-Screenshots aller Szenen durch den Simulations-Filter als Abnahme.",
-      "prio": 13
+      "prio": 8
     },
     {
       "area": "Qualität",
-      "prio": 14,
+      "prio": 9,
       "size": "S–M",
       "kind": null,
       "title": "Noch unentschieden",
@@ -206,9 +107,42 @@
         "Testrunde: 42 von 63 Spielen haben noch kein Feedback von Marlon – nach jedem Spieleabend Status-Seite pflegen",
         "Gestrichen (24.11.): Pixel-Avatare aus Fotos"
       ]
+    },
+    {
+      "area": "Musik",
+      "size": "S",
+      "kind": null,
+      "title": "Musik-Werkstatt: Nacharbeit nach dem Umbau",
+      "detail": "Reste aus dem Umbau vom 24.11.: (1) TV-Musikmenü (client/host/musicMenu.ts) kennzeichnet Überschreibungen nicht – sie erscheinen als eigener Song mit dem Titel des Originals; (2) bei Szenen mit Stil oder Stille sind „Kopie & bearbeiten“/„Direkt bearbeiten“ gesperrt, bis man einen festen Song wählt – besser: Dropdown der Stil-Songs direkt anbieten; (3) ändert man in einer Überschreibung den Stil, rotiert sie trotzdem im Stil des Originals; (4) am TV-Bild nachmessen, dass die Überschreibung wirklich spielt. Später, nur falls gewünscht: Klang, Komponierhilfen, Tastatur-Spielen, Handy-Ansicht.",
+      "prio": 10
     }
   ],
   "done": [
+    {
+      "title": "Kart-Rennen: GAS rastet ein (antippen = fährt von allein, BREMSE = aus), eigene große Knöpfe DRIFT und ITEM rechts, kein Hochrutschen mehr; Regelkarte und Bots angepasst",
+      "pr": null,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Handy-Zoom-Schutz: iOS-Pinch, Doppeltipp und Zwei-Finger-Wischen außerhalb von Stick/Knöpfen geblockt, Overlay „Zoom zurücksetzen“ bei erkanntem Zoom, Android-Vollbild beim ersten Tipp",
+      "pr": null,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "UX-Rosinen aus dem Branch vom 5.11. frisch übernommen: Parcours-Sprunghilfe + Aufgeben/Aussetzen, Türen-Hilfe im Verräter, Rempler-Puffer Sumo, Sprung-Puffer Bogen/Smash, Bot-Stärke leicht/normal/profi (VIP-Knopf + --skill), Flunkyball mit Schwung/Wischen/Schütteln, Abstieg klettert über Hindernisse, SUP-Bojen verschwinden, iOS-Schriftgröße + Mittelspalte quer",
+      "pr": null,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "VIP am Laptop jederzeit wechseln: Spieler-Panel (P) „👑 Zum VIP machen“, nur für echte Laptop-Verbindungen, gilt bis der Spieler den Raum verlässt",
+      "pr": null,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Musik-Werkstatt aufgeräumt: Startseite „Wo läuft was?“ (Szenen, aktiver Song, Anhören, Song wechseln, Kopie & bearbeiten, Direkt bearbeiten), Überschreibungen eingebauter Songs mit „Original wiederherstellen“, Speichern wirkt sofort am TV, Editor entrümpelt mit Mehr-Menü und Brotkrumen",
+      "pr": null,
+      "date": "2026-11-24"
+    },
     {
       "title": "Startseite: TV-Lobby zeigt die anwesenden Spieler (Figur, VIP-Krone, offline grau) statt Leaderboard; Arcade/Turnier mit Tagespunkten unter den Namen; Tabellen nur mit Anwesenden, Punkte bleiben bei Rückkehr erhalten (lag seit 9.11. auf Branch)",
       "pr": 115,
@@ -617,8 +551,8 @@
   ],
   "feedback": {
     "kart": {
-      "status": "offen",
-      "notes": "Marlon (24.11.): „Mario Kart ist gerade noch ziemlich ass“ – Details offen, Überarbeitung in der Warteschlange · vorher umgesetzt: Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone (#14), TV-Regie (#84), Rückansicht (#87)"
+      "status": "umgesetzt",
+      "notes": "„Gerade noch ziemlich ass“ – Driften ging nicht, weil man GAS/Stick loslassen musste → GAS rastet ein, BREMSE löst, DRIFT und ITEM als eigene große Knöpfe (24.11.); SNES-Look bleibt. Offen für Marlon: soll langes Halten von GAS auch einrasten (heute ja) oder nur kurzes Antippen? · vorher: Handy-Ansicht pro Spieler, Joystick, Drift, KIPPEN (#14), TV-Regie (#84), Rückansicht (#87)"
     },
     "enten": {
       "status": "positiv",
@@ -791,20 +725,20 @@
       "status": "offen"
     },
     {
-      "title": "Handy-Browser zoomt manchmal in den Controller rein",
-      "status": "offen"
+      "title": "Handy-Browser zoomt manchmal in den Controller rein → Zoom-Schutz (Gesten geblockt, Overlay „Zoom zurücksetzen“, Android-Vollbild); am echten iPhone noch zu prüfen",
+      "status": "umgesetzt"
     },
     {
       "title": "Knöpfe/Bedienelemente am Handy besser sichtbar und bedienbar (Abbrechen-Knopf im Spiel darf durchsichtig bleiben)",
       "status": "offen"
     },
     {
-      "title": "VIP am Laptop jederzeit wechseln können",
-      "status": "offen"
+      "title": "VIP am Laptop jederzeit wechseln → Spieler-Panel „👑 Zum VIP machen“",
+      "status": "umgesetzt"
     },
     {
-      "title": "Musik-Werkstatt ausbauen – Anforderungen noch aufnehmen",
-      "status": "offen"
+      "title": "Musik-Werkstatt zu unübersichtlich → Übersicht „Wo läuft was?“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt",
+      "status": "umgesetzt"
     },
     {
       "title": "VIP-Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers → kompakt „n offline“ neben „Abbrechen“ (#113)",
