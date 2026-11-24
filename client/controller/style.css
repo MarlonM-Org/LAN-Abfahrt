@@ -987,6 +987,13 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 :where(html.land-short) .wackel .wk-wins { margin-right: 120px; }
 .mode-tabs.four { grid-template-columns: 1fr 1fr; }
 .mode-tabs.five { grid-template-columns: 1fr 1fr 1fr; }
+/* Lobby: Arcade + Party groß, Turnier/Trinken/Story klein darunter */
+.mode-tabs.main { grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-tab.big { padding: 12px 4px 10px; font-size: 11px; line-height: 1.5; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.mode-tab.big .mt-icon { font-size: 22px; line-height: 1; }
+.mode-tab.big small { font-size: 7px; opacity: 0.85; }
+.mode-tabs.more { margin-top: -2px; }
+.mode-tabs.more .mode-tab { font-size: 8px; padding: 9px 2px; }
 .tour-btn small { font-size: 7px; line-height: 1.6; display: block; margin-top: 4px; opacity: 0.95; }
 .tour-pick { font-size: 8px; line-height: 1.8; color: var(--ink-soft); min-height: 1em; }
 .tour-pick:empty { display: none; }

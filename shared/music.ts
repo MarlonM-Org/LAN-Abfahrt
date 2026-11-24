@@ -130,7 +130,7 @@ export const ASSIGN_SCENES: { id: string; name: string }[] = [
   { id: 'lobby', name: 'Lobby' },
   { id: 'board', name: 'Spielbrett' },
   { id: 'results', name: 'Ergebnisse' },
-  { id: 'story', name: 'Date Night – Geschichte' },
+  { id: 'story', name: 'Story (Date Night) – Geschichte' },
   ...Object.entries(MINI_INFO).map(([id, info]) => ({ id, name: info.title })),
 ];
 

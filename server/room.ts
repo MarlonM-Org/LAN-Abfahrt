@@ -191,7 +191,8 @@ export class Room {
   private mini: MiniGame | null = null;
   private board: Board | null = null;
   private dateRun: DateRun | null = null;
-  private mode: GameMode = 'party';
+  /** Im Lobby-Menü gewählter Modus – Arcade (Spiel für Spiel) ist der Standard der Minispiel-Sammlung */
+  private mode: GameMode = 'arcade';
   /** Trinkspiel: Gesamtschlücke + zuletzt gespieltes Spiel */
   private drinkRun: { totals: Record<string, number>; last: MiniKind | null; rounds: number } | null = null;
   private nhie = new QuestionStore('nhie.json', 'nhie');
@@ -386,7 +387,7 @@ export class Room {
         this.nextDrinkRound();
       } else if (req.mode === 'date') {
         const def = DATE_VERSIONS.find((v) => v.id === req.version) ?? DATE_VERSIONS[0];
-        if (ids.length !== 2) return socket.emit('toast', 'Date Night ist für genau 2 Spieler.');
+        if (ids.length !== 2) return socket.emit('toast', 'Story (Date Night) ist für genau 2 Spieler.');
         this.startDate(def.id, [ids[0], ids[1]]);
       } else if (req.mode === 'party') {
         if (ids.length < MIN_PLAYERS) return socket.emit('toast', `Mindestens ${MIN_PLAYERS} Spieler nötig.`);
@@ -1221,7 +1222,7 @@ export class Room {
       return { playerId: id, place, detail: `${b.cocktails[id]} Cocktails · ${b.coins[id]} Münzen`, coins: 0 };
     });
     const winner = this.nameOf(ids[0]);
-    return { title: 'Urlaubs-Champion', subtitle: `${winner} gewinnt die LAN-Abfahrt!`, rows, final: true };
+    return { title: 'Party-Champion', subtitle: `${winner} gewinnt die Party!`, rows, final: true };
   }
 
   private backToLobby() {

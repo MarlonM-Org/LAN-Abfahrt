@@ -53,7 +53,7 @@ for (const m of ag.matchAll(/\{ title: '([^']+)', kinds: \[([^\]]*)\] \}/g)) {
 const arcade = groups.map((g) => ({ title: g.title, kinds: g.kinds.filter((k) => !date.includes(k)) })).filter((g) => g.kinds.length);
 const covered = new Set([...arcade.flatMap((g) => g.kinds), ...drink, ...date]);
 const rest = Object.keys(info).filter((k) => !covered.has(k));
-const sections = [...arcade, { title: 'Trinkspiel', kinds: drink }, { title: 'Date Night (zu zweit)', kinds: date }];
+const sections = [...arcade, { title: 'Trinkspiel', kinds: drink }, { title: 'Story: Date Night (zu zweit)', kinds: date }];
 if (rest.length) sections.push({ title: 'Weitere', kinds: rest });
 
 // ---------------------------------------------------------------- Tabelle
