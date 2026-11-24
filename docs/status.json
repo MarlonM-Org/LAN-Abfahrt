@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T14:10+00:00",
+  "updated": "2026-11-24T14:40+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -51,14 +51,13 @@
       "prio": 3,
       "size": "M–L",
       "kind": "kart",
-      "title": "Kart-Rennen gründlich überarbeiten („gerade noch ziemlich ass“)",
-      "detail": "Marlon (24.11.): SNES-Look soll bleiben. Hauptproblem: Driften geht praktisch nicht, weil man dafür GAS oder den Stick loslassen muss (Drift liegt heute „über GAS“: Daumen hochrutschen). Hardware-Lautstärketasten gehen nicht – Browser (iOS wie Android) geben sie Webseiten nicht weiter. Es bleiben Touch-Lösungen (Optionen unten); Empfehlung: Auto-Gas + eigener DRIFT-Knopf, Stick-Flick als Alternative. Weitere Verdachtsmomente aus dem Spiel-Review: zu komplex für Neue, Handy-Ansicht zieht den Blick vom TV, 8 s Countdown. Hinweis: Auf dem alten Branch claude/practical-wozniak-2dsd2e (5.11.) gab es schon „Kart-Lenkung weicher“ – nie gemergt.",
+      "title": "Kart-Rennen: Gas rastet ein, Hand frei für Drift und Item (entschieden)",
+      "detail": "Marlon (24.11.): SNES-Look bleibt. Hauptproblem: Driften geht praktisch nicht, weil man dafür GAS oder den Stick loslassen muss. Lautstärketasten gehen nicht (Browser geben sie nicht weiter). Entscheidung: GAS rastet ein – einmal am Start GAS drücken, dann gibt das Kart dauerhaft Gas; BREMSE beendet das automatische Gas (und bremst/fährt rückwärts wie bisher); danach muss man GAS wieder selbst drücken, um es neu einzurasten. So ist der rechte Daumen frei für DRIFT und ITEM.",
       "steps": [
-        "Option A · Auto-Gas (Empfehlung): Kart fährt von allein, rechter Daumen liegt frei auf einem großen DRIFT-Knopf (halten = Drift, loslassen = Mini-Turbo), daneben ITEM, kleine BREMSE; Lenken bleibt links. Wie Mario Kart mit Auto-Beschleunigung – Einsteiger kommen sofort klar.",
-        "Option B · Drift am Stick: Stick schnell zur Seite „schnippen“ (Flick) oder zweiten Finger neben dem Stick aufsetzen = Hop/Drift; GAS bleibt gedrückt. Fühlt sich nach Controller an, braucht Übung.",
-        "Option C · Wischen auf dem GAS-Knopf: GAS rastet nach 1 s ein (bleibt an, auch wenn man loslässt), Wisch nach oben = Drift halten, Wisch nach unten = bremsen. Nah am Heutigen, aber ohne Loslass-Problem.",
-        "Option D · Kippen: Drift durch kurzes Kippen des Handys (nur über HTTPS mit Sensor), als Zusatz zu A oder B.",
-        "Danach: Aufwärmrunde zeigt den Drift mit Pfeil-Animation (Text-Diät), Countdown kürzer, Tribünen-Zuschauer für fertige Fahrer (2 Bananen), Grand-Prix „Nochmal“ über 3 Strecken."
+        "Server (kart.ts): Eingabe-Flag „autoGas“ pro Spieler – GAS-Tap setzt es, BREMSE löscht es; Gas gilt, solange autoGas oder GAS gehalten. Bots nutzen dasselbe.",
+        "Handy (screens/kart.ts, Querlayout): GAS zeigt eingerastet an (leuchtet, Label „GAS ●“), BREMSE wie bisher; rechts daneben große eigene Knöpfe DRIFT (halten = Drift, loslassen = Mini-Turbo, Funken blau → orange) und ITEM – kein Hochrutschen über GAS mehr; input-reset löst alles.",
+        "Aufwärmrunde: Hinweis-Animation „GAS antippen → fährt von allein · DRIFT halten in der Kurve“ (visuell, Text-Diät), 3-2-1 statt 8 s Countdown.",
+        "Danach prüfen: Lenkgefühl/Streckenbreite, Handy-Ansicht nur noch optional, Tribünen-Zuschauer für fertige Fahrer (2 Bananen), Grand-Prix „Nochmal“ über 3 Strecken."
       ]
     },
     {
@@ -66,8 +65,8 @@
       "prio": 4,
       "size": "S",
       "kind": null,
-      "title": "Handy-Browser zoomt manchmal rein (Controller unbrauchbar)",
-      "detail": "Bisher wohl auf iPhones, für beide Plattformen lösen. „Zum Home-Bildschirm“ fällt weg (wechselnde Tunnel-Adresse, öffentliches Repo). Andere Wege: (1) Zoom technisch blocken – touch-action: none auf allen Spielflächen und body im Spiel, iOS-Gesten (gesturestart/gesturechange) und Doppeltipp per preventDefault abfangen, Zwei-Finger-Touches im Querlayout schlucken; das reicht in der Praxis für Web-Spiele. (2) Zoom erkennen und reparieren – visualViewport.scale > 1 → Vollbild-Overlay „Zoom zurücksetzen“ mit Anleitung (zwei Finger zusammenziehen) + Viewport-Reset-Trick; die Lobby zeigt beim Beitritt einen Zoom-Check. (3) Android: Fullscreen-API beim ersten Tipp (keine Adressleiste, kein Zoom); iPhone kann das nicht. (4) Optional für feste Adressen (im LAN gibt es mit deSEC/HTTPS schon lan-party.ma-und-ma.de, das ist nur .env-Konfiguration, nicht im Repo): PWA-Manifest anbieten, aber nie voraussetzen. Testen mit Playwright-Touch-Gesten + echtes iPhone/Android."
+      "title": "Handy-Browser-Zoom blocken (entschieden)",
+      "detail": "Marlon (24.11.): Zoom technisch blocken, für iPhone und Android. „Zum Home-Bildschirm“ fällt weg (wechselnde Tunnel-Adresse). Umsetzung: touch-action: none auf allen Spielflächen und auf body, sobald ein Spiel-Screen aktiv ist; iOS-Gesten (gesturestart/gesturechange/gestureend) und Doppeltipp per preventDefault abfangen; Zwei-Finger-Touches im Querlayout nur an Stick/Knöpfe durchreichen; dazu als Netz: visualViewport.scale > 1 erkennen → Overlay „Zoom zurücksetzen“ (zwei Finger zusammenziehen) mit Viewport-Reset-Trick; Android zusätzlich Fullscreen-API beim ersten Tipp. Testen mit Playwright-Touch-Gesten und echtem iPhone/Android."
     },
     {
       "area": "Handy",
