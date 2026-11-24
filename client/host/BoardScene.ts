@@ -167,10 +167,12 @@ export class BoardScene extends Phaser.Scene {
       if (t) icon.setPosition(t.x + 9, t.y - 30).setDepth(t.depth + 1);
     }
     if (b.sub !== 'roll') return;
-    // Kein Zeitlimit – nur, wie viele schon gewürfelt haben
+    // Kein Zeitlimit – wie viele schon gewürfelt haben; fehlen nur noch wenige, stehen sie da (📵 = Handy weg, der VIP kann überspringen)
     const here = b.order.filter((id) => !playerById(id)?.removed);
-    const done = here.filter((id) => id in b.rolls).length;
-    this.timerText.setText(`Alle würfeln! ${done}/${here.length}`);
+    const missing = here.filter((id) => !(id in b.rolls));
+    const short = (id: string) => `${playerById(id)?.connected === false ? '📵' : ''}${(playerById(id)?.name ?? '?').slice(0, 8)}`;
+    const names = missing.length && missing.length <= 2 ? ` · ⏳${missing.map(short).join(', ')}` : '';
+    this.timerText.setText(`Würfeln ${here.length - missing.length}/${here.length}${names}`);
   }
 
   // ---------------------------------------------------------------- Tageszeit (Overlay, Sonne/Mond, Lichterkette)

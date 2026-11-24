@@ -208,8 +208,8 @@ interface Move {
  * (Minispiel-Star, Pechvogel, Wanderer) und erst dann den Endstand.
  *
  * Kein Zeitlimit für Spieler (Marlons Wunsch: in Ruhe zocken): Würfeln, Bar, Laden, Gabelung und Duell warten,
- * bis der Spieler selbst gewählt hat. Der Server entscheidet nur für Handys, die weg sind, oder wenn der
- * VIP/Laptop überspringt.
+ * bis der Spieler selbst gewählt hat – auch, wenn sein Handy gerade weg ist (gesperrt, App gewechselt). Der Server
+ * entscheidet nur, wenn der VIP/Laptop überspringt; vom VIP entfernte Spieler werden übersprungen.
  */
 export class Board {
   state: BoardState;
@@ -355,10 +355,9 @@ export class Board {
     }
   }
 
-  /** Handy weg (nach der Gnadenfrist): nicht auf ihn warten – würfeln die anderen, würfelt der Server für ihn mit */
-  playerDisconnected(id: string) {
-    this.checkAllRolled();
-    this.withoutPlayer(id);
+  /** Handy weg: das Brett wartet trotzdem (Marlon: „3 s ist zu schnell“) – weiter geht's, wenn er zurück ist oder der VIP überspringt */
+  playerDisconnected(_id: string) {
+    this.ctx.onChange();
   }
 
   /** Spieler entfernt: Würfelfenster wartet nicht auf ihn, seine Züge werden übersprungen */
@@ -367,7 +366,7 @@ export class Board {
     this.withoutPlayer(id);
   }
 
-  /** Offene Entscheidung/Duell-Wahl eines Spielers, der weg ist, sofort auflösen */
+  /** Offene Entscheidung/Duell-Wahl eines vom VIP entfernten Spielers sofort auflösen */
   private withoutPlayer(id: string) {
     const s = this.state;
     if (s.ask?.playerId === id) this.resolveAsk(this.defaultAnswer());
@@ -475,17 +474,16 @@ export class Board {
     return late;
   }
 
-  /** Haben alle, die da sind, gewürfelt? → Fenster kurz danach schließen */
+  /** Haben alle auf dem Brett gewürfelt (auch wer gerade kein Handy hat – auf den wird gewartet)? → kurz danach weiter */
   private checkAllRolled() {
     const s = this.state;
     if (s.sub !== 'roll' || this.closing) return;
-    const here = this.active.filter((id) => this.ctx.isConnected(id));
-    if (here.some((id) => !(id in s.rolls))) return;
+    if (this.active.some((id) => !(id in s.rolls))) return;
     this.closing = true;
-    this.timers.later(here.length ? 700 : 1500, () => this.closeWindow());
+    this.timers.later(700, () => this.closeWindow());
   }
 
-  /** Würfeln vorbei: Für alle, die (weil ihr Handy weg ist oder der VIP überspringt) nicht gewürfelt haben, würfelt der Server – dann laufen die Züge nacheinander */
+  /** Würfeln vorbei: Für alle, die (weil der VIP überspringt) nicht gewürfelt haben, würfelt der Server – dann laufen die Züge nacheinander */
   private closeWindow() {
     const s = this.state;
     if (s.sub !== 'roll') return;
@@ -612,11 +610,10 @@ export class Board {
     }
     s.ask = a;
     this.ctx.onChange();
-    // Kein Zeitlimit: gewartet wird, bis der Spieler antwortet – nur ohne Handy (oder per VIP) wählt der Server
-    if (!this.ctx.isConnected(m.id)) return this.resolveAsk(this.defaultAnswer());
+    // Kein Zeitlimit: gewartet wird, bis der Spieler antwortet (auch ohne Handy) – nur per VIP/Laptop wählt der Server
   }
 
-  /** Was der Server wählt, wenn das Handy weg ist oder der VIP überspringt */
+  /** Was der Server wählt, wenn der VIP/Laptop überspringt (oder der Spieler entfernt wurde) */
   private defaultAnswer(): unknown {
     const s = this.state;
     const a = s.ask;
@@ -735,8 +732,7 @@ export class Board {
     s.duel = { seq: ++this.duelSeq, a, b, pot: DUEL_POT, sub: 'choose', chosen: [] };
     this.say(`Duell um ${DUEL_POT} Münzen: ${this.ctx.nameOf(a)} gegen ${this.ctx.nameOf(b)} – beide wählen geheim!`);
     this.ctx.onChange();
-    // Kein Zeitlimit: aufgedeckt wird, wenn beide gewählt haben (ohne Handy wählt der Server „Teilen“, der VIP kann auflösen)
-    for (const id of [a, b]) if (!this.ctx.isConnected(id)) this.withoutPlayer(id);
+    // Kein Zeitlimit: aufgedeckt wird, wenn beide gewählt haben – auch ohne Handy wird gewartet; der VIP kann auflösen (fehlende Wahl = Teilen)
   }
 
   /** Beide haben gewählt (oder der VIP löst auf): Karten aufdecken – der TV dreht sie nacheinander um */
