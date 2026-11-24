@@ -863,7 +863,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .big-btn.turm-btn svg { filter: drop-shadow(2px 2px 0 rgba(45, 27, 18, 0.6)); }
 .turm-btn.shift svg { width: 44px; height: 44px; }
 
-/* ---------------------------------------------------------------- Igel-Krieg (quer: links Waffen + Stick, Mitte Karte, rechts Ziel-Pad + SPRUNG/FEUER) */
+/* ---------------------------------------------------------------- Waschbär-Bande, MiniKind igel (quer: links Waffen + Stick, Mitte Karte, rechts Ziel-Pad + SPRUNG/FEUER) */
 .lx.ig-lx { --lx-l: 31%; --lx-r: 41%; }
 .ig-head { color: var(--red); font-weight: normal; font-size: 9px; }
 .ig-lx .ig-wind { color: #2d64a8; }
