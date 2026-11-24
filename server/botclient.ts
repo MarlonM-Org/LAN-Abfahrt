@@ -10,7 +10,7 @@ import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTe
 import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
-import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
+import { FLUNKY_THROWERS, flunkyBotThrow } from '../shared/flunky';
 import { ARCADE_GROUPS, ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lightSwitch, lineFree, nextWaypoint, roomAt, roomInner } from '../shared/house';
@@ -121,6 +121,8 @@ export class Bot {
 
   leader: boolean;
   private human = HUMAN.normal;
+  /** Flunkyball: Zug, in dem dieser Bot schon geworfen hat (Team-Wurfzahl) */
+  private fkThrown = '';
   /** Eingaben bleiben in Reihenfolge: nie früher als die vorige */
   private sendAt = 0;
   private resultCount = 0;
@@ -864,16 +866,30 @@ export class Bot {
     spectatorBot(this, s);
     if (m.kind === 'flunky') {
       const f = m.state;
-      if (f.sub === 'aim' && f.throwerId === this.id) {
-        this.once(`throw-${f.lastThrow?.seq ?? 0}`, async () => {
-          await sleep(rand(800, 1800));
-          const team = f.teams.A.includes(this.id) ? 'A' : 'B';
-          const power = Math.abs(BOTTLE.x - THROW_SPOT[team].x) / RANGE + rand(-0.07, 0.07);
-          this.send('throw', { angle: -f.wind * WIND_K + rand(-0.1, 0.1), power });
+      const turn = `${s.miniSeq ?? 0}-${f.turnTeam}-${f.throws[f.turnTeam]}`;
+      if (f.sub === 'aim' && f.throwerId === this.id && this.fkThrown !== turn) {
+        this.once('fk-throw', async () => {
+          this.fkThrown = turn;
+          // Zielen wie ein Mensch: Pfeil in ein paar Schritten auf die Flasche drehen (TV zeigt ihn), dann werfen –
+          // Genauigkeit je nach Bot-Stärke (leicht ≈ Anfänger, profi ≈ geübt)
+          const skill = (Object.keys(HUMAN) as BotSkill[]).find((k) => HUMAN[k] === this.human) ?? 'normal';
+          const plan = flunkyBotThrow(f, FLUNKY_THROWERS[skill]);
+          await sleep(rand(400, 900));
+          const steps = 3 + Math.floor(rand(0, 4));
+          for (let i = 1; i <= steps; i++) {
+            const now = this.state?.mini;
+            if (now?.kind !== 'flunky' || now.state.sub !== 'aim' || now.state.throwerId !== this.id) return;
+            this.send('aim', { aim: Math.round(((plan.aim * i) / steps) * 1000) / 1000 });
+            await sleep(rand(140, 280));
+          }
+          await sleep(rand(300, 900));
+          const now = this.state?.mini;
+          if (now?.kind !== 'flunky' || now.state.sub !== 'aim' || now.state.throwerId !== this.id) return;
+          this.send('throw', plan);
         });
       }
       if (f.sub === 'chug') {
-        const drinking = f.teams[f.turnTeam].includes(this.id) && f.beer[this.id] > 0;
+        const drinking = f.teams[f.turnTeam].includes(this.id) && f.beer[this.id] > (f.sipFloor[this.id] ?? 0);
         if (drinking || f.runnerId === this.id) {
           this.once('tap', async () => {
             for (let i = 0; i < 6; i++) {
