@@ -4,7 +4,7 @@
  * wandert der Ring mit (`trailing`), man muss nie „zurückgreifen“.
  *
  * - Deadzone 0,18 (danach auf 0…1 umskaliert), Werte auf 2 Nachkommastellen gerundet
- * - gedrosselt: große Richtungswechsel sofort, kleine höchstens alle 50 ms, beim Halten alle 250 ms erneut
+ * - gedrosselt: große Richtungswechsel sofort, kleine höchstens alle 50 ms (`every`), beim Halten alle 250 ms erneut
  * - hört auf `input-reset` (Handy gedreht, Overlay eingeblendet) → (0, 0)
  * - Randabstand: die Zone selbst liegt im `.lx`-Layout ≥ 24 px vom Bildschirmrand (Zurück-Wischgeste)
  * - Pseudo-Quer (orientation.ts dreht die Seite per CSS um 90°): Pointer-Koordinaten über `localPoint()` ins
@@ -32,6 +32,8 @@ export interface StickOpts {
   trailing?: boolean;
   /** Kleinste Änderung, die (gedrosselt) gesendet wird – kleiner = feinere Vorschau auf dem TV (Standard 0,08) */
   step?: number;
+  /** Kleine Änderungen höchstens alle … ms (Standard 50; große Richtungswechsel gehen immer sofort raus) */
+  every?: number;
   /** Statt automatisch (0, 0) zu senden: Loslassen selbst behandeln (z. B. Wurf beim Loslassen). `ok` = echtes pointerup */
   onRelease?: (x: number, y: number, ok: boolean) => void;
 }
@@ -43,6 +45,7 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
   const axis = opts.axis ?? 'xy';
   const trailing = opts.trailing ?? true;
   const step = opts.step ?? 0.08;
+  const every = opts.every ?? 50;
   zone.classList.add('st-zone');
   const ring = document.createElement('div');
   ring.className = `st-ring${axis === 'x' ? ' st-x' : ''}`;
@@ -63,7 +66,7 @@ export function stickZone(zone: HTMLElement, onMove: (x: number, y: number) => v
     const now = performance.now();
     const changed = Math.hypot(cur.x - sent.x, cur.y - sent.y);
     if (!force && changed < step) return;
-    if (!force && changed < 0.45 && now - sent.t < 50) return;
+    if (!force && changed < 0.45 && now - sent.t < every) return;
     sent = { ...cur, t: now };
     onMove(cur.x, cur.y);
   };
