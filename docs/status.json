@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T21:00+00:00",
+  "updated": "2026-11-24T21:45+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -9,8 +9,8 @@
     {
       "type": "in Arbeit · Claude",
       "kind": null,
-      "title": "Marlons Feedback vom 24.11.: Party ohne Zeitlimit, Wasserbomben-Schlacht raus, Sumo-Rempler, Kofferpacken voll, Stapelphysik",
-      "detail": "Fertig gebaut und getestet (npm run test:physik, Bot-Party), wartet auf PR/Merge. Spielbrett: Würfeln, Bar, Laden, Gabelung und Duell ohne Countdown – der Server entscheidet nur noch für Handys, die weg sind, oder per VIP-Überspringen. Wasserbomben-Schlacht komplett entfernt. Sumo: Rempler stößt ≈ 90 statt ≈ 55 px weit. Kofferpacken: bis unters Dach gepackt + alles ruhig → kein neues Teil, VOLL. Stapelphysik (Kofferpacken, Wackelturm) in server/stapelphysik.ts: Trägheit mit Steiner-Anteil, 120 Hz, kein Einschlafen beim Kippen – abgestützte Stapel verrutschen nicht mehr (vorher 75 bzw. 363 von 597 Teilen im Kofferraum, 112 von 289 im Wackelturm).",
+      "title": "Marlons Feedback 24.11., Teil 2: Kopfball statt Volleyball, Aufräumen mit Besen, Flunkyball, Darts 301, Busfahrer, Rhythmus wie Piano Tiles, Igel → Waschbären",
+      "detail": "Parallel in Arbeit: Volleyball raus → Kopfball-Fußball + Kopfball-Basketball (Stick, Anstoß wechselt); Aufräumen: Besen statt runder Hitbox, Ruckeln (AirPlay!) glätten; Flunkyball: zielen, Position wechselt, mehr Treffer nötig, Sensor-Weite; Darts: Ziehen/Sensor-Zielen, 301 Single Out; Busfahrer mit Bus und 4 Karten; Das erste Gespräch: Latenz-Kalibrierung, Spuren, Wettkampf; Igel-Krieg: Stick, Zuschauer-Fehler, danach Waschbären-Thema mit eigenen 8-Bit-Icons.",
       "branch": "claude/optimistic-johnson-korj2c",
       "since": "2026-11-24"
     }
@@ -37,7 +37,7 @@
       "detail": "Es gibt schon ein Spielbrett „Ferienhaus“ (Party-Abfahrt in der Lobby: 3/5/8 Runden, gleichzeitig würfeln, Münzen/Cocktails, Bar, Strandladen mit 4 Items, Gabelung, Duell „Teilen oder Klauen“, nach jeder Runde ein Minispiel, Finale Mord/Verräter, Bonus-Cocktails, Tageszeit, Nachzügler, Fortsetzen). Marlon hat es noch nie gespielt und wünscht sich einen großen Modus à la Mario Party / Lego Party, 2D reicht, Zieldauer ≈ 45 Minuten. Reihenfolge der Stufen unten ist der Vorschlag.",
       "steps": [
         "Stufe 0 · Testabend mit dem bestehenden Brett (3 Runden, Bots dazu) – Marlon kennt den Modus noch nicht; Feedback entscheidet, was Stufe 2–4 wirklich braucht.",
-        "Stufe 1 · „Kurzparty 45 min“ als Standard: 3 Runden, nur kurze Spiele, Würfelfenster 6 s, Zeitbudget am TV sichtbar (Restzeit-Balken, Spiel-Auswahl passt sich an); dazu mehr Minispiele aufs Brett mit Kurzformen: Wackelturm (90 s, Höhe zählt – Marlons Wunsch), Igel-Krieg („Kurz-Igel“), Kofferpacken (60 s), Minigolf (3 Löcher), Sektkorken als Blitz-Spiel; Minispiel-Pool wählbar (Alle / Action / Kopf & Bauch / Favoriten / Getestete) und Spiele-Roulette mit 3 Vorschlägen + Handy-Abstimmung (à la Lego Party).",
+        "Stufe 1 · „Kurzparty 45 min“ als Standard: 3 Runden, nur kurze Spiele, Zeitbudget am TV sichtbar (Restzeit-Balken, Spiel-Auswahl passt sich an); dazu mehr Minispiele aufs Brett mit Kurzformen: Wackelturm (90 s, Höhe zählt – Marlons Wunsch), Igel-Krieg („Kurz-Igel“), Kofferpacken (60 s), Minigolf (3 Löcher), Sektkorken als Blitz-Spiel; Minispiel-Pool wählbar (Alle / Action / Kopf & Bauch / Favoriten / Getestete) und Spiele-Roulette mit 3 Vorschlägen + Handy-Abstimmung (à la Lego Party).",
         "Stufe 2 · Mehrere Bretter als Themenwelten: Ferienhaus (jetzt), Strandpromenade/Hafen, Berghütte am Rhein – je eigener Wege-Graph (BOARD_FIELDS verallgemeinern), eigene Ereignisse und Deko, Brett-Wahl in der Lobby.",
         "Stufe 3 · Brett-Mechaniken: Blitz-Events direkt auf dem Feld (30-s-Spiel für alle), Showdown-Feld (1 gegen 1 um einen Cocktail), Strandladen auf 6–8 Items (Fernglas, Sandsturm, Doppelcocktail), Rutsche/Fähre als Teleport, Überhol-Bonus.",
         "Stufe 4 · Präsentation: Brett-Kamera folgt der Figur (Zoom + Schwenk), Zwischenstand-Zeremonie nach jeder Runde, großes Finale mit Rangliste-Countdown, Moderator-Sprüche, animierte Figuren.",
@@ -89,7 +89,7 @@
       "size": "M",
       "kind": null,
       "title": "Highlights & Replays am TV (freigegeben)",
-      "detail": "Der TV puffert die letzten 6 s an Snapshots (SnapBuffer gibt es schon, Auto-Fußball hat die Tor-Wiederholung bereits) und spielt K.O., letzten Treffer, Zieleinlauf oder Rauswurf in Zeitlupe nochmal ab – mit Banner, Sprecher und Zoom auf den Moment. Reihenfolge: Smash (K.O.), Bogen (letzter Treffer), Igel (Volltreffer/Selbsttreffer), Kart (Zieleinlauf, Überholen auf der Linie), Sumo (letzter Rauswurf), Wasserbomben, Bomben-Arena. Reine Client-Arbeit, der Server meldet nur den Moment über ctx.log(). Am Ende des Abends „Best of“: die 5 besten Momente nacheinander vor der Siegerehrung.",
+      "detail": "Der TV puffert die letzten 6 s an Snapshots (SnapBuffer gibt es schon, Auto-Fußball hat die Tor-Wiederholung bereits) und spielt K.O., letzten Treffer, Zieleinlauf oder Rauswurf in Zeitlupe nochmal ab – mit Banner, Sprecher und Zoom auf den Moment. Reihenfolge: Smash (K.O.), Bogen (letzter Treffer), Igel (Volltreffer/Selbsttreffer), Kart (Zieleinlauf, Überholen auf der Linie), Sumo (letzter Rauswurf), Bomben-Arena. Reine Client-Arbeit, der Server meldet nur den Moment über ctx.log(). Am Ende des Abends „Best of“: die 5 besten Momente nacheinander vor der Siegerehrung.",
       "prio": 6
     },
     {
@@ -136,9 +136,47 @@
       "title": "Musik-Werkstatt: Nacharbeit nach dem Umbau",
       "detail": "Reste aus dem Umbau vom 24.11.: (1) TV-Musikmenü (client/host/musicMenu.ts) kennzeichnet Überschreibungen nicht – sie erscheinen als eigener Song mit dem Titel des Originals; (2) bei Szenen mit Stil oder Stille sind „Kopie & bearbeiten“/„Direkt bearbeiten“ gesperrt, bis man einen festen Song wählt – besser: Dropdown der Stil-Songs direkt anbieten; (3) ändert man in einer Überschreibung den Stil, rotiert sie trotzdem im Stil des Originals; (4) am TV-Bild nachmessen, dass die Überschreibung wirklich spielt. Später, nur falls gewünscht: Klang, Komponierhilfen, Tastatur-Spielen, Handy-Ansicht.",
       "prio": 11
+    },
+    {
+      "area": "Story / Rhythmus",
+      "prio": 12,
+      "size": "S",
+      "kind": "rhythm",
+      "title": "Halte-Noten im Rhythmusspiel („Das erste Gespräch“)",
+      "detail": "Marlon (24.11.): Gedrückt-Halten wie bei Piano Tiles „ist gar nicht nötig, auch wenn es ein cooles Feature wäre – kann gerne auf die Roadmap“. Lange Noten in einer Spur, Wertung für Anschlag und Loslassen."
     }
   ],
   "done": [
+    {
+      "title": "Spielbrett ohne Zeitlimit: Würfeln, Bar, Laden, Gabelung und Duell warten – auch auf Handys, die gerade weg sind; nur VIP/Laptop überspringt (TV zeigt, auf wen gewartet wird)",
+      "pr": 122,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Wasserbomben-Schlacht entfernt (Prämisse trägt nicht)",
+      "pr": 122,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Sumo-Steg: Rempler stößt ≈ 90 statt ≈ 55 px weit (frontal ≈ 100 px)",
+      "pr": 122,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Kofferpacken: bis unters Dach gepackt und alles ruhig → VOLL, kein neues Teil mehr",
+      "pr": 122,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Stapelphysik Kofferpacken + Wackelturm: Trägheit mit Steiner-Anteil, 120 Hz, kein Einschlafen beim Kippen – abgestützte Stapel verrutschen nicht mehr (vorher bis 363/597 Teile); npm run test:physik",
+      "pr": 122,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Angeln: Spannungsleiste senkrecht · Bowling, Boule, Darts ohne „Strand“ · Guess the Song aus der Arcade · Regeln „Bewegen per Stick“ und „kein Zeitlimit“ in CLAUDE.md",
+      "pr": 122,
+      "date": "2026-11-24"
+    },
     {
       "title": "Neues Framing: Minispiel-Sammlung mit Handy-Controllern statt „Urlaubs-Edition“ – TV-Startseite als Arcade-Halle (Neon-Schild, Automaten blättern durch die Minispiele, Rampenlicht mit Titel), Handy-Lobby mit Arcade + Party als Haupt-Reiter, Date Night als „Story“, Arcade als Standardmodus, Party-Champion statt Urlaubs-Champion",
       "pr": 120,
@@ -589,20 +627,20 @@
       "notes": "„Nur 4 Sekunden zum Platzieren“: jeder Tipp auf den Joystick baute das Teil sofort ein → behoben, nur noch PLATZIEREN baut ein (#112) · vorher: kein Zeitlimit (AFK nach 60 s), alles quer, bis 12 Läufer (#43)"
     },
     "turm": {
-      "status": "in Arbeit",
-      "notes": "„Physik anpassen, Blöcke verschieben sich unten komisch“ (24.11.) → gemeinsame Stapelphysik mit Kofferpacken: abgestützte Türme verrutschen auch nach ▼ nicht mehr, Hochkant-Surfbrett steht, Überhänge kippen statt schräg einzuschlafen (Branch claude/optimistic-johnson-korj2c) · vorher: Kanten-Raster, Landevorschau, seitlich unter Überhänge schieben, Lock-Delay"
+      "status": "umgesetzt",
+      "notes": "„Physik anpassen, Blöcke verschieben sich unten komisch“ (24.11.) → gemeinsame Stapelphysik mit Kofferpacken: abgestützte Türme verrutschen auch nach ▼ nicht mehr, Hochkant-Surfbrett steht, Überhänge kippen statt schräg einzuschlafen (#122) · vorher: Kanten-Raster, Landevorschau, seitlich unter Überhänge schieben, Lock-Delay"
     },
     "bowling": {
       "status": "umgesetzt",
-      "notes": "Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
+      "notes": "Titel ohne „Strand“ (#122) · vorher: Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
     },
     "boule": {
       "status": "umgesetzt",
-      "notes": "Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
+      "notes": "Titel ohne „Strand“ (#122) · vorher: Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
     },
     "igel": {
-      "status": "umgesetzt",
-      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern mit Kamera und Minikarte (24.11.)"
+      "status": "in Arbeit",
+      "notes": "Stick statt ◀ ▶; als Zuschauer scrollt die Seite; Sprüche-Blase am TV nur halb sichtbar; Emoji-Icons → eigene 8-Bit-Icons; Thema unklar (Muschel-Teleport?) → Umbau zu Waschbären · vorher: Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern mit Kamera und Minikarte (24.11.)"
     },
     "ttt": {
       "status": "umgesetzt",
@@ -625,8 +663,8 @@
       "notes": "Joystick absolut statt Links/Rechts aus Autosicht, Hüpfer weg, große Knöpfe rechts; Kippen-Steuerung entfällt hier (#99) · vorher: Tor-Wiederholung, Tick 30 Hz (#83)"
     },
     "sumo": {
-      "status": "in Arbeit",
-      "notes": "„Man sollte ein bisschen mehr rempeln können – der Gegner soll weiter zurückgestoßen werden“ (24.11.) → Stoß ≈ 55 → 90 px (5–6 Planken), frontal ≈ 100 px, Anlaufen schubst stärker (Branch claude/optimistic-johnson-korj2c) · vorher: Zu wenig Wirkung beim Treffer, man fällt oft selbst runter → Stoß 36 → 53 px, Sprint 65 → 49 px mit Abbremsen (#98) · vorher: Finale-Zoom, Zeitlupe (#84)"
+      "status": "umgesetzt",
+      "notes": "„Man sollte ein bisschen mehr rempeln können – der Gegner soll weiter zurückgestoßen werden“ (24.11.) → Stoß ≈ 55 → 90 px (5–6 Planken), frontal ≈ 100 px, Anlaufen schubst stärker (#122) · vorher: Zu wenig Wirkung beim Treffer, man fällt oft selbst runter → Stoß 36 → 53 px, Sprint 65 → 49 px mit Abbremsen (#98) · vorher: Finale-Zoom, Zeitlupe (#84)"
     },
     "kugel": {
       "status": "umgesetzt",
@@ -637,8 +675,8 @@
       "notes": "Rekorde-Tafel (#91) · Unklar ob vorlehnen oder nur abspringen → 3-Schritt-Leiste + kurze Hinweise · nach Landung nicht stehen bleiben → Auslauf, Abschwung, Fahne · mehr Sound · kein Gewicht anzeigen (#93)"
     },
     "lieder": {
-      "status": "umgesetzt",
-      "notes": "Liederraten mit Genre-Wahl (1 gegen 1: je 4), 4 → 6 → 8 Antworten, umbenannt in „Guess the Song“ (#96). Musikquelle: eigene gekaufte MP3s in data/lieder/ oder Deezer-Hörproben (LIEDER_VORSCHAU=deezer, nicht-kommerziell) – Spotify/YouTube/Amazon/iTunes lizenzmäßig nicht nutzbar."
+      "status": "in Arbeit",
+      "notes": "„Man hört einfach nichts“, nur Spiel-Sounds wirken komisch → deaktiviert, Code bleibt (aus der Arcade #122; Zufall/Party folgen) · vorher: Liederraten mit Genre-Wahl (1 gegen 1: je 4), 4 → 6 → 8 Antworten, umbenannt in „Guess the Song“ (#96). Musikquelle: eigene gekaufte MP3s in data/lieder/ oder Deezer-Hörproben (LIEDER_VORSCHAU=deezer, nicht-kommerziell) – Spotify/YouTube/Amazon/iTunes lizenzmäßig nicht nutzbar."
     },
     "kurve": {
       "status": "umgesetzt",
@@ -649,16 +687,40 @@
       "notes": "Hängenbleiben an Ecken/Kreuzungen behoben (Ursache: Abbiege-Regel ab 22° Stick-Schräge ließ die Figur zittern); Feld 17×9 (2) · 19×11 (3–4) · 23×11 (5–6) · 23×13 (7–8) · 25×13 (9–12) (#101)"
     },
     "volley": {
-      "status": "umgesetzt",
-      "notes": "Rüberziehen von links nach rechts blieb links hängen → Richtung folgt dem Daumen; Ball 12 → 20 px am TV, Feld 468 → 368 px, Landepunkt-Ring (#103)"
+      "status": "in Arbeit",
+      "notes": "Aufschlag wechselt nicht, Pfeilknöpfe statt Stick, Feld zu groß → Volleyball fliegt raus, dafür zwei Spiele à la Head Soccer: Kopfball-Fußball und Kopfball-Basketball"
     },
     "golf": {
       "status": "umgesetzt",
       "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
     },
     "koffer": {
+      "status": "umgesetzt",
+      "notes": "„Oben kommen weiter Sachen, obwohl die Reihe ruhig an der Dachlinie liegt“ → bis unters Dach gepackt + alles ruhig = VOLL, kein neues Teil; „Tetris-Blöcke verschieben sich unten komisch“ → Stapelphysik repariert (Trägheit mit Steiner-Anteil, 120 Hz, kein Einschlafen beim Kippen) (24.11., #122)"
+    },
+    "angeln": {
+      "status": "umgesetzt",
+      "notes": "Spannungsleiste im Drill senkrecht statt waagerecht – „weil man ja so ziehen muss“ (#122) · sonst gut"
+    },
+    "darts": {
       "status": "in Arbeit",
-      "notes": "„Oben kommen weiter Sachen, obwohl die Reihe ruhig an der Dachlinie liegt“ → bis unters Dach gepackt + alles ruhig = VOLL, kein neues Teil; „Tetris-Blöcke verschieben sich unten komisch“ → Stapelphysik repariert (Trägheit mit Steiner-Anteil, 120 Hz, kein Einschlafen beim Kippen) (24.11., Branch claude/optimistic-johnson-korj2c)"
+      "notes": "Heißt nur noch „Darts“ (#122); Zielen: Finger halten + ziehen (mit Atmen), loslassen = Wurf, oder Handy bewegen + tippen; Modus 301 Single Out statt 5 Runden"
+    },
+    "tidy": {
+      "status": "in Arbeit",
+      "notes": "Steuerung fühlt sich laggy/abgehackt an; runde Hitbox schiebt Sachen zufällig weg → Besen mit gerader Kante vor dem Spieler, dreht mit; Glättung am TV"
+    },
+    "flunky": {
+      "status": "in Arbeit",
+      "notes": "Richtung selbst einstellen, jeder Wurf von anderer Position/Flasche versetzt, zu viele Fehlwürfe, ein Treffer = schon gewonnen, Sensor-Schwung zu weit → Zielen, Positionswechsel, Balance, neue Kraft-Kurve"
+    },
+    "hilo": {
+      "status": "in Arbeit",
+      "notes": "Wird zu Busfahrer: alle im Bus, 4 verdeckte Karten – Rot/Schwarz (1), Höher/Tiefer/Gleich (2), Dazwischen/Außerhalb/Gleich (3), Symbol schon gehabt? (4 Schlücke)"
+    },
+    "rhythm": {
+      "status": "in Arbeit",
+      "notes": "Beats fühlten sich wie auf dem Nachschlag an (TV per AirPlay verzögert) → Kalibrierung/Latenz-Ausgleich; mehr wie Piano Tiles (Spuren, schwerere Rhythmen exakt auf dem Beat), außerhalb der Story Gewinner nach Trefferquote; Halte-Noten auf die Roadmap"
     }
   },
   "general": [
@@ -783,11 +845,19 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Party-Modus: Zeitlimit lässt Spieler automatisch handeln („mega nervig, man will sich Zeit lassen“) → Würfeln, Bar, Laden, Gabelung, Duell ohne Countdown; nur für Handys, die weg sind, oder per VIP entscheidet der Server",
+      "title": "Party-Modus: Zeitlimit lässt Spieler automatisch handeln („mega nervig, man will sich Zeit lassen“) → Würfeln, Bar, Laden, Gabelung, Duell ohne Countdown; gewartet wird auch auf Handys, die weg sind – nur der VIP/Laptop überspringt (#122)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Wasserbomben-Schlacht: „Prämisse falsch – Punkte nur fürs komplett Nassmachen, aber man trifft sich niemals“ → Spiel komplett entfernt (#122)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Bewegen per Stick statt ◀ ▶-Knöpfen als Standard (Regel in CLAUDE.md, #122) – Igel-Krieg wird umgestellt, Volleyball fliegt raus",
       "status": "in Arbeit"
     },
     {
-      "title": "Wasserbomben-Schlacht: „Prämisse falsch – Punkte nur fürs komplett Nassmachen, aber man trifft sich niemals“ → Spiel komplett entfernt",
+      "title": "TV läuft per AirPlay (Mac → Apple TV): Bild und Ton kommen verzögert – erklärt Takt-Versatz und Ruckel-Gefühl; Ausgleich/Kalibrierung in Arbeit",
       "status": "in Arbeit"
     }
   ]
