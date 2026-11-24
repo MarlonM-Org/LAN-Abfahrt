@@ -35,6 +35,12 @@ const fbClass = { umgesetzt: 'ok', positiv: 'ok', 'in Arbeit': 'wip', offen: 'op
 const total = Object.keys(info).length;
 const withFb = Object.keys(info).filter((k) => data.feedback[k]).length;
 
+const sizeOf = (q) => (q.size ? `<span class="size">${esc(q.size)}</span>` : '');
+const qcard = (q) => typeof q === 'string'
+  ? `<div class="card q-card"><h3>${esc(q)}</h3></div>`
+  : `<div class="card q-card"><div class="row"><span class="tag q-tag">${esc(q.area ?? '')}${q.prio ? ` · #${q.prio}` : ''}</span>${q.kind && info[q.kind] ? `<span class="ic">${info[q.kind].icon}</span>` : ''}${sizeOf(q)}</div>
+<h3>${esc(q.title)}</h3>${q.detail ? `<p>${esc(q.detail)}</p>` : ''}${q.steps?.length ? `<ol class="steps">${q.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>` : ''}</div>`;
+
 const card = (t) => `<div class="card wip-card"><div class="row"><span class="tag">${esc(t.type)}</span>${t.kind && info[t.kind] ? `<span class="ic">${info[t.kind].icon}</span>` : ''}</div>
 <h3>${esc(t.title)}</h3><p>${esc(t.detail)}</p><code>${esc(t.branch)}</code></div>`;
 
@@ -65,7 +71,9 @@ h2{font:12px 'Press Start 2P',monospace;color:var(--acc);margin:34px 0 14px;lett
 .row{display:flex;justify-content:space-between;align-items:center}
 .tag{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--wip);font-weight:700}
 .ic{font-size:20px;width:34px;text-align:center}
-.queue{display:flex;gap:8px;flex-wrap:wrap}.queue span{background:var(--panel);border:1px dashed var(--line);border-radius:999px;padding:6px 12px;font-size:13.5px;color:var(--mut)}
+.queue{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+.q-card{border-left:4px solid var(--open)}.q-tag{color:var(--open)}.size{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-left:auto}
+.steps{margin:6px 0 0;padding-left:20px;color:var(--txt);font-size:13px}.steps li{margin:4px 0}.steps li::marker{color:var(--acc);font-weight:700}
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}tr:first-child td{border-top:none}
 .gh td{background:#2a2541;font:10px 'Press Start 2P',monospace;color:var(--acc);padding:10px}
@@ -85,11 +93,12 @@ ul.done a{color:#b9a8ff;text-decoration:none;font-size:13px}.d{color:var(--mut);
 <div class="stats">
 <div class="stat"><b>${total}</b><span>Spiele in main</span></div>
 <div class="stat"><b>${data.inProgress.length}</b><span>gerade in Arbeit</span></div>
-<div class="stat"><b>${data.queue.length}</b><span>Spiele in der Warteschlange</span></div>
+<div class="stat"><b>${data.queue.length}</b><span>Punkte auf der Roadmap</span></div>
+<div class="stat"><b>${Object.values(data.feedback).filter((f) => f.status === 'offen').length + data.general.filter((g) => g.status === 'offen').length}</b><span>offenes Feedback</span></div>
 <div class="stat"><b>${withFb}/${total}</b><span>Spiele mit Feedback</span></div>
 </div>
 <h2>▶ GERADE IN ARBEIT</h2><div class="grid">${data.inProgress.map(card).join('')}</div>
-<h2>⏳ ALS NÄCHSTES</h2><div class="queue">${data.queue.map((q) => `<span>${esc(q)}</span>`).join('')}</div>
+<h2>🗺 ROADMAP · ALS NÄCHSTES</h2><div class="queue">${data.queue.map(qcard).join('')}</div>
 <h2>🎮 SPIELE & FEEDBACK</h2>
 <div class="filters"><button class="on" data-f="all">Alle</button><button data-f="fb">Mit Feedback</button><button data-f="nofb">Noch kein Feedback</button></div>
 <table id="games">${groups.map((g) => `<tr class="gh"><td colspan="4">${esc(g.title)}</td></tr>${g.kinds.filter((k) => info[k]).map(gameRow).join('')}`).join('')}</table>

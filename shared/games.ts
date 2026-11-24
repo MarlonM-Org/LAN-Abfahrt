@@ -43,6 +43,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   kurve: { title: 'Kurven-Duell', icon: '🌀', inspiredBy: '„Achtung, die Kurve!“', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2 , orientation: 'landscape' },
   arena: { title: 'Bomben-Arena', icon: '💣', inspiredBy: 'Bomberman', tagline: 'Kokosnüsse legen, Sandburgen sprengen – wer bleibt trocken?', minPlayers: 2 , orientation: 'landscape' },
   bowling: { title: 'Strand-Bowling', icon: '🎳', tagline: 'Handy schwingen wie eine Bowlingkugel – Strike!', minPlayers: 2 , orientation: 'portrait' },
+  sekt: { title: 'Sektkorken', icon: '🍾', tagline: 'Schütteln, zittern, PLOPP! – wessen Korken fliegt am weitesten?', minPlayers: 2, orientation: 'portrait' },
   enten: { title: 'Ententeich', icon: '🦆', inspiredBy: 'Duck Hunt', tagline: 'Handy auf den TV richten und abdrücken – aber nicht auf die Badegäste!', minPlayers: 2 , orientation: 'portrait' },
   ttt: { title: 'Verräter im Ferienhaus', icon: '🏊', inspiredBy: 'Trouble in Terrorist Town', tagline: 'Poolnudeln raus – wer spielt falsch?', minPlayers: 4 , orientation: 'landscape' },
   verstecken: { title: 'Versteckspiel mit Möbeln', icon: '🪴', inspiredBy: 'Prop Hunt', tagline: 'Werdet zur Kühlbox – und bloß nicht bewegen!', minPlayers: 3 , orientation: 'landscape' },
@@ -80,12 +81,15 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   wolfrunde: { title: 'Werwolf mit Erzähler', icon: '🌕', inspiredBy: 'Die Werwölfe von Düsterwald', tagline: 'Einer erzählt – alle anderen ziehen eine geheime Karte.', minPlayers: 5, orientation: 'portrait' },
   funk: { title: 'Funkfrequenz', icon: '📻', inspiredBy: 'Wavelength', tagline: 'Ein Hinweis, zwei Pole – trefft ihr die geheime Frequenz?', minPlayers: 4, orientation: 'portrait' },
   schaetz: { title: 'Schätzkönig', icon: '🧮', inspiredBy: 'Wits & Wagers', tagline: 'Keine Ahnung? Egal – schätzen, dann auf die beste Zahl wetten!', minPlayers: 3, orientation: 'portrait' },
+  lexikon: { title: 'Lügen-Lexikon', icon: '📚', inspiredBy: 'Fibbage', tagline: 'Seltsames Wort, kurioser Fakt – erfindet Antworten, findet die Wahrheit!', minPlayers: 3, orientation: 'portrait' },
   lieder: { title: 'Guess the Song', icon: '🎶', inspiredBy: 'SongPop', tagline: 'Der Song läuft – tipp den richtigen Titel, bevor die anderen es tun!', minPlayers: 2, orientation: 'portrait' },
   maexchen: { title: 'Mäxchen am Pool', icon: '🎲', inspiredBy: 'Mäxchen', tagline: 'Würfeln, ansagen, bluffen – glaubst du das oder deckst du auf?', minPlayers: 2, orientation: 'portrait' },
   werwars: { title: 'Wer war’s?', icon: '🕵️‍♀️', inspiredBy: "Who's Who", tagline: 'Peinliche Geständnisse, anonym auf dem TV – wer hat das geschrieben?', minPlayers: 3, orientation: 'portrait' },
   skisprung: { title: 'Schanzen-Springen', icon: '🎿', inspiredBy: 'Wii Fit', tagline: 'Balance Board: Hocke, Absprung, fliegen!', minPlayers: 1, orientation: 'any' },
   teppich: { title: 'Teppich-Parcours', icon: '🧞', tagline: 'Balance Board: Lehnend durch die Wüstenstadt fliegen!', minPlayers: 1, orientation: 'any' },
   kugel: { title: 'Tempel-Kugel', icon: '🔮', inspiredBy: 'Marble Madness', tagline: 'Balance Board: Kugel über den Abgrund lehnen!', minPlayers: 1, orientation: 'any' },
+  band: { title: 'Strand-Band', icon: '🎸', inspiredBy: 'Rock Band', tagline: 'Jedes Handy ein Instrument – bleibt im Takt, dann tobt der Strand!', minPlayers: 2, orientation: 'portrait' },
+  maler: { title: 'Montagsmaler live', icon: '✏️', inspiredBy: 'skribbl.io', tagline: 'Einer malt live auf den TV – wer’s zuerst errät, kassiert!', minPlayers: 3, orientation: 'portrait' },
 };
 
 /** „🏎️ Kart-Rennen“ – Titel mit Icon für Listen und Ansagen */
@@ -125,6 +129,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   flieger: { goal: 'Ruft euch die Anweisungen zu – sie betreffen meist ein anderes Handy!', controls: [{ icon: '📣', text: 'Anweisung oben laut vorlesen' }, { icon: '🎛️', text: 'Eigene Knöpfe und Schalter' }, { icon: '⛽', text: 'Verpasst = weniger Sprit' }] },
   kurve: { goal: 'Zieht eure Spur und rammt keine Spur! Am Rand geht’s auf der anderen Seite weiter.', controls: [{ icon: '↩️', text: 'LINKS / RECHTS: halten = lenken' }, { icon: '⭐', text: 'Power-ups einsammeln' }, { icon: '🏆', text: 'Wer überlebt, punktet' }] },
   arena: { goal: 'Sprengt euch den Weg frei und erwischt die anderen – wer trocken bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💣', text: 'BOMBE: Kokosnuss legen' }, { icon: '🌊', text: 'Nach 60 s kommt die Flut' }] },
+  sekt: { goal: 'Schüttelt Druck in die Flasche und lasst los, bevor sie im Roten platzt – der weiteste Korken gewinnt!', controls: [{ icon: '👍', text: 'Daumen auf den Korken halten' }, { icon: '📳', text: 'Schütteln = Druck (sonst: reiben)' }, { icon: '🍾', text: 'Loslassen = PLOPP! Bester von 3' }] },
   bowling: { goal: 'Räumt alle Pins ab – Strike!', controls: [{ icon: '📱', text: 'Knopf halten, Handy schwingen, loslassen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }, { icon: '🎳', text: 'Reihum – zwei Würfe pro Frame' }] },
   enten: { goal: 'Schießt Enten, Möwen und Flamingos – aber keine Badegäste!', controls: [{ icon: '📱', text: 'Handy auf den TV richten' }, { icon: '👆', text: 'Tippen = schießen' }, { icon: '🔄', text: 'Nach unten wischen = laden' }] },
   ttt: { goal: 'Stromausfall! Findet die Verräter – im Dunkeln zeigt der Fernseher nur Umrisse. Verräter knipsen heimlich das Licht aus.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🏊', text: 'ANGRIFF: Poolnudel & Co.' }, { icon: '💡', text: 'BENUTZEN: Licht an, aufheben' }] },
@@ -161,12 +166,15 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   werwolf: { goal: 'Dorf gegen Werwölfe: Findet die Wölfe, bevor sie euch fressen.', controls: [{ icon: '🃏', text: 'Rolle geheim (verdeckte Karte)' }, { icon: '🌙', text: 'Nachts: alle tippen jemanden an' }, { icon: '🗳️', text: 'Tags: diskutieren, abstimmen' }] },
   funk: { goal: 'Nur der Funker kennt das Ziel und gibt laut einen Hinweis – sein Team trifft die Frequenz!', controls: [{ icon: '📻', text: 'Schieber: Frequenz einstellen' }, { icon: '🃏', text: 'Funker: Ziel geheim (halten)' }, { icon: '↔️', text: 'Gegner: links/rechts wetten' }] },
   schaetz: { goal: 'Schätzt die Zahl – dann setzt Chips auf die Karte, die am nächsten dran ist, ohne drüber.', controls: [{ icon: '🔢', text: 'Zahl am Handy eintippen' }, { icon: '🪙', text: '2 Chips setzen (außen = ×3/×4)' }, { icon: '👑', text: 'Beste Karte: Autor +3' }] },
+  lexikon: { goal: 'Erfindet eine glaubwürdige Antwort – und findet dann die Wahrheit zwischen euren Lügen.', controls: [{ icon: '✍️', text: 'Glaubwürdige Lüge schreiben' }, { icon: '👆', text: 'Auf die Wahrheit tippen: +100' }, { icon: '🤥', text: 'Wer auf deine reinfällt: +50' }] },
   lieder: { goal: 'Ein Song läuft auf dem TV – tippt so schnell wie möglich den richtigen Titel an.', controls: [{ icon: '🎛️', text: 'Vorher: eure Genres wählen' }, { icon: '👆', text: 'Titel antippen – nur ein Versuch' }, { icon: '⚡', text: 'Schneller = mehr Punkte (bis 6)' }] },
   maexchen: { goal: 'Würfelt geheim, sagt einen höheren Wert an – ehrlich oder geblufft. Wer erwischt wird, verliert!', controls: [{ icon: '📳', text: 'Schütteln = würfeln' }, { icon: '🤥', text: 'Wert ansagen (Bluff?)' }, { icon: '🔍', text: 'AUFDECKEN!: Lüge entlarven' }] },
   werwars: { goal: 'Beantwortet persönliche Fragen – dann erratet, von wem jede Antwort stammt.', controls: [{ icon: '✍️', text: 'Fragen ehrlich beantworten' }, { icon: '👆', text: 'Avatar des Autors antippen' }, { icon: '🤫', text: 'Keiner errät dich = +3' }] },
   skisprung: { goal: 'Auf dem Balance Board: im Anlauf ruhig in der Mitte stehen, bei „JETZT ABSPRINGEN!“ einmal kräftig hochdrücken, im Flug leicht nach vorn lehnen – und weit fliegen!', controls: [{ icon: '⚖️', text: '1 Anlauf: ruhig mittig, nicht lehnen' }, { icon: '⤴️', text: '2 Am Tisch: einmal abspringen' }, { icon: '🛫', text: '3 Flug: leicht nach vorn lehnen' }] },
   teppich: { goal: 'Auf dem Balance Board durch die Wüstenstadt fliegen: Juwelen holen, Türmen und Geiern ausweichen.', controls: [{ icon: '⬆️', text: 'Nach hinten lehnen = steigen' }, { icon: '⬇️', text: 'Nach vorn lehnen = sinken' }, { icon: '➡️', text: 'Rechts = schneller, links = bremsen' }] },
   kugel: { goal: 'Auf dem Balance Board die Kugel über den schmalen, moosigen Tempelpfad ins Ziel lehnen – ohne in den Abgrund zu rollen.', controls: [{ icon: '⬆️', text: 'Vorn lehnen = Gas' }, { icon: '↪️', text: 'Seitlich = drehen (Hoverboard)' }, { icon: '🛑', text: 'Hinten lehnen = bremsen' }] },
+  band: { goal: 'Jedes Handy ist ein Instrument: Tippt eure Noten im Takt – zusammen groovt die Band!', controls: [{ icon: '🎸', text: 'Instrument wählen (★ = leicht)' }, { icon: '👆', text: 'Tippen, wenn die Note ankommt' }, { icon: '✋', text: 'Lange Noten gedrückt halten' }] },
+  maler: { goal: 'Reihum malt einer ein geheimes Wort live auf den TV – alle anderen tippen, was das sein soll. Schneller = mehr Punkte.', controls: [{ icon: '✏️', text: 'Dran? Wort wählen, am Handy malen' }, { icon: '⌨️', text: 'Sonst: Tipp eintippen, Enter' }, { icon: '💡', text: 'Mit der Zeit kommen Buchstaben' }] },
 };
 
 /**
@@ -187,7 +195,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
@@ -195,7 +203,7 @@ export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
  * Ohne Igel/Turm (zu lang) und ohne Date-Night-Kapitel (Abstieg, Wraps). Lange Spiele (`MINI_LENGTH`)
  * zieht das Brett nur mit der VIP-Option „Lange Spiele“.
  */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'parcours', 'kart', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'parcours', 'kart', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz', 'lexikon'];
 
 export type MiniLength = 'kurz' | 'mittel' | 'lang';
 /**
@@ -225,6 +233,8 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   arena: 'mittel',
   // reihum: bei 12 Spielern ca. 6 min
   bowling: 'lang',
+  // 3 Durchgänge à Countdown 3 s + Schütteln ≤ 8 s + Weiten-Schau 4 s ≈ 50 s
+  sekt: 'kurz',
   enten: 'kurz',
   // 2 × 100 s ab 6 Spielern, sonst 3 Runden
   ttt: 'lang',
@@ -264,6 +274,8 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   funk: 'lang',
   // Brett: 1 Frage ≈ 90 s (Arcade: 4 Fragen ≈ 4–5 min)
   schaetz: 'kurz',
+  // Brett: 1 Frage ≈ Schreiben 45 s + Tippen 20 s + Aufdecken ≈ 30 s ≈ 1,5–2 min (Arcade: 5/4/3 Fragen je nach Spielerzahl ≈ 6–9 min)
+  lexikon: 'mittel',
   // Genres wählen ≤ 35 s + Übersicht 6 s + 8–12 Runden à Ansage 3 s + Hören ≤ 20 s (meist ≈ 10 s) + Auflösung 7 s ≈ 20 s → 3–5 min
   lieder: 'mittel',
   // reihum, 3 Leben; Runden um den Tisch: 6 (≤ 6 Spieler), 4 (≤ 9), 3 (≥ 10), Trinkspiel 2. Pro Zug Würfeln ≤ 15 s + Ansage ≤ 15 s
@@ -277,6 +289,11 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   teppich: 'lang',
   // reihum: Einmessen + ≈ 30–50 s Rollen (je Absturz +4 s) + Auswertung ≈ 50 s pro Spieler
   kugel: 'lang',
+  // Instrument wählen ≤ 25 s + Einzähler + Song ≈ 60 s + Schluss ≈ 1,5 min
+  band: 'kurz',
+  // ein Bild pro Spieler (höchstens 8): Wortwahl ≤ 12 s + Malen 60–80 s (früher Schluss, wenn alle es haben) + Auflösung 6 s
+  // → 6 Spieler ≈ 6–9 min, 12 Spieler (8 Maler, 60 s) ≈ 7–10 min
+  maler: 'lang',
 };
 /** Minispiele der Date Night */
 export const DATE_KINDS: MiniKind[] = ['descent', 'rhythm', 'wrap', 'stars'];
@@ -885,16 +902,16 @@ const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'R
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele und ohne Date-Night-Kapitel) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'wasser', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'wasser', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess', 'wackel'] },
-  { title: 'Zielen & Werfen', kinds: ['bowling', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
-  { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug'] },
+  { title: 'Zielen & Werfen', kinds: ['bowling', 'sekt', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
+  { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug', 'band'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf', 'wolfrunde'] },
   { title: 'Balance Board', kinds: ['skisprung', 'teppich', 'kugel'] },
-  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'maler', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon'] },
 ];
 
 /**
