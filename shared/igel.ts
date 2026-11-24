@@ -1,5 +1,6 @@
 /**
- * Igel-Krieg: gemeinsame Konstanten, Insel-Generator und Physik-Helfer.
+ * Waschbär-Bande (MiniKind `igel`, früher Igel-Krieg): Waschbären-Banden auf einer Campinginsel im See, abends.
+ * Gemeinsame Konstanten, Insel-Generator und Physik-Helfer.
  * Server (autoritativ), TV (eigene Terrain-Kopie) und Bots (Zielsimulation)
  * benutzen denselben Code – das Terrain wird nur als Seed + Breite + Kraterliste übertragen.
  * Die Inselbreite wächst mit der Spielerzahl (`igelWidth()`); die Maske kennt ihre Breite (`Mask.w`).
@@ -57,11 +58,10 @@ export const IGEL = {
   DT: 0.005,
 };
 
+/** Icons der Waffen sind eigene Pixel-Art: `weaponIcon()` in `client/art/igelIcons.ts` (TV-Textur, Handy-Bild-URL) */
 export interface IgelWeaponInfo {
   name: string;
   short: string;
-  /** Symbol fürs Waffenraster am Handy */
-  icon: string;
   /** Startmunition, −1 = unbegrenzt */
   ammo: number;
   hint: string;
@@ -74,25 +74,25 @@ export interface IgelWeaponInfo {
 }
 
 export const WEAPONS: Record<IgelWeapon, IgelWeaponInfo> = {
-  bazooka: { name: 'Kokosnuss-Bazooka', short: 'Bazooka', icon: '🥥', ammo: -1, hint: 'Fliegt mit dem Wind – explodiert beim Aufprall', info: '45 · Wind', aim: 'drag' },
-  grenade: { name: 'Wasserbomben-Granate', short: 'Wasserbombe', icon: '💧', ammo: 3, hint: 'Hüpft – platzt nach dem Zünder (1–5 s, kein Wind)', info: '40 · Zünder', aim: 'drag' },
-  cluster: { name: 'Ananas-Splitterbombe', short: 'Splitter', icon: '🍍', ammo: 1, hint: 'Platzt beim Aufprall in 5 Stücke (mit Wind)', info: '25 + 5×15', aim: 'drag' },
-  holy: { name: 'Heilige Ananas', short: 'Heilige A.', icon: '😇', ammo: 1, hint: 'Nur einmal pro Spiel – riesiger Krater nach 3 s', info: '75 · riesig', aim: 'drag' },
-  shotgun: { name: 'Wasser-Schrotflinte', short: 'Schrot', icon: '🔫', ammo: -1, hint: 'Zwei Sofortschüsse geradeaus – kein Wind', info: '2 × 18', aim: 'dir' },
-  airstrike: { name: 'Möwen-Luftschlag', short: 'Möwen', icon: '🐦', ammo: 1, hint: 'Ziel auf der Karte antippen – 3 Bomben von oben', info: '3 × 26', aim: 'map' },
-  dynamite: { name: 'Böller', short: 'Böller', icon: '🧨', ammo: 1, hint: 'Ablegen und weglaufen – knallt nach 5 s', info: '60 · 5 s', aim: 'none' },
-  mine: { name: 'Seeigel-Mine', short: 'Seeigel', icon: '✴️', ammo: 2, hint: 'Ablegen – nach 2 s scharf, geht hoch, wenn wer kommt', info: '35 · Falle', aim: 'none' },
-  paddle: { name: 'Paddel-Schlag', short: 'Paddel', icon: '🛶', ammo: 1, hint: 'Richtung wischen – schlägt den Nachbarn weit weg', info: '10 · weit', aim: 'dir' },
-  punch: { name: 'Igel-Schlag', short: 'Schlag', icon: '👊', ammo: -1, hint: 'Richtung wischen – haut Nachbarn weg', info: '22 · nah', aim: 'dir' },
-  teleport: { name: 'Muschel-Teleport', short: 'Teleport', icon: '🐚', ammo: 2, hint: 'Richtung + Weite wischen – du landest dort', info: 'beamen', aim: 'drag' },
-  bridge: { name: 'Surfbrett-Brücke', short: 'Surfbrett', icon: '🏄', ammo: 2, hint: 'Richtung wischen – legt ein Brett ins Gelände', info: 'Brücke', aim: 'dir' },
-  rope: { name: 'Lianen-Seil', short: 'Liane', icon: '🪢', ammo: 3, hint: 'Nach oben wischen – Liane hakt sich fest. Schwingen, klettern, loslassen', info: 'Werkzeug · schwingen', aim: 'dir', tool: true },
-  parasol: { name: 'Sonnenschirm-Gleiter', short: 'Schirm', icon: '⛱️', ammo: 2, hint: 'Hüpft hoch und gleitet sanft – kein Fallschaden, Wind schiebt', info: 'Werkzeug · gleiten', aim: 'none', tool: true },
-  shovel: { name: 'Schaufel', short: 'Schaufel', icon: '🪏', ammo: 3, hint: 'Richtung wischen – gräbt einen Tunnel (Deckung!)', info: 'Werkzeug · graben', aim: 'dir', tool: true },
+  bazooka: { name: 'Silvesterrakete', short: 'Rakete', ammo: -1, hint: 'Fliegt mit dem Wind – knallt beim Aufprall', info: '45 · Wind', aim: 'drag' },
+  grenade: { name: 'Dosenbombe', short: 'Dose', ammo: 3, hint: 'Hüpft – knallt nach dem Zünder (1–5 s, kein Wind)', info: '40 · Zünder', aim: 'drag' },
+  cluster: { name: 'Platz-Müllsack', short: 'Müllsack', ammo: 1, hint: 'Platzt beim Aufprall in 5 Müllbrocken (mit Wind)', info: '25 + 5×15', aim: 'drag' },
+  holy: { name: 'Heilige Mülltonne', short: 'Goldtonne', ammo: 1, hint: 'Nur einmal pro Spiel – riesiger Krater nach 3 s', info: '75 · riesig', aim: 'drag' },
+  shotgun: { name: 'Gartenschlauch', short: 'Schlauch', ammo: -1, hint: 'Zwei Wasserstrahlen geradeaus – kein Wind', info: '2 × 18', aim: 'dir' },
+  airstrike: { name: 'Tauben-Angriff', short: 'Tauben', ammo: 1, hint: 'Ziel auf der Karte antippen – 3 Tauben werfen ab', info: '3 × 26', aim: 'map' },
+  dynamite: { name: 'Riesenböller', short: 'Böller', ammo: 1, hint: 'Ablegen und weglaufen – knallt nach 5 s', info: '60 · 5 s', aim: 'none' },
+  mine: { name: 'Mausefalle', short: 'Falle', ammo: 2, hint: 'Aufstellen – nach 2 s scharf, schnappt zu, wenn wer kommt', info: '35 · Falle', aim: 'none' },
+  paddle: { name: 'Bratpfanne', short: 'Pfanne', ammo: 1, hint: 'Richtung wischen – KLONG, der Nachbar fliegt weit weg', info: '10 · weit', aim: 'dir' },
+  punch: { name: 'Pfotenhieb', short: 'Pfote', ammo: -1, hint: 'Richtung wischen – haut Nachbarn weg', info: '22 · nah', aim: 'dir' },
+  teleport: { name: 'Gully-Tunnel', short: 'Gully', ammo: 2, hint: 'Richtung + Weite wischen – rein in den Gully, dort wieder raus', info: 'Abkürzung', aim: 'drag' },
+  bridge: { name: 'Brett-Brücke', short: 'Brett', ammo: 2, hint: 'Richtung wischen – legt ein Brett ins Gelände', info: 'Brücke', aim: 'dir' },
+  rope: { name: 'Wäscheleine', short: 'Leine', ammo: 3, hint: 'Nach oben wischen – die Leine hakt sich fest. Schwingen, klettern, loslassen', info: 'Werkzeug · schwingen', aim: 'dir', tool: true },
+  parasol: { name: 'Regenschirm', short: 'Schirm', ammo: 2, hint: 'Hüpft hoch und gleitet sanft – kein Fallschaden, Wind schiebt', info: 'Werkzeug · gleiten', aim: 'none', tool: true },
+  shovel: { name: 'Schaufel', short: 'Schaufel', ammo: 3, hint: 'Richtung wischen – gräbt einen Tunnel (Deckung!)', info: 'Werkzeug · graben', aim: 'dir', tool: true },
 };
 /** Reihenfolge im Waffenraster (5 × 3): Wurfwaffen · Spezial/Nahkampf · Werkzeuge */
 export const WEAPON_ORDER: IgelWeapon[] = ['bazooka', 'grenade', 'cluster', 'holy', 'shotgun', 'airstrike', 'dynamite', 'mine', 'paddle', 'punch', 'teleport', 'bridge', 'rope', 'parasol', 'shovel'];
-/** Was in Kisten stecken kann (Heilige Ananas gibt's nur einmal pro Spiel) */
+/** Was in Picknickkörben stecken kann (die Heilige Mülltonne gibt's nur einmal pro Spiel) */
 export const CRATE_LOOT: IgelWeapon[] = ['grenade', 'grenade', 'cluster', 'airstrike', 'dynamite', 'mine', 'paddle', 'teleport', 'bridge', 'rope', 'parasol', 'shovel'];
 export const isTool = (w: IgelWeapon) => !!WEAPONS[w].tool;
 
@@ -102,45 +102,44 @@ export const igelMaxHp = (n: number) => (n >= 8 ? IGEL.HP_BIG : IGEL.HP);
 export const igelSuddenMs = (n: number) => (n >= 7 ? IGEL.SUDDEN_MS_BIG : IGEL.SUDDEN_MS);
 
 /**
- * Inselbreite nach Spielerzahl: bis 5 Spieler 480 wie bisher (bis 4 hat jeder 2 Igel – also höchstens 8 Igel),
+ * Inselbreite nach Spielerzahl: bis 5 Spieler 480 wie bisher (bis 4 hat jeder 2 Waschbären – also höchstens 8),
  * darüber 90 px pro Spieler (auf 40 gerundet, höchstens 960): 6 → 560, 7 → 640, 8 → 720, 9 → 840, 10 → 920, ab 11 → 960.
- * So bleibt bei „Alle gleichzeitig“ Platz zwischen den Igeln, obwohl alle zugleich schießen.
+ * So bleibt bei „Alle gleichzeitig“ Platz zwischen den Waschbären, obwohl alle zugleich schießen.
  */
 export const igelWidth = (n: number) => (n <= 5 ? IGEL.W : Math.min(IGEL.W_MAX, Math.max(IGEL.W, Math.ceil((n * IGEL.W_PER_PLAYER) / 40) * 40)));
 
 /** Zuschauer-Sprüche (Action `taunt` mit `{ i }` = Index in diese Liste) */
-export const IGEL_TAUNTS = ['Rache!', 'Feigling!', 'Ups.', 'Für die Strandbar!', 'Daneben!', 'Volltreffer!'];
+export const IGEL_TAUNTS = ['Rache!', 'Feigling!', 'Ups.', 'Für die Bande!', 'Daneben!', 'Volltreffer!'];
 
-/** Igel-Sprüche: was die Igel von selbst sagen (Sprechblase) */
+/** Waschbär-Sprüche: was die Waschbären von selbst sagen (Sprechblase) */
 export const IGEL_QUIPS = {
   /** Zugbeginn (ab und zu) */
-  start: ['Jetzt aber!', 'Ich hab einen Plan.', 'Mal sehen ...', 'Zielwasser!', 'Aus dem Weg!', 'Ganz ruhig ...'],
+  start: ['Jetzt aber!', 'Ich hab einen Plan.', 'Mal sehen ...', 'Riecht nach Pizza ...', 'Aus dem Weg!', 'Ganz ruhig ...'],
   /** Beim Abschuss */
-  fire: ['Fang!', 'Friss Kokosnuss!', 'Achtung!', 'Für die Strandbar!', 'Hoppla ...', 'Lieferung!'],
+  fire: ['Fang!', 'Mahlzeit!', 'Achtung!', 'Für die Bande!', 'Hoppla ...', 'Lieferung!'],
   /** Getroffen, aber noch da */
-  hurt: ['Autsch!', 'Meine Stacheln!', 'Das gibt Rache!', 'Aua aua!', 'Hey!', 'Mein Sonnenbrand!'],
-  /** Ins Wasser gefallen */
-  drown: ['Blubb ...', 'Ich kann nicht schwimmen!', 'Kaltes Wasser!'],
-  /** Liane / Schirm / Schaufel */
-  rope: ['Tarzan-Igel!', 'Huiii!', 'Hoch hinaus!'],
+  hurt: ['Autsch!', 'Mein Fell!', 'Das gibt Rache!', 'Aua aua!', 'Hey!', 'Mein Ringelschwanz!'],
+  /** In den See gefallen */
+  drown: ['Blubb ...', 'Ich wollte nur was waschen!', 'Kaltes Wasser!'],
+  /** Wäscheleine / Regenschirm / Schaufel */
+  rope: ['Tarzan-Waschbär!', 'Huiii!', 'Hoch hinaus!'],
   parasol: ['Abflug!', 'Schön luftig hier.', 'Sanft wie ein Blatt.'],
-  shovel: ['Ich grab mich ein.', 'Buddeln!', 'Sandburg 2.0'],
+  shovel: ['Ich grab mich ein.', 'Buddeln!', 'Geheimer Vorratskeller!'],
 };
 
-/** Themenkarten: eine pro Partie, verändert die Insel-Regeln */
+/** Themenkarten: eine pro Partie, verändert die Insel-Regeln (Icons: `themeIcon()` in `client/art/igelIcons.ts`) */
 export interface IgelTheme {
   name: string;
-  icon: string;
   /** Kurzregel für Karte, Handy und Sprecher */
   text: string;
 }
 export const IGEL_THEMES: Record<IgelThemeId, IgelTheme> = {
-  sturm: { name: 'Sturmtag', icon: '🌪️', text: 'Doppelter Wind – Kokosnüsse fliegen schief!' },
-  mond: { name: 'Mondnacht', icon: '🌙', text: 'Wenig Schwerkraft – alles fliegt weiter und höher.' },
-  kisten: { name: 'Kistenregen', icon: '📦', text: 'Jede Runde fallen Kisten vom Himmel.' },
-  spreng: { name: 'Sprengmeister', icon: '🧨', text: 'Doppelt so viele Gaskartuschen und Seeigel, jeder hat 2 Böller.' },
-  vampir: { name: 'Vampir-Igel', icon: '🧛', text: 'Ein Drittel deines Schadens heilt deinen Igel.' },
-  flut: { name: 'Flutwarnung', icon: '🌊', text: 'Das Wasser steht höher und die Flut kommt doppelt so früh.' },
+  sturm: { name: 'Sturmnacht', text: 'Doppelter Wind – Raketen und Müllsäcke fliegen schief!' },
+  mond: { name: 'Vollmond', text: 'Wenig Schwerkraft – alles fliegt weiter und höher.' },
+  kisten: { name: 'Picknick-Regen', text: 'Jede Runde schweben Picknickkörbe vom Himmel.' },
+  spreng: { name: 'Silvesternacht', text: 'Doppelt so viele Gaskartuschen und Mausefallen, jeder hat 2 Böller.' },
+  vampir: { name: 'Vampir-Waschbär', text: 'Ein Drittel deines Schadens heilt deinen Waschbären.' },
+  flut: { name: 'Hochwasser', text: 'Der See steht höher und steigt doppelt so früh.' },
 };
 export const IGEL_THEME_IDS = Object.keys(IGEL_THEMES) as IgelThemeId[];
 /** Schwerkraft- und Wind-Faktor der Themenkarte */
@@ -150,26 +149,26 @@ export const themeWind = (t: IgelThemeId) => (t === 'sturm' ? 1.8 : 1);
 export const BAZOOKA = { R: 21, DMG: 45, ARM_MS: 140 };
 export const GRENADE = { R: 19, DMG: 40, FUSE_MS: 3000, SPEED: 0.8, FUSE_MIN: 1, FUSE_MAX: 5 };
 export const PUNCH = { REACH: 15, DMG: 22, VX: 170, VY: -170 };
-/** Wasser-Schrotflinte: Sofortschuss (Strahl) bis RANGE, SHOTS Schüsse pro Zug */
+/** Gartenschlauch: Sofortschuss (Wasserstrahl) bis RANGE, SHOTS Schüsse pro Zug */
 export const SHOTGUN = { R: 8, DMG: 18, RANGE: 260, SHOTS: 2 };
-/** Möwen-Luftschlag: N Bomben im Abstand SPREAD, fallen von oben */
+/** Tauben-Angriff: N Ladungen im Abstand SPREAD, fallen von oben */
 export const AIRSTRIKE = { R: 15, DMG: 26, N: 3, SPREAD: 15, VX: 40 };
 export const DYNAMITE = { R: 30, DMG: 60, FUSE_MS: 5000 };
-/** Seeigel-Mine: scharf nach ARM_MS, löst bei Nähe TRIGGER aus und knallt FUSE_MS später */
+/** Mausefalle: scharf nach ARM_MS, schnappt bei Nähe TRIGGER zu und knallt FUSE_MS später */
 export const MINE = { R: 18, DMG: 35, ARM_MS: 2000, TRIGGER: 11, FUSE_MS: 800, START_MIN: 3, START_MAX: 6 };
 export const CLUSTER = { R: 15, DMG: 25, N: 5, FRAG_R: 10, FRAG_DMG: 15, SPEED: 0.9 };
-/** Paddel-Schlag: wenig Schaden, dafür fliegt der Getroffene weit in Schlagrichtung */
+/** Bratpfanne: wenig Schaden, dafür fliegt der Getroffene weit in Schlagrichtung */
 export const PADDLE = { REACH: 16, DMG: 10, SPEED: 330 };
 export const HOLY = { R: 52, DMG: 75, FUSE_MS: 3000, SPEED: 0.75 };
-/** Surfbrett-Brücke: Planke aus „add“-Scheiben (Länge, Dicke, Schrittweite, max. Neigung) */
+/** Brett-Brücke: Planke aus „add“-Scheiben (Länge, Dicke, Schrittweite, max. Neigung) */
 export const BRIDGE = { LEN: 34, THICK: 2.5, STEP: 2, MAX_TILT: 0.6 };
-/** Gaskartuschen vom Grill: explodieren bei Treffer, Kettenreaktion */
+/** Gaskartuschen vom Campingkocher: explodieren bei Treffer, Kettenreaktion */
 export const BARREL = { R: 22, DMG: 32, MIN: 3, MAX: 5, CHAIN_MS: 180 };
-/** Kisten am Sonnenschirm-Fallschirm */
+/** Picknickkörbe an Luftballons */
 export const CRATE = { CHANCE: 0.3, HP: 25, FALL: 34, MAX: 3, REACH: 9 };
-/** Lianen-Seil: Reichweite, Seillänge (min/max), Klettern px/s, Schwung px/s², Höchsttempo */
+/** Wäscheleine: Reichweite, Leinenlänge (min/max), Klettern px/s, Schwung px/s², Höchsttempo */
 export const ROPE = { RANGE: 120, MIN: 12, MAX: 130, CLIMB: 55, PUSH: 160, VMAX: 260 };
-/** Sonnenschirm: Absprung, Sinkrate, Steuern, Windeinfluss (px/s) */
+/** Regenschirm: Absprung, Sinkrate, Steuern, Windeinfluss (px/s) */
 export const PARASOL = { HOP_VY: -150, FALL: 26, STEER: 45, WIND: 30 };
 /** Schaufel: Tunnel aus „carve“-Scheiben (Radius, Länge, Schrittweite) */
 export const SHOVEL = { R: 6, LEN: 26, STEP: 4 };
@@ -177,7 +176,7 @@ export const SHOVEL = { R: 6, LEN: 26, STEP: 4 };
 /**
  * Schwebender Stick links am Handy (Werte wie von `stickZone()`: −1 … 1, y < 0 = oben, Totzone schon abgezogen):
  * waagerecht = laufen (analog – wenig Ausschlag = langsam, zum genauen Hinstellen), deutlich nach oben = Sprung
- * (einmal pro Hochdrücken), an der Liane senkrecht = klettern und waagerecht = schwingen, am Schirm waagerecht = steuern.
+ * (einmal pro Hochdrücken), an der Wäscheleine senkrecht = klettern und waagerecht = schwingen, am Schirm waagerecht = steuern.
  */
 export const IGEL_STICK = {
   /** Ab dieser waagerechten Auslenkung wird gelaufen */
@@ -189,7 +188,7 @@ export const IGEL_STICK = {
   /** Stick so weit nach oben = Sprung; scharf erst wieder, wenn er unter REARM zurück ist */
   JUMP: 0.65,
   REARM: 0.35,
-  /** An der Liane: ab dieser senkrechten Auslenkung klettern */
+  /** An der Wäscheleine: ab dieser senkrechten Auslenkung klettern */
   CLIMB: 0.3,
 };
 
@@ -202,7 +201,7 @@ export function stickWalk(x: number): number {
   return Math.sign(x) * stickRamp(a, IGEL_STICK.WALK, IGEL_STICK.SLOW);
 }
 
-/** Klettern an der Liane aus der senkrechten Auslenkung: > 0 = hoch (Stick oben), < 0 = runter */
+/** Klettern an der Wäscheleine aus der senkrechten Auslenkung: > 0 = hoch (Stick oben), < 0 = runter */
 export function stickClimb(y: number): number {
   const a = Math.abs(y);
   if (!Number.isFinite(y) || a < IGEL_STICK.CLIMB) return 0;
@@ -219,10 +218,10 @@ export const SIMUL = { MIN_PLAYERS: 7, AIM_MS: 15000, FLIGHT_MAX_MS: 12000 };
 
 /** Spieler-Teams ab 5 Spielern */
 export const IGEL_SQUADS = [
-  { name: 'Sonne', color: '#f2c33a', icon: '☀️' },
-  { name: 'Meer', color: '#3f8fe0', icon: '🌊' },
-  { name: 'Sand', color: '#e0a868', icon: '🏖️' },
-  { name: 'Palme', color: '#46b04a', icon: '🌴' },
+  { name: 'Mond', color: '#f2c33a' },
+  { name: 'See', color: '#3f8fe0' },
+  { name: 'Zelt', color: '#e0a868' },
+  { name: 'Tanne', color: '#46b04a' },
 ];
 /** 2–4 Teams: 5–6 Spieler → 2, 7–9 → 3, 10–12 → 4; darunter jeder für sich */
 export const igelSquadCount = (n: number) => (n < 5 ? 0 : n <= 6 ? 2 : n <= 9 ? 3 : 4);
@@ -277,7 +276,7 @@ export function carve(m: Mask, cx: number, cy: number, r: number) {
 }
 
 /**
- * Urlaubsinsel aus Höhenprofil + Höhlen. Manchmal zwei Inseln mit einer Bucht dazwischen,
+ * Campinginsel aus Höhenprofil + Höhlen. Manchmal zwei Inseln mit einer Bucht dazwischen,
  * auf breiten Inseln (`w` > 480) bis zu drei – Höhlen und Felsbrocken wachsen mit der Breite.
  * Bei 480 entsteht aus demselben Seed genau die bisherige Insel. Unterhalb des Wassers bleibt alles fest.
  */
@@ -347,7 +346,7 @@ export function genTerrain(seed: number, w: number = IGEL.W): Mask {
   return m;
 }
 
-/** Schüttet einen Kreis auf (Surfbrett-Brücke) */
+/** Schüttet einen Kreis auf (Brett-Brücke) */
 export function fill(m: Mask, cx: number, cy: number, r: number) {
   const x0 = Math.max(0, Math.floor(cx - r));
   const x1 = Math.min(m.w - 1, Math.ceil(cx + r));
@@ -375,7 +374,7 @@ export function buildTerrain(seed: number, ops: IgelOp[], w: number = IGEL.W): M
   return m;
 }
 
-/** Surfbrett-Brücke vor dem Igel (Fußpunkt x/y): „add“-Scheiben entlang der Zielrichtung, Neigung höchstens ±MAX_TILT */
+/** Brett-Brücke vor dem Waschbären (Fußpunkt x/y): „add“-Scheiben entlang der Zielrichtung, Neigung höchstens ±MAX_TILT */
 export function plankOps(x: number, y: number, angle: number, w: number = IGEL.W): IgelOp[] {
   const dir = Math.cos(angle) >= 0 ? 1 : -1;
   let tilt = dir > 0 ? angle : Math.PI - angle;
@@ -395,7 +394,7 @@ export function plankOps(x: number, y: number, angle: number, w: number = IGEL.W
   return ops;
 }
 
-/** Schaufel: Tunnel vor dem Igel (Körpermitte x/y) in Grabrichtung */
+/** Schaufel: Tunnel vor dem Waschbären (Körpermitte x/y) in Grabrichtung */
 export function shovelOps(x: number, y: number, angle: number, w: number = IGEL.W): IgelOp[] {
   const ops: IgelOp[] = [];
   const ux = Math.cos(angle);
@@ -409,7 +408,7 @@ export function shovelOps(x: number, y: number, angle: number, w: number = IGEL.
   return ops;
 }
 
-/** Lianen-Seil: erster fester Punkt in Zielrichtung (bis ROPE.RANGE), sonst null */
+/** Wäscheleine: erster fester Punkt in Zielrichtung (bis ROPE.RANGE), sonst null */
 export function ropeAnchor(m: Mask, x: number, y: number, angle: number): { x: number; y: number } | null {
   const ux = Math.cos(angle);
   const uy = Math.sin(angle);
@@ -428,9 +427,9 @@ export function surfaceY(m: Mask, x: number): number {
   return IGEL.H;
 }
 
-// ------------------------------------------------------------------ Igel-Körper
+// ------------------------------------------------------------------ Waschbär-Körper
 
-/** Igel-Position = Fußpunkt (unterste Körperzeile). Kollision über ein paar Messpunkte. */
+/** Waschbär-Position = Fußpunkt (unterste Körperzeile). Kollision über ein paar Messpunkte. */
 export function bodyHits(m: Mask, x: number, y: number): boolean {
   return isSolid(m, x, y) || isSolid(m, x, y - 7) || isSolid(m, x - 3, y - 3) || isSolid(m, x + 3, y - 3) || isSolid(m, x - 2, y - 6) || isSolid(m, x + 2, y - 6);
 }
@@ -454,7 +453,7 @@ export function launch(x: number, y: number, angle: number, power: number, scale
   return { x: x + Math.cos(angle) * 7, y: y + Math.sin(angle) * 7, vx: Math.cos(angle) * v, vy: Math.sin(angle) * v };
 }
 
-/** `grav` = Schwerkraft-Faktor der Themenkarte (Mondnacht 0.6) */
+/** `grav` = Schwerkraft-Faktor der Themenkarte (Vollmond 0.6) */
 export function stepBallistic(p: Ballistic, dt: number, wind: number, grav = 1) {
   p.vx += wind * IGEL.WIND_ACC * dt;
   p.vy += IGEL.GRAVITY * grav * dt;
@@ -492,7 +491,7 @@ export function simulateBazooka(
   return null;
 }
 
-/** Wie stark wirkt der Wind auf diese Waffe? (Bazooka und Splitterbombe ja, Wurfwaffen nicht) */
+/** Wie stark wirkt der Wind auf diese Waffe? (Rakete und Müllsack ja, Wurfwaffen nicht) */
 export const windFactor = (w: IgelWeapon) => (w === 'bazooka' || w === 'cluster' ? 1 : 0);
 /** Startgeschwindigkeits-Faktor der Wurfwaffen */
 export const speedScale = (w: IgelWeapon) => (w === 'grenade' ? GRENADE.SPEED : w === 'holy' ? HOLY.SPEED : w === 'cluster' ? CLUSTER.SPEED : 1);

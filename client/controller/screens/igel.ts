@@ -1,6 +1,7 @@
-import type { IgelState, IgelWeapon } from '../../../shared/types';
+import type { IgelState, IgelThemeId, IgelWeapon } from '../../../shared/types';
 import { GRENADE, IGEL, IGEL_TAUNTS, IGEL_THEMES, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, isTool, squadOf, stickRearmed, stickUp, surfaceY, windArrows } from '../../../shared/igel';
-import { type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
+import { type Builder, type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
+import { themeIconUrl, uiIconUrl, weaponIconUrl } from '../../art/igelIcons';
 import { haptic } from '../haptic';
 import { onInputReset, localPoint, stickZone } from '../stick';
 
@@ -12,15 +13,34 @@ const squadColor = (st: IgelState, id: string) => {
   return i >= 0 ? st.squads![i].color : null;
 };
 const myHog = (st: IgelState, id: string) => st.hogs.find((h) => h.owner === id && h.state === 'ok') ?? null;
-/** Themenkarte als kurze Zeile („🌙 Mondnacht“) */
+/** Eigene Pixel-Icons (Waffen, Themenkarte, Wind, Hochwasser) als kleines Inline-Bild */
+const pix = (src: string, cls = 'ig-pi') => `<img class="${cls}" src="${src}" alt="">`;
+/** Themenkarte als kurze Zeile (Icon + Name, z. B. „Vollmond“) */
 const themeLine = (st: IgelState) => {
   const th = IGEL_THEMES[st.theme];
-  return th ? `${th.icon} ${th.name}` : '';
+  return th ? `${pix(themeIconUrl(st.theme))} ${escapeHtml(th.name)}` : '';
 };
-/** Flut-/Themenzeile unter der Karte */
-const sdText = (st: IgelState) => `${themeLine(st)} · ${st.suddenDeath ? 'SUDDEN DEATH – die Flut steigt!' : `Flut in ${Math.ceil(st.suddenIn / 1000)}s`}`;
+/** Hochwasser-/Themenzeile unter der Karte (HTML) */
+const sdText = (st: IgelState) =>
+  `${themeLine(st)} · ${pix(uiIconUrl('flood'))} ${st.suddenDeath ? 'SUDDEN DEATH – der See steigt!' : `Hochwasser in ${Math.ceil(st.suddenIn / 1000)}s`}`;
+/** innerHTML nur setzen, wenn sich etwas geändert hat (sonst würden die Bilder bei jedem Update neu gebaut) */
+function setHtml(e: HTMLElement, html: string) {
+  if (e.dataset.html === html) return;
+  e.dataset.html = html;
+  e.innerHTML = html;
+}
 
-/** Zuschauer-Sprüche: Abklingzeit lokal mitzählen (überlebt das Neubauen des Screens) */
+/** Countdown: Themenkarte mit Icon, darunter was zu tun ist */
+function countdownCard(theme: IgelThemeId, rest: string): Builder {
+  return () => {
+    const th = IGEL_THEMES[theme];
+    const card = th ? `<p class="ig-card">${pix(themeIconUrl(theme), 'ig-pi ig-pi2')}<span><b>Themenkarte: ${escapeHtml(th.name)}</b><br>${escapeHtml(th.text)}</span></p>` : '';
+    app.append(el(`<div class="center ig-count"><h2>Waschbär-Bande!</h2>${card}<p>${escapeHtml(rest)}</p></div>`));
+    return null;
+  };
+}
+
+/** Zuschauer-Sprüche: Abklingzeit lokal mitzählen (überlebt das Neubauen des Screens) – Waschbär-Bande (MiniKind `igel`) */
 let tauntUntil = 0;
 
 export function pickIgel(s: IgelState): Screen {
@@ -34,9 +54,7 @@ export function pickIgel(s: IgelState): Screen {
     const mode = s.simul
       ? 'ALLE GLEICHZEITIG: 15 s zielen, FEUER drücken – dann fliegt alles zugleich!'
       : 'Wenn du dran bist: mit dem Stick links laufen (nach oben = Sprung), Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER.';
-    const th = IGEL_THEMES[s.theme];
-    const card = th ? `Themenkarte ${th.icon} ${th.name}: ${th.text} ` : '';
-    return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der ${s.w > IGEL.W ? 'großen ' : ''}Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
+    return ['ig-count', countdownCard(s.theme, `Du hast ${n === 1 ? 'einen Waschbären' : `${n} Waschbären`} auf der ${s.w > IGEL.W ? 'großen ' : ''}Campinginsel.${team} ${mode} Wäscheleine, Regenschirm und Schaufel beenden den Zug nicht. See = raus!`)];
   }
   if (s.sub === 'replay') return ['ig-over-replay', message('Schuss des Abends!', 'Die Wiederholung läuft am Fernseher.')];
   if (s.sub === 'over') {
@@ -48,14 +66,15 @@ export function pickIgel(s: IgelState): Screen {
   return ['ig-watch', buildWatch];
 }
 
+/** Wind: Pixel-Icon + Pfeile (HTML) */
 function windText(w: number) {
-  return Math.abs(w) < 0.17 ? 'Wind: still' : `Wind ${windArrows(w)}`;
+  return `${pix(uiIconUrl('wind'))} ${Math.abs(w) < 0.17 ? 'still' : escapeHtml(windArrows(w))}`;
 }
 
 // ------------------------------------------------------------------ Aktiver Spieler
 
 function buildActive(turn: number) {
-  // Quer wie bei Worms: links Waffenraster + schwebender Stick (laufen, hoch = Sprung), Mitte Minikarte,
+  // Quer: links Waffenraster + schwebender Stick (laufen, hoch = Sprung), Mitte Minikarte,
   // rechts Ziel-Pad + SPRUNG/FEUER (der rechte Daumen ist beim Laufen frei)
   const me = store.playerId!;
   const root = el(`
@@ -86,11 +105,11 @@ function buildActive(turn: number) {
   const mapCanvas = q<HTMLCanvasElement>(root, '.ig-map');
   const drawMap = miniMap(mapCanvas);
 
-  // Waffenraster 5 × 3 mit Symbol + Munition
+  // Waffenraster 5 × 3 mit eigenem Pixel-Icon + Munition
   const wrap = q(root, '.ig-weapons');
   const wBtns = new Map<IgelWeapon, HTMLButtonElement>();
   for (const w of WEAPON_ORDER) {
-    const b = el(`<button class="ig-weapon ig-w-${w}"><span class="ig-ico">${WEAPONS[w].icon}</span><small></small></button>`).firstElementChild as HTMLButtonElement;
+    const b = el(`<button class="ig-weapon ig-w-${w}" aria-label="${escapeHtml(WEAPONS[w].name)}">${pix(weaponIconUrl(w), 'ig-ico')}<small></small></button>`).firstElementChild as HTMLButtonElement;
     tapButton(b, () => {
       if (b.disabled) return;
       send('weapon', { weapon: w });
@@ -100,7 +119,7 @@ function buildActive(turn: number) {
     wBtns.set(w, b);
   }
 
-  // Wasserbomben-Zünder 1–5 s
+  // Zünder der Dosenbombe 1–5 s
   const fuseBox = q(root, '.ig-fuse');
   const fuseBtns: HTMLButtonElement[] = [];
   for (let s = GRENADE.FUSE_MIN; s <= GRENADE.FUSE_MAX; s++) {
@@ -116,7 +135,7 @@ function buildActive(turn: number) {
   }
   const taunts = tauntRow(q(root, '.ig-taunts'), q(root, '.ig-tcd'));
 
-  // Schwebender Stick: waagerecht = laufen (analog), deutlich nach oben = Sprung, an der Liane hoch/runter = klettern,
+  // Schwebender Stick: waagerecht = laufen (analog), deutlich nach oben = Sprung, an der Wäscheleine hoch/runter = klettern,
   // seitlich = schwingen, am Schirm seitlich = steuern. Der Server deutet die Werte (Schwellen in IGEL_STICK);
   // stickZone() lässt bei input-reset los und wiederholt alle 250 ms (der Raum setzt nach 700 ms ohne Nachschub auf 0).
   const stickEl = q(root, '.ig-stick');
@@ -124,7 +143,7 @@ function buildActive(turn: number) {
   let stickHigh = false;
   stickZone(stickEl, (x, y) => {
     send('stick', { x, y });
-    // Rückmeldung beim Hochschnippen (nicht an der Liane – da heißt oben klettern)
+    // Rückmeldung beim Hochschnippen (nicht an der Leine – da heißt oben klettern)
     if (stickUp(y) && !stickHigh) {
       stickHigh = true;
       if (!roped() && !stickEl.classList.contains('off')) haptic(10);
@@ -145,7 +164,7 @@ function buildActive(turn: number) {
   let drag: { id: number; x0: number; y0: number; x: number; y: number } | null = null;
   /** Losgelassener Zielvektor, wartet auf FEUER (Pfeil bleibt sichtbar) */
   let ready: { angle: number; power: number; x0: number; y0: number } | null = null;
-  /** Luftschlag: angetipptes Ziel auf der Karte */
+  /** Tauben-Angriff: angetipptes Ziel auf der Karte */
   let target: number | null = null;
   let lastSent = 0;
   let fired = false;
@@ -227,7 +246,7 @@ function buildActive(turn: number) {
   const sendAim = (angle: number, power: number) => send('aim', { angle: Math.round(angle * 100) / 100, power: Math.round(power * 100) / 100 });
   pad.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    // An der Liane klettert der Stick – das Pad zielt erst wieder am Boden (FEUER = LOSLASSEN)
+    // An der Leine klettert der Stick – das Pad zielt erst wieder am Boden (FEUER = LOSLASSEN)
     if (roped() || !canAim() || drag || aimKind() === 'map' || aimKind() === 'none') return;
     pad.setPointerCapture(e.pointerId);
     const p = localPoint(pad, e);
@@ -271,7 +290,7 @@ function buildActive(turn: number) {
   pad.addEventListener('pointercancel', (e) => release(e, true));
   onInputReset(pad, () => release(null, true));
 
-  // Möwen-Luftschlag: Ziel auf der Minikarte antippen (die Karte zeigt immer die ganze Insel, Canvas-Breite = Inselbreite)
+  // Tauben-Angriff: Ziel auf der Minikarte antippen (die Karte zeigt immer die ganze Insel, Canvas-Breite = Inselbreite)
   mapCanvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     if (!canAim() || aimKind() !== 'map') return;
@@ -288,7 +307,7 @@ function buildActive(turn: number) {
   });
 
   tapButton(fireBtn, () => {
-    // Am Seil wird FEUER zu LOSLASSEN
+    // An der Leine wird FEUER zu LOSLASSEN
     if (roped()) {
       send('jump');
       haptic(20);
@@ -306,7 +325,7 @@ function buildActive(turn: number) {
       send('fire', { angle: ready.angle, power: ready.power });
     }
     haptic(isTool(weapon) ? 20 : 40);
-    // Werkzeuge beenden den Zug nicht: gleich weiter zielen (Liane neu wischen)
+    // Werkzeuge beenden den Zug nicht: gleich weiter zielen (Leine neu wischen)
     if (isTool(weapon)) {
       ready = null;
       draw();
@@ -318,7 +337,7 @@ function buildActive(turn: number) {
     draw();
   });
 
-  /** Hängt der gesteuerte Igel gerade an der Liane? */
+  /** Hängt der gesteuerte Waschbär gerade an der Wäscheleine? */
   const roped = () => {
     const st = igel();
     if (!st) return false;
@@ -340,15 +359,15 @@ function buildActive(turn: number) {
       draw();
     }
     const locked = st.simul && st.locked.includes(me);
-    // Schuss wurde abgelehnt (z. B. Teleport-Ziel ungültig) → wieder zielen lassen
+    // Schuss wurde abgelehnt (z. B. Gully-Ziel ungültig) → wieder zielen lassen
     const aimPhase = st.simul ? st.sub === 'aimAll' : st.sub === 'aim';
     if (fired && aimPhase && !locked && performance.now() - firedAt > 1200) fired = false;
-    // Schrotflinte: nach dem ersten Schuss gleich nochmal
+    // Gartenschlauch: nach dem ersten Schuss gleich nochmal
     if (fired && st.sub === 'aim' && st.shotsLeft > 0 && st.shotsLeft !== lastShots) fired = false;
     lastShots = st.shotsLeft;
     const timed = st.sub === 'aim' || st.sub === 'retreat' || st.sub === 'aimAll' || st.sub === 'retreatAll';
     q(root, '.timer').textContent = timed ? `${Math.ceil(st.endsIn / 1000)}s` : '';
-    q(root, '.ig-wind').textContent = windText(st.wind);
+    setHtml(q(root, '.ig-wind'), windText(st.wind));
     if (st.wind !== windKey) {
       windKey = st.wind;
       wind = st.wind;
@@ -366,9 +385,9 @@ function buildActive(turn: number) {
     const wk = `${weapon}|${ammo?.[weapon]}`;
     if (wk !== weaponKey) {
       weaponKey = wk;
-      q(root, '.ig-winfo').innerHTML = `<b>${escapeHtml(WEAPONS[weapon].name)}</b> · ${escapeHtml(WEAPONS[weapon].info)}`;
+      q(root, '.ig-winfo').innerHTML = `${pix(weaponIconUrl(weapon))} <b>${escapeHtml(WEAPONS[weapon].name)}</b> · ${escapeHtml(WEAPONS[weapon].info)}`;
     }
-    // Zünder nur bei der Wasserbombe
+    // Zünder nur bei der Dosenbombe
     fuseBox.classList.toggle('hidden', weapon !== 'grenade' || !aiming);
     const fz = st.fuse[me] ?? 3;
     fuseBtns.forEach((b, i) => b.classList.toggle('sel', i + GRENADE.FUSE_MIN === fz));
@@ -383,7 +402,7 @@ function buildActive(turn: number) {
     fireBtn.disabled = !armed;
     fireBtn.classList.toggle('armed', armed);
     // LOSLASSEN mit weichem Trennstrich; lange Wörter kleiner, damit sie in die schmale Knopfspalte passen
-    const fireLabel = onRope ? 'LOS\u00adLASSEN' : weapon === 'rope' ? 'LIANE!' : weapon === 'parasol' ? 'SCHIRM AUF' : weapon === 'shovel' ? 'GRABEN' : kind === 'none' ? 'ABLEGEN' : kind === 'map' ? 'MÖWEN LOS' : 'FEUER';
+    const fireLabel = onRope ? 'LOS\u00adLASSEN' : weapon === 'rope' ? 'LEINE!' : weapon === 'parasol' ? 'SCHIRM AUF' : weapon === 'shovel' ? 'GRABEN' : kind === 'none' ? 'ABLEGEN' : kind === 'map' ? 'TAUBEN LOS' : 'FEUER';
     if (fireBtn.textContent !== fireLabel) fireBtn.textContent = fireLabel;
     fireBtn.classList.toggle('ig-long', fireLabel.length > 5);
     // Simultan: nach FEUER warten – mit Sprüchen für die Wartezeit
@@ -401,11 +420,11 @@ function buildActive(turn: number) {
     else if (st.sub === 'flight' || st.sub === 'flightAll') head.textContent = 'Flieeeeg ...';
     else if (retreat) head.textContent = 'Schnell weg hier!';
     else head.textContent = 'Abwarten ...';
-    q(root, '.ig-sd').textContent = sdText(st);
+    setHtml(q(root, '.ig-sd'), sdText(st));
     if (!drag) {
       const shotgun2 = st.sub === 'aim' && st.shotsLeft > 0;
       padText.textContent = onRope
-        ? 'An der Liane: Stick ▲ ▼ = klettern,\n◀ ▶ = schwingen · LOSLASSEN = abspringen'
+        ? 'An der Leine: Stick ▲ ▼ = klettern,\n◀ ▶ = schwingen · LOSLASSEN = abspringen'
         : locked
         ? ''
         : aiming
@@ -414,7 +433,7 @@ function buildActive(turn: number) {
             : kind === 'map'
               ? target === null
                 ? 'Tippe auf der Karte das Ziel an!'
-                : `Ziel gesetzt – MÖWEN LOS!\nKarte antippen = neues Ziel`
+                : `Ziel gesetzt – TAUBEN LOS!\nKarte antippen = neues Ziel`
               : weapon === 'parasol'
                 ? `${WEAPONS[weapon].hint}\nSCHIRM AUF – dann mit dem Stick steuern`
               : kind === 'none'
@@ -459,7 +478,7 @@ function tauntRow(box: HTMLElement, cd: HTMLElement) {
 }
 
 /**
- * Zuschauen/Warten (nicht dran, Igel raus): im Querlayout `.lx` ohne Scrollen – links Karte + was gerade passiert,
+ * Zuschauen/Warten (nicht dran, Waschbär raus): im Querlayout `.lx` ohne Scrollen – links Karte + was gerade passiert,
  * Mitte „gleich dran“ + Teams (schrumpft bei vielen Spielern über fit.ts), rechts große Spruch-Knöpfe.
  */
 function buildWatch() {
@@ -490,26 +509,28 @@ function buildWatch() {
     const me = store.playerId!;
     const timed = st.sub === 'aim' || st.sub === 'retreat' || st.sub === 'aimAll' || st.sub === 'retreatAll';
     q(root, '.timer').textContent = timed ? `${Math.ceil(st.endsIn / 1000)}s` : '';
-    q(root, '.ig-wind').textContent = windText(st.wind);
+    setHtml(q(root, '.ig-wind'), windText(st.wind));
     const who = q(root, '.ig-who');
     const what = q(root, '.ig-what');
     if (st.simul) {
       const alive = st.hogs.filter((h) => h.state === 'ok').length;
       who.textContent = st.sub === 'aimAll' ? 'Alle zielen!' : st.sub === 'flightAll' ? 'Achtung, Einschläge!' : st.sub === 'retreatAll' ? 'Rückzug ...' : 'Gleich geht’s weiter ...';
       who.style.color = '';
-      what.textContent = st.sub === 'aimAll' ? `Bereit: ${st.locked.length}/${alive}` : '';
+      setHtml(what, st.sub === 'aimAll' ? `Bereit: ${st.locked.length}/${alive}` : '');
     } else {
       const ctrlHog = st.activeHog !== null ? st.hogs[st.activeHog] : null;
       who.textContent = st.active ? `${nameOf(st.active)} ist dran` : 'Gleich geht’s weiter ...';
       who.style.color = st.active ? teamColor(st, st.active) : '';
-      what.textContent =
+      setHtml(
+        what,
         st.sub === 'aim'
-          ? `${ctrlHog && st.active && ctrlHog.owner !== st.active ? `mit ${nameOf(ctrlHog.owner)}s Igel · ` : ''}zielt mit: ${WEAPONS[st.weapon].name}`
+          ? `${ctrlHog && st.active && ctrlHog.owner !== st.active ? `mit ${escapeHtml(nameOf(ctrlHog.owner))}s Waschbär · ` : ''}zielt mit: ${pix(weaponIconUrl(st.weapon))} ${escapeHtml(WEAPONS[st.weapon].name)}`
           : st.sub === 'flight'
             ? 'Achtung, Einschlag!'
             : st.sub === 'retreat'
               ? 'Rückzug ...'
-              : '';
+              : '',
+      );
     }
     const mineAlive = st.hogs.some((h) => h.owner === me && h.state === 'ok');
     const sq = squadOf(st, me);
@@ -517,13 +538,13 @@ function buildWatch() {
     const next = q(root, '.ig-next');
     next.textContent = !mineAlive
       ? teamAlive
-        ? `Dein Igel ist raus – Team ${st.squads![sq].name} kämpft weiter${st.simul ? '' : ', du steuerst bald einen Mitspieler'}!`
-        : 'Deine Igel sind raus – feuer die anderen an!'
+        ? `Dein Waschbär ist raus – Team ${st.squads![sq].name} kämpft weiter${st.simul ? '' : ', du steuerst bald einen Mitspieler'}!`
+        : 'Deine Waschbären sind raus – feuer die anderen an!'
       : st.next === me
         ? 'Gleich bist du dran!'
         : '';
     next.classList.toggle('ig-soon', st.next === me && (mineAlive || teamAlive));
-    q(root, '.ig-sd').textContent = sdText(st);
+    setHtml(q(root, '.ig-sd'), sdText(st));
     const key = JSON.stringify(st.hogs.map((h) => [h.hp, h.state]));
     if (key === teamsKey) return;
     teamsKey = key;
@@ -554,7 +575,7 @@ const MAP_ASPECT = 2.4;
 
 /**
  * Kleine Inselkarte fürs Handy: immer die ganze Insel (Canvas-Breite = Inselbreite), Terrain aus Seed + Operationen,
- * Igel als farbige Punkte (Teamfarbe als Ring). Breite Inseln werden höchstens 2,4 : 1 – senkrecht gestreckt um `sy`.
+ * Waschbären als farbige Punkte (Teamfarbe als Ring). Breite Inseln werden höchstens 2,4 : 1 – senkrecht gestreckt um `sy`.
  */
 function miniMap(canvas: HTMLCanvasElement) {
   const g = canvas.getContext('2d')!;
@@ -642,7 +663,7 @@ function miniMap(canvas: HTMLCanvasElement) {
       g.fillRect(p.x - 4 * u, Y(p.y) - 4 * u, 8 * u, 8 * u);
     }
     if (target !== null) {
-      // Luftschlag-Ziel: Fadenkreuz über die ganze Höhe
+      // Tauben-Ziel: Fadenkreuz über die ganze Höhe
       g.strokeStyle = '#e0503f';
       g.lineWidth = 4 * u;
       g.setLineDash([10 * u, 8 * u]);
@@ -678,7 +699,11 @@ function ensureStyle() {
 .lx .big-btn.ig-jump:disabled { filter: grayscale(0.7); opacity: 0.5; }
 .lx .big-btn.ig-fire.ig-long { font-size: 8px; line-height: 1.6; hyphens: manual; }
 .ig-m .ig-weapon { position: relative; padding: 0; justify-content: center; flex-direction: column; gap: 0; }
-.ig-m .ig-weapon .ig-ico { font-size: 16px; line-height: 1; filter: drop-shadow(1px 1px 0 rgba(45, 27, 18, 0.5)); }
+/* Eigene Pixel-Icons (16 × 16): im Raster doppelt groß, sonst als kleines Inline-Bild ohne die Zeile zu vergrößern */
+.ig-m .ig-weapon .ig-ico { width: 32px; height: 32px; max-width: 88%; max-height: 88%; object-fit: contain; image-rendering: pixelated; }
+.ig-pi { width: 16px; height: 16px; margin: -4px 0; vertical-align: middle; image-rendering: pixelated; }
+.ig-pi.ig-pi2 { width: 32px; height: 32px; margin: 0; flex: none; }
+.ig-count .ig-card { display: flex; gap: 10px; align-items: center; justify-content: center; text-align: left; }
 .ig-m .ig-weapon small { position: absolute; right: 2px; bottom: 1px; font-size: 7px; }
 .ig-m .ig-weapon:disabled { opacity: 0.4; }
 .ig-m .ig-weapon.sel:disabled { opacity: 0.75; }

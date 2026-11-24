@@ -50,7 +50,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   parcours: { title: 'Fallen-Parcours', icon: '🏁', inspiredBy: 'Ultimate Chicken Horse', tagline: 'Baut Fallen – und schafft es selbst zur Cocktailbar!', minPlayers: 2 , orientation: 'landscape' },
   kart: { title: 'Kart-Rennen', icon: '🏎️', inspiredBy: 'Mario Kart', tagline: 'Verfolger-Kamera wie auf dem SNES – Gas, Drift, Items!', minPlayers: 2 , orientation: 'landscape' },
   turm: { title: 'Wackelturm', icon: '🗼', inspiredBy: 'Tricky Towers', tagline: 'Stapelt euer Urlaubsgepäck bis zum Gipfelkreuz!', minPlayers: 2 , orientation: 'landscape' },
-  igel: { title: 'Igel-Krieg', icon: '🦔', inspiredBy: 'Worms', tagline: 'Kokosnüsse, Wasserbomben – wer bleibt auf der Insel?', minPlayers: 2 , orientation: 'landscape' },
+  igel: { title: 'Waschbär-Bande', icon: '🦝', inspiredBy: 'Worms', tagline: 'Raketen, Müllsäcke, Mausefallen – wer behält den Campingplatz?', minPlayers: 2 , orientation: 'landscape' },
   // max. 8: die Hauptplattform ist 280 px breit, bei 12 Kämpfern (16 px) blieben keine 8 px Abstand zum Nachbarn
   smash: { title: 'Smash-Arena', icon: '🥊', inspiredBy: 'Super Smash Bros.', tagline: 'Hau sie von der Bühne – wer zuletzt steht, gewinnt!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
   stillepost: { title: 'Stille Post mit Bildern', icon: '🖍️', inspiredBy: 'Gartic Phone', tagline: 'Schreiben, malen, raten – und dann lachen!', minPlayers: 3 , orientation: 'portrait' },
@@ -138,7 +138,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   parcours: { goal: 'Baut Fallen in die Strecke – und schafft es selbst zur Cocktailbar.', controls: [{ icon: '🕹️', text: 'Stick: Teil setzen, laufen' }, { icon: '🧱', text: 'PLATZIEREN: Teil einbauen' }, { icon: '⤴️', text: 'SPRINGEN: länger = höher' }] },
   kart: { goal: 'Drei Runden mit Items aus den ?-Boxen – wer kommt zuerst ins Ziel?', controls: [{ icon: '🏎️', text: 'GAS antippen = fährt, BREMSE = aus' }, { icon: '🕹️', text: 'Stick: lenken' }, { icon: '✨', text: 'DRIFT halten, loslassen = Turbo' }] },
   turm: { goal: 'Stapelt euer Gepäck bis zum Gipfelkreuz und haltet den Turm 2 s.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = schneller fallen' }] },
-  igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦔', text: 'Stick links: laufen, nach oben = Sprung' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '🪢', text: 'Liane, Schirm, Schaufel: Zug geht weiter' }] },
+  igel: { goal: 'Waschbären am See: Raketen, Dosen, Müllsäcke – wer behält den Campingplatz? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦝', text: 'Stick links: laufen, nach oben = Sprung' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '☂️', text: 'Leine, Schirm, Schaufel: Zug geht weiter' }] },
   smash: { goal: 'Haut die anderen von der Bühne – je höher die Prozente, desto weiter fliegen sie.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Richtung = Schlag' }, { icon: '🥊', text: 'SCHLAG / SPEZIAL: hauen' }, { icon: '🛡️', text: 'SPRUNG / SCHILD: springen, blocken' }] },
   stillepost: { goal: 'Schreiben, malen, raten – reihum wandert alles weiter. Am Ende wird gelacht.', controls: [{ icon: '✍️', text: 'Satz schreiben' }, { icon: '🖍️', text: 'Das Bild dazu malen' }, { icon: '🤔', text: 'Bild beschreiben' }] },
   fangen: { goal: 'Der Animateur ist unsichtbar – fangt ihn gemeinsam (oder entkommt als Animateur)!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💨', text: 'SPRINT / ABLENKUNG: Spezialknopf' }, { icon: '👣', text: 'Auf Fußspuren achten, rufen!' }] },
@@ -201,7 +201,7 @@ export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', '
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
  * Minispiele, die auf dem Spielbrett zufällig drankommen (Finale: Mord oder Verräter).
- * Ohne Igel/Turm (zu lang) und ohne Date-Night-Kapitel (Abstieg, Wraps). Lange Spiele (`MINI_LENGTH`)
+ * Ohne Waschbär-Bande (igel)/Turm (zu lang) und ohne Date-Night-Kapitel (Abstieg, Wraps). Lange Spiele (`MINI_LENGTH`)
  * zieht das Brett nur mit der VIP-Option „Lange Spiele“.
  */
 export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'parcours', 'kart', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'kopfball', 'kopfkorb', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz', 'lexikon'];

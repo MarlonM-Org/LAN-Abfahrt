@@ -17,7 +17,7 @@ import { haptic } from './haptic';
 
 /** Screen-Keys, die als Zuschauer-/Warte-Screen gelten */
 const SPECTATOR_KEY = /(^|-)(spectate|watch|dead|out|over)(-|$)/;
-/** Ausnahmen: Igel hat eine eigene Zuschauer-Karte (eigener Bereich) */
+/** Ausnahmen: die Waschbär-Bande (MiniKind igel) hat eine eigene Zuschauer-Karte (eigener Bereich) */
 const SKIP_KEY = /^ig-/;
 
 let emoteReadyAt = 0;
