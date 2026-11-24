@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T18:30+00:00",
+  "updated": "2026-11-24T19:10+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -45,27 +45,17 @@
       "detail": "Stufe 1–3: Übersicht „Wo läuft was“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt. Dateien: client/musik/, client/musik.html, server/music.ts, shared/music.ts.",
       "branch": "claude/ecstatic-goodall-rlrs70-musik",
       "since": "2026-11-24"
-    },
-    {
-      "type": "in Arbeit · Claude (laughing-heisenberg)",
-      "kind": null,
-      "title": "Neues Framing (Minispiel-Sammlung) + Arcade-Lobby am TV – Stufe 1+2",
-      "detail": "Urlaubs-Framing raus (TV-Untertitel, Champion, README), Handy-Lobby: Arcade + Party groß, Story statt Date Night; TV-Startseite als Arcade-Halle mit Automaten, die Minispiele zeigen. Dateien: client/host/LobbyScene.ts, client/art/arcadeHall.ts (neu), client/controller/screens/lobby.ts, style.css, server/room.ts, README.md.",
-      "branch": "claude/laughing-heisenberg-c3j9ue",
-      "since": "2026-11-24"
     }
   ],
   "queue": [
     {
       "area": "Lobby / Framing",
       "prio": 1,
-      "size": "M",
+      "size": "S–M",
       "kind": null,
       "title": "Neues Framing: Minispiel-Sammlung mit Handy-Controllern statt „Urlaubs-Edition“ + Arcade-Lobby am TV",
-      "detail": "Marlon (24.11.): „Es ist keine Urlaubs-Edition mehr, sondern eine Minispiel-Sammlung mit Handy-Controllern. Das Framing weg. Arcade und Party sind der Standard, Date Night als Story framen. Die Startseite ist so ein Urlaubs-Haus – lieber was Arcade-Cooles, das ein paar der Minispiele zeigt, bisschen wie die Astro’s-Playroom-Lobby.“",
+      "detail": "Marlon (24.11.): „Es ist keine Urlaubs-Edition mehr, sondern eine Minispiel-Sammlung mit Handy-Controllern. Das Framing weg. Arcade und Party sind der Standard, Date Night als Story framen. Die Startseite ist so ein Urlaubs-Haus – lieber was Arcade-Cooles, das ein paar der Minispiele zeigt, bisschen wie die Astro’s-Playroom-Lobby.“ – Stufe 1+2 (Texte, Handy-Reiter, Arcade-Halle am TV) in #120; offen: Spiel-Titel und frei laufende Figuren.",
       "steps": [
-        "Stufe 1 · Texte: „Urlaubs-Edition“/„Urlaubs-Champion“/🏖️ raus (TV-Lobby, Ergebnis, README), Untertitel = Minispiel-Sammlung; Handy-Lobby: Arcade + Party als große Haupt-Reiter, Turnier/Trinken/Story darunter; Date Night heißt im Menü „Story“ (Geschichten für 2). ← Claude (laughing-heisenberg)",
-        "Stufe 2 · TV-Startseite als Arcade-Halle: dunkler Boden mit Leucht-Teppich, Neon-Schild „LAN-ABFAHRT“, Automaten an der Rückwand, deren Bildschirme durch die Minispiele blättern (Icon + Titel, getestete zuerst, Arcade-Abstimmung hebt die Wunschspiele hervor), Spieler stehen davor; QR-Code auf einem Automaten, Adresse als Laufband unten. ← Claude (laughing-heisenberg)",
         "Stufe 3 · Spiel-Titel ohne Urlaubs-Vorsilbe prüfen (Urlaubsflieger, Urlaubs-Fangen, Urlaubs-Minigolf, „… im Ferienhaus“) – Entscheidung von Marlon, Feedback-Notizen nennen die alten Namen.",
         "Stufe 4 · Lobby-Figuren laufen frei durch die Halle (à la Astro’s Playroom): Joystick am Handy bewegt die eigene Figur, vor einem Automaten stehen = Stimme für dieses Spiel."
       ]
@@ -231,6 +221,11 @@
     }
   ],
   "done": [
+    {
+      "title": "Neues Framing: Minispiel-Sammlung mit Handy-Controllern statt „Urlaubs-Edition“ – TV-Startseite als Arcade-Halle (Neon-Schild, Automaten blättern durch die Minispiele, Rampenlicht mit Titel), Handy-Lobby mit Arcade + Party als Haupt-Reiter, Date Night als „Story“, Arcade als Standardmodus, Party-Champion statt Urlaubs-Champion",
+      "pr": 120,
+      "date": "2026-11-24"
+    },
     {
       "title": "Startseite: TV-Lobby zeigt die anwesenden Spieler (Figur, VIP-Krone, offline grau) statt Leaderboard; Arcade/Turnier mit Tagespunkten unter den Namen; Tabellen nur mit Anwesenden, Punkte bleiben bei Rückkehr erhalten (lag seit 9.11. auf Branch)",
       "pr": 115,
@@ -841,8 +836,8 @@
       "status": "offen"
     },
     {
-      "title": "Kein Urlaubs-Framing mehr: Minispiel-Sammlung mit Handy-Controllern, Arcade + Party als Standard, Date Night als „Story“, TV-Startseite als Arcade-Halle statt Ferienhaus (à la Astro’s Playroom)",
-      "status": "in Arbeit"
+      "title": "Kein Urlaubs-Framing mehr: Minispiel-Sammlung mit Handy-Controllern, Arcade + Party als Standard, Date Night als „Story“, TV-Startseite als Arcade-Halle statt Ferienhaus (à la Astro’s Playroom) (#120; offen: Spiel-Titel mit Urlaubs-Vorsilbe)",
+      "status": "umgesetzt"
     }
   ]
 }
