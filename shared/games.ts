@@ -59,7 +59,9 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   grill: { title: 'Grill-Chaos', icon: '🔥', inspiredBy: 'Overcooked', tagline: 'Schnippeln, grillen, servieren – bevor die Gäste meckern!', minPlayers: 2 , orientation: 'landscape' },
   boule: { title: 'Boule am Strand', icon: '🥥', tagline: 'Legen oder schießen – wer liegt am Schweinchen?', minPlayers: 2 , orientation: 'portrait' },
   sumo: { title: 'Sumo-Steg', icon: '🤼', tagline: 'Rempeln, schubsen, platsch – wer bleibt auf dem Steg?', minPlayers: 2 , orientation: 'landscape' },
-  volley: { title: 'Strand-Volleyball', icon: '🏐', inspiredBy: 'Slime Volleyball', tagline: 'Baggern, springen, schmettern – Team Sonne gegen Team Meer!', minPlayers: 2 , orientation: 'landscape' },
+  // max. 8 (4 gegen 4): das Feld wächst mit der Teamgröße (shared/kopfball.ts), bei 6 pro Seite stünden sie sich nur noch auf den Füßen
+  kopfball: { title: 'Kopfball-Duell', icon: '🥅', inspiredBy: 'Head Soccer', tagline: 'Riesenköpfe, kleiner Ball – köpfen, kicken, Tor!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
+  kopfkorb: { title: 'Kopf-Korb', icon: '🏀', inspiredBy: 'Head Basketball', tagline: 'Köpfen, werfen, dunken – ab in den Korb!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
   tourist: { title: 'Wer ist der Tourist?', icon: '🧳', inspiredBy: 'Spyfall', tagline: 'Alle kennen den Ort – nur einer nicht. Fragt euch durch!', minPlayers: 4 , orientation: 'portrait' },
   sprueche: { title: 'Sprüche-Duell', icon: '🗯️', inspiredBy: 'Quiplash', tagline: 'Schreibt die lustigste Antwort – die anderen stimmen ab!', minPlayers: 3 , orientation: 'portrait' },
   pixel: { title: 'Pixel-Galerie', icon: '🖼️', tagline: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage entscheidet!', minPlayers: 3 , orientation: 'portrait' },
@@ -144,7 +146,8 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   grill: { goal: 'Arbeitet die Bestellungen ab: schnippeln, grillen, servieren!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🥕', text: 'NEHMEN: aufheben, ablegen' }, { icon: '🔪', text: 'AKTION: halten = schneiden, löschen' }] },
   boule: { goal: 'Bringt eure Kugeln am nächsten ans Schweinchen.', controls: [{ icon: '🥥', text: 'Legen oder Schießen wählen' }, { icon: '📱', text: 'Knopf halten, Handy schwingen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }] },
   sumo: { goal: 'Schubst die anderen vom Steg – wer zuletzt steht, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💥', text: 'REMPELN: kurzer Sprint' }, { icon: '🌊', text: 'Der Steg bricht weg!' }] },
-  volley: { goal: 'Team Sonne gegen Team Meer – der Ball darf nicht in eurem Sand landen.', controls: [{ icon: '↔️', text: '◀ / ▶: laufen' }, { icon: '⤴️', text: 'SPRUNG: Ball treffen' }, { icon: '💥', text: 'SCHMETTERN: nur in der Luft' }] },
+  kopfball: { goal: 'Team Sonne gegen Team Meer: köpft und kickt den Ball ins gegnerische Tor!', controls: [{ icon: '🕹️', text: 'Stick: laufen (hoch = springen)' }, { icon: '⤴️', text: 'SPRUNG: hoch zum Kopfball' }, { icon: '🦶', text: 'SCHUSS: Fuß raus – Richtung Tor' }] },
+  kopfkorb: { goal: 'Team Sonne gegen Team Meer: Ball in den gegnerischen Korb – von hinter der Mitte zählt er 3!', controls: [{ icon: '🕹️', text: 'Stick: laufen (hoch = springen)' }, { icon: '⤴️', text: 'SPRUNG: köpfen und dunken' }, { icon: '🏀', text: 'WURF: im hohen Bogen zum Korb' }] },
   tourist: { goal: 'Alle kennen den Urlaubsort – nur der Tourist nicht. Findet ihn durch Fragen!', controls: [{ icon: '🃏', text: 'Karte zeigt Ort + Rolle (geheim)' }, { icon: '🗣️', text: 'Reihum fragen: Spieler antippen' }, { icon: '☝️', text: 'Verdacht? Anklagen!' }] },
   sprueche: { goal: 'Schreibt die lustigste Antwort – die anderen stimmen ab.', controls: [{ icon: '✍️', text: 'Lücke lustig füllen' }, { icon: '🗳️', text: 'Lieblingsantwort wählen' }, { icon: '🏆', text: 'Stimmen = Punkte' }] },
   pixel: { goal: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage stimmt ab.', controls: [{ icon: '🎨', text: 'Farbe wählen, tippen oder wischen' }, { icon: '🪣', text: 'Eimer, Radierer, Zurück' }, { icon: '🗳️', text: 'Lieblingsbild wählen' }] },
@@ -183,7 +186,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
  * (oder VIP/Laptop starten), beginnt das echte Spiel frisch mit Countdown.
  * Nicht hier: rundenbasierte, Quiz-, Abstimmungs-, Geheimrollen- und Balance-Board-Spiele.
  */
-export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint'];
+export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint', 'kopfball', 'kopfkorb'];
 export const isWarmupKind = (kind: MiniKind) => WARMUP_KINDS.includes(kind);
 
 /** Minispiele im Trinkspiel-Modus */
@@ -193,7 +196,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'kopfball', 'kopfkorb', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
@@ -201,7 +204,7 @@ export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
  * Ohne Igel/Turm (zu lang) und ohne Date-Night-Kapitel (Abstieg, Wraps). Lange Spiele (`MINI_LENGTH`)
  * zieht das Brett nur mit der VIP-Option „Lange Spiele“.
  */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'parcours', 'kart', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz', 'lexikon'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'parcours', 'kart', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'kopfball', 'kopfkorb', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz', 'lexikon'];
 
 export type MiniLength = 'kurz' | 'mittel' | 'lang';
 /**
@@ -248,7 +251,9 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   grill: 'mittel',
   boule: 'mittel',
   sumo: 'kurz',
-  volley: 'mittel',
+  // 2 min (bzw. 5 Tore / 15 Punkte) + höchstens 1 min Golden Goal + Anstöße
+  kopfball: 'mittel',
+  kopfkorb: 'mittel',
   tourist: 'lang',
   sprueche: 'lang',
   pixel: 'mittel',
@@ -409,9 +414,9 @@ export const FIELD_COINS = { blue: 3, red: -3 };
  */
 export const BOARD_TEAM_CHANCE = 0.65;
 /** Minispiele, die feste Teams übernehmen können (gleich große Teams, z. B. 2 gegen 2) */
-export const TEAM_KINDS: MiniKind[] = ['flunky', 'volley', 'autoball', 'grill'];
+export const TEAM_KINDS: MiniKind[] = ['flunky', 'autoball', 'grill', 'kopfball', 'kopfkorb'];
 /** … und davon die, die auch mit ungleichen Teams funktionieren (1 gegen 3; Flunky/Grill nicht) */
-export const UNEVEN_TEAM_KINDS: MiniKind[] = ['volley', 'autoball'];
+export const UNEVEN_TEAM_KINDS: MiniKind[] = ['autoball', 'kopfball', 'kopfkorb'];
 
 /** „2 gegen 2“, „1 gegen 3“ – das kleinere Team zuerst */
 export const teamLabel = (a: number, b: number) => `${Math.min(a, b)} gegen ${Math.max(a, b)}`;
@@ -432,7 +437,7 @@ export function teamHandicapText(teams: MiniTeams, kind: MiniKind): string {
   const t: Team | null = hc.A ? 'A' : hc.B ? 'B' : null;
   if (!t) return '';
   const n = hc[t];
-  const unit = kind === 'autoball' ? (n === 1 ? 'Tor' : 'Toren') : n === 1 ? 'Punkt' : 'Punkten';
+  const unit = kind === 'autoball' || kind === 'kopfball' ? (n === 1 ? 'Tor' : 'Toren') : n === 1 ? 'Punkt' : 'Punkten';
   return `${t === 'A' ? 'Team Sonne' : 'Team Meer'} startet mit ${n} ${unit} Vorsprung`;
 }
 
@@ -896,11 +901,11 @@ const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'R
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele und ohne Date-Night-Kapitel) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'kopfball', 'kopfkorb', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
-  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess', 'wackel'] },
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'sumo', 'bogen', 'autoball', 'kopfball', 'kopfkorb', 'zauber', 'suess', 'wackel'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'sekt', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug', 'band'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf', 'wolfrunde'] },

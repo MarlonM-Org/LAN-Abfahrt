@@ -218,7 +218,7 @@ export function defaultSongForScene(scene: string): string {
       return 'zauber';
     case 'wpistole': case 'enten':
       return 'western';
-    case 'volley': case 'bowling': case 'darts': case 'golf': case 'boule':
+    case 'kopfball': case 'kopfkorb': case 'bowling': case 'darts': case 'golf': case 'boule':
       return 'sport';
     case 'angeln': case 'sup':
       return 'wasser';

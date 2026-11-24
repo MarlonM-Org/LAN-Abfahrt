@@ -33,7 +33,7 @@ import { pickSpion } from './screens/spion';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
-import { pickVolley } from './screens/volley';
+import { pickKopfball } from './screens/kopfball';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
 import { pickPixel } from './screens/pixel';
@@ -375,8 +375,9 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickBoule(m.state);
     case 'sumo':
       return pickSumo(m.state);
-    case 'volley':
-      return pickVolley(m.state);
+    case 'kopfball':
+    case 'kopfkorb':
+      return pickKopfball(m.state);
     case 'tourist':
       return pickTourist(m.state);
     case 'sprueche':
