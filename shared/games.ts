@@ -905,7 +905,7 @@ export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug', 'band'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf', 'wolfrunde'] },
   { title: 'Balance Board', kinds: ['skisprung', 'teppich', 'kugel'] },
-  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'maler', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon'] },
+  { title: 'Partyklassiker', kinds: ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup', 'stillepost', 'sprueche', 'pixel', 'maler', 'werwars', 'maexchen', 'schaetz', 'funk', 'lexikon'] },
 ];
 
 /**
