@@ -38,7 +38,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 const TITLES: TitleDef[] = [
   { id: 'kos', type: 'ko', title: 'Meiste K.O.s', icon: '🥊', mode: 'sum', min: 2, text: (n) => plural(n, 'K.O.', 'K.O.s') },
   { id: 'owngoals', type: 'owngoal', title: 'Eigentor-König', icon: '🙈', mode: 'sum', min: 1, text: (n) => plural(n, 'Eigentor', 'Eigentore') },
-  { id: 'kamikaze', type: 'selfhit', title: 'Igel-Kamikaze', icon: '🦔', mode: 'sum', min: 1, text: (n) => `${n}× selbst getroffen` },
+  { id: 'kamikaze', type: 'selfhit', title: 'Waschbär-Kamikaze', icon: '🦝', mode: 'sum', min: 1, text: (n) => `${n}× selbst getroffen` },
   { id: 'hidden', type: 'hidden', title: 'Unsichtbar', icon: '🫥', mode: 'max', min: 20_000, text: mmss },
   { id: 'pechvogel', type: 'coinloss', title: 'Pechvogel', icon: '🐦‍⬛', mode: 'sum', min: 3, text: (n) => `${n} Münzen verloren` },
   { id: 'streak', type: 'streak', title: 'Längste Siegesserie', icon: '🔥', mode: 'max', min: 2, text: (n) => `${n} Siege in Folge` },
@@ -46,7 +46,7 @@ const TITLES: TitleDef[] = [
   { id: 'goals', type: 'goal', title: 'Torjäger', icon: '⚽', mode: 'sum', min: 2, text: (n) => plural(n, 'Tor', 'Tore') },
   { id: 'pushes', type: 'out', title: 'Rausschmeißer', icon: '🤼', mode: 'sum', min: 2, text: (n) => `${n}× vom Steg geschubst` },
   { id: 'bomber', type: 'hit', title: 'Bomben-Legende', icon: '💣', mode: 'sum', min: 3, text: (n) => `${n} nass gemacht` },
-  { id: 'sniper', type: 'igelhit', title: 'Igel-Scharfschütze', icon: '🎯', mode: 'sum', min: 3, text: (n) => plural(n, 'Treffer', 'Treffer') },
+  { id: 'sniper', type: 'igelhit', title: 'Waschbär-Scharfschütze', icon: '🎯', mode: 'sum', min: 3, text: (n) => plural(n, 'Treffer', 'Treffer') },
   { id: 'racer', type: 'kartwin', title: 'Pole-Position', icon: '🏎️', mode: 'sum', min: 1, text: (n) => plural(n, 'Rennsieg', 'Rennsiege') },
   { id: 'selfout', type: 'selfout', title: 'Selbst ist der Mann', icon: '🪂', mode: 'sum', min: 2, text: (n) => `${n}× selbst von der Bühne` },
   { id: 'wins', type: 'win', title: 'Seriensieger', icon: '🏆', mode: 'sum', min: 3, text: (n) => plural(n, 'Spiel gewonnen', 'Spiele gewonnen') },

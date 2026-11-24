@@ -1,138 +1,542 @@
-import type { Look } from '../../shared/types';
-import { HAIRS, SHIRTS } from '../../shared/avatar';
 import { IGEL, type Mask } from '../../shared/igel';
 import { C } from './palette';
 import { type BgLayer, Pix, bgLayers, rng, shade } from './pix';
 import { paintSky } from './ground';
 
+/**
+ * Waschbär-Bande (MiniKind `igel`): Figuren, Geschosse, Gegenstände und Kulisse –
+ * Waschbären-Banden auf einer Campinginsel im See, abends. Icons fürs Waffenraster: `igelIcons.ts`.
+ */
+
+const OUT = C.outline;
+
 // ------------------------------------------------------------------ Figuren
 
-/** Igel (schaut nach rechts) mit Halstuch in Shirtfarbe und Frisur/Cap in Haarfarbe */
-export function hedgehog(look: Look, frame = 0): Pix {
-  const p = new Pix(18, 15);
-  const spike = '#6e4a2c';
-  const spikeL = '#9a6c42';
-  const spikeD = '#4a2f1a';
-  const face = '#f1d2a6';
-  const faceS = '#d9b07c';
-  const shirt = SHIRTS[look.shirt] ?? SHIRTS[0];
-  const hair = HAIRS[look.hair] ?? HAIRS[0];
-  // Stachelkleid
-  p.ellipse(7.5, 9, 6.5, 5, spike);
-  p.overlayOn(() => {
-    p.ellipse(6.5, 7.5, 4.5, 3, spikeL);
-    for (const [x, y] of [[3, 6], [5, 5], [7, 5], [4, 8], [6, 8], [2, 9], [8, 7]]) p.px(x, y, spikeD);
-  });
-  // Stachelspitzen am Rücken
-  for (const [x, y] of [[1, 6], [2, 4], [4, 3], [6, 3], [8, 3], [0, 9], [10, 4]]) p.px(x, y, spikeD);
-  // Gesicht/Schnauze
-  p.ellipse(12, 10, 3.6, 3, face);
-  p.rect(14, 10, 2, 2, face);
-  p.px(16, 10, C.outline);
-  p.px(12, 12, faceS).px(13, 12, faceS);
-  p.px(12, 8, C.outline).px(12, 9, C.outline);
-  p.px(13, 10, '#f0928a');
-  // Halstuch
-  p.rect(9, 11, 3, 2, shirt).px(8, 12, shade(shirt, 0.8)).px(8, 13, shirt);
-  // Füße (2 Laufbilder)
-  const fy = 13;
-  if (frame === 0) p.rect(5, fy, 2, 1, spikeD).rect(10, fy, 2, 1, spikeD);
-  else p.rect(4, fy, 2, 1, spikeD).rect(11, fy - 1, 2, 1, spikeD);
-  // Kopfbedeckung
-  if (look.hairStyle === 3) {
-    p.rect(8, 4, 5, 2, hair).rect(12, 5, 3, 1, shade(hair, 0.75)).px(9, 4, shade(hair, 1.3));
-  } else if (look.hairStyle === 4) {
-    p.rect(9, 3, 3, 3, hair).px(10, 3, shade(hair, 1.3));
-  } else if (look.hairStyle !== 7) {
-    p.px(10, 4, hair).px(11, 5, hair).px(9, 5, shade(hair, 0.8)).px(12, 6, hair);
+/** Aussehen eines Waschbären: Halstuch in Spielerfarbe, Kopfbedeckung (Team-Mütze oder nach dem Avatar) */
+export interface RaccoonLook {
+  scarf: string;
+  hat: 'none' | 'beanie' | 'cap' | 'tuft';
+  hatColor: string;
+}
+
+/** Haltungen: stehen/laufen (2 Laufbilder), springen/fliegen, hängen (Wäscheleine, Schirm), getroffen, zielen */
+export type RaccoonPose = 'stand' | 'walk' | 'jump' | 'hang' | 'hurt' | 'aim';
+export const RACCOON_POSES: RaccoonPose[] = ['stand', 'walk', 'jump', 'hang', 'hurt', 'aim'];
+
+const FUR: Record<string, string> = {
+  g: '#8f877c', // Fell
+  G: '#4a423b', // Ohr innen, Pfoten
+  l: '#bcb3a6', // Bauch
+  w: '#f4efe6', // weiße Gesichtszeichnung
+  W: '#ffffff', // Augenglanz
+  x: '#26201c', // Maske
+  n: '#120e0c', // Nase
+  t: '#3a332d', // Schwanz dunkel
+  T: '#c4baac', // Schwanz hell
+  f: '#4a423b', // Pfoten/Füße
+  R: '#c0443a', // offener Mund
+};
+
+/** Waschbär (schaut nach rechts), 18 × 17, Fußpunkt = Mitte der vorletzten Zeile */
+const RACCOON: Record<RaccoonPose, string[]> = {
+  stand: [
+    '..................',
+    '........g.....g...',
+    '.......gGg...gGg..',
+    '.......ggggggggg..',
+    '..tt...gwwgggwwg..',
+    '.tttt..xxWxgxWxx..',
+    '.TTTT..gxxxwxxxg..',
+    '.tttt...gwwwnwg...',
+    '..TTTT...gwwwg....',
+    '..tttt..ssssssS...',
+    '...TTTgglllgg.....',
+    '....ttgglllggf....',
+    '....TTgglllgg.....',
+    '.....tggglllg.....',
+    '......ggggggg.....',
+    '.......ff..ff.....',
+    '..................',
+  ],
+  walk: [
+    '..................',
+    '........g.....g...',
+    '.......gGg...gGg..',
+    '.......ggggggggg..',
+    '...tt..gwwgggwwg..',
+    '..tttt.xxWxgxWxx..',
+    '..TTTT.gxxxwxxxg..',
+    '..tttt..gwwwnwg...',
+    '...TTTT..gwwwg....',
+    '...tttt.ssssssS...',
+    '....TTgglllgg.....',
+    '....ttgglllgg.....',
+    '....TTgglllggf....',
+    '.....tggglllg.....',
+    '......ggggggg.....',
+    '......ff....ff....',
+    '..................',
+  ],
+  jump: [
+    '..................',
+    '........g.....g...',
+    '.tt....gGg...gGg..',
+    'tttt...ggggggggg..',
+    'TTTT...gwwgggwwg..',
+    'tttt...xxWxgxWxx..',
+    '.TTTT..gxxxwxxxg..',
+    '.tttt...gwwwnwg...',
+    '..TTT....gwwwg....',
+    '..ttt...ssssssSf..',
+    '...TTTgglllggg....',
+    '....ttgglllgg.....',
+    '.....Tgglllgg.....',
+    '......gglllgg.....',
+    '.....fgggggggf....',
+    '..................',
+    '..................',
+  ],
+  hang: [
+    '......f.......f...',
+    '......g.g...g.g...',
+    '......ggGg..gGgg..',
+    '......gggggggggg..',
+    '......ggwwgggwwg..',
+    '......gxxWxgxWxx..',
+    '......ggxxxwxxxg..',
+    '.........gwwnwg...',
+    '..tt......gwwg....',
+    '.tttt...ssssssS...',
+    '.TTTT..glllgg.....',
+    '.tttt..glllgg.....',
+    '..TTTT.glllgg.....',
+    '...tttgglllg......',
+    '.......ggggg......',
+    '........f..f......',
+    '..................',
+  ],
+  hurt: [
+    '..................',
+    '........g.....g...',
+    '.t.t...gGg...gGg..',
+    '..tt...ggggggggg..',
+    '.tttt..gwwgggwwg..',
+    'tTTTTt.xxxxgxxxx..',
+    '.TTTT..gxxxwxxxg..',
+    'ttttt...gwwnwwg...',
+    '.TTTTT...gwRwg....',
+    '..tttt..ssssssS...',
+    '...TTTgglllgg.....',
+    '....ttgglllggf....',
+    '....TTgglllgg.....',
+    '.....tggglllg.....',
+    '......ggggggg.....',
+    '.......ff..ff.....',
+    '..................',
+  ],
+  aim: [
+    '..................',
+    '........g.....g...',
+    '.......gGg...gGg..',
+    '.......ggggggggg..',
+    '..tt...gwwgggwwg..',
+    '.tttt..xxWxgxWxx..',
+    '.TTTT..gxxxwxxxg..',
+    '.tttt...gwwwnwg...',
+    '..TTTT...gwwwg....',
+    '..tttt..ssssssS...',
+    '...TTTgglllggggf..',
+    '....ttgglllgg.....',
+    '....TTgglllgg.....',
+    '.....tggglllg.....',
+    '......ggggggg.....',
+    '.......ff..ff.....',
+    '..................',
+  ],
+};
+
+/** Kopf-Oberkante (Zeile) und Mitte (Spalte) je Haltung – für Mütze und Haare */
+const HEAD: Record<RaccoonPose, { x: number; y: number }> = {
+  stand: { x: 11, y: 3 },
+  walk: { x: 11, y: 3 },
+  jump: { x: 11, y: 3 },
+  hang: { x: 11, y: 3 },
+  hurt: { x: 11, y: 3 },
+  aim: { x: 11, y: 3 },
+};
+
+export function raccoon(look: RaccoonLook, pose: RaccoonPose = 'stand'): Pix {
+  const p = new Pix(18, 17);
+  const pal = { ...FUR, s: look.scarf, S: shade(look.scarf, 0.7) };
+  p.map(0, 0, RACCOON[pose], pal);
+  // Halstuch-Zipfel vorne (größere Fläche in Spielerfarbe)
+  p.px(11, 10, look.scarf).px(12, 10, look.scarf).px(12, 11, pal.S);
+  const h = HEAD[pose];
+  const c = look.hatColor;
+  if (look.hat === 'beanie') {
+    // Bommelmütze zwischen den Ohren
+    p.rect(h.x - 3, h.y - 2, 7, 2, c).hline(h.x - 3, h.y, 7, shade(c, 0.75)).px(h.x - 2, h.y - 2, shade(c, 1.3));
+    p.px(h.x, h.y - 3, C.white).px(h.x - 1, h.y - 3, shade(C.white, 0.85));
+  } else if (look.hat === 'cap') {
+    p.rect(h.x - 3, h.y - 2, 6, 2, c).px(h.x - 2, h.y - 2, shade(c, 1.3)).hline(h.x + 1, h.y, 4, shade(c, 0.7));
+  } else if (look.hat === 'tuft') {
+    p.px(h.x, h.y - 1, c).px(h.x - 1, h.y - 2, c).px(h.x + 1, h.y - 2, shade(c, 0.8)).px(h.x, h.y - 3, c);
   }
-  p.outline(C.outline);
+  p.outline(OUT);
   return p;
 }
 
-/** Sandburg als „Grabstein“ für K.o.-Igel */
-export function sandcastle(): Pix {
-  const p = new Pix(14, 14);
-  p.rect(1, 8, 12, 5, C.sand);
-  p.rect(4, 4, 6, 5, C.sand);
-  p.rect(1, 6, 2, 2, C.sand).rect(5, 2, 1, 2, C.sand).rect(8, 2, 1, 2, C.sand).rect(11, 6, 2, 2, C.sand);
+/** Grabstein mit Pfotenabdruck – K.o.-Waschbär */
+export function gravestone(): Pix {
+  const p = new Pix(13, 14);
+  p.rect(2, 4, 9, 9, C.stone).ellipse(6.5, 4.5, 4.5, 3.5, C.stone);
   p.overlayOn(() => {
-    p.speckle(0, 0, 14, 14, C.sandDark, 18, rng(5));
-    p.rect(6, 9, 2, 4, C.sandDark);
+    p.vline(3, 3, 10, C.stoneLight);
+    // Pfote eingraviert
+    p.rect(5, 7, 3, 2, C.stoneDark).px(4, 5, C.stoneDark).px(6, 4, C.stoneDark).px(8, 5, C.stoneDark);
   });
-  p.vline(7, 0, 4, C.woodDark).rect(8, 0, 3, 2, C.red);
-  p.outline(C.outline);
+  p.rect(0, 12, 13, 2, C.grass).px(1, 11, C.grassLight).px(11, 11, C.grassLight);
+  p.outline(OUT);
   return p;
 }
 
-/** Schwimmring – K.o. im Wasser: Igel treibt davon */
-export function swimRing(look: Look): Pix {
-  const p = new Pix(18, 12);
-  const shirt = SHIRTS[look.shirt] ?? SHIRTS[0];
-  p.ellipse(8.5, 6, 6, 4, '#7a5030');
-  p.ellipse(11, 6, 3, 2.5, '#f1d2a6');
-  p.px(13, 6, C.outline).px(11, 5, C.outline);
-  p.ellipse(8.5, 9, 8.5, 3, C.red);
+/** Schwimmring – K.o. im See: der Waschbär treibt davon */
+export function swimRing(look: RaccoonLook): Pix {
+  const p = new Pix(18, 13);
+  p.map(5, 0, ['.g...g.', 'ggggggg', 'xxWgWxx', 'gxwwwxg', '.gwnwg.'], FUR);
+  p.ellipse(8.5, 9.5, 8.5, 3, C.red);
   p.overlayOn(() => {
-    p.rect(3, 6, 2, 6, C.white).rect(12, 6, 2, 6, C.white);
+    p.rect(3, 7, 2, 6, C.white).rect(12, 7, 2, 6, C.white);
   });
-  p.rect(8, 9, 2, 1, shirt);
-  p.outline(C.outline);
+  p.rect(7, 6, 4, 1, look.scarf);
+  p.outline(OUT);
   return p;
 }
 
-export function coconut(): Pix {
-  const p = new Pix(8, 8);
-  p.disc(4, 4, 3.4, '#7a4a26');
-  p.overlayOn(() => {
-    p.disc(3, 3, 1.6, '#a8703c');
-    p.px(5, 5, '#4a2c14').px(4, 6, '#4a2c14');
-  });
-  p.outline(C.outline);
+// ------------------------------------------------------------------ Geschosse
+
+/** Silvesterrakete (zeigt nach rechts – die Szene dreht sie in Flugrichtung) */
+export function rocket(): Pix {
+  const p = new Pix(12, 7);
+  p.map(0, 0, [
+    '............',
+    '.N.....r....',
+    'NNNNrrwrrrY.',
+    '.NNNrrwrrrYy',
+    '...NRRwRRRY.',
+    '.......R....',
+    '............',
+  ], { N: '#b8783f', r: C.red, R: '#a8342a', w: C.white, Y: '#d99a2b', y: C.gold });
+  p.outline(OUT);
   return p;
 }
 
-export function waterBomb(): Pix {
+/** Dosenbombe: Konservendose mit Zündschnur */
+export function tinCan(): Pix {
   const p = new Pix(9, 10);
-  p.ellipse(4.5, 5.5, 3.5, 3.6, '#4ab4f0');
-  p.overlayOn(() => p.disc(3.5, 4.5, 1.3, '#bfe9ff'));
-  p.rect(4, 1, 1, 2, '#2b6ba6');
-  p.outline(C.outline);
+  p.map(0, 0, [
+    '......o..',
+    '.....n...',
+    '.lllln...',
+    '.sllllS..',
+    '.rrrrrR..',
+    '.rwwwrR..',
+    '.rrrrrR..',
+    '.slsssS..',
+    '..SSSS...',
+    '.........',
+  ], { o: C.gold, n: '#5e3518', l: '#eef0f2', s: '#cfd2d6', S: '#8a8f96', r: C.red, R: '#a8342a', w: C.white });
+  p.outline(OUT);
+  return p;
+}
+
+/** Platzender Müllsack (Splitterbombe) */
+export function trashBag(): Pix {
+  const p = new Pix(9, 11);
+  p.map(0, 0, [
+    '..v..v...',
+    '...yy....',
+    '...vv....',
+    '..vVvv...',
+    '.vVvvvv..',
+    '.vVvvvvv.',
+    '.vvvvvvv.',
+    '.vvvvvvv.',
+    '..vvvvv..',
+    '.........',
+    '.........',
+  ], { v: '#3e4c43', V: '#6f8a76', y: C.gold });
+  p.outline(OUT);
+  return p;
+}
+
+/** Müllbrocken aus dem Sack: Dose, Bananenschale, Apfelrest */
+export function junk(kind: number): Pix {
+  const p = new Pix(6, 6);
+  const k = ((kind % 3) + 3) % 3;
+  if (k === 0) p.map(1, 1, ['ss', 'rr', 'ss'], { s: '#cfd2d6', r: C.red });
+  else if (k === 1) p.map(0, 1, ['y...', '.yy.', '..yY'], { y: C.gold, Y: '#8d5629' });
+  else p.map(1, 1, ['.N', 'rr', 'mm', 'rr'], { N: '#5e3518', r: C.red, m: '#fbe7bd' });
+  p.outline(OUT);
+  return p;
+}
+
+/** Heilige Mülltonne: goldene Tonne mit Heiligenschein */
+export function holyBin(): Pix {
+  const p = new Pix(11, 13);
+  p.map(0, 3, [
+    '....YY.....',
+    '.YyyyyyyY..',
+    '.YYYYYYYY..',
+    '..yWyYyY...',
+    '..yWyYyY...',
+    '..yWyYyY...',
+    '..yyyYyY...',
+    '...YYYY....',
+  ], { y: C.gold, Y: '#d99a2b', W: '#fffbe8' });
+  p.outline(OUT);
+  p.hline(3, 0, 4, '#d99a2b').px(2, 1, '#d99a2b').px(7, 1, '#d99a2b').hline(3, 2, 4, '#d99a2b').px(4, 0, C.gold);
+  return p;
+}
+
+/** Was die Tauben fallen lassen */
+export function pigeonDrop(): Pix {
+  const p = new Pix(6, 7);
+  p.map(1, 1, ['.w.', 'www', 'wlw', '.w.'], { w: '#f4f1ea', l: '#c9c3b6' });
+  p.outline(OUT);
+  return p;
+}
+
+/** Riesenböller mit Zündschnur */
+export function boeller(): Pix {
+  const p = new Pix(7, 12);
+  p.rect(1, 3, 5, 8, '#d8473c').rect(1, 5, 5, 1, '#fff4d6').rect(1, 8, 5, 1, '#fff4d6').vline(5, 3, 8, '#a8342a');
+  p.vline(3, 1, 2, '#5e4e40').px(4, 0, '#ffd25e');
+  p.outline(OUT);
+  return p;
+}
+
+// ------------------------------------------------------------------ Gegenstände
+
+/** Camping-Gaskartusche (explodiert bei Treffer) */
+export function gasCan(): Pix {
+  const p = new Pix(9, 12);
+  p.rect(1, 4, 7, 7, '#2f6fc0').ellipse(4.5, 4, 3.5, 1.5, '#2f6fc0');
+  p.overlayOn(() => {
+    p.vline(2, 3, 8, '#6aa5ea');
+    p.rect(1, 6, 7, 3, '#fdf7ea');
+    p.px(3, 7, '#e04a3f').px(4, 7, '#e04a3f').px(5, 7, '#e04a3f');
+  });
+  p.rect(3, 0, 3, 3, '#cfd2d6').px(5, 1, '#8a8f96');
+  p.outline(OUT);
+  return p;
+}
+
+/** Picknickkorb (Kiste: zufällige Waffe oder Snack mit +HP) */
+export function picnicBasket(): Pix {
+  const p = new Pix(13, 12);
+  p.map(0, 0, [
+    '....NNNNN....',
+    '...N.....N...',
+    '..N.......N..',
+    '.qqqqqqqqqqq.',
+    '.qQqQqQqQqQq.',
+    '.rwrwrwrwrwr.',
+    '.wrwrwrwrwrw.',
+    '.qQqQqQqQqQq.',
+    '.qqQqQqQqQqq.',
+    '..QQQQQQQQQ..',
+    '.............',
+    '.............',
+  ], { N: '#8d5629', q: '#c79b54', Q: '#946a2c', r: C.red, w: C.white });
+  p.outline(OUT);
+  return p;
+}
+
+/** Luftballons, an denen der Picknickkorb herabschwebt */
+export function balloons(): Pix {
+  const p = new Pix(19, 17);
+  const cols = ['#e04a3f', '#3f8fe0', '#f2c33a'];
+  const spots: [number, number][] = [[4.5, 4], [14.5, 4], [9.5, 2.5]];
+  spots.forEach(([x, y], i) => {
+    p.ellipse(x, y, 3.2, 3.6, cols[i]);
+    p.px(x - 1.5, y - 2, shade(cols[i], 1.5));
+  });
+  p.outline(OUT);
+  // Schnüre zum Korb
+  for (let i = 0; i <= 8; i++) {
+    p.px(4.5 + i * 0.55, 8 + i, '#5e4e40');
+    p.px(14.5 - i * 0.55, 8 + i, '#5e4e40');
+  }
+  p.vline(9, 7, 10, '#5e4e40');
+  return p;
+}
+
+/** Mausefalle: `armed` = Bügel gespannt (flach) mit Käse, sonst Bügel noch oben */
+export function mouseTrap(armed: boolean): Pix {
+  const p = new Pix(13, 9);
+  p.rect(0, 6, 13, 2, '#d39a5c').hline(0, 7, 13, '#8d5629');
+  p.rect(8, 3, 3, 3, C.gold).px(9, 4, '#d99a2b');
+  if (armed) {
+    p.hline(1, 5, 7, '#8a8f96').vline(1, 4, 2, '#8a8f96').px(7, 5, C.red);
+  } else {
+    p.vline(2, 1, 5, '#8a8f96').vline(6, 1, 5, '#8a8f96').hline(2, 1, 5, '#8a8f96');
+  }
+  p.outline(OUT);
+  return p;
+}
+
+/** Taube (fliegt nach rechts), 2 Flügelschläge */
+export function pigeon(frame: number): Pix {
+  const p = new Pix(16, 9);
+  const wing = frame === 0
+    ? ['....ee..........', '....eEe.........', '.....eEe........']
+    : ['................', '................', '................'];
+  const body = [
+    '............uh..',
+    '..eeeeeeeeeeuhko',
+    '.eeeeeeeeeeeee..',
+    '...EEeeeeeee....',
+  ];
+  const down = frame === 1 ? ['.....eEe........', '....eEe.........'] : [];
+  p.map(0, 0, [...wing, ...body, ...down], { e: '#9aa1b2', E: '#6b7286', u: '#8a63b8', h: '#5fae6e', k: '#1e1a17', o: C.orange });
+  p.outline(OUT);
+  return p;
+}
+
+/** Fledermaus (Kulisse am Abendhimmel), 2 Flügelschläge */
+export function bat(frame: number): Pix {
+  const p = new Pix(11, 6);
+  const rows = frame === 0 ? ['x.........x', 'xx..x.x..xx', '.xxxxxxxxx.', '...xxxxx...', '....x.x....'] : ['...........', '....x.x....', '.xxxxxxxxx.', 'xx.xxxxx.xx', 'x...x.x...x'];
+  p.map(0, 0, rows, { x: '#2a2440' });
+  return p;
+}
+
+/** Gullydeckel-Loch (Teleport: rein und woanders wieder raus) */
+export function manhole(): Pix {
+  const p = new Pix(15, 6);
+  p.ellipse(7.5, 3, 7, 2.6, '#8a8f96');
+  p.ellipse(7.5, 3, 5.4, 1.6, '#1e1a17');
+  p.outline(OUT);
+  return p;
+}
+
+/** Gullydeckel (fliegt beim Teleport hoch) */
+export function manholeLid(): Pix {
+  const p = new Pix(11, 4);
+  p.ellipse(5.5, 2, 5, 1.6, '#6b6f76');
+  p.overlayOn(() => p.hline(2, 1, 7, '#8a8f96').px(3, 2, '#4a4d52').px(5, 2, '#4a4d52').px(7, 2, '#4a4d52'));
+  p.outline(OUT);
+  return p;
+}
+
+/** Regenschirm-Gleiter: lila Schirm mit Griff (Griff unten = Pfoten des Waschbären) */
+export function umbrellaPix(): Pix {
+  const p = new Pix(17, 15);
+  p.ellipse(8.5, 5, 8, 4.5, '#6b4fb8');
+  p.overlayOn(() => {
+    for (const x of [4, 8, 12]) p.vline(x, 0, 6, '#8f75d6');
+  });
+  p.outline(OUT);
+  p.g.clearRect(0, 6, 17, 9);
+  for (let x = 1; x < 16; x += 4) p.px(x, 5, OUT).px(x + 1, 6, OUT).px(x + 2, 6, OUT).px(x + 3, 5, OUT);
+  p.px(8, 0, OUT);
+  p.vline(8, 6, 7, '#3a332d').px(7, 13, '#3a332d').px(6, 12, '#3a332d');
+  return p;
+}
+
+// ------------------------------------------------------------------ Deko (wird ins Terrain gemalt)
+
+/** Tanne */
+export function pine(seed = 1): Pix {
+  const r = rng(seed);
+  const h = 30 + Math.floor(r() * 10);
+  const p = new Pix(22, h + 2);
+  p.rect(10, h - 6, 3, 7, C.trunk);
+  const tiers = 4;
+  for (let i = 0; i < tiers; i++) {
+    const top = 1 + i * ((h - 10) / tiers);
+    const bot = top + (h - 8) / tiers + 4;
+    for (let y = Math.floor(top); y <= bot; y++) {
+      const half = ((y - top) / (bot - top)) * (4 + i * 2);
+      p.hline(11 - half, y, half * 2 + 1, C.leafDark);
+    }
+  }
+  p.overlayOn(() => {
+    p.speckle(0, 0, 11, h - 6, C.leafLight, 10, r);
+    p.speckle(11, 0, 11, h - 6, C.leafDarker, 14, r);
+  });
+  p.outline(OUT);
+  return p;
+}
+
+/** Zelt mit offener Tür */
+export function tent(col: string): Pix {
+  const p = new Pix(28, 17);
+  for (let y = 1; y <= 15; y++) {
+    const half = (y / 15) * 13;
+    p.hline(14 - half, y, half * 2, col);
+  }
+  p.overlayOn(() => {
+    p.rect(0, 0, 14, 17, shade(col, 0.8));
+    for (let y = 6; y <= 15; y++) p.hline(14 - (y - 6) * 0.45, y, (y - 6) * 0.9 + 1, '#2a2030');
+  });
+  p.vline(14, 0, 2, '#5e4e40');
+  p.outline(OUT);
+  return p;
+}
+
+/** Mülltonne (Lieblingsplatz der Bande) */
+export function trashCan(): Pix {
+  const p = new Pix(12, 16);
+  p.rect(1, 3, 10, 2, '#7d8896').rect(4, 1, 4, 2, '#5e6670');
+  p.rect(2, 5, 8, 10, '#8f9aa8');
+  p.overlayOn(() => {
+    for (const x of [3, 5, 7]) p.vline(x, 5, 10, '#6c7682');
+    p.vline(8, 5, 10, '#b5bfcb');
+  });
+  // Bananenschale lugt heraus
+  p.px(9, 2, C.gold).px(10, 1, C.gold);
+  p.outline(OUT);
   return p;
 }
 
 // ------------------------------------------------------------------ Hintergrund
 
-/** Himmel hinter der Insel – `layer`: far (Himmel, Sonne, Wolken), mid (ferne Inseln, Meer am Horizont) oder alles */
+/** Abendhimmel über dem See – `layer`: far (Himmel, Sterne, Abendsonne, Wolken), mid (Waldufer, See am Horizont) oder alles */
 export function paintIslandSky(p: Pix, seed: number, layer: BgLayer = 'all') {
   const { W, H } = IGEL;
   const r = rng(seed);
   const L = bgLayers(layer);
   if (L.far) {
-    paintSky(p, 0, 0, W, H, ['#7ec8f2', '#a9dcf6', '#d6efff', '#ffe9c4']);
-    // Sonne
-    p.disc(400, 46, 16, '#ffe9a0').disc(400, 46, 12, '#fff3c4');
-    // Wolken
-    for (let i = 0; i < 5; i++) {
+    paintSky(p, 0, 0, W, H, ['#25285a', '#3f3a78', '#7a4f8f', '#c86a7e', '#f29a6a', '#ffc98a']);
+    // erste Sterne oben
+    for (let i = 0; i < 40; i++) p.px(Math.floor(r() * W), Math.floor(r() * 70), i % 4 ? '#c9c6ea' : '#fff4d6');
+    // Abendsonne knapp über dem Ufer
+    p.disc(390, 196, 18, '#ffb36b').disc(390, 196, 14, '#ffd28f').disc(390, 196, 9, '#ffe7b8');
+    // rosa Wolkenbänder
+    for (let i = 0; i < 6; i++) {
       const cx = r() * W;
-      const cy = 22 + r() * 70;
-      for (let k = 0; k < 4; k++) p.ellipse(cx + k * 9 - 14, cy + (k % 2) * 2, 10, 5, k % 2 ? '#f5fbff' : C.white);
+      const cy = 60 + r() * 90;
+      const len = 30 + r() * 50;
+      p.ellipse(cx, cy, len / 2, 2.5, i % 2 ? '#d98a9a' : '#e7a2a0');
+      p.hline(cx - len / 3, cy + 2, len / 1.5, '#b56a86');
     }
   }
   if (!L.mid) return;
-  // Ferne Inseln am Horizont – nahtlos kachelbar (breite Inseln schwenken die Ebene als TileSprite):
-  // was über den Rand ragt, wird auf der anderen Seite noch einmal gemalt
-  for (let i = 0; i < 3; i++) {
+  // Waldufer am Horizont – nahtlos kachelbar (was über den Rand ragt, wird drüben noch einmal gemalt)
+  for (const dx of [-W, 0, W]) p.rect(dx, 204, W, 10, '#3a335e');
+  for (let i = 0; i < 70; i++) {
     const cx = r() * W;
-    const rx = 30 + r() * 30;
+    const h = 8 + r() * 14;
     for (const dx of [-W, 0, W]) {
-      p.ellipse(cx + dx, 214, rx, 12, '#8fb8c9');
-      p.vline(cx + dx, 196, 12, '#7aa3b5').ellipse(cx + dx + 2, 196, 6, 2, '#7aa3b5');
+      for (let y = 0; y < h; y++) p.hline(cx + dx - (y / h) * 4, 206 - h + y, (y / h) * 8 + 1, i % 3 ? '#3a335e' : '#2f2a50');
     }
   }
-  // Meer weit hinten
-  p.rect(0, 212, W, H - 212, '#5fb3e3');
-  for (let i = 0; i < 80; i++) p.hline(r() * W, 214 + r() * 50, 2 + r() * 4, '#93d3f3');
+  // See weit hinten mit Abendglitzern
+  p.rect(0, 212, W, H - 212, '#4f6fa8');
+  for (let i = 0; i < 80; i++) p.hline(r() * W, 214 + r() * 50, 2 + r() * 4, '#7d96c8');
+  for (let i = 0; i < 24; i++) p.hline(380 + (r() - 0.5) * 40, 214 + r() * 40, 2 + r() * 6, '#f6b27a');
 }
 
 // ------------------------------------------------------------------ Terrain

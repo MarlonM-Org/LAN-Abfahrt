@@ -72,7 +72,7 @@ function zauber(): Song {
   });
 }
 
-// ------------------------------------------------------------------ Igel-Krieg
+// ------------------------------------------------------------------ Waschbär-Bande (igel)
 
 /** B-Dur-Marsch mit Humptata, pfeifenden „Granaten“ (chromatisch fallend) und Trio in Es-Dur */
 function igelkrieg(): Song {
@@ -90,7 +90,7 @@ function igelkrieg(): Song {
   const K = 'x.......x.......', S = '....x.x.....x.xx', H = 'x.x.x.x.x.x.x.x.', ROLL = 'x.xxx.xxx.xxxxxx';
   const NONE = '................', BOOM = 'x...x.x.....x.xx';
   return theme({
-    id: 'igelkrieg', title: 'Igel im Gleichschritt', style: 'action', bpm: 120, key: { root: 10, minor: false },
+    id: 'igelkrieg', title: 'Waschbären im Gleichschritt', style: 'action', bpm: 120, key: { root: 10, minor: false },
     lead: { wave: 'pulse50', volume: 0.06, env: 'hold', part: lead },
     bass: { wave: 'triangle', volume: 0.17, env: 'pluck', part: bass },
     harmony: { wave: 'pulse25', volume: 0.025, env: 'pluck', part: harmony },

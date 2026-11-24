@@ -1229,7 +1229,7 @@ export interface TurmState {
   lanes: TurmLane[];
 }
 
-// ------------------------------------------------------------------ Controller-Spiele: Igel-Krieg
+// ------------------------------------------------------------------ Controller-Spiele: Waschbär-Bande (MiniKind `igel`, früher Igel-Krieg)
 
 export type IgelWeapon =
   | 'bazooka' | 'grenade' | 'shotgun' | 'airstrike' | 'dynamite' | 'mine'
@@ -1239,7 +1239,7 @@ export type IgelWeapon =
 /** Themenkarte einer Partie (siehe `IGEL_THEMES` in `shared/igel.ts`) */
 export type IgelThemeId = 'sturm' | 'mond' | 'kisten' | 'spreng' | 'vampir' | 'flut';
 
-/** Terrain-Operation: Krater sprengen (`carve`) oder Fläche aufschütten (`add`, z. B. Surfbrett-Brücke) */
+/** Terrain-Operation: Krater sprengen (`carve`) oder Fläche aufschütten (`add`, z. B. Brett-Brücke) */
 export type IgelOp = [number, number, number, 'carve' | 'add'];
 
 export type IgelProjType = 'bazooka' | 'grenade' | 'cluster' | 'frag' | 'gull' | 'dynamite' | 'holy';
@@ -1251,19 +1251,19 @@ export interface IgelHog {
   y: number;
   hp: number;
   dir: 1 | -1;
-  /** ok = im Spiel, dead = Sandburg-Grabstein, drowned = treibt auf dem Schwimmring davon */
+  /** ok = im Spiel, dead = Grabstein, drowned = treibt auf dem Schwimmring davon */
   state: 'ok' | 'dead' | 'drowned';
   flying: boolean;
   walking: boolean;
   /** Angezeigte HP: Schaden zählt erst in der Settle-Phase Punkt für Punkt herunter (wie bei Worms) */
   shown: number;
-  /** Hängt am Lianen-Seil: Ankerpunkt (x, y) */
+  /** Hängt an der Wäscheleine: Ankerpunkt (x, y) */
   rope?: [number, number];
-  /** Gleitet am Sonnenschirm */
+  /** Gleitet am Regenschirm */
   chute?: boolean;
 }
 
-/** Gegenstände auf der Insel: Seeigel-Minen, Gaskartuschen vom Grill, Kisten am Sonnenschirm */
+/** Gegenstände auf der Insel: Mausefallen (`mine`), Gaskartuschen vom Campingkocher (`barrel`), Picknickkörbe an Luftballons (`crate`) */
 export interface IgelObj {
   id: number;
   type: 'mine' | 'barrel' | 'crate';
@@ -1273,16 +1273,16 @@ export interface IgelObj {
   armed?: boolean;
   /** Mine/Kartusche ausgelöst – gleich knallt's */
   lit?: boolean;
-  /** Kiste schwebt noch am Sonnenschirm */
+  /** Picknickkorb schwebt noch an den Luftballons */
   chute?: boolean;
 }
 
 export interface IgelFx {
   seq: number;
   /**
-   * taunt = Zuschauer-Spruch als Sprechblase über dem Igel `hog`; shot = Wasserstrahl von (x, y) nach (x2, y2);
-   * gull = Möwe fliegt über x; crate = Kiste eingesammelt; land = Kiste gelandet; beep = Mine ausgelöst;
-   * holy = Heilige Ananas geworfen; fire = Abschuss; rope = Seil schießt bis (x2, y2); dig = Schaufel;
+   * taunt = Zuschauer-Spruch als Sprechblase über dem Waschbären `hog`; shot = Wasserstrahl (Gartenschlauch) von (x, y) nach (x2, y2);
+   * gull = Tauben fliegen über x; crate = Picknickkorb eingesammelt; land = Korb gelandet; beep = Mausefalle schnappt zu;
+   * holy = Heilige Mülltonne geworfen; fire = Abschuss; rope = Wäscheleine schießt bis (x2, y2); dig = Schaufel; tele = Gully auf;
    * quip = Sprecher-Kommentar (`text`, TV zeigt ihn als Laufschrift und sagt ihn an)
    */
   type: 'boom' | 'dmg' | 'splash' | 'pow' | 'tele' | 'ko' | 'water' | 'taunt' | 'shot' | 'gull' | 'crate' | 'land' | 'beep' | 'holy' | 'fire' | 'rope' | 'dig' | 'quip';
@@ -1290,8 +1290,10 @@ export interface IgelFx {
   y: number;
   r?: number;
   text?: string;
-  /** Igel, über dem die Sprechblase hängt (taunt) */
+  /** Waschbär, über dem die Sprechblase hängt (taunt) bzw. der getroffen wurde (dmg – TV zeigt kurz das Aua-Gesicht) */
   hog?: number;
+  /** Inhalt des eingesammelten Picknickkorbs (crate) – TV zeigt das Waffen-Icon */
+  loot?: IgelWeapon;
   x2?: number;
   y2?: number;
 }
@@ -1303,7 +1305,7 @@ export interface IgelAim {
   tx?: number;
 }
 
-/** Spieler-Team (ab 5 Spielern): Sonne, Meer, Sand, Palme */
+/** Spieler-Team (ab 5 Spielern): Mond, See, Zelt, Tanne */
 export interface IgelSquad {
   name: string;
   color: string;
@@ -1312,7 +1314,7 @@ export interface IgelSquad {
 
 /**
  * Ein Bild der Wiederholung „Schuss des Abends“ (alle 50 ms aufgezeichnet).
- * h: je Igel [x, y, dir, Zustand (0 ok · 1 Sandburg · 2 baden), Flags (1 fliegt · 2 Seil · 4 Schirm), Anker-x, Anker-y]
+ * h: je Waschbär [x, y, dir, Zustand (0 ok · 1 Grabstein · 2 baden), Flags (1 fliegt · 2 Leine · 4 Schirm), Anker-x, Anker-y]
  * p: Geschosse [id, Typ, x, y] · b: Gegenstände [id, Typ, x, y] · o: Anzahl Terrain-Operationen bis hier
  */
 export interface IgelRecFrame {
@@ -1376,7 +1378,7 @@ export interface IgelState {
   hogs: IgelHog[];
   objs: IgelObj[];
   turn: number;
-  /** Rundlauf: wer gerade steuert (bei Teams evtl. den Igel eines Mitspielers) */
+  /** Rundlauf: wer gerade steuert (bei Teams evtl. den Waschbären eines Mitspielers) */
   active: string | null;
   activeHog: number | null;
   next: string | null;
@@ -1401,7 +1403,7 @@ export interface IgelState {
   suddenDeath: boolean;
   /** ms bis Sudden Death (0 = läuft schon) */
   suddenIn: number;
-  /** Start-HP pro Igel (100; nur im Rundlauf ab 8 Spielern 60 – „Alle gleichzeitig“ hat immer 100) */
+  /** Start-HP pro Waschbär (100; nur im Rundlauf ab 8 Spielern 60 – „Alle gleichzeitig“ hat immer 100) */
   maxHp: number;
   /** Zugzeit dieser Partie (nach Spielerzahl) */
   turnMs: number;
@@ -2866,7 +2868,7 @@ export interface MiniTeams {
 /**
  * Ereignis im Protokoll des Abends (`FxLog`, server/fx.ts). Die Minispiele melden markante Momente über
  * `ctx.log(type, { p, n })`, der Raum zählt Siege, Serien, Münzen und Wetten dazu.
- *   ko · selfout (Smash) · hit (Arena) · goal · owngoal (Autoball) · igelhit · selfhit (Igel) · out (Sumo) ·
+ *   ko · selfout (Smash) · hit (Arena) · goal · owngoal (Autoball) · igelhit · selfhit (Waschbär-Bande) · out (Sumo) ·
  *   kartwin · place (Kart) · hidden (Versteckspiel, n = ms) · win · streak · last · coingain · coinloss · bet · play
  */
 export interface FxEvent {
