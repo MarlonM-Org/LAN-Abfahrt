@@ -1,11 +1,52 @@
 {
-  "updated": "2026-11-24T15:50+00:00",
+  "updated": "2026-11-24T17:00+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "type": "in Arbeit · Marlon/Claude",
+      "kind": "kart",
+      "title": "Kart-Rennen: Gas rastet ein, Hand frei für Drift und Item (entschieden)",
+      "detail": "GAS rastet ein, BREMSE löst, eigene Knöpfe DRIFT und ITEM rechts, Bots angepasst, Aufwärm-Hinweis. Dateien: server/kart.ts, client/controller/screens/kart.ts, scripts/bots.ts, shared/games.ts (HOWTO).",
+      "branch": "claude/ecstatic-goodall-rlrs70-kart",
+      "since": "2026-11-24"
+    },
+    {
+      "type": "in Arbeit · Marlon/Claude",
+      "kind": null,
+      "title": "Handy-Browser-Zoom blocken (entschieden)",
+      "detail": "touch-action, iOS-Gesten und Doppeltipp blocken, Zoom-Erkennung mit Overlay, Android-Vollbild. Dateien: client/index.html, client/controller/main.ts, style.css, neues zoom.ts.",
+      "branch": "claude/ecstatic-goodall-rlrs70-zoom",
+      "since": "2026-11-24"
+    },
+    {
+      "type": "in Arbeit · Marlon/Claude",
+      "kind": null,
+      "title": "UX-Branch vom 5.11.: Rosinen picken, Rest verwerfen (entschieden)",
+      "detail": "Rosinen aus claude/practical-wozniak-2dsd2e einzeln gegen main prüfen und frisch übernehmen (Parcours, Verräter, Sumo, Bogen, Smash, Bot-Stärke, Flunkyball, Handy quer). Kart und Auto-Fußball bleiben unangetastet.",
+      "branch": "claude/ecstatic-goodall-rlrs70-ux",
+      "since": "2026-11-24"
+    },
+    {
+      "type": "in Arbeit · Marlon/Claude",
+      "kind": null,
+      "title": "VIP am Laptop jederzeit wechseln",
+      "detail": "Spieler-Panel am Laptop: „Zum VIP machen“, host:vip am Server, Handys aktualisieren sofort. Dateien: server/room.ts, client/host/playersPanel.ts, hostControls.ts.",
+      "branch": "claude/ecstatic-goodall-rlrs70-vip",
+      "since": "2026-11-24"
+    },
+    {
+      "type": "in Arbeit · Marlon/Claude",
+      "kind": null,
+      "title": "Musik-Werkstatt (/musik.html) aufräumen: Übersicht, Kopie, Bearbeiten, Speichern",
+      "detail": "Stufe 1–3: Übersicht „Wo läuft was“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt. Dateien: client/musik/, client/musik.html, server/music.ts, shared/music.ts.",
+      "branch": "claude/ecstatic-goodall-rlrs70-musik",
+      "since": "2026-11-24"
+    }
+  ],
   "queue": [
     {
       "area": "Spielbrett",
