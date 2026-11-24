@@ -91,6 +91,26 @@ export function walkable(x: number, y: number, r: number): boolean {
   return false;
 }
 
+/**
+ * Ecken-Hilfe für Türen (wie in der Bomben-Arena): Läuft man waagerecht (`horizontal`) bzw. senkrecht gegen eine Wand,
+ * steht aber knapp neben einer Tür, rutscht man quer zur Laufrichtung Richtung Türmitte statt an der Wand zu kleben.
+ * `side` = Stick quer zur Laufrichtung (−1 … 1): Zeigt er deutlich von der Tür weg, gibt es keine Hilfe.
+ * Liefert die Verschiebung quer zur Laufrichtung (höchstens `step`), sonst 0.
+ */
+export function doorNudge(x: number, y: number, horizontal: boolean, r: number, step: number, side = 0): number {
+  for (const d of DOORS) {
+    if (d.vertical !== horizontal) continue;
+    const along = horizontal ? Math.abs(x - d.cx) : Math.abs(y - d.cy);
+    if (along > (horizontal ? d.w : d.h) / 2 + r + step + 1) continue; // direkt vor der Wand (bis zu einem Schritt Abstand)
+    const off = horizontal ? d.cy - y : d.cx - x;
+    // Nur knapp daneben: höchstens ein Spieler-Durchmesser neben der Türöffnung
+    if (Math.abs(off) < 0.01 || Math.abs(off) > (horizontal ? d.h : d.w) / 2 + r + 2) continue;
+    if (side * Math.sign(off) < -0.2) continue;
+    return Math.max(-step, Math.min(step, off));
+  }
+  return 0;
+}
+
 /** Ist die Sichtlinie zwischen zwei Punkten frei (keine Wand dazwischen)? */
 export function lineFree(x1: number, y1: number, x2: number, y2: number): boolean {
   const len = Math.hypot(x2 - x1, y2 - y1);
