@@ -1,11 +1,26 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { DARTS, DART_SEGMENTS, type DartsDart, type DartsState } from '../../shared/darts';
+import {
+  DARTS,
+  DART_SEGMENTS,
+  type DartsDart,
+  type DartsPlayer,
+  type DartsState,
+  dartsCalm,
+  dartsCheckoutText,
+  dartsCross,
+  dartsDone,
+  dartsLeft,
+  dartsPhase,
+  dartsRank,
+} from '../../shared/darts';
 import { DART_COLORS, DART_TV, dartPix, dartboardPix, paintDartsBar } from '../art/darts';
 import { crown } from '../art/objects';
+import { serverNow } from '../timesync';
 import { bus, getState, playerById } from './store';
-import { Countdown, GOLD, LIGHT, RED_INK, background, ensureTex, ink, panel, txt } from './ui';
+import { GOLD, LIGHT, RED_INK, background, ensureTex, ink, panel, txt } from './ui';
+import { Juice } from './juice';
 import { sfx } from './sfx';
 import { say } from './speech';
 
@@ -14,6 +29,9 @@ const { CX, CY, S } = DART_TV;
 const wx = (x: number) => CX + x * S;
 const wy = (y: number) => CY + y * S;
 const shortName = (id: string, n = 7) => (playerById(id)?.name ?? '?').replace(/^Bot\s+/, '').slice(0, n);
+const BAD = '#ff7a5e';
+/** Checkout-Weg auf der Tafel */
+const HINT = '#2f7a3f';
 
 interface Special {
   text: string;
@@ -21,9 +39,21 @@ interface Special {
   color: string;
 }
 
+/** Live-Fadenkreuz eines Spielers: Zielpunkt (gleitet zum gemeldeten), Atem-Amplitude ab `ampAt` */
+interface AimView {
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  amp: number;
+  ampAt: number;
+  on: boolean;
+  key: string;
+}
+
 /**
- * Darts an der Strandbar (TV): große Scheibe an der Bambuswand, alle Darts der Runde in Spielerfarben,
- * live mitlaufende Punktetafel rechts, Runde/Zeit links.
+ * Darts, 301 Single Out (TV): große Scheibe an der Bambuswand, alle Darts der Runde in Spielerfarben, die
+ * Fadenkreuze aller Spieler live (mit demselben Atmen wie am Handy), rechts die Tafel mit Reststand, links die Runde.
  */
 export class DartsScene extends Phaser.Scene {
   private latest: GameState | null = null;
@@ -32,17 +62,18 @@ export class DartsScene extends Phaser.Scene {
   private primed = false;
   private side!: Phaser.GameObjects.Container;
   private sideKey = '';
-  private timerTxt!: Phaser.GameObjects.Text;
   private board!: Phaser.GameObjects.Container;
   private boardKey = '';
   private intro!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
   private bannerSub!: Phaser.GameObjects.Text;
   private plate!: Phaser.GameObjects.Rectangle;
+  private cross!: Phaser.GameObjects.Graphics;
+  private aims = new Map<string, AimView>();
   private queue: Special[] = [];
   private bannerUntil = 0;
   private phaseKey = '';
-  private countdown = new Countdown();
+  private juice!: Juice;
 
   constructor() {
     super('darts');
@@ -50,6 +81,7 @@ export class DartsScene extends Phaser.Scene {
 
   create() {
     this.darts = new Map();
+    this.aims = new Map();
     this.lastSeq = 0;
     this.primed = false;
     this.sideKey = '';
@@ -70,8 +102,9 @@ export class DartsScene extends Phaser.Scene {
         .setDepth(2);
     });
 
+    this.cross = this.add.graphics().setDepth(1500);
+    this.juice = new Juice(this, { depth: 1950 });
     this.side = this.add.container(0, 0).setDepth(2000);
-    this.timerTxt = ink(this, 41, 78, '', { color: RED_INK }).setDepth(2001);
     this.board = this.add.container(0, 0).setDepth(2000);
     this.intro = this.add.container(0, 0).setDepth(2005);
     this.plate = this.add.rectangle(CX, 104, 10, 10, 0x2d1b12, 0.8).setStrokeStyle(2, 0xffd25e, 0.9).setDepth(2009).setVisible(false);
@@ -100,29 +133,93 @@ export class DartsScene extends Phaser.Scene {
     const key = `${st.sub}-${st.round}`;
     if (key !== this.phaseKey) {
       this.phaseKey = key;
-      this.countdown.set(st.endsIn);
       this.onPhase(st);
     }
+    this.syncAims(st);
     this.syncDarts(st);
     this.renderIntro(st);
     this.renderSide(st);
     this.renderBoard(st);
   }
 
+  private names(ids: string[], n = 10) {
+    return ids.map((id) => shortName(id, n)).join(' & ');
+  }
+
   private onPhase(st: DartsState) {
     this.queue = [];
     if (st.sub === 'throw') {
-      const final = st.mult > 1;
-      this.showBanner(final ? 'FINALE!' : `RUNDE ${st.round}`, final ? 'Alle Punkte zählen DOPPELT!' : `von ${st.rounds} · 3 Darts für alle`, final ? '#ff9a7a' : GOLD, 1600);
+      const last = st.round >= st.rounds;
+      this.showBanner(last ? 'LETZTE RUNDE!' : `RUNDE ${st.round}`, last ? 'Danach gewinnt der niedrigste Rest' : `von ${st.rounds} · 3 Darts für alle`, last ? '#ff9a7a' : GOLD, 1600);
     } else if (st.sub === 'tally' && st.tally) {
-      const names = st.tally.best.map((id) => shortName(id, 10)).join(' & ');
-      const next = st.round + 1 === st.rounds ? '\nGleich: FINALE – doppelte Punkte!' : '';
-      this.showBanner(`RUNDE ${st.round} VORBEI`, st.tally.points > 0 ? `Beste Runde: ${names} +${st.tally.points}${next}` : `Keiner hat getroffen …${next}`, GOLD, DARTS.TALLY_MS);
+      const t = st.tally;
+      const lines = [`Vorne: ${this.names(t.lead)} – Rest ${t.rest}`];
+      if (t.busts.length) lines.push(`Überworfen: ${this.names(t.busts, 8)}`);
+      if (st.round + 1 === st.rounds) lines.push('Gleich: LETZTE RUNDE!');
+      this.showBanner(`RUNDE ${st.round} VORBEI`, lines.join('\n'), GOLD, DARTS.TALLY_MS);
     } else if (st.sub === 'over') {
-      const ranked = [...st.players].sort((a, b) => b.total - a.total);
-      const tie = ranked.length > 1 && ranked[0].total === ranked[1].total;
-      this.showBanner('ENDSTAND', tie ? 'Gleichstand!' : `${shortName(ranked[0].id, 12)} gewinnt mit ${ranked[0].total}!`, GOLD, DARTS.OVER_MS);
+      const outs = st.players.filter((p) => p.out > 0);
+      const win = this.names(st.winners, 12);
+      const many = st.winners.length > 1;
+      if (outs.length) {
+        const sub = many ? `${win} checken gleichzeitig aus!` : outs.length > 1 ? `${win} gewinnt – weniger Darts!` : `${win} gewinnt!`;
+        this.showBanner('CHECKOUT!', sub, GOLD, DARTS.OVER_MS);
+        sfx('fanfare');
+        this.juice.burst(CX, 70, 'confetti', 40);
+      } else {
+        const rest = st.players.find((p) => p.id === st.winners[0])?.rest ?? st.start;
+        this.showBanner('ENDSTAND', `Nach ${st.rounds} Runden: ${win} (Rest ${rest})`, GOLD, DARTS.OVER_MS);
+      }
+      say(many ? 'Gleichstand!' : `${shortName(st.winners[0], 20)} gewinnt!`);
     } else this.hideBanner();
+  }
+
+  // ---------------------------------------------------------------- Fadenkreuze
+
+  private syncAims(st: DartsState) {
+    const now = performance.now();
+    const live = new Set<string>();
+    if (st.sub === 'throw') {
+      for (const p of st.players) {
+        if (!p.aim || dartsDone(p)) continue;
+        live.add(p.id);
+        const key = `${p.aim.x}|${p.aim.y}|${p.aim.amp}|${p.aim.on}`;
+        const a = this.aims.get(p.id);
+        if (!a) this.aims.set(p.id, { x: p.aim.x, y: p.aim.y, tx: p.aim.x, ty: p.aim.y, amp: p.aim.amp, ampAt: now, on: p.aim.on, key });
+        else if (a.key !== key) Object.assign(a, { tx: p.aim.x, ty: p.aim.y, amp: p.aim.amp, ampAt: now, on: p.aim.on, key });
+      }
+    }
+    for (const id of [...this.aims.keys()]) if (!live.has(id)) this.aims.delete(id);
+  }
+
+  private drawAims(st: DartsState, delta: number) {
+    const g = this.cross;
+    g.clear();
+    if (st.sub !== 'throw' || !this.aims.size) return;
+    const t = serverNow() - st.t0;
+    const now = performance.now();
+    const k = 1 - Math.exp(-delta / 55); // gleitet den gemeldeten Positionen nach (Handy sendet ~14×/s)
+    // Wer gerade zielt (Finger drauf / Sensor), liegt obenauf
+    const list = [...this.aims.entries()].sort((a, b) => Number(a[1].on) - Number(b[1].on));
+    for (const [id, a] of list) {
+      a.x += (a.tx - a.x) * k;
+      a.y += (a.ty - a.y) * k;
+      const c = dartsCross({ x: a.x, y: a.y }, t, dartsCalm(a.amp, now - a.ampAt), dartsPhase(id, st.round));
+      const x = Math.round(wx(c.x));
+      const y = Math.round(wy(c.y));
+      const R = a.on ? 6 : 5;
+      const alpha = a.on ? 1 : 0.55;
+      for (const [col, w] of [[0x2d1b12, 3], [this.colorOf(st, id), 1]] as [number, number][]) {
+        g.fillStyle(col, alpha);
+        const o = (w - 1) / 2;
+        g.fillRect(x - R - o, y - o, R - 2 + w - 1, w); // links
+        g.fillRect(x + 3 - o, y - o, R - 2 + w - 1, w); // rechts
+        g.fillRect(x - o, y - R - o, w, R - 2 + w - 1); // oben
+        g.fillRect(x - o, y + 3 - o, w, R - 2 + w - 1); // unten
+        g.lineStyle(w, col, alpha);
+        g.strokeCircle(x + 0.5, y + 0.5, 3);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- Darts
@@ -170,41 +267,68 @@ export class DartsScene extends Phaser.Scene {
 
   private popLabel(st: DartsState, d: DartsDart, x: number, y: number) {
     const col = hex(this.colorOf(st, d.owner));
-    const text = d.ring === 'miss' ? 'DANEBEN' : st.mult > 1 && d.points > 0 ? `${d.short} x2` : d.short;
-    const t = txt(this, x + 6, y - 16, text, { color: col }).setDepth(1900);
-    this.tweens.add({ targets: t, y: y - 30, alpha: 0, delay: 500, duration: 700, onComplete: () => t.destroy() });
-    // Einschlag + Callout
+    const text = d.bust ? 'ÜBERWORFEN' : d.out ? 'CHECKOUT' : d.ring === 'miss' ? 'DANEBEN' : d.short;
+    const t = txt(this, x + 6, y - 16, text, { color: d.bust ? BAD : col }).setDepth(1900);
+    this.tweens.add({ targets: t, y: y - 30, alpha: 0, delay: d.bust || d.out ? 900 : 500, duration: 700, onComplete: () => t.destroy() });
+    const who = shortName(d.owner, 12);
+    if (d.out) {
+      // Genau auf 0 – Single Out: jedes Feld beendet
+      this.queueSpecial({ text: 'CHECKOUT!', sub: `${who} · ${d.label}`, color: GOLD }, true);
+      sfx('cheer');
+      say(`${shortName(d.owner, 20)} checkt aus!`, { interrupt: true });
+      this.juice.burst(x, y, 'confetti', 24);
+      this.juice.shake(1);
+      return;
+    }
+    if (d.bust) {
+      // Unter 0: Aufnahme zählt nicht, Rest wie vorher
+      this.queueSpecial({ text: 'ÜBERWORFEN!', sub: `${who} bleibt bei ${d.rest}`, color: BAD }, true);
+      sfx('lose', { x, vol: 0.8 });
+      say('Überworfen!');
+      this.juice.shake(1);
+      return;
+    }
     sfx(d.ring === 'miss' ? 'bonk' : 'hit', { x, pitch: d.ring === 'miss' ? 0.7 : 1.3, vol: 0.7 });
     if (d.ring === 'bull') (sfx('goal'), say('Bullseye!'));
     else if (d.ring === 'triple' && d.seg >= 17) (sfx('coin'), say(`Triple ${d.seg}!`));
     if (d.ring === 'bull' || (d.ring === 'triple' && d.seg >= 17)) {
-      this.queueSpecial({ text: d.ring === 'bull' ? 'BULLSEYE!' : `TRIPLE ${d.seg}!`, sub: shortName(d.owner, 12), color: col });
+      this.queueSpecial({ text: d.ring === 'bull' ? 'BULLSEYE!' : `TRIPLE ${d.seg}!`, sub: who, color: col });
     }
     // Alle drei Darts in der Triple 20 = 180!
     const mine = st.darts.filter((x) => x.owner === d.owner);
     if (mine.length === DARTS.DARTS_PER_ROUND && mine.every((x) => x.ring === 'triple' && x.seg === 20)) {
-      this.queueSpecial({ text: 'ONE HUNDRED AND EIGHTY!', sub: shortName(d.owner, 12), color: GOLD });
+      this.queueSpecial({ text: 'ONE HUNDRED AND EIGHTY!', sub: who, color: GOLD }, true);
       sfx('cheer');
       say('One hundred and eighty!', { interrupt: true, rate: 0.9 });
     }
   }
 
-  private queueSpecial(s: Special) {
-    if (this.queue.length < 3) this.queue.push(s);
+  /** Banner-Warteschlange; Checkout/Überworfen kommen vor die Treffer-Ansagen */
+  private queueSpecial(s: Special, urgent = false) {
+    if (urgent) {
+      this.queue.unshift(s);
+      this.queue.length = Math.min(this.queue.length, 4);
+    } else if (this.queue.length < 3) this.queue.push(s);
   }
 
   // ---------------------------------------------------------------- Banner
 
-  private showBanner(text: string, sub: string, color: string, ms: number, y = 104) {
+  /**
+   * Banner mit dunkler Tafel. `small` = Treffer-Ansagen während der Runde: klein ganz oben über der Scheibe,
+   * damit sie die Fadenkreuze (meist auf T20) nicht verdecken.
+   */
+  private showBanner(text: string, sub: string, color: string, ms: number, small = false) {
     this.tweens.killTweensOf([this.banner, this.bannerSub, this.plate]);
+    const base = small ? (text.length > 12 ? 0.5 : 0.67) : text.length > 12 ? 0.67 : 1;
+    const y = small ? 12 : 104;
     this.banner.setY(y).setText(text).setColor(color).setAlpha(1);
-    this.bannerSub.setY(y + 20).setText(sub).setAlpha(1);
-    const base = text.length > 12 ? 0.67 : 1;
+    this.bannerSub.setY(y + (small ? 9 : 20)).setText(sub).setAlpha(1);
     // dunkle Tafel hinter dem Text, damit er auf der bunten Scheibe lesbar bleibt
     const w = Math.max(this.banner.width * base, this.bannerSub.width) + 16;
-    const h = sub ? 38 + this.bannerSub.height : 30;
-    this.plate.setPosition(CX, y - 14 + h / 2).setSize(w, h).setVisible(true).setAlpha(1);
-    this.plate.setDisplaySize(w, h);
+    const top = y - 12 * base - 4;
+    const bottom = sub ? this.bannerSub.y + this.bannerSub.height + 3 : y + 12 * base + 4;
+    this.plate.setPosition(CX, (top + bottom) / 2).setSize(w, bottom - top).setVisible(true).setAlpha(1);
+    this.plate.setDisplaySize(w, bottom - top);
     this.banner.setScale(base * 0.3);
     this.tweens.add({ targets: this.banner, scale: base, duration: 340, ease: 'Back.Out' });
     this.tweens.add({ targets: [this.banner, this.bannerSub, this.plate], alpha: 0, delay: Math.max(400, ms - 300), duration: 300 });
@@ -218,88 +342,103 @@ export class DartsScene extends Phaser.Scene {
     this.bannerSub.setText('');
   }
 
-  update(time: number) {
+  update(time: number, delta: number) {
     const st = this.st;
     if (!st) return;
     if (this.queue.length && time >= this.bannerUntil && st.sub === 'throw') {
       const s = this.queue.shift()!;
-      this.showBanner(s.text, s.sub, s.color, 1200, 50);
+      this.showBanner(s.text, s.sub, s.color, 1300, true);
     }
-    if (st.sub === 'throw' || st.sub === 'intro') {
-      const sec = this.countdown.seconds;
-      this.timerTxt.setText(st.sub === 'throw' && !this.countdown.none ? `${sec} s` : '');
-    } else this.timerTxt.setText('');
+    this.drawAims(st, delta);
   }
 
-  // ---------------------------------------------------------------- Intro, Rundenanzeige, Punktetafel
+  // ---------------------------------------------------------------- Intro, Rundenanzeige, Tafel
 
   private renderIntro(st: DartsState) {
     const want = st.sub === 'intro';
     if (want === this.intro.visible && this.intro.length) return;
     this.intro.removeAll(true).setVisible(want);
     if (!want) return;
-    this.intro.add(panel(this, 70, 58, 340, 150));
-    this.intro.add(ink(this, 240, 70, 'DARTS AN DER STRANDBAR', { size: 16, color: RED_INK }));
+    this.intro.add(panel(this, 66, 54, 348, 160));
+    this.intro.add(ink(this, 240, 66, `DARTS · ${st.start} SINGLE OUT`, { size: 16, color: RED_INK }));
     this.intro.add(
       ink(
         this,
         240,
-        96,
-        `Alle werfen GLEICHZEITIG – ${DARTS.ROUNDS} Runden,\nje ${DARTS.DARTS_PER_ROUND} Darts. Höchste Punktzahl gewinnt!\n\nAm Handy zielen, ruhig halten,\ndann werfen (schnippen oder wischen).\nDoppel x2 · Triple x3 · Bull 50\n\nLetzte Runde: alles zählt DOPPELT!`,
+        92,
+        `Jeder startet bei ${st.start} – wer zuerst GENAU\nauf 0 kommt, gewinnt. Alle werfen GLEICHZEITIG,\n${DARTS.DARTS_PER_ROUND} Darts pro Runde, höchstens ${st.rounds} Runden.\n\nHandy: Finger halten + ziehen = zielen,\nloslassen = werfen (oder Sensor + tippen).\nDas Fadenkreuz atmet – den Moment abpassen!\n\nUnter 0 = ÜBERWORFEN: Runde zählt nicht.`,
       ),
     );
   }
 
   private renderSide(st: DartsState) {
-    const waiting = st.players.filter((p) => p.thrown < DARTS.DARTS_PER_ROUND).length;
-    const key = JSON.stringify([st.sub, st.round, st.mult, st.sub === 'throw' ? waiting : -1]);
+    const waiting = st.players.filter((p) => !dartsDone(p)).length;
+    const key = JSON.stringify([st.sub, st.round, st.sub === 'throw' ? waiting : -1]);
     if (key === this.sideKey) return;
     this.sideKey = key;
     this.side.removeAll(true);
     if (st.sub === 'intro') return;
-    const final = st.mult > 1;
-    this.side.add(panel(this, 3, 30, 76, final ? 86 : 74));
-    this.side.add(ink(this, 41, 38, 'RUNDE'));
-    this.side.add(ink(this, 41, 52, `${Math.max(1, st.round)}/${st.rounds}`, { size: 16, color: RED_INK }));
-    // Zeit steht in this.timerTxt (y 78)
-    if (st.sub === 'throw') this.side.add(ink(this, 41, 89, waiting ? `${waiting} ${waiting === 1 ? 'wirft' : 'werfen'}` : 'fertig!'));
-    else if (st.sub === 'tally') this.side.add(ink(this, 41, 89, 'Wertung'));
-    else this.side.add(ink(this, 41, 89, 'Ende'));
-    if (final) this.side.add(ink(this, 41, 100, 'FINALE x2', { color: RED_INK }));
+    const last = st.round >= st.rounds;
+    this.side.add(panel(this, 3, 30, 76, last ? 92 : 80));
+    this.side.add(ink(this, 41, 37, 'RUNDE'));
+    this.side.add(ink(this, 41, 47, String(Math.max(1, st.round)), { size: 24, color: RED_INK }));
+    this.side.add(ink(this, 41, 74, `von ${st.rounds}`));
+    if (st.sub === 'throw') this.side.add(ink(this, 41, 92, waiting ? `${waiting} dran` : 'fertig!'));
+    else if (st.sub === 'tally') this.side.add(ink(this, 41, 92, 'Wertung'));
+    else this.side.add(ink(this, 41, 92, 'Ende'));
+    if (last) this.side.add(ink(this, 41, 105, 'LETZTE!', { color: RED_INK }));
+  }
+
+  /** Zweite Zeile der Tafel: ausgecheckt/überworfen, sonst der Checkout-Weg („Aus: 20·17“) oder die Punkte dieser Runde */
+  private statusOf(st: DartsState, p: DartsPlayer): { text: string; color?: string } {
+    if (p.out) return { text: st.sub === 'over' ? `${p.out} Darts` : 'CHECKOUT!', color: RED_INK };
+    if (p.bust) return { text: 'ÜBERWORFEN', color: RED_INK };
+    if (st.sub === 'over') return { text: '' };
+    if (p.skipped) return { text: 'verfallen' };
+    const left = st.sub === 'throw' ? dartsLeft(p) : DARTS.DARTS_PER_ROUND;
+    const co = left ? dartsCheckoutText(p.rest, left) : null;
+    if (co) return { text: `Aus: ${co.replace(/ · /g, '·')}`.slice(0, 11), color: HINT };
+    return { text: p.thrown > 0 ? `-${p.scored}` : '' };
   }
 
   private renderBoard(st: DartsState) {
-    const key = JSON.stringify([st.sub, st.players.map((p) => [p.total, p.round, p.thrown])]);
+    const key = JSON.stringify([st.sub, st.round, st.players.map((p) => [p.rest, p.scored, p.thrown, p.bust, p.out, p.skipped]), st.winners]);
     if (key === this.boardKey) return;
     this.boardKey = key;
     this.board.removeAll(true);
     if (st.sub === 'intro') return;
-    const rows = [...st.players].sort((a, b) => b.total - a.total);
+    const rows = [...st.players].sort(dartsRank);
+    const compact = rows.length > 8;
     const w = 159;
     const x0 = WORLD.W - w - 3;
-    const rowH = st.players.length > 9 ? 13 : 15;
-    const top = 30;
+    const rowH = compact ? 17 : 25;
+    const top = compact ? 24 : 30;
     const h = 22 + rows.length * rowH;
     this.board.add(panel(this, x0, top, w, h));
-    this.board.add(ink(this, x0 + 8, top + 7, 'PUNKTE', { origin: [0, 0], color: RED_INK }));
-    this.board.add(ink(this, x0 + 122, top + 7, 'Rd.', { origin: [1, 0] }));
-    this.board.add(ink(this, x0 + w - 6, top + 7, 'Ges', { origin: [1, 0] }));
-    const best = rows[0]?.total ?? 0;
+    this.board.add(ink(this, x0 + 8, top + 7, 'SINGLE OUT', { origin: [0, 0], color: RED_INK }));
+    this.board.add(ink(this, x0 + w - 6, top + 7, 'REST', { origin: [1, 0] }));
     rows.forEach((p, i) => {
-      const y = top + 20 + i * rowH + rowH / 2;
-      this.board.add(this.add.circle(x0 + 8, y, 3.5, p.color).setStrokeStyle(1, 0x2d1b12));
-      this.board.add(ink(this, x0 + 14, y, shortName(p.id), { origin: [0, 0.5] }));
+      const y = Math.round(top + 20 + i * rowH + rowH / 2);
+      const y1 = compact ? y : y - 5;
+      const status = this.statusOf(st, p);
+      this.board.add(this.add.circle(x0 + 8, y1, 3.5, p.color).setStrokeStyle(1, 0x2d1b12));
+      this.board.add(ink(this, x0 + 14, y1, shortName(p.id, compact ? 6 : 7), { origin: [0, 0.5], color: p.bust ? RED_INK : undefined }));
       // übrige Darts dieser Runde
-      if (st.sub === 'throw') {
+      const pips = st.sub === 'throw' && !dartsDone(p);
+      const px = x0 + (compact ? 66 : 76);
+      if (pips) {
         for (let k = 0; k < DARTS.DARTS_PER_ROUND; k++) {
           const left = k >= p.thrown;
-          this.board.add(this.add.rectangle(x0 + 75 + k * 5, y, 3, 7, left ? p.color : 0xb9a37a).setStrokeStyle(1, left ? 0x2d1b12 : 0xb9a37a));
+          this.board.add(this.add.rectangle(px + 2 + k * 5, y1, 3, 7, left ? p.color : 0xb9a37a).setStrokeStyle(1, left ? 0x2d1b12 : 0xb9a37a));
         }
       }
-      const rd = st.sub === 'over' ? '' : `+${p.round}`;
-      this.board.add(ink(this, x0 + 122, y, rd, { origin: [1, 0.5], color: p.round >= 100 ? RED_INK : undefined }));
-      this.board.add(ink(this, x0 + w - 6, y, String(p.total), { origin: [1, 0.5], color: RED_INK }));
-      if (st.sub === 'over' && p.total === best && best > 0) this.board.add(this.add.image(x0 + 8, y - 3, ensureTex(this, 'crown', crown)).setOrigin(0.5, 1));
+      if (compact) {
+        // eine Zeile: Status kurz statt der Pfeile, sobald fertig
+        const short = p.out ? 'AUS' : p.bust ? 'ÜBER' : !pips && (st.sub === 'throw' || st.sub === 'tally') && p.thrown > 0 ? `-${p.scored}` : '';
+        if (short) this.board.add(ink(this, px, y, short, { origin: [0, 0.5], color: p.out || p.bust ? RED_INK : undefined }));
+      } else if (status.text) this.board.add(ink(this, x0 + 14, y + 6, status.text, { origin: [0, 0.5], color: status.color }));
+      this.board.add(txt(this, x0 + w - 6, y + 1, String(p.rest), { size: 16, color: RED_INK, origin: [1, 0.5], shadow: false }));
+      if (st.sub === 'over' && st.winners.includes(p.id)) this.board.add(this.add.image(x0 + 8, y1 - 3, ensureTex(this, 'crown', crown)).setOrigin(0.5, 1));
     });
   }
 }

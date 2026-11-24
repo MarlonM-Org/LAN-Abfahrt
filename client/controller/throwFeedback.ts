@@ -4,7 +4,6 @@
  * Reine Funktionen ohne DOM.
  */
 import { BOULE } from '../../shared/boule';
-import { DARTS } from '../../shared/darts';
 import type { BowlThrow } from './bowlingThrow';
 import { type Feedback, type FeedbackLine, type ThrowInfo, type Tone, lr, pct, spinText, timingLine, timingTip } from './motionFeedback';
 
@@ -114,39 +113,6 @@ export function bouleFeedback(t: BowlThrow, info: ThrowInfo, jackPow: number | n
     lines,
     tip,
     tone: worst(short || long ? 'warn' : 'ok', ...lines.map((l) => l.tone)),
-  };
-}
-
-// ------------------------------------------------------------------ Darts
-
-export function dartsFeedback(t: BowlThrow, info: ThrowInfo): Feedback {
-  const lo = DARTS.POWER_IDEAL - DARTS.POWER_TOL;
-  const hi = DARTS.POWER_IDEAL + DARTS.POWER_TOL;
-  const low = t.speed < lo;
-  const high = t.speed > hi;
-  const lines: FeedbackLine[] = [];
-  lines.push({ k: 'Wirkung', v: low ? 'landet tiefer' : high ? 'landet höher' : 'fliegt aufs Kreuz', tone: low || high ? 'warn' : 'ok' });
-  const sideMm = Math.round(t.angle * DARTS.SIDE_MM);
-  push(lines, turnLine(info));
-  lines.push({ k: 'Seite', v: sideMm === 0 ? 'kein Versatz' : `${Math.abs(sideMm)} mm nach ${sideMm < 0 ? 'links' : 'rechts'}`, tone: Math.abs(sideMm) >= 15 ? 'warn' : 'ok' });
-  push(lines, timingLine(info));
-  const tip =
-    strengthTip(info, low, high, {
-      more: 'Zu schwach – schnipp kräftiger aus dem Handgelenk.',
-      less: 'Zu stark – lockerer schnippen, nur aus dem Handgelenk.',
-    }) ??
-    (Math.abs(sideMm) >= 15
-      ? info.source === 'motion'
-        ? 'Handy beim Schnippen nicht drehen – gerade nach vorn.'
-        : 'Gerade nach oben wischen.'
-      : (timingTip(info) ?? 'Perfekte Kraft – genau so!'));
-  return {
-    title: info.source === 'motion' ? 'Dein Schnippen' : 'Dein Wischer',
-    info,
-    bar: { label: 'Kraft', value: t.speed, lo, hi, text: `${pct(t.speed)} (ideal ${pct(lo)}–${pct(hi)})` },
-    lines,
-    tip,
-    tone: worst(low || high ? 'warn' : 'ok', ...lines.map((l) => l.tone)),
   };
 }
 

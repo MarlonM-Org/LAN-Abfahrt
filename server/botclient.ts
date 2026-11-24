@@ -41,7 +41,7 @@ import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
 import type { BogenState } from '../shared/types';
 import { BOGEN, BOGEN_DIRS, BOGEN_STAGES, bogenDx, bogenDy, bogenLineFree, bogenRectSolid, bogenTile } from '../shared/bogen';
-import { DARTS, type DartsState, dartsTarget } from '../shared/darts';
+import { DARTS, type DartsState, dartsAimFor, dartsBump, dartsCalm, dartsDone, dartsLeft, dartsNoise, dartsTarget } from '../shared/darts';
 import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
@@ -214,25 +214,48 @@ export class Bot {
     });
   }
 
-  /** Darts: meist auf die Triple 20, ab und zu aufs Bull – mit menschlicher Streuung bei Kraft und Ruhe */
+  /** Darts: Zielpunkt (mm) des Bots – bleibt wie am Handy von Dart zu Dart stehen */
+  private dartsAim = dartsTarget(20, 'triple');
+
+  /**
+   * Darts (301 Single Out): Fadenkreuz in ein paar Schritten zum Ziel ziehen (der TV zeigt es live), kurz ruhig
+   * halten, dann loslassen. Ziel = leichtester Checkout-Weg, sonst Triple 20 – mit menschlicher Streuung beim
+   * Zielen und ohne Gefühl fürs Atmen (der Server rechnet es zum Wurf-Zeitpunkt dazu).
+   */
   private dartsPlay(st: DartsState) {
     const me = st.players.find((p) => p.id === this.id);
-    if (!me || me.thrown >= DARTS.DARTS_PER_ROUND) return;
+    if (!me || dartsDone(me)) return;
     const n = me.thrown;
     this.once(`darts-${st.round}-${n}`, async () => {
-      await sleep(rand(1500, 4500));
-      const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
-      if (!cur || cur.sub !== 'throw' || cur.round !== st.round) return;
-      const target = Math.random() < 0.7 ? dartsTarget(20, 'triple') : { x: 0, y: 0 };
-      this.send('throw', {
-        n,
-        ax: target.x + rand(-4, 4),
-        ay: target.y + rand(-4, 4),
-        t: Math.round(rand(500, 6000)),
-        amp: rand(DARTS.AMP_MIN, DARTS.AMP_MIN + 16),
-        power: DARTS.POWER_IDEAL + rand(-0.2, 0.2),
-        side: rand(-0.15, 0.15),
-      });
+      await sleep(rand(400, 1400));
+      const fresh = () => {
+        const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
+        const p = cur?.players.find((x) => x.id === this.id);
+        return cur && cur.sub === 'throw' && cur.round === st.round && p && !dartsDone(p) && p.thrown === n ? p : null;
+      };
+      const p = fresh();
+      if (!p) return;
+      const target = dartsAimFor(p.rest, dartsLeft(p));
+      const [nx, ny] = dartsNoise((Math.random() * 2 ** 32) >>> 0);
+      const goal = { x: target.x + nx * 9, y: target.y + ny * 9 };
+      // Ziehen: ein paar Zwischenschritte, das Atmen wird dabei unruhiger
+      let amp = n === 0 ? DARTS.AMP_START : DARTS.AMP_AFTER;
+      const from = { ...this.dartsAim };
+      const steps = 4 + Math.floor(Math.random() * 4);
+      for (let i = 1; i <= steps; i++) {
+        const pos = { x: from.x + ((goal.x - from.x) * i) / steps, y: from.y + ((goal.y - from.y) * i) / steps };
+        amp = dartsBump(dartsCalm(amp, 90), Math.hypot(pos.x - this.dartsAim.x, pos.y - this.dartsAim.y));
+        this.dartsAim = pos;
+        this.send('aim', { x: Math.round(pos.x * 10) / 10, y: Math.round(pos.y * 10) / 10, amp: Math.round(amp * 10) / 10, on: true });
+        await sleep(90);
+      }
+      // ruhig halten …
+      const hold = rand(700, 2200);
+      await sleep(hold);
+      if (!fresh()) return;
+      amp = dartsCalm(amp, hold);
+      // … und loslassen (Serverzeit = eigene Uhr, Bots laufen meist auf demselben Rechner)
+      this.send('throw', { n, ax: Math.round(goal.x * 10) / 10, ay: Math.round(goal.y * 10) / 10, amp: Math.round(amp * 10) / 10, at: Date.now() });
     });
   }
 
