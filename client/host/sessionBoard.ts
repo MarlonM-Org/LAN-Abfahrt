@@ -1,6 +1,7 @@
 /**
  * Leaderboard des Abends auf dem TV (Ergebnis eines Einzelspiels und Lobby):
- * Platz mit ▲▼, Avatar, Name (offline/weg markiert), ggf. Serien-Spalte, Punkte des letzten Spiels, Gesamtpunkte.
+ * Platz mit ▲▼, Avatar, Name (offline markiert), ggf. Serien-Spalte, Punkte des letzten Spiels, Gesamtpunkte.
+ * Nur wer gerade in der Runde ist – wer ganz weg ist, liefert der Server gar nicht erst mit.
  */
 import Phaser from 'phaser';
 import type { SessionState } from '../../shared/types';
@@ -49,7 +50,7 @@ export function drawSessionBoard(scene: Phaser.Scene, layer: Phaser.GameObjects.
   rows.forEach((r, i) => {
     const ry = y + 32 + i * rowH;
     const objs: Phaser.GameObjects.GameObject[] = [];
-    const gone = r.status !== 'online';
+    const gone = r.status === 'offline';
     const color = gone ? SOFT : r.rank === 1 && r.points > 0 ? GOLD_INK : INK;
     objs.push(ink(scene, x + 10, ry, `${r.rank}.`, { origin: [0, 0], color }));
     // Bewegung seit dem letzten Spiel
@@ -73,7 +74,7 @@ export function drawSessionBoard(scene: Phaser.Scene, layer: Phaser.GameObjects.
     if (rowH < 14) portrait.setScale(rowH / 14);
     if (gone) portrait.setAlpha(0.45);
     objs.push(portrait);
-    const tag = r.status === 'removed' ? ' (weg)' : r.status === 'offline' ? ' (off)' : '';
+    const tag = gone ? ' (off)' : '';
     const maxName = withSeries ? 9 : 12;
     objs.push(ink(scene, x + 82, ry, `${r.name.slice(0, maxName)}${tag}`, { origin: [0, 0], color }));
     if (withSeries) objs.push(ink(scene, colSeries, ry, String(s.series!.totals[r.id] ?? 0), { origin: [1, 0], color: SOFT }));
