@@ -25,7 +25,9 @@ export interface Present {
  * Leaderboard des Abends: Punkte pro Spieler-ID über alle Einzelspiele (Arcade, Laptop-Auswahl,
  * Einzelspiel aus der Lobby). Lebt nur im Speicher – bis der VIP/Laptop zurücksetzt oder der Server neu startet
  * (die ewige Tabelle über alle Abende speichert server/leaderboard.ts in data/arcade.json).
- * Spieler, die offline gehen oder entfernt werden, behalten ihre Punkte; wer neu dazukommt, startet bei 0.
+ * Die Tabelle zeigt nur, wer gerade in der Runde ist (online oder kurz offline). Wer ganz weg ist (entfernt bzw.
+ * nach der Offline-Frist raus), verschwindet aus der Tabelle – seine Punkte bleiben aber gespeichert und sind wieder
+ * da, wenn er mit demselben Handy zurückkommt. Wer neu dazukommt, startet bei 0.
  */
 export class SessionBoard {
   private entries = new Map<string, Entry>();
@@ -78,43 +80,26 @@ export class SessionBoard {
     return this.series?.kind === kind ? this.series.round + 1 : 1;
   }
 
-  /** Tabelle: alle mit Punkten + alle, die gerade da sind (mit 0) */
+  /** Tabelle: alle, die gerade da sind (mit ihren Punkten bzw. 0) – Plätze nur unter ihnen */
   rows(present: Present[]): SessionRow[] {
-    const byId = new Map(present.map((p) => [p.id, p]));
     const list: Omit<SessionRow, 'rank'>[] = [];
-    const seen = new Set<string>();
-    for (const e of this.entries.values()) {
-      const p = byId.get(e.id);
-      seen.add(e.id);
-      list.push({
-        id: e.id,
-        name: p?.name ?? e.name,
-        look: p?.look ?? e.look,
-        points: e.points,
-        games: e.games,
-        wins: e.wins,
-        prevRank: this.prevRank.get(e.id) ?? null,
-        last: this.lastGain.get(e.id) ?? null,
-        status: !p || p.removed ? 'removed' : p.connected ? 'online' : 'offline',
-        ...(e.bot || p?.isBot ? { bot: true } : {}),
-      });
-    }
     for (const p of present) {
-      if (seen.has(p.id) || p.removed) continue;
+      if (p.removed) continue;
+      const e = this.entries.get(p.id);
       list.push({
         id: p.id,
         name: p.name,
         look: p.look,
-        points: 0,
-        games: 0,
-        wins: 0,
+        points: e?.points ?? 0,
+        games: e?.games ?? 0,
+        wins: e?.wins ?? 0,
         prevRank: this.prevRank.get(p.id) ?? null,
-        last: null,
+        last: this.lastGain.get(p.id) ?? null,
         status: p.connected ? 'online' : 'offline',
-        ...(p.isBot ? { bot: true } : {}),
+        ...(e?.bot || p.isBot ? { bot: true } : {}),
       });
     }
-    list.sort((a, b) => b.points - a.points || b.wins - a.wins || (a.status === 'removed' ? 1 : 0) - (b.status === 'removed' ? 1 : 0) || a.name.localeCompare(b.name));
+    list.sort((a, b) => b.points - a.points || b.wins - a.wins || a.name.localeCompare(b.name));
     let rank = 0;
     return list.map((r, i) => {
       const prev = list[i - 1];
