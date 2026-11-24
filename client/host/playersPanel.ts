@@ -9,6 +9,7 @@ import type { GameState, KickResponse, PlayerPublic } from '../../shared/types';
 import { offlineLabel } from '../../shared/players';
 import { bus, getState, metaReceivedAt } from './store';
 import { isMusicMenuOpen } from './musicMenu';
+import { say as speak } from './speech';
 
 /** So lange bleibt der Knopf nach einer Mausbewegung sichtbar (im Spiel) */
 const PEEK_MS = 3500;
@@ -65,6 +66,8 @@ export function initPlayersPanel(socket: Socket) {
 
   // Der Server sagt nach 'host:hello', ob diese TV-Seite am Laptop selbst läuft (Loopback)
   socket.on('host:info', (r: { local?: boolean }) => ((local = !!r?.local), (key = ''), render()));
+
+  socket.on('vip:changed', (r: { name?: string }) => r?.name && speak(`${r.name} ist jetzt VIP`, { interrupt: false }));
 
   const say = (text: string) => (msg.textContent = text);
   const result = (ok: string) => (r: KickResponse) => say(r?.ok ? ok.replace('#', String(r.removed ?? 0)) : (r?.error ?? 'Hat nicht geklappt.'));
@@ -124,6 +127,13 @@ export function initPlayersPanel(socket: Socket) {
       const b = document.createElement('button');
       b.disabled = !local;
       confirmBtn(b, 'Entfernen', () => socket.emit('host:kick', p.id, result(`${p.name} wurde entfernt.`)));
+      if (!p.isVip) {
+        const v = document.createElement('button');
+        v.disabled = !local;
+        confirmBtn(v, '👑 Zum VIP machen', () =>
+          socket.emit('host:vip', p.id, (r: KickResponse) => say(r?.ok ? `${p.name} ist jetzt VIP.` : (r?.error ?? 'Hat nicht geklappt.'))));
+        row.append(v);
+      }
       row.append(b);
       list.append(row);
     }
