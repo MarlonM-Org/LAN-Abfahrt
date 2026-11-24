@@ -23,7 +23,7 @@ interface Playback {
 }
 
 /**
- * Boule am Strand (TV): Bouleplatz von oben, Sonnenuntergang am Horizont.
+ * Boule (TV): Bouleplatz von oben, Sonnenuntergang am Horizont.
  * Spielt die vom Server simulierten Würfe ab (Bogen mit Schatten, Sandwolke, Rollen) und misst am Ende jeder Aufnahme.
  */
 export class BouleScene extends Phaser.Scene {

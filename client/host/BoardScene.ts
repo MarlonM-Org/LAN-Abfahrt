@@ -47,8 +47,6 @@ export class BoardScene extends Phaser.Scene {
   private prevItems: Record<string, string | null> | null = null;
   private prevUsing: Record<string, string> = {};
   private askKey = '';
-  private askMs = 0;
-  private askAt = 0;
   private askText: Phaser.GameObjects.Text | null = null;
   private duelKey = '';
   private introShown = false;
@@ -60,8 +58,6 @@ export class BoardScene extends Phaser.Scene {
   private prevRolls: Record<string, number> = {};
   private msgSeq = -1;
   /** Würfelfenster: Restzeit (Server schickt ~1×/s, dazwischen zählt der TV selbst) */
-  private rollMs = 0;
-  private rollAt = 0;
   private roundSeen = '';
   private bonusKey = '';
   // Tageszeit
@@ -84,8 +80,6 @@ export class BoardScene extends Phaser.Scene {
     this.prevItems = null;
     this.prevUsing = {};
     this.askKey = '';
-    this.askMs = 0;
-    this.askAt = 0;
     this.askText = null;
     this.duelKey = '';
     this.introShown = false;
@@ -94,8 +88,6 @@ export class BoardScene extends Phaser.Scene {
     this.prevCocktails = null;
     this.prevRolls = {};
     this.msgSeq = -1;
-    this.rollMs = 0;
-    this.rollAt = 0;
     this.roundSeen = '';
     this.bonusKey = '';
     this.dayT = -1;
@@ -174,15 +166,13 @@ export class BoardScene extends Phaser.Scene {
       const t = this.tokens.get(id);
       if (t) icon.setPosition(t.x + 9, t.y - 30).setDepth(t.depth + 1);
     }
-    if (this.askText && b.ask) {
-      const left = Math.max(0, Math.ceil((this.askMs - (this.time.now - this.askAt)) / 1000));
-      this.askText.setText(`${ASK_ICON[b.ask.kind]} ${left}s`);
-    }
     if (b.sub !== 'roll') return;
-    const left = Math.max(0, Math.ceil((this.rollMs - (this.time.now - this.rollAt)) / 1000));
+    // Kein Zeitlimit – wie viele schon gewürfelt haben; fehlen nur noch wenige, stehen sie da (📵 = Handy weg, der VIP kann überspringen)
     const here = b.order.filter((id) => !playerById(id)?.removed);
-    const done = here.filter((id) => id in b.rolls).length;
-    this.timerText.setText(`Alle würfeln! ${done}/${here.length} · ${left}s`);
+    const missing = here.filter((id) => !(id in b.rolls));
+    const short = (id: string) => `${playerById(id)?.connected === false ? '📵' : ''}${(playerById(id)?.name ?? '?').slice(0, 8)}`;
+    const names = missing.length && missing.length <= 2 ? ` · ⏳${missing.map(short).join(', ')}` : '';
+    this.timerText.setText(`Würfeln ${here.length - missing.length}/${here.length}${names}`);
   }
 
   // ---------------------------------------------------------------- Tageszeit (Overlay, Sonne/Mond, Lichterkette)
@@ -316,14 +306,7 @@ export class BoardScene extends Phaser.Scene {
     this.bar.setPosition(bp.x, bp.y - 4).setDepth(bp.y + 30);
 
     this.roundText.setText(`Runde ${Math.min(b.round, b.maxRounds)}/${b.maxRounds}${b.double && b.sub !== 'bonus' ? '  x2' : ''}`);
-    if (b.sub === 'roll') {
-      if (b.rollMs !== this.rollMs) {
-        this.rollMs = b.rollMs;
-        this.rollAt = this.time.now;
-      }
-    } else {
-      this.timerText.setText('');
-    }
+    if (b.sub !== 'roll') this.timerText.setText('');
     this.msgText.setText(b.message);
 
     const curId = b.order[b.turnIdx];
@@ -385,10 +368,6 @@ export class BoardScene extends Phaser.Scene {
   private renderAsk(b: BoardState) {
     const a = b.sub === 'moving' ? b.ask : null;
     const key = a ? `${a.seq}` : '';
-    if (a && (a.ms !== this.askMs || key !== this.askKey)) {
-      this.askMs = a.ms;
-      this.askAt = this.time.now;
-    }
     if (key === this.askKey) return;
     this.askKey = key;
     this.askLayer.removeAll(true);
@@ -399,7 +378,8 @@ export class BoardScene extends Phaser.Scene {
     const y = Math.max(70, (t?.y ?? 140) - 46);
     const bubble = this.add.container(x, y);
     bubble.add(panel(this, -30, -11, 60, 22));
-    this.askText = ink(this, 0, -4, `${ASK_ICON[a.kind]} ${Math.ceil(a.ms / 1000)}s`, { color: RED_INK });
+    // Kein Countdown: der Spieler entscheidet in Ruhe
+    this.askText = ink(this, 0, -4, `${ASK_ICON[a.kind]} ?`, { color: RED_INK });
     bubble.add(this.askText);
     bubble.setScale(0.2);
     this.tweens.add({ targets: bubble, scale: 1, duration: 260, ease: 'Back.out' });

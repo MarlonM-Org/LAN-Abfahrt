@@ -1,5 +1,5 @@
 /**
- * Boule am Strand: gemeinsame Geometrie und Regeln (Server, TV, Handy, Bots).
+ * Boule: gemeinsame Geometrie und Regeln (Server, TV, Handy, Bots).
  * Koordinaten = Welt-Pixel (480 × 270), von oben gesehen: Wurfkreis links, geworfen wird nach rechts.
  * Aus Sicht des Werfers ist "rechts" auf dem TV also unten (+y).
  */

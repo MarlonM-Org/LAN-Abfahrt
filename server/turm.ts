@@ -2,6 +2,7 @@ import Matter from 'matter-js';
 import type { MiniSnapshot, TurmActive, TurmLane } from '../shared/types';
 import { TURM, TURM_SHAPES, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore } from './minigame';
+import { ruhig, stapelSchritt, stapelTraegheitSetzen } from './stapelphysik';
 
 const { Bodies, Body, Composite, Engine } = Matter;
 
@@ -124,8 +125,8 @@ function makeBody(shape: number, x: number, y: number, angle: number, size: numb
     slop: 0.03,
     isStatic: !dynamic,
   });
-  // Höhere Trägheit: Teile kippen etwas gemütlicher – der Turm wackelt, stürzt aber nicht bei jedem Hauch ein
-  if (dynamic) Body.setInertia(body, body.inertia * 4);
+  // Richtige Trägheit (mit Steiner-Anteil, siehe stapelphysik.ts): Teile kippen gemütlich, der Turm wackelt, stürzt aber nicht bei jedem Hauch ein
+  if (dynamic) stapelTraegheitSetzen(body);
   Body.setAngle(body, angle);
   return body;
 }
@@ -242,7 +243,7 @@ export class TurmGame implements MiniGame {
       if (lane.frozen || lane.place) continue;
       for (let i = 0; i < steps; i++) {
         this.moveActive(lane, now);
-        Engine.update(lane.engine, STEP_MS);
+        stapelSchritt(lane.engine, STEP_MS);
       }
       this.cleanup(lane);
       this.measure(lane, now);
@@ -516,7 +517,7 @@ export class TurmGame implements MiniGame {
   }
 
   private settled(b: Matter.Body) {
-    return b.isSleeping || b.isStatic || (b.speed < 0.25 && b.angularSpeed < 0.01);
+    return ruhig(b);
   }
 
   private stableHeight(lane: Lane) {
@@ -690,9 +691,11 @@ export class TurmGame implements MiniGame {
       },
       lane: (i: number) => g.lanes[i],
       /** Liegendes Teil (Physik-y nach unten, x/y = Schwerpunkt) */
-      place(i: number, shape: number, x: number, y: number, rot: number, isStatic: boolean) {
+      /** `vy`: Fallgeschwindigkeit beim Aufsetzen (wie `land()` sie mitgibt) */
+      place(i: number, shape: number, x: number, y: number, rot: number, isStatic: boolean, vy = 0) {
         const lane = g.lanes[i];
         const body = makeBody(shape, x, y, (rot * Math.PI) / 2, B, !isStatic);
+        if (vy) Body.setVelocity(body, { x: 0, y: vy });
         Composite.add(lane.engine.world, body);
         lane.bodies.push(body);
         lane.meta.set(body.id, [++g.seq, shape, 0]);

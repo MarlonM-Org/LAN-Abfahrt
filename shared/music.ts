@@ -220,7 +220,7 @@ export function defaultSongForScene(scene: string): string {
       return 'western';
     case 'volley': case 'bowling': case 'darts': case 'golf': case 'boule':
       return 'sport';
-    case 'wasser': case 'angeln': case 'sup':
+    case 'angeln': case 'sup':
       return 'wasser';
     case 'sekt':
       return 'poolparty';

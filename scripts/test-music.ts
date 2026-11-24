@@ -222,7 +222,7 @@ console.log('\nEingebaute Songs:');
   const counts = new Map<string, number>();
   for (const x of scenes) counts.set(defaultSongForScene(x), (counts.get(defaultSongForScene(x)) ?? 0) + 1);
   check(Math.max(...counts.values()) <= 7, `Abwechslung: höchstens 7 Szenen pro Song (${[...counts].map(([k, n]) => `${k} ${n}`).join(', ')})`);
-  const want: Record<string, string> = { zauber: 'zauber', igel: 'igelkrieg', kart: 'rennen', autoball: 'rennen', smash: 'arena', wpistole: 'western', volley: 'sport', murder: 'krimi', wasser: 'wasser', angeln: 'wasser' };
+  const want: Record<string, string> = { zauber: 'zauber', igel: 'igelkrieg', kart: 'rennen', autoball: 'rennen', smash: 'arena', wpistole: 'western', volley: 'sport', murder: 'krimi', angeln: 'wasser', sup: 'wasser' };
   const wrong = Object.entries(want).filter(([k, v]) => defaultSongForScene(k) !== v);
   check(!wrong.length, `Themen-Zuordnung${wrong.length ? ' falsch: ' + wrong.map(([k]) => k).join(', ') : ''}`);
 }

@@ -154,7 +154,7 @@ function collide(a: Body, b: Body): boolean {
 // ================================================================== Spiel
 
 /**
- * Boule am Strand: bis 4 Spieler jeder gegen jeden, ab 5 zwei Teams. Das Schweinchen wird zu Beginn jeder
+ * Boule: bis 4 Spieler jeder gegen jeden, ab 5 zwei Teams. Das Schweinchen wird zu Beginn jeder
  * Aufnahme automatisch geworfen (zufällige Stelle). Es wirft immer die Seite, die NICHT am nächsten liegt.
  */
 export class BouleGame implements MiniGame {

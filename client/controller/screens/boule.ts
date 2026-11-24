@@ -20,7 +20,7 @@ export function pickBoule(s: BouleState): Screen {
     return [
       'bo-intro',
       message(
-        'Boule am Strand!',
+        'Boule!',
         `${team}${s.ballsPer[id]} ${s.ballsPer[id] === 1 ? 'Kugel' : 'Kugeln'} pro Aufnahme. Wer nicht am nächsten am Schweinchen liegt, wirft. Bis ${s.target} Punkte oder ${s.maxEnds} Aufnahmen.`,
       ),
     ];

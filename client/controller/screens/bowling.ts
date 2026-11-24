@@ -13,7 +13,7 @@ export function pickBowling(s: BowlingState): Screen {
   if (!s.order.includes(id)) return ['spectate', message('Du schaust zu', 'Nächstes Spiel bist du dabei!')];
   if (s.sub === 'intro') {
     forgetFeedback('bowling');
-    return ['bw-intro', message('Strand-Bowling!', `${s.frames} Frames pro Person. Reihum werfen – am Handy schwingen oder wischen. Strike = alle 10 Pins!`)];
+    return ['bw-intro', message('Bowling!', `${s.frames} Frames pro Person. Reihum werfen – am Handy schwingen oder wischen. Strike = alle 10 Pins!`)];
   }
   if (s.sub === 'over') return ['bw-over', () => buildWatch(true)];
   if (s.sub === 'aim' && s.turn === id) return [`bw-aim-${s.aimSeq}`, () => buildAim(s)];

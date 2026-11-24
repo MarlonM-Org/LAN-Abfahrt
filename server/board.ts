@@ -9,8 +9,7 @@ import {
 import { Timers, shuffle } from './minigame';
 
 const {
-  STEP_MS, MOVE_LEAD_MS, TAXI_MS, PAUSE_MS, EVENT_PAUSE_MS, INTRO_MS, ROLL_WINDOW_MS, BONUS_DRUM_MS, BONUS_SHOW_MS,
-  ASK_BAR_MS, ASK_SHOP_MS, ASK_FORK_MS, DUEL_CHOOSE_MS, DUEL_REVEAL_MS, DUEL_DONE_MS,
+  STEP_MS, MOVE_LEAD_MS, TAXI_MS, PAUSE_MS, EVENT_PAUSE_MS, INTRO_MS, BONUS_DRUM_MS, BONUS_SHOW_MS, DUEL_REVEAL_MS, DUEL_DONE_MS,
 } = BOARD_TIMING;
 
 export interface BoardCtx {
@@ -201,12 +200,16 @@ interface Move {
 }
 
 /**
- * Das Spielbrett im Mario-Party-Stil: Pro Runde würfeln alle gleichzeitig (Würfelfenster), danach laufen die Züge
+ * Das Spielbrett im Mario-Party-Stil: Pro Runde würfeln alle gleichzeitig, danach laufen die Züge
  * nacheinander im Schnelldurchlauf, dann folgt ein Minispiel. Unterwegs gibt es Entscheidungen am Handy:
  * Cocktail an der Bar kaufen (Preisstaffel 10/15/20), Item im Laden kaufen (Doppelwürfel, Cocktail-Klau, Taxi, Schild),
  * Abkürzung oder langer Weg an der Gabelung, und das Duell „Teilen oder Klauen“ auf dem Duell-Feld.
  * Die letzten Runden zählen doppelt, das Finale bringt Cocktails, am Ende gibt es Bonus-Cocktails
  * (Minispiel-Star, Pechvogel, Wanderer) und erst dann den Endstand.
+ *
+ * Kein Zeitlimit für Spieler (Marlons Wunsch: in Ruhe zocken): Würfeln, Bar, Laden, Gabelung und Duell warten,
+ * bis der Spieler selbst gewählt hat – auch, wenn sein Handy gerade weg ist (gesperrt, App gewechselt). Der Server
+ * entscheidet nur, wenn der VIP/Laptop überspringt; vom VIP entfernte Spieler werden übersprungen.
  */
 export class Board {
   state: BoardState;
@@ -214,13 +217,10 @@ export class Board {
   private lastMini: MiniKind | null = null;
   /** Ist das angesagte Minispiel das Finale? (Sieger bekommen Cocktails) */
   private finaleNow = false;
-  private rollDeadline = 0;
   private closing = false;
   private move: Move | null = null;
   private askSeq = 0;
-  private askDeadline = 0;
   private duelSeq = 0;
-  private duelDeadline = 0;
   /** Geheime Duell-Wahl (geht nur per `private` an den jeweiligen Spieler) */
   private duelPicks: Record<string, DuelPick> = {};
 
@@ -251,7 +251,6 @@ export class Board {
       ask: null,
       duel: null,
       rolls: {},
-      rollMs: 0,
       double: false,
       timeOfDay: 0,
       stats: each((id) => ({ ...freshStats(), ...from?.stats[id] })),
@@ -356,10 +355,9 @@ export class Board {
     }
   }
 
-  /** Handy weg (gesperrt, App gewechselt): nicht auf ihn warten – am Ende des Fensters würfelt der Server */
-  playerDisconnected(id: string) {
-    this.checkAllRolled();
-    this.withoutPlayer(id);
+  /** Handy weg: das Brett wartet trotzdem (Marlon: „3 s ist zu schnell“) – weiter geht's, wenn er zurück ist oder der VIP überspringt */
+  playerDisconnected(_id: string) {
+    this.ctx.onChange();
   }
 
   /** Spieler entfernt: Würfelfenster wartet nicht auf ihn, seine Züge werden übersprungen */
@@ -368,7 +366,7 @@ export class Board {
     this.withoutPlayer(id);
   }
 
-  /** Offene Entscheidung/Duell-Wahl eines Spielers, der weg ist, sofort auflösen */
+  /** Offene Entscheidung/Duell-Wahl eines vom VIP entfernten Spielers sofort auflösen */
   private withoutPlayer(id: string) {
     const s = this.state;
     if (s.ask?.playerId === id) this.resolveAsk(this.defaultAnswer());
@@ -452,14 +450,7 @@ export class Board {
       this.say(`${s.message} ${names} ${s.joined.length > 1 ? 'steigen' : 'steigt'} mit ${s.coins[s.joined[0]]} Münzen ein!`);
     }
     this.persist();
-    this.rollDeadline = Date.now() + ROLL_WINDOW_MS;
-    s.rollMs = ROLL_WINDOW_MS;
-    // Restzeit ~1×/s an TV und Handys (die zählen dazwischen selbst runter)
-    this.timers.every(1000, () => {
-      s.rollMs = Math.max(0, this.rollDeadline - Date.now());
-      if (s.rollMs <= 300) this.closeWindow();
-      else this.ctx.onChange();
-    });
+    // Kein Zeitlimit: es geht weiter, sobald alle Verbundenen gewürfelt haben (oder der VIP „Für alle würfeln“ drückt)
     this.ctx.onChange();
     this.checkAllRolled();
   }
@@ -483,24 +474,22 @@ export class Board {
     return late;
   }
 
-  /** Haben alle, die da sind, gewürfelt? → Fenster kurz danach schließen */
+  /** Haben alle auf dem Brett gewürfelt (auch wer gerade kein Handy hat – auf den wird gewartet)? → kurz danach weiter */
   private checkAllRolled() {
     const s = this.state;
     if (s.sub !== 'roll' || this.closing) return;
-    const here = this.active.filter((id) => this.ctx.isConnected(id));
-    if (here.some((id) => !(id in s.rolls))) return;
+    if (this.active.some((id) => !(id in s.rolls))) return;
     this.closing = true;
-    this.timers.later(here.length ? 700 : 1500, () => this.closeWindow());
+    this.timers.later(700, () => this.closeWindow());
   }
 
-  /** Würfelfenster zu: Für alle, die nicht gewürfelt haben, würfelt der Server – dann laufen die Züge nacheinander */
+  /** Würfeln vorbei: Für alle, die (weil der VIP überspringt) nicht gewürfelt haben, würfelt der Server – dann laufen die Züge nacheinander */
   private closeWindow() {
     const s = this.state;
     if (s.sub !== 'roll') return;
     this.timers.clear();
     for (const id of this.active) if (!(id in s.rolls)) s.rolls[id] = this.rollValue(id);
     s.sub = 'moving';
-    s.rollMs = 0;
     s.turnIdx = -1;
     this.nextMove();
   }
@@ -608,8 +597,7 @@ export class Board {
     const s = this.state;
     const m = this.move!;
     const name = this.ctx.nameOf(m.id);
-    const ms = kind === 'bar' ? ASK_BAR_MS : kind === 'shop' ? ASK_SHOP_MS : ASK_FORK_MS;
-    const a: BoardAsk = { seq: ++this.askSeq, playerId: m.id, kind, ms };
+    const a: BoardAsk = { seq: ++this.askSeq, playerId: m.id, kind };
     if (kind === 'bar') {
       a.price = this.price(m.id);
       this.say(`${name} steht an der Bar – Cocktail für ${a.price} Münzen?`);
@@ -622,16 +610,10 @@ export class Board {
     }
     s.ask = a;
     this.ctx.onChange();
-    if (!this.ctx.isConnected(m.id)) return this.resolveAsk(this.defaultAnswer());
-    this.askDeadline = Date.now() + ms;
-    this.timers.every(1000, () => {
-      a.ms = Math.max(0, this.askDeadline - Date.now());
-      if (a.ms <= 300) this.resolveAsk(this.defaultAnswer());
-      else this.ctx.onChange();
-    });
+    // Kein Zeitlimit: gewartet wird, bis der Spieler antwortet (auch ohne Handy) – nur per VIP/Laptop wählt der Server
   }
 
-  /** Was der Server wählt, wenn das Handy nicht antwortet */
+  /** Was der Server wählt, wenn der VIP/Laptop überspringt (oder der Spieler entfernt wurde) */
   private defaultAnswer(): unknown {
     const s = this.state;
     const a = s.ask;
@@ -747,21 +729,13 @@ export class Board {
   private startDuel(a: string, b: string) {
     const s = this.state;
     this.duelPicks = {};
-    s.duel = { seq: ++this.duelSeq, a, b, pot: DUEL_POT, sub: 'choose', ms: DUEL_CHOOSE_MS, chosen: [] };
+    s.duel = { seq: ++this.duelSeq, a, b, pot: DUEL_POT, sub: 'choose', chosen: [] };
     this.say(`Duell um ${DUEL_POT} Münzen: ${this.ctx.nameOf(a)} gegen ${this.ctx.nameOf(b)} – beide wählen geheim!`);
     this.ctx.onChange();
-    this.duelDeadline = Date.now() + DUEL_CHOOSE_MS;
-    this.timers.every(1000, () => {
-      const d = s.duel;
-      if (!d || d.sub !== 'choose') return;
-      d.ms = Math.max(0, this.duelDeadline - Date.now());
-      if (d.ms <= 300) this.revealDuel();
-      else this.ctx.onChange();
-    });
-    for (const id of [a, b]) if (!this.ctx.isConnected(id)) this.withoutPlayer(id);
+    // Kein Zeitlimit: aufgedeckt wird, wenn beide gewählt haben – auch ohne Handy wird gewartet; der VIP kann auflösen (fehlende Wahl = Teilen)
   }
 
-  /** Beide haben gewählt (oder die Zeit ist um): Karten aufdecken – der TV dreht sie nacheinander um */
+  /** Beide haben gewählt (oder der VIP löst auf): Karten aufdecken – der TV dreht sie nacheinander um */
   private revealDuel() {
     const s = this.state;
     const d = s.duel;
@@ -769,7 +743,6 @@ export class Board {
     this.timers.clear();
     const picks: Record<string, DuelPick> = { [d.a]: this.duelPicks[d.a] ?? 'share', [d.b]: this.duelPicks[d.b] ?? 'share' };
     d.sub = 'reveal';
-    d.ms = 0;
     d.picks = picks;
     d.chosen = [d.a, d.b];
     this.say('Die Karten werden aufgedeckt …');
@@ -907,7 +880,6 @@ export class Board {
     s.sub = 'bonus';
     s.timeOfDay = 1;
     s.rolls = {};
-    s.rollMs = 0;
     s.ask = null;
     s.duel = null;
     s.bonus = { awards: this.awards(), shown: 0, revealed: false };

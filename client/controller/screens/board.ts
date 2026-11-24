@@ -10,21 +10,6 @@ function stats(b: BoardState) {
   return `<div class="stats"><span>$ ${b.coins[id] ?? 0}</span>${slot}<span class="pink">Cocktails ${b.cocktails[id] ?? 0}</span></div>`;
 }
 
-/** Lokaler Countdown aus einem Server-Wert (ms, ~1×/s aktualisiert) */
-function countdown() {
-  let ms = 0;
-  let at = performance.now();
-  return {
-    set(v: number) {
-      if (v !== ms) {
-        ms = v;
-        at = performance.now();
-      }
-    },
-    left: () => Math.max(0, Math.ceil((ms - (performance.now() - at)) / 1000)),
-  };
-}
-
 export function pickBoard(b: BoardState): Screen {
   const id = store.playerId ?? '';
   // Bonus-Cocktails sehen alle (auch wer gerade erst dazugekommen ist)
@@ -71,24 +56,20 @@ function buildRoll(b: BoardState) {
     socket.emit('board:roll');
   });
   app.append(root);
-  // Restzeit: Server schickt rollMs ~1×/s, dazwischen zählt das Handy selbst
-  const cd = countdown();
-  cd.set(b.rollMs);
+  // Kein Zeitlimit: es geht weiter, sobald alle gewürfelt haben
   const sub = q(root, '.roll-sub');
   const paint = () => {
     const s = store.state?.board;
     if (!s || s.sub !== 'roll') return;
     const end = s.double ? ' · Endspurt: doppelte Münzen!' : '';
-    sub.textContent = `Runde ${s.round}/${s.maxRounds} · noch ${cd.left()} s${end}`;
+    sub.textContent = `Runde ${s.round}/${s.maxRounds}${end}`;
   };
-  const timer = setInterval(() => (root.isConnected ? paint() : clearInterval(timer)), 250);
   paint();
   const me = store.playerId ?? '';
   let itemKey = '';
   return () => {
     const s = store.state?.board;
     if (!s) return;
-    cd.set(s.rollMs);
     q(root, '.stat-slot').innerHTML = stats(s);
     const mine = s.rolls[me];
     const using = s.using?.[me];
@@ -179,20 +160,16 @@ function buildAsk(ask: BoardAsk) {
       q(root, '.ask-wait').textContent = 'Gewählt!';
     });
   }
-  const cd = countdown();
-  cd.set(ask.ms);
-  const fallback = ask.kind === 'bar' ? 'Ja' : ask.kind === 'shop' ? 'nichts kaufen' : 'der Server wählt';
+  // Kein Zeitlimit: alle warten, bis gewählt ist
   const paint = () => {
     if (answered) return;
-    q(root, '.ask-wait').textContent = `Noch ${cd.left()} s – ohne Antwort: ${fallback}`;
+    q(root, '.ask-wait').textContent = 'Lass dir Zeit – alle warten auf dich.';
   };
-  const timer = setInterval(() => (root.isConnected ? paint() : clearInterval(timer)), 250);
   paint();
   return () => {
     const s = store.state?.board;
     if (!s) return;
     q(root, '.stat-slot').innerHTML = stats(s);
-    if (s.ask?.seq === ask.seq) cd.set(s.ask.ms);
     paint();
   };
 }
@@ -257,22 +234,18 @@ function buildDuelChoose(d: BoardDuel) {
       socket.emit('board:duel', { seq: d.seq, pick: picked });
     });
   }
-  const cd = countdown();
-  cd.set(d.ms);
   const paint = () => {
     const s = store.state?.board?.duel;
     const other = s?.chosen.includes(opp);
     q(root, '.duel-wait').textContent = picked
       ? `Du hast ${picked === 'share' ? 'TEILEN' : 'KLAUEN'} gewählt. ${other ? 'Beide haben gewählt – schaut auf den TV!' : `Warte auf ${nameOf(opp)} ...`}`
-      : `Noch ${cd.left()} s – ohne Wahl: Teilen${other ? ` · ${nameOf(opp)} hat schon gewählt` : ''}`;
+      : `Wähle in Ruhe${other ? ` – ${nameOf(opp)} hat schon gewählt` : ''}.`;
   };
-  const timer = setInterval(() => (root.isConnected ? paint() : clearInterval(timer)), 250);
   paint();
   return () => {
     const s = store.state?.board;
     if (!s) return;
     q(root, '.stat-slot').innerHTML = stats(s);
-    if (s.duel?.seq === d.seq) cd.set(s.duel.ms);
     // Nach einem Reconnect: die eigene Wahl kommt über das private Event zurück
     const priv = store.priv;
     if (!picked && priv?.kind === 'board' && priv.state.duelPick) show(priv.state.duelPick);

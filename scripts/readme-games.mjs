@@ -54,7 +54,8 @@ const arcade = groups.map((g) => ({ title: g.title, kinds: g.kinds.filter((k) =>
 const covered = new Set([...arcade.flatMap((g) => g.kinds), ...drink, ...date]);
 const rest = Object.keys(info).filter((k) => !covered.has(k));
 const sections = [...arcade, { title: 'Trinkspiel', kinds: drink }, { title: 'Story: Date Night (zu zweit)', kinds: date }];
-if (rest.length) sections.push({ title: 'Weitere', kinds: rest });
+// In MINI_INFO, aber in keiner Arcade-Gruppe: zurzeit deaktiviert (Code bleibt, z. B. Guess the Song bis es Song-Lizenzen gibt)
+if (rest.length) sections.push({ title: 'Zurzeit deaktiviert (nicht in der Auswahl)', kinds: rest });
 
 // ---------------------------------------------------------------- Tabelle
 const ORIENT = { landscape: '↔ quer', portrait: '↕ hochkant', any: 'egal' };
