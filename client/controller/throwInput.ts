@@ -25,6 +25,8 @@ export interface ThrowInputTexts {
   holding?: string;
   /** Umrechnung der Sensordaten (Standard: Bowling-Schwung) – z. B. Darts: kurzes Schnippen */
   swing?: (samples: MotionSample[]) => ThrowResult;
+  /** Umrechnung der Wischgeste (Standard: Tempo = Stärke) – z. B. Flunkyball: Länge = Kraft */
+  swipe?: (pts: SwipePoint[], padH: number) => ThrowResult;
   /** Skala von `swing` fürs Feedback (Standard: Bowling) */
   scale?: SwingScale;
 }
@@ -199,7 +201,7 @@ export function mountThrowInput(
       pts.push({ x: e.clientX, y: e.clientY, t: e.timeStamp });
       ball.style.left = '';
       ball.style.top = '';
-      const r = swipeToThrow(pts, pad.clientHeight);
+      const r = (texts.swipe ?? swipeToThrow)(pts, pad.clientHeight);
       const info = swipeInfo(pts);
       if (r.ok) doThrow(r.t, info);
       else {
