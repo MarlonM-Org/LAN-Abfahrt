@@ -101,7 +101,7 @@ export class LiederTon {
     // 1. Soundtrack
     for (const s of BUILTIN_SONGS) songs.push({ id: `synth:${s.id}`, title: s.title, artist: 'LAN-Abfahrt', year: null, genre: SOUNDTRACK_GENRE.id, quelle: 'synth', synth: s.id });
     for (const info of this.music?.list() ?? []) {
-      if (info.builtin) continue;
+      if (info.builtin || info.overrides) continue;
       songs.push({ id: `synth:${info.id}`, title: info.title, artist: 'Musik-Werkstatt', year: null, genre: SOUNDTRACK_GENRE.id, quelle: 'synth', synth: info.id });
     }
     // 2. Eigene Dateien

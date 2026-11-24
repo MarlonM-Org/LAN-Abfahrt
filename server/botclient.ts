@@ -11,12 +11,12 @@ import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
 import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
-import { ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
+import { ARCADE_GROUPS, ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lightSwitch, lineFree, nextWaypoint, roomAt, roomInner } from '../shared/house';
 import { SMASH_STAGES, mainPlatform } from '../shared/smash';
 import { GEIST, inCone, navTarget, roomCenter } from '../shared/geist';
-import { CONSTELLATIONS, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
+import { CONSTELLATIONS, DESCENT, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
 import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState, aimFor as wasserAimFor } from '../shared/wasser';
@@ -63,6 +63,7 @@ import { liederBot } from './liederbot';
 import { sektBot } from './sektbot';
 import { bandBot } from './bandbot';
 import { malerBot } from './malerbot';
+import { type BotSkill, asBotSkill } from '../shared/players';
 
 export interface BotOptions {
   url: string;
@@ -81,12 +82,32 @@ export interface BotOptions {
   kartView?: 'phone' | 'tv';
   /** Turnier: Playlist-ID (sport, arena, kopf) oder eigene Liste „sumo,sprint,maexchen“ */
   turnier?: string;
+  /** Stärke: leicht/normal (menschliche Reaktionszeit, kleine Fehler) oder profi (sofort, exakt) – Standard normal */
+  skill?: string;
   /** Ausgaben (z. B. Phasenwechsel) */
   log?: (msg: string) => void;
   onDone?: () => void;
 }
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/**
+ * „Menschliche“ Eingaben in Action-Spielen: Jede Bot-Eingabe geht mit Reaktionszeit raus, der Stick zittert etwas
+ * und ab und zu wird ein Druck verpasst. So spielen die Bots wie Menschen am Handy – und finden dabei auch Stellen,
+ * an denen man mit normaler Reaktionszeit hängen bleibt (Profi-Bots reagieren auf den Tick genau).
+ */
+const HUMAN: Record<BotSkill, { lag: [number, number]; noise: number; miss: number }> = {
+  leicht: { lag: [260, 480], noise: 0.22, miss: 0.16 },
+  normal: { lag: [140, 290], noise: 0.1, miss: 0.06 },
+  profi: { lag: [0, 0], noise: 0, miss: 0 },
+};
+/**
+ * Nur Echtzeit-Spiele (Arcade-Gruppe „Action“) – Runden-, Quiz- und Abstimmungsspiele bleiben exakt, damit dort
+ * kein verpasster Knopf eine Runde aufhält. Kart bleibt außen vor (eigener Lenk-Regler, wird gerade umgebaut).
+ */
+const HUMAN_KINDS = new Set<string>(ARCADE_GROUPS.find((g) => g.title === 'Action')!.kinds.filter((k) => k !== 'kart'));
+/** Diese Eingaben können „verpasst“ werden (nur das Drücken, nie Loslassen oder Eingaben mit seq) */
+const MISSABLE = new Set(['jump', 'hop', 'dash', 'strike', 'attack', 'tap', 'paddle', 'btn', 'punch', 'grab', 'cast']);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export class Bot {
@@ -100,6 +121,9 @@ export class Bot {
   phasesSeen = new Set<string>();
 
   leader: boolean;
+  private human = HUMAN.normal;
+  /** Eingaben bleiben in Reihenfolge: nie früher als die vorige */
+  private sendAt = 0;
   private resultCount = 0;
   private nochmalCount = 0;
   private resultsEntered = 0;
@@ -160,6 +184,7 @@ export class Bot {
     private opts: BotOptions,
   ) {
     this.leader = !!opts.leader;
+    this.setSkill(asBotSkill(opts.skill));
     this.socket = io(opts.url, { transports: ['websocket'], forceNew: true });
     // Regelmäßig "nachdenken" – der Zustand kommt nicht immer, wenn der Bot dran ist
     this.timer = setInterval(() => this.state && this.react(this.state), 200);
@@ -479,8 +504,34 @@ export class Bot {
     this.socket.disconnect();
   }
 
+  setSkill(skill: BotSkill) {
+    this.human = HUMAN[skill];
+  }
+
+  /** Mittlere eigene Reaktionszeit (ms) in Action-Spielen – Bots planen so weit voraus wie ein Mensch, der die Kante kommen sieht */
+  get reactMs() {
+    return HUMAN_KINDS.has(this.state?.mini?.kind ?? '') ? (this.human.lag[0] + this.human.lag[1]) / 2 : 0;
+  }
+
   send(action: string, payload?: unknown) {
-    this.socket.emit('mini:input', { action, payload });
+    const h = this.human;
+    if (!h.lag[1] || !HUMAN_KINDS.has(this.state?.mini?.kind ?? '')) {
+      this.socket.emit('mini:input', { action, payload });
+      return;
+    }
+    const pl = payload as Record<string, unknown> | undefined;
+    const isObj = !!pl && typeof pl === 'object' && !Array.isArray(pl);
+    const press = !isObj || (pl.down === true && pl.b !== 'shield');
+    if (MISSABLE.has(action) && press && !(isObj && 'seq' in pl) && Math.random() < h.miss) return;
+    let p = payload;
+    if (action === 'stick' && isObj && h.noise) {
+      // Daumen zittert: Stick-Ausschlag leicht daneben (Nullstellung bleibt Null)
+      const jit = (v: unknown) => (typeof v === 'number' && v !== 0 ? Math.round(Math.max(-1, Math.min(1, v + rand(-h.noise, h.noise))) * 100) / 100 : v);
+      p = { ...pl, x: jit(pl.x), y: jit(pl.y) };
+    }
+    const now = Date.now();
+    this.sendAt = Math.max(now + rand(h.lag[0], h.lag[1]), this.sendAt);
+    setTimeout(() => this.socket.connected && this.socket.emit('mini:input', { action, payload: p }), this.sendAt - now);
   }
 
   /** Führt eine Aktion pro Schlüssel nur einmal gleichzeitig aus */
@@ -569,18 +620,24 @@ export class Bot {
     const solids: Rect[] = [...BASE_SOLIDS];
     for (const p of st.parts) if (PART_DEFS[p.type].kind !== 'hazard' && p.type !== 'bomb') solids.push(partRect(p, st.t));
     const hit = (rc: Rect) => solids.some((s) => overlaps(rc, s));
-    const gapAhead = !hit({ x: r.x + 3, y: r.y + 1, w: 6, h: 40 });
+    // Vorausschauen um die eigene Reaktionszeit (wie ein Mensch, der die Lücke kommen sieht)
+    const lead = (PARCOURS.RUN * this.reactMs) / 1000;
+    const gapAhead = !hit({ x: r.x + 3 + lead, y: r.y + 1, w: 6, h: 40 });
     const wallAhead = hit({ x: r.x + 4, y: r.y - PARCOURS.PH + 2, w: 10, h: PARCOURS.PH - 4 });
     const danger =
       st.parts.some((p) => p.type === 'urchin' && overlaps(partRect(p), { x: r.x + 2, y: r.y - 40, w: 26, h: 44 })) ||
       st.nuts.some((n) => Math.abs(n.x - r.x) < 34 && Math.abs(n.y - (r.y - 6)) < 14);
     if ((gapAhead || wallAhead || danger) && Math.random() > this.pc.sloppy) {
+      // Sprungstärke nach Augenmaß: breite Lücke = lange drücken, schmale = kurz
+      let land = 0;
+      for (let dx = 12; dx <= 96 && !land; dx += 4) if (hit({ x: r.x + dx, y: r.y - 24, w: 4, h: 60 })) land = dx;
+      const hold = gapAhead && (!land || land > 52) ? rand(400, 520) : rand(200, 340);
       this.pc.jumping = true;
       this.send('jump', { down: true });
       setTimeout(() => {
         this.send('jump', { down: false });
         this.pc.jumping = false;
-      }, rand(200, 340));
+      }, hold);
     }
   }
 
@@ -918,8 +975,10 @@ export class Bot {
     if (m.kind === 'descent' && m.state.sub === 'run') {
       const r = m.state.runners[this.id];
       if (r && !r.finished && !r.stunned && r.jumpLeft === 0) {
-        const stoneBehind = m.state.stones.some((st) => r.s - st.s > 0 && r.s - st.s < 20);
-        const obAhead = DESCENT_OBSTACLES.some((o) => o.s - r.s > 3 && o.s - r.s < 16);
+        // Um die eigene Reaktionszeit vorausplanen: Der Sprung kommt erst so viel später an
+        const t = this.reactMs / 1000;
+        const stoneBehind = m.state.stones.some((st) => r.s - st.s > 0 && r.s - st.s < 20 + (DESCENT.STONE_SPEED - DESCENT.SPEED) * t);
+        const obAhead = DESCENT_OBSTACLES.some((o) => o.s - r.s - DESCENT.SPEED * t > 3 && o.s - r.s - DESCENT.SPEED * t < 16);
         if ((stoneBehind || obAhead) && Math.random() < 0.85) this.send('jump');
       }
     }
@@ -997,7 +1056,7 @@ export class Bot {
       if (b && !b.finished && !b.fallen) {
         this.once('sup', async () => {
           await sleep(rand(230, 380));
-          const ahead = m.state.obstacles.find((o) => o.x > b.x && o.x - b.x < 70 && Math.abs(o.y - b.y) < o.r + 14);
+          const ahead = m.state.obstacles.find((o) => !o.gone && o.x > b.x && o.x - b.x < 70 && Math.abs(o.y - b.y) < o.r + 14);
           const targetY = ahead ? (ahead.y > b.y ? ahead.y - 34 : ahead.y + 34) : b.y;
           const want = Math.max(-0.5, Math.min(0.5, (targetY - b.y) / 60));
           const sides: ('left' | 'right')[] = b.left === b.right ? [b.strokes.left <= b.strokes.right ? 'left' : 'right'] : [b.left === this.id ? 'left' : 'right'];
@@ -1212,7 +1271,9 @@ export class Bot {
           // Driften in Kurven (mit Hysterese, damit die Ladung nicht verloren geht), bremsen nur wenn's eng wird
           if (!this.kartDrift && Math.abs(ap.steer) > 0.55 && speed > 50 && !car.offroad) this.kartDrift = Math.random() < 0.6;
           else if (this.kartDrift && (Math.abs(ap.steer) < 0.2 || speed < 30)) this.kartDrift = false;
-          this.send('steer', { x: Math.round(steer * 100) / 100, gas: true, brake: ap.brake && !this.kartDrift && Math.random() < 0.5, drift: this.kartDrift });
+          // Gas rastet ein: einmal antippen (gas true → false), BREMSE löst es – danach neu antippen
+          const brake = ap.brake && !this.kartDrift && Math.random() < 0.5;
+          this.send('steer', { x: Math.round(steer * 100) / 100, gas: !car.auto && !brake, brake, drift: this.kartDrift });
           if (car.item) {
             if (!this.kartItemAt) this.kartItemAt = Date.now() + rand(600, 3500);
             if (Date.now() >= this.kartItemAt) {

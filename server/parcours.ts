@@ -24,6 +24,8 @@ import { type MiniCtx, type MiniGame, OFFLINE_OUT_MS, Timers, asRecord, groupByS
 
 const TICK_MS = 50;
 const SUBSTEPS = 4;
+/** Ein Sprung gilt mindestens so lange als „gehalten“ – auch ein kurzer Tipp reicht auf die nächste Felsstufe */
+const MIN_HOLD_MS = 90;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 interface Runner extends ParcoursRunner {
@@ -37,6 +39,9 @@ interface Runner extends ParcoursRunner {
   coyoteUntil: number;
   bufferUntil: number;
   held: boolean;
+  /** Absprung-Zeitpunkt und geplanter Sprung-Abbruch (kurzer Tipp = kleiner Sprung, aber nie unter MIN_HOLD_MS) */
+  jumpAt: number;
+  cutAt: number;
   lockUntil: number;
   /** Letzte Eingabe (für die AFK-Erkennung) */
   lastInput: number;
@@ -163,6 +168,8 @@ export class ParcoursGame implements MiniGame {
           coyoteUntil: 0,
           bufferUntil: 0,
           held: false,
+          jumpAt: 0,
+          cutAt: 0,
           lockUntil: 0,
           lastInput: 0,
           afk: 0,
@@ -363,7 +370,9 @@ export class ParcoursGame implements MiniGame {
           r.ground = false;
           r.coyoteUntil = 0;
           r.bufferUntil = 0;
-          if (!r.held) r.vy *= P.JUMP_CUT;
+          r.jumpAt = now;
+          // Schon losgelassen (schneller Tipp, oder Drücken+Loslassen im selben Netz-Paket): trotzdem ein Mindestsprung
+          r.cutAt = r.held ? 0 : now + MIN_HOLD_MS;
         } else if (r.wallUntil > now && r.wallDir !== 0) {
           r.vy = -P.JUMP_V * 0.92;
           r.vx = -r.wallDir * P.RUN * 1.25;
@@ -372,6 +381,11 @@ export class ParcoursGame implements MiniGame {
           r.wallUntil = 0;
           r.bufferUntil = 0;
         }
+      }
+      // Geplanter Sprung-Abbruch (Knopf früh losgelassen) – nur solange es noch richtig nach oben geht
+      if (r.cutAt && now >= r.cutAt) {
+        if (r.vy < -120) r.vy *= P.JUMP_CUT;
+        r.cutAt = 0;
       }
       // Laufen
       const target = Math.abs(r.sx) > 0.2 ? Math.sign(r.sx) * P.RUN * Math.min(1, Math.abs(r.sx) * 1.3) : 0;
@@ -559,6 +573,12 @@ export class ParcoursGame implements MiniGame {
         b.rot = (b.rot + 1) % PART_DEFS[b.pick].rots;
       } else if (action === 'place' && b.stage === 'place') {
         this.placePart(id, b);
+      } else if (action === 'skip' && b.stage !== 'done') {
+        // Kein Teil passt mehr: diese Runde selbst aussetzen, statt bis zur AFK-Grenze zu warten
+        b.stage = 'done';
+        b.skipped = true;
+        b.pass = true;
+        b.sx = b.sy = 0;
       }
       this.ctx.onChange();
       return;
@@ -574,8 +594,17 @@ export class ParcoursGame implements MiniGame {
         r.bufferUntil = Date.now() + P.BUFFER_MS;
       } else {
         r.held = false;
-        if (r.vy < 0 && this.sub === 'run') r.vy *= P.JUMP_CUT;
+        if (r.vy < 0 && this.sub === 'run') {
+          const now = Date.now();
+          if (now - r.jumpAt < MIN_HOLD_MS) r.cutAt = r.jumpAt + MIN_HOLD_MS;
+          else r.vy *= P.JUMP_CUT;
+        }
       }
+    } else if (action === 'giveup' && this.sub === 'run' && r.st === 'run' && !r.away) {
+      // Festgesteckt (z. B. hinter einem Ventilator): selbst aufgeben statt 60 s bis zum Einschlafen zu warten
+      r.quit = true;
+      this.knockOut(id, r, null);
+      this.ctx.onChange();
     }
   }
 
@@ -596,10 +625,10 @@ export class ParcoursGame implements MiniGame {
         t: Math.round(this.t),
         nuts: this.nuts.map((n) => ({ id: n.id, x: rnd(n.x), y: rnd(n.y) })),
         runners: Object.fromEntries(
-          [...this.runners.entries()].map(([id, r]) => [id, { x: rnd(r.x), y: rnd(r.y), face: r.face, st: r.st, ground: r.ground, by: r.by, place: r.place, afk: r.afk, zzz: r.zzz, ...(r.away ? { away: true } : {}) }]),
+          [...this.runners.entries()].map(([id, r]) => [id, { x: rnd(r.x), y: rnd(r.y), face: r.face, st: r.st, ground: r.ground, by: r.by, place: r.place, afk: r.afk, zzz: r.zzz, ...(r.quit ? { quit: true } : {}), ...(r.away ? { away: true } : {}) }]),
         ),
         builders: Object.fromEntries(
-          [...this.builders.entries()].map(([id, b]) => [id, { stage: b.stage, choice: b.choice, pick: b.pick, gx: snap(b.gx), gy: snap(b.gy), rot: b.rot, ok: b.ok, afk: b.afk, skipped: b.skipped }]),
+          [...this.builders.entries()].map(([id, b]) => [id, { stage: b.stage, choice: b.choice, pick: b.pick, gx: snap(b.gx), gy: snap(b.gy), rot: b.rot, ok: b.ok, afk: b.afk, skipped: b.skipped, ...(b.pass ? { pass: true } : {}) }]),
         ),
         colors: this.colors,
         points: this.points,

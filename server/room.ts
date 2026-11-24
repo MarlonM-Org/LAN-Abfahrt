@@ -22,7 +22,7 @@ import type {
   TurnierState,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
-import { freePlayerColor } from '../shared/players';
+import { type BotSkill, asBotSkill, freePlayerColor } from '../shared/players';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, isWarmupKind, placeCoins, teamLabel } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
@@ -213,6 +213,8 @@ export class Room {
   private holds = new Map<string, { id: string; action: string; at: number; neutral: unknown }>();
 
   private bots: Bot[] = [];
+  /** Stärke der Lobby-Bots (VIP schaltet um) */
+  private botSkill: BotSkill = 'normal';
   /** Ewige Tabelle (data/arcade.json) */
   private leaderboard = new Leaderboard();
   /** Bestleistungen der Board-Spiele (Weite, Zeiten) über alle Abende */
@@ -253,6 +255,8 @@ export class Room {
   private offlineBucket = '';
   /** Gastgeber = erster Mensch, der beigetreten ist. Kommt er zurück, ist er wieder VIP. */
   private hostId: string | null = null;
+  /** Per Laptop („host:vip“) gesetzter VIP: gilt dauerhaft, bis er den Raum verlässt – dann greift die normale Nachfolge */
+  private vipPin: string | null = null;
   /** Worauf gerade gewartet wird (Ergebnis, Story-Karte, …) und seit wann – für das Auto-Weiter */
   private gateKey: unknown = null;
   private gateSince = 0;
@@ -457,7 +461,15 @@ export class Room {
       if (!isVip() || this.phase !== 'lobby' || this.connectedIds().length >= MAX_PLAYERS) return;
       const used = new Set([...this.players.values()].map((p) => p.name));
       const name = BOT_NAMES.find((n) => !used.has(n)) ?? `Bot ${this.bots.length + 1}`;
-      this.bots.push(new Bot(name, { url: this.localUrl }));
+      this.bots.push(new Bot(name, { url: this.localUrl, skill: this.botSkill }));
+    });
+
+    // Bot-Stärke (leicht / normal / profi) – gilt sofort auch für schon beigetretene Bots
+    socket.on('vip:botSkill', (v: unknown) => {
+      if (!isVip()) return;
+      this.botSkill = asBotSkill(v);
+      for (const b of this.bots) b.setSkill(this.botSkill);
+      this.changed();
     });
 
     // Ewige Tabelle (alle Abende) löschen
@@ -1467,7 +1479,10 @@ export class Room {
     const host = this.hostId ? this.players.get(this.hostId) : undefined;
     const current = list.find((p) => p.isVip);
     let vip: Player | undefined;
-    if (host?.connected && !host.isBot) vip = host;
+    const pin = this.vipPin ? this.players.get(this.vipPin) : undefined;
+    if (this.vipPin && (!pin || pin.removed || (!pin.isBot && !pin.connected && !this.inGrace(pin, now)))) this.vipPin = null;
+    if (this.vipPin && pin) vip = pin;
+    else if (host?.connected && !host.isBot) vip = host;
     else if (current && !current.isBot && (current.connected || this.inGrace(current, now))) vip = current;
     else if (humans.length) vip = humans[0];
     else if (current?.connected) vip = current;
@@ -1509,6 +1524,21 @@ export class Room {
       if (!isHost()) return reply(ack, { ok: false, error: 'Nur direkt am Laptop (localhost) erlaubt.' });
       const n = this.kickPlayers([String(id ?? '')]);
       reply(ack, n ? { ok: true, removed: n } : { ok: false, error: 'Spieler nicht gefunden.' });
+    });
+    // Laptop: VIP wechseln (jederzeit, auch mitten im Spiel; Bots dürfen VIP werden)
+    socket.on('host:vip', (id: unknown, ack?: unknown) => {
+      if (!isHost()) return reply(ack, { ok: false, error: 'Nur direkt am Laptop (localhost) erlaubt.' });
+      const p = this.players.get(String(id ?? ''));
+      if (!p || p.removed) return reply(ack, { ok: false, error: 'Spieler nicht gefunden.' });
+      if (p.isVip) return reply(ack, { ok: true });
+      this.vipPin = p.id;
+      this.ensureVip();
+      const sock = p.socketId ? this.io.sockets.sockets.get(p.socketId) : undefined;
+      this.io.to('players').emit('toast', `${p.name} ist jetzt VIP`);
+      sock?.emit('toast', 'Du bist jetzt VIP 👑');
+      this.io.emit('vip:changed', { id: p.id, name: p.name });
+      this.changed();
+      reply(ack, { ok: true });
     });
     socket.on('host:kickAll', (ack?: unknown) => {
       if (!isHost()) return reply(ack, { ok: false, error: 'Nur direkt am Laptop (localhost) erlaubt.' });
@@ -1837,6 +1867,7 @@ export class Room {
       onlineUrl: this.onlineUrl,
       customNhieCount: this.nhie.all.length,
       botCount: this.bots.length,
+      botSkill: this.botSkill,
       leaderboard: this.leaderboard.list,
       customQuestionCount: this.questions.all.length,
       customPostCount: this.posts.all.length,

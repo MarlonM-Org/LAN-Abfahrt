@@ -4,6 +4,7 @@ import { ARCADE_GROUPS, ARCADE_SORTS, ARCADE_SORT_KEY, type ArcadeSort, DATE_KIN
 import { DATE_COMING_SOON, DATE_VERSIONS } from '../../../shared/dates';
 import { LS, app, avatarCanvas, el, escapeHtml, myColor, paintAvatar, q, socket, store, toast } from '../core';
 import { lobbyPlayerList } from '../players';
+import { BOT_SKILLS, BOT_SKILL_LABEL } from '../../../shared/players';
 import { loadFavorites, toggleFavorite } from '../../favorites';
 import { sessionPanel } from './leaderboard';
 
@@ -290,13 +291,20 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
   }
 
   // Bots zum Testen
+  let skillBtn: HTMLButtonElement | null = null;
   if (vip) {
     const row = q(root, '.bot-row');
     const add = el(`<button class="secondary small">+ Bot</button>`).firstElementChild as HTMLButtonElement;
     add.addEventListener('click', () => socket.emit('vip:addBot'));
     const rm = el(`<button class="secondary small">Bots entfernen</button>`).firstElementChild as HTMLButtonElement;
     rm.addEventListener('click', () => socket.emit('vip:removeBots'));
-    row.append(add, rm);
+    // Stärke in Action-Spielen: Leicht → Normal (menschliche Reaktionszeit) → Profi (sofort, exakt)
+    skillBtn = el(`<button class="secondary small" style="grid-column: 1 / -1"></button>`).firstElementChild as HTMLButtonElement;
+    skillBtn.addEventListener('click', () => {
+      const cur = BOT_SKILLS.indexOf(store.state?.botSkill ?? 'normal');
+      socket.emit('vip:botSkill', BOT_SKILLS[(cur + 1) % BOT_SKILLS.length]);
+    });
+    row.append(add, rm, skillBtn);
   }
 
   // Eigene Fragen (Wer würde eher / Ich hab noch nie) bzw. Startsätze für Stille Post / Fragen fürs Sprüche-Duell
@@ -355,6 +363,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     q(root, '.hello').innerHTML = `Hi ${escapeHtml(store.name)}!` + ((c) => (c ? ` Du bist <span class="me-color" style="background:${c.hex};color:${c.ink}">${c.name.toUpperCase()}</span>` : ''))(myColor());
     q(root, '.count').textContent = `${n} Spieler in der Lobby${st?.botCount ? ` (davon ${st.botCount} Bots)` : ''}${off ? ` · ${off} offline` : ''}`;
     plist.update();
+    if (skillBtn) skillBtn.textContent = `Bot-Stärke: ${BOT_SKILL_LABEL[st?.botSkill ?? 'normal']}`;
     invite.update(st?.onlineUrl ?? null);
     q(root, '.q-count').textContent =
       mode === 'drink'

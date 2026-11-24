@@ -421,7 +421,8 @@ export interface SupState {
   endsIn: number;
   length: number;
   boards: SupBoard[];
-  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly' }[];
+  /** `gone`: Boje/Qualle wurde gerammt und ist weg (Steine bleiben immer liegen) */
+  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly'; gone?: boolean }[];
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Aufräumen
@@ -1035,6 +1036,8 @@ export interface ParcoursRunner {
   afk: number;
   /** Wegen Untätigkeit ausgeschieden */
   zzz: boolean;
+  /** Selbst aufgegeben (Knopf „Aufgeben“) */
+  quit?: boolean;
   /** Verbindung weg (Gnadenfrist): eingefroren + unverwundbar, TV zeigt die Figur halbtransparent */
   away?: boolean;
 }
@@ -1051,6 +1054,8 @@ export interface ParcoursBuilder {
   afk: number;
   /** Wegen Untätigkeit übersprungen (kein Teil eingebaut) */
   skipped: boolean;
+  /** Selbst ausgesetzt (Knopf „Aussetzen“) */
+  pass?: boolean;
 }
 
 export interface ParcoursGain {
@@ -1113,6 +1118,8 @@ export interface KartCar {
   bm: number;
   /** Dieser Spieler sieht seine Verfolger-Ansicht auf dem eigenen Handy (statt im TV-Splitscreen) */
   phoneView: boolean;
+  /** Gas eingerastet (einmal GAS angetippt, BREMSE löst es wieder) */
+  auto: boolean;
   /** Verbindung weg: Geist ohne Kollision (TV halbtransparent) */
   ghost?: boolean;
 }
@@ -2327,6 +2334,8 @@ export interface GameMeta {
   onlineUrl: string | null;
   customNhieCount: number;
   botCount: number;
+  /** Stärke der Lobby-Bots (VIP schaltet um) */
+  botSkill: import('./players').BotSkill;
   /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
   leaderboard: LeaderEntry[];
   customQuestionCount: number;
