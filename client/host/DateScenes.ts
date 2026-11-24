@@ -23,9 +23,7 @@ import {
 } from '../art/rhine';
 import { bus, getState, playerById } from './store';
 import { figure } from './textures';
-import { duckMusic, playRhythmSong } from './music';
-import { toLocalPerf } from '../timesync';
-import { RHYTHM } from '../../shared/dategames';
+import { RhythmScene } from './RhythmusScene';
 import { NameTags, RED_INK, background, ensureTex, fitText, ink, nameTag, panel, tagName, txt } from './ui';
 import { sfx } from './sfx';
 import { gulls, twinkle } from './ambient';
@@ -249,120 +247,7 @@ export class DescentScene extends StateScene {
   }
 }
 
-// ================================================================== Gespräch
-
-export class RhythmScene extends StateScene {
-  private bubble!: Phaser.GameObjects.Container;
-  private meter!: Phaser.GameObjects.Graphics;
-  private info!: Phaser.GameObjects.Text;
-  private seats = new Map<string, Phaser.GameObjects.Image>();
-  private playStart = 0;
-  private playSeq = 0;
-  private lastHits = new Map<string, number>();
-  private phraseIdx = -1;
-  private latest: GameState | null = null;
-  private stopSong?: () => void;
-
-  constructor() {
-    super('rhythm');
-  }
-
-  create() {
-    this.seats.clear();
-    this.lastHits.clear();
-    this.playSeq = 0;
-    this.phraseIdx = -1;
-    background(this, 'rhine', WORLD.W, WORLD.H, rhineBackground);
-    // Wasser glitzert
-    for (let i = 0; i < 14; i++) {
-      const s = this.add.rectangle(Phaser.Math.Between(60, WORLD.W), Phaser.Math.Between(126, 184), 3, 1, 0xffd77a).setAlpha(0);
-      this.tweens.add({ targets: s, alpha: 0.8, duration: 700, yoyo: true, repeat: -1, delay: i * 210, repeatDelay: 1400 });
-    }
-    this.meter = this.add.graphics().setDepth(1001);
-    this.bubble = this.add.container(0, 0).setDepth(1000);
-    this.info = txt(this, WORLD.W / 2, 254, '').setDepth(1001);
-    panel(this, 130, 36, 220, 30).setDepth(1000);
-    ink(this, WORLD.W / 2, 42, 'Sympathie', { color: PINK_INK }).setDepth(1001);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.stopSong?.();
-      duckMusic(false);
-    });
-    this.listen();
-  }
-
-  update() {
-    const s = this.latest;
-    if (s?.mini?.kind !== 'rhythm') return;
-    const r = s.mini.state;
-    this.meter.clear();
-    this.meter.fillStyle(0x2d1b12).fillRect(150, 53, 180, 8);
-    this.meter.fillStyle(0xf6d7e2).fillRect(151, 54, 178, 6);
-    this.meter.fillStyle(0xe46e98).fillRect(151, 54, 178 * (r.sympathy / 100), 6);
-    if (r.sub !== 'play') return;
-    const now = performance.now() - this.playStart;
-    const idx = r.phrases.findIndex((p) => now >= p.from && now < p.to);
-    if (idx !== this.phraseIdx) {
-      this.phraseIdx = idx;
-      this.bubble.removeAll(true);
-      const ph = r.phrases[idx];
-      const seat = ph && this.seats.get(ph.speaker);
-      if (ph && seat) {
-        const w = Math.max(60, ph.topic.length * 8 + 16);
-        this.bubble.add(panel(this, Math.round(seat.x - w / 2), 150, w, 24));
-        this.bubble.add(ink(this, seat.x, 158, ph.topic));
-        this.bubble.setAlpha(0);
-        this.tweens.add({ targets: this.bubble, alpha: 1, duration: 200 });
-      }
-    }
-    if (now < r.leadIn) this.info.setText(`Gleich geht’s los ... ${Math.ceil((r.leadIn - now) / 1000)}`);
-    else if (now > r.duration) this.info.setText('');
-    else this.info.setText('Im Takt bleiben!');
-  }
-
-  protected onState(s: GameState) {
-    this.latest = s;
-    if (s.mini?.kind !== 'rhythm') return;
-    const r = s.mini.state;
-    const ids = Object.keys(r.charts);
-    ids.forEach((id, i) => {
-      if (this.seats.has(id)) return;
-      const p = playerById(id);
-      if (!p) return;
-      const facing = i === 0 ? 1 : -1;
-      const key = ensureTex(this, `sit_${id}_${facing}`, () => sittingFrom(avatarCanvas(p.look), facing as 1 | -1));
-      const img = this.add.image(WORLD.W / 2 + (i === 0 ? -34 : 34), 214, key).setOrigin(0.5, 1).setScale(2).setDepth(500);
-      this.seats.set(id, img);
-      this.add.existing(nameTag(this, img.x, 218, p.name.slice(0, 8))).setDepth(501);
-    });
-    if (r.sub === 'ready') {
-      const waiting = ids.filter((id) => !r.ready.includes(id)).map((id) => playerById(id)?.name ?? '?');
-      this.info.setText(waiting.length ? `Warte auf: ${waiting.join(', ')} (Ton an!)` : '');
-    }
-    if (r.sub === 'play' && r.playSeq !== this.playSeq) {
-      this.playSeq = r.playSeq;
-      // Song-Start aus der synchronisierten Serverzeit – passt zu den Noten auf den Handys
-      this.playStart = toLocalPerf(r.startAt);
-      duckMusic(true);
-      this.stopSong = playRhythmSong(this.playStart, r.bpm, RHYTHM.BEATS, r.leadIn);
-    }
-    if (r.sub === 'over') {
-      duckMusic(false);
-      this.bubble.removeAll(true);
-      this.info.setText(r.sympathy > 70 ? 'Da hat es gefunkt!' : 'Schön war’s trotzdem.');
-    }
-    for (const [id, h] of Object.entries(r.lastHit)) {
-      if (this.lastHits.get(id) === h.seq) continue;
-      this.lastHits.set(id, h.seq);
-      const seat = this.seats.get(id);
-      if (!seat) continue;
-      if (h.q === 2) this.floatHeart(seat.x, seat.y - 44);
-      else if (h.q === 0) {
-        const t = txt(this, seat.x, seat.y - 46, '...', { color: '#c9c3e6' }).setDepth(4000);
-        this.tweens.add({ targets: t, alpha: 0, y: t.y - 10, duration: 700, onComplete: () => t.destroy() });
-      }
-    }
-  }
-}
+// ================================================================== Gespräch: eigene Datei (RhythmusScene.ts)
 
 // ================================================================== Wrap
 

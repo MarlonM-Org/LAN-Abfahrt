@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T23:30+00:00",
+  "updated": "2026-11-25T00:30+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -8,9 +8,9 @@
   "inProgress": [
     {
       "type": "in Arbeit · Claude",
-      "kind": null,
-      "title": "Marlons Feedback 24.11., Teil 3: Das erste Gespräch wie Piano Tiles + Igel-Krieg wird Waschbär-Spiel",
-      "detail": "Das erste Gespräch: Takt-Versatz (TV per AirPlay) mit Kalibrierung ausgleichen, Spuren und schwerere Rhythmen exakt auf dem Beat, außerhalb der Story Gewinner nach Trefferquote. Igel-Krieg: Thema Waschbären mit neuem Namen, Figuren und Waffen, die zeigen, was sie tun, eigene 8-Bit-Icons statt Emojis.",
+      "kind": "igel",
+      "title": "Igel-Krieg wird Waschbär-Spiel",
+      "detail": "Marlon (24.11.): Emoji-Icons blöd, Thema unklar („warum sollte eine Muschel teleportieren?“) → Waschbären mit neuem Namen, Figuren und Waffen, die zeigen, was sie tun, eigene 8-Bit-Icons.",
       "branch": "claude/optimistic-johnson-korj2c",
       "since": "2026-11-24"
     }
@@ -143,10 +143,15 @@
       "size": "S",
       "kind": "rhythm",
       "title": "Halte-Noten im Rhythmusspiel („Das erste Gespräch“)",
-      "detail": "Marlon (24.11.): Gedrückt-Halten wie bei Piano Tiles „ist gar nicht nötig, auch wenn es ein cooles Feature wäre – kann gerne auf die Roadmap“. Lange Noten in einer Spur, Wertung für Anschlag und Loslassen."
+      "detail": "Marlon (24.11.): Gedrückt-Halten wie bei Piano Tiles „ist gar nicht nötig, auch wenn es ein cooles Feature wäre – kann gerne auf die Roadmap“. Lange Noten in einer Spur, Wertung für Anschlag und Loslassen. Weitere Ideen vom Umbau (#124): mehr Songs/Schwierigkeitsstufen, Ton-Versatz pro TV statt pro Server, 9–12 Spieler mit geteilter Bahn."
     }
   ],
   "done": [
+    {
+      "title": "Das erste Gespräch: Soundcheck gegen den TV-Versatz (AirPlay), neuer Uhrabgleich, Klavier-Kacheln auf 4 Tasten, Wettkampf 1–8 Spieler nach Trefferquote, test:rhythmus",
+      "pr": 124,
+      "date": "2026-11-25"
+    },
     {
       "title": "Volleyball raus → Kopfball-Duell + Kopf-Korb (à la Head Soccer/Head Basketball): große Köpfe, Stick + SPRUNG/SCHUSS, Anstoß wechselt nach Tor/Korb, kompaktes Feld, 2–8 Spieler, test:kopfball",
       "pr": 123,
@@ -745,8 +750,8 @@
       "notes": "Jetzt Busfahrer: alle im Doppeldecker, 4 Karten – Rot/Schwarz (1), Höher/Tiefer/Gleich (2), Dazwischen/Außerhalb/Gleich (3), Symbol schon gehabt? (4 Schlücke), aufgedeckt erst wenn alle getippt haben oder der VIP aufdeckt (#123)"
     },
     "rhythm": {
-      "status": "in Arbeit",
-      "notes": "Beats fühlten sich wie auf dem Nachschlag an (TV per AirPlay verzögert) → Kalibrierung/Latenz-Ausgleich; mehr wie Piano Tiles (Spuren, schwerere Rhythmen exakt auf dem Beat), außerhalb der Story Gewinner nach Trefferquote; Halte-Noten auf die Roadmap"
+      "status": "umgesetzt",
+      "notes": "„Beats auf dem Nachschlag“ – Ursache: TV-Ton per AirPlay ≈ 100–300 ms später, ohne Ausgleich → Soundcheck vor jedem Song (zum TV-Klick tippen, Taste K = neu einmessen), neuer Uhrabgleich; Klavier-Kacheln auf 4 Tasten exakt im Raster, schwerere Rhythmen; außerhalb der Story Wettkampf 1–8 Spieler nach Trefferquote (#124). Halte-Noten auf der Roadmap"
     }
   },
   "general": [
@@ -883,8 +888,8 @@
       "status": "umgesetzt"
     },
     {
-      "title": "TV läuft per AirPlay (Mac → Apple TV): Bild und Ton kommen verzögert – Glättung/Verzögerung im eigenen Code reduziert (#123), Kalibrierung fürs Rhythmusspiel in Arbeit; Empfehlung für Action-Spiele: HDMI",
-      "status": "in Arbeit"
+      "title": "TV läuft per AirPlay (Mac → Apple TV): Bild und Ton kommen verzögert – eigene Verzögerung reduziert (#123), Soundcheck im Rhythmusspiel gleicht den Ton-Versatz aus (#124); Empfehlung für Action-Spiele: HDMI",
+      "status": "umgesetzt"
     }
   ]
 }
