@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T19:30+00:00",
+  "updated": "2026-11-24T19:45+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -120,27 +120,27 @@
   "done": [
     {
       "title": "Kart-Rennen: GAS rastet ein (antippen = fährt von allein, BREMSE = aus), eigene große Knöpfe DRIFT und ITEM rechts, kein Hochrutschen mehr; Regelkarte und Bots angepasst",
-      "pr": null,
+      "pr": 121,
       "date": "2026-11-24"
     },
     {
       "title": "Handy-Zoom-Schutz: iOS-Pinch, Doppeltipp und Zwei-Finger-Wischen außerhalb von Stick/Knöpfen geblockt, Overlay „Zoom zurücksetzen“ bei erkanntem Zoom, Android-Vollbild beim ersten Tipp",
-      "pr": null,
+      "pr": 121,
       "date": "2026-11-24"
     },
     {
       "title": "UX-Rosinen aus dem Branch vom 5.11. frisch übernommen: Parcours-Sprunghilfe + Aufgeben/Aussetzen, Türen-Hilfe im Verräter, Rempler-Puffer Sumo, Sprung-Puffer Bogen/Smash, Bot-Stärke leicht/normal/profi (VIP-Knopf + --skill), Flunkyball mit Schwung/Wischen/Schütteln, Abstieg klettert über Hindernisse, SUP-Bojen verschwinden, iOS-Schriftgröße + Mittelspalte quer",
-      "pr": null,
+      "pr": 121,
       "date": "2026-11-24"
     },
     {
       "title": "VIP am Laptop jederzeit wechseln: Spieler-Panel (P) „👑 Zum VIP machen“, nur für echte Laptop-Verbindungen, gilt bis der Spieler den Raum verlässt",
-      "pr": null,
+      "pr": 121,
       "date": "2026-11-24"
     },
     {
       "title": "Musik-Werkstatt aufgeräumt: Startseite „Wo läuft was?“ (Szenen, aktiver Song, Anhören, Song wechseln, Kopie & bearbeiten, Direkt bearbeiten), Überschreibungen eingebauter Songs mit „Original wiederherstellen“, Speichern wirkt sofort am TV, Editor entrümpelt mit Mehr-Menü und Brotkrumen",
-      "pr": null,
+      "pr": 121,
       "date": "2026-11-24"
     },
     {
