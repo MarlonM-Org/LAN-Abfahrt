@@ -9,7 +9,7 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 
 const ITEM_NAMES: Record<KartItem, string> = { coconut: 'Kokosnuss', banana: 'Bananenschale', ice: 'Turbo-Eis', gull: 'Möwe' };
 
-interface Car extends KartCar {
+interface Car extends Omit<KartCar, 'auto'> {
   id: string;
   inp: KartInput;
   nextCp: number;
@@ -19,6 +19,8 @@ interface Car extends KartCar {
   boostMs: number;
   driftDir: number;
   driftCharge: number;
+  /** Gas eingerastet: GAS-Flanke setzt, BREMSE löscht (effektives Gas = inp.gas || autoGas) */
+  autoGas: boolean;
 }
 
 interface Hazard {
@@ -42,7 +44,7 @@ interface Gull {
 }
 
 /**
- * Kart-Rennen: GAS, BREMSE (im Stand rückwärts), DRIFT (halten + lenken → Funken → loslassen = Mini-Turbo), gelenkt per Touch oder Kippen.
+ * Kart-Rennen: GAS (antippen = rastet ein, BREMSE löst), BREMSE (im Stand rückwärts), DRIFT (halten + lenken → Funken → loslassen = Mini-Turbo), gelenkt per Touch oder Kippen.
  * Ansicht: bis 4 Menschen Verfolger-Splitscreen auf dem TV – jeder kann aber für sich auf die eigene Ansicht am Handy
  * umschalten (fliegt dann aus dem Splitscreen). Ab 5 Menschen rendert jedes Handy seine eigene Verfolger-Ansicht.
  * Fährt keiner auf dem TV, zeigt der TV die Draufsicht. Die Physik (`stepKart`) ist geteilt, damit die Handys ihr eigenes Kart vorhersagen können.
@@ -118,6 +120,7 @@ export class KartGame implements MiniGame {
         boostMs: 0,
         driftDir: 0,
         driftCharge: 0,
+        autoGas: false,
       });
     });
     for (const c of this.cars.values()) c.prog = this.progressOf(c, project(this.track, c.x, c.y).s);
@@ -144,7 +147,7 @@ export class KartGame implements MiniGame {
     const T = this.track;
     this.lastTick = now;
     for (const c of this.cars.values()) {
-      let inp = c.inp;
+      let inp = c.autoGas && !c.inp.gas ? { ...c.inp, gas: true } : c.inp;
       if (c.finished) {
         // Ehrenrunde auf Autopilot
         const ap = autopilot(T, c.x, c.y, c.angle, Math.hypot(c.vx, c.vy));
@@ -391,15 +394,30 @@ export class KartGame implements MiniGame {
     const pl = asRecord(payload);
     if (action === 'steer') {
       // { x: Lenkung, gas, brake, drift } – fehlende Felder bleiben, wie sie sind
+      // `auto: false` = Handy setzt die Eingaben zurück (gedreht, Overlay) – eingerastetes Gas lösen
+      const was = { gas: c.inp.gas, brake: c.inp.brake };
       c.inp.steer = clamp(Number(pl.x) || 0, -1, 1);
       if (typeof pl.gas === 'boolean') c.inp.gas = pl.gas;
       if (typeof pl.brake === 'boolean') c.inp.brake = pl.brake;
       if (typeof pl.drift === 'boolean') c.inp.drift = pl.drift;
+      if (pl.auto === false) c.autoGas = false;
+      else this.latchGas(c, was);
     } else if (action === 'brake') {
+      const was = { gas: c.inp.gas, brake: c.inp.brake };
       c.inp.brake = !!pl.on;
+      this.latchGas(c, was);
     } else if (action === 'item' && this.sub === 'race') {
       this.useItem(c, Date.now());
     }
+  }
+
+  /**
+   * „Gas rastet ein“: GAS antippen (Flanke) → fährt von allein weiter, BREMSE löst es.
+   * Wer GAS noch hält, während er BREMSE loslässt, rastet ebenfalls wieder ein.
+   */
+  private latchGas(c: Car, was: { gas: boolean; brake: boolean }) {
+    if (c.inp.brake) c.autoGas = false;
+    else if ((c.inp.gas && !was.gas) || (c.inp.gas && was.brake)) c.autoGas = true;
   }
 
   private useItem(c: Car, now: number) {
@@ -483,6 +501,7 @@ export class KartGame implements MiniGame {
         dc: Math.round(c.driftCharge * 100) / 100,
         bm: Math.round(c.boostMs),
         phoneView: this.isPhoneView(c.id),
+        auto: c.autoGas,
         ...(!c.finished && !this.ctx.isConnected(c.id) ? { ghost: true } : {}),
       };
     }
@@ -511,7 +530,9 @@ export class KartGame implements MiniGame {
 
   playerDisconnected(id: string) {
     const c = this.cars.get(id);
-    if (c) c.inp = { steer: 0, gas: false, brake: false, drift: false };
+    if (!c) return;
+    c.inp = { steer: 0, gas: false, brake: false, drift: false };
+    c.autoGas = false;
   }
 
   // ---------------------------------------------------------------- Ansicht (TV-Splitscreen / Handy)
