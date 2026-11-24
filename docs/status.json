@@ -1,20 +1,11 @@
 {
-  "updated": "2026-11-25T00:30+00:00",
+  "updated": "2026-11-25T01:30+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "type": "in Arbeit · Claude",
-      "kind": "igel",
-      "title": "Igel-Krieg wird Waschbär-Spiel",
-      "detail": "Marlon (24.11.): Emoji-Icons blöd, Thema unklar („warum sollte eine Muschel teleportieren?“) → Waschbären mit neuem Namen, Figuren und Waffen, die zeigen, was sie tun, eigene 8-Bit-Icons.",
-      "branch": "claude/optimistic-johnson-korj2c",
-      "since": "2026-11-24"
-    }
-  ],
+  "inProgress": [],
   "queue": [
     {
       "area": "Lobby / Framing",
@@ -147,6 +138,11 @@
     }
   ],
   "done": [
+    {
+      "title": "Igel-Krieg wird Waschbär-Bande: Waschbären, Campinginsel am See, Waffen passend zum Thema, eigene 16×16-Pixel-Icons statt Emojis",
+      "pr": 125,
+      "date": "2026-11-25"
+    },
     {
       "title": "Das erste Gespräch: Soundcheck gegen den TV-Versatz (AirPlay), neuer Uhrabgleich, Klavier-Kacheln auf 4 Tasten, Wettkampf 1–8 Spieler nach Trefferquote, test:rhythmus",
       "pr": 124,
@@ -674,8 +670,8 @@
       "notes": "Titel ohne „Strand“ (#122) · vorher: Handy zeigt nach jedem Wurf Kurve, Kraft vs. Ideal, Richtung + Tipp"
     },
     "igel": {
-      "status": "in Arbeit",
-      "notes": "Stick statt ◀ ▶, Zuschauer-Seite scrollt nicht mehr, Sprechblasen am TV immer ganz im Bild (#123); Emoji-Icons → eigene 8-Bit-Icons + Umbau zu Waschbären in Arbeit · Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern mit Kamera und Minikarte (24.11.)"
+      "status": "umgesetzt",
+      "notes": "Jetzt „Waschbär-Bande“: Waschbären auf einer Campinginsel, Waffen zeigen, was sie tun (Gully-Tunnel statt Muschel-Teleport, Tauben-Angriff, Mausefalle …), eigene 8-Bit-Icons statt Emojis (#125) · Stick statt ◀ ▶, Zuschauer-Seite ohne Scrollen, Sprechblasen immer im Bild (#123)"
     },
     "ttt": {
       "status": "umgesetzt",
