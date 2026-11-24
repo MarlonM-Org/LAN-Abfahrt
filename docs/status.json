@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T21:45+00:00",
+  "updated": "2026-11-24T23:30+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -9,8 +9,8 @@
     {
       "type": "in Arbeit · Claude",
       "kind": null,
-      "title": "Marlons Feedback 24.11., Teil 2: Kopfball statt Volleyball, Aufräumen mit Besen, Flunkyball, Darts 301, Busfahrer, Rhythmus wie Piano Tiles, Igel → Waschbären",
-      "detail": "Parallel in Arbeit: Volleyball raus → Kopfball-Fußball + Kopfball-Basketball (Stick, Anstoß wechselt); Aufräumen: Besen statt runder Hitbox, Ruckeln (AirPlay!) glätten; Flunkyball: zielen, Position wechselt, mehr Treffer nötig, Sensor-Weite; Darts: Ziehen/Sensor-Zielen, 301 Single Out; Busfahrer mit Bus und 4 Karten; Das erste Gespräch: Latenz-Kalibrierung, Spuren, Wettkampf; Igel-Krieg: Stick, Zuschauer-Fehler, danach Waschbären-Thema mit eigenen 8-Bit-Icons.",
+      "title": "Marlons Feedback 24.11., Teil 3: Das erste Gespräch wie Piano Tiles + Igel-Krieg wird Waschbär-Spiel",
+      "detail": "Das erste Gespräch: Takt-Versatz (TV per AirPlay) mit Kalibrierung ausgleichen, Spuren und schwerere Rhythmen exakt auf dem Beat, außerhalb der Story Gewinner nach Trefferquote. Igel-Krieg: Thema Waschbären mit neuem Namen, Figuren und Waffen, die zeigen, was sie tun, eigene 8-Bit-Icons statt Emojis.",
       "branch": "claude/optimistic-johnson-korj2c",
       "since": "2026-11-24"
     }
@@ -147,6 +147,36 @@
     }
   ],
   "done": [
+    {
+      "title": "Volleyball raus → Kopfball-Duell + Kopf-Korb (à la Head Soccer/Head Basketball): große Köpfe, Stick + SPRUNG/SCHUSS, Anstoß wechselt nach Tor/Korb, kompaktes Feld, 2–8 Spieler, test:kopfball",
+      "pr": 123,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Aufräumen!: Besen mit gerader Kante statt runder Hitbox, Physik 60 Hz, TV-Glättung (vorher 20-Hz-Sprünge), SnapBuffer-Verzögerung für alle Szenen ≈ 40 statt 60 ms, test:aufraeumen",
+      "pr": 123,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Flunkyball: selbst zielen, wechselnde Wurfposition, Flasche versetzt, max. ⅓ pro Treffer, Sensor-Kraft über Drehrate, test:flunky",
+      "pr": 123,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Darts: Ziehen/Sensor-Zielen mit Atmen, 301 Single Out mit Überworfen und Checkout-Hinweis",
+      "pr": 123,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Busfahrer statt Höher oder Tiefer: Doppeldecker, 4 Karten, 1–4 Schlücke, ohne Zeitlimit, test:busfahrer",
+      "pr": 123,
+      "date": "2026-11-24"
+    },
+    {
+      "title": "Igel-Krieg: Stick statt ◀ ▶, Zuschauer-Seite ohne Scrollen, Sprechblasen immer im Bild · Guess the Song aus allen Auswahl-Listen",
+      "pr": 123,
+      "date": "2026-11-24"
+    },
     {
       "title": "Spielbrett ohne Zeitlimit: Würfeln, Bar, Laden, Gabelung und Duell warten – auch auf Handys, die gerade weg sind; nur VIP/Laptop überspringt (TV zeigt, auf wen gewartet wird)",
       "pr": 122,
@@ -640,7 +670,7 @@
     },
     "igel": {
       "status": "in Arbeit",
-      "notes": "Stick statt ◀ ▶; als Zuschauer scrollt die Seite; Sprüche-Blase am TV nur halb sichtbar; Emoji-Icons → eigene 8-Bit-Icons; Thema unklar (Muschel-Teleport?) → Umbau zu Waschbären · vorher: Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern mit Kamera und Minikarte (24.11.)"
+      "notes": "Stick statt ◀ ▶, Zuschauer-Seite scrollt nicht mehr, Sprechblasen am TV immer ganz im Bild (#123); Emoji-Icons → eigene 8-Bit-Icons + Umbau zu Waschbären in Arbeit · Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern mit Kamera und Minikarte (24.11.)"
     },
     "ttt": {
       "status": "umgesetzt",
@@ -675,8 +705,8 @@
       "notes": "Rekorde-Tafel (#91) · Unklar ob vorlehnen oder nur abspringen → 3-Schritt-Leiste + kurze Hinweise · nach Landung nicht stehen bleiben → Auslauf, Abschwung, Fahne · mehr Sound · kein Gewicht anzeigen (#93)"
     },
     "lieder": {
-      "status": "in Arbeit",
-      "notes": "„Man hört einfach nichts“, nur Spiel-Sounds wirken komisch → deaktiviert, Code bleibt (aus der Arcade #122; Zufall/Party folgen) · vorher: Liederraten mit Genre-Wahl (1 gegen 1: je 4), 4 → 6 → 8 Antworten, umbenannt in „Guess the Song“ (#96). Musikquelle: eigene gekaufte MP3s in data/lieder/ oder Deezer-Hörproben (LIEDER_VORSCHAU=deezer, nicht-kommerziell) – Spotify/YouTube/Amazon/iTunes lizenzmäßig nicht nutzbar."
+      "status": "umgesetzt",
+      "notes": "„Man hört einfach nichts“, nur Spiel-Sounds wirken komisch → deaktiviert, Code bleibt (aus Arcade, Zufall, Party und Turnier – #122, #123) · vorher: Liederraten mit Genre-Wahl (1 gegen 1: je 4), 4 → 6 → 8 Antworten, umbenannt in „Guess the Song“ (#96). Musikquelle: eigene gekaufte MP3s in data/lieder/ oder Deezer-Hörproben (LIEDER_VORSCHAU=deezer, nicht-kommerziell) – Spotify/YouTube/Amazon/iTunes lizenzmäßig nicht nutzbar."
     },
     "kurve": {
       "status": "umgesetzt",
@@ -685,10 +715,6 @@
     "arena": {
       "status": "umgesetzt",
       "notes": "Hängenbleiben an Ecken/Kreuzungen behoben (Ursache: Abbiege-Regel ab 22° Stick-Schräge ließ die Figur zittern); Feld 17×9 (2) · 19×11 (3–4) · 23×11 (5–6) · 23×13 (7–8) · 25×13 (9–12) (#101)"
-    },
-    "volley": {
-      "status": "in Arbeit",
-      "notes": "Aufschlag wechselt nicht, Pfeilknöpfe statt Stick, Feld zu groß → Volleyball fliegt raus, dafür zwei Spiele à la Head Soccer: Kopfball-Fußball und Kopfball-Basketball"
     },
     "golf": {
       "status": "umgesetzt",
@@ -703,20 +729,20 @@
       "notes": "Spannungsleiste im Drill senkrecht statt waagerecht – „weil man ja so ziehen muss“ (#122) · sonst gut"
     },
     "darts": {
-      "status": "in Arbeit",
-      "notes": "Heißt nur noch „Darts“ (#122); Zielen: Finger halten + ziehen (mit Atmen), loslassen = Wurf, oder Handy bewegen + tippen; Modus 301 Single Out statt 5 Runden"
+      "status": "umgesetzt",
+      "notes": "Heißt „Darts“ (#122); Finger halten + ziehen = zielen (mit Atmen), loslassen = Wurf; Sensor-Modus mit Tippen; 301 Single Out mit Überworfen und Checkout-Hinweis (#123). Ziehen/Sensor am echten Handy nachjustieren"
     },
     "tidy": {
-      "status": "in Arbeit",
-      "notes": "Steuerung fühlt sich laggy/abgehackt an; runde Hitbox schiebt Sachen zufällig weg → Besen mit gerader Kante vor dem Spieler, dreht mit; Glättung am TV"
+      "status": "umgesetzt",
+      "notes": "Laggy/abgehackt + runde Hitbox schiebt Sachen zufällig weg → Besen mit gerader Kante vor der Figur (Sachen bleiben auch im Bogen davor), Physik 60 Hz, TV glättet (Sachen sprangen vorher mit 20 Hz) (#123). Gefühl mit echten Daumen noch prüfen; AirPlay bleibt der größte Teil der Verzögerung – für Action-Spiele HDMI"
     },
     "flunky": {
-      "status": "in Arbeit",
-      "notes": "Richtung selbst einstellen, jeder Wurf von anderer Position/Flasche versetzt, zu viele Fehlwürfe, ein Treffer = schon gewonnen, Sensor-Schwung zu weit → Zielen, Positionswechsel, Balance, neue Kraft-Kurve"
+      "status": "umgesetzt",
+      "notes": "Zielpfeil selbst drehen, jeder Wurf von anderer Position, Flasche wird versetzt, max. ⅓ austrinken pro Treffer (≥ 3 Treffer), Sensor-Kraft über Drehrate statt Beschleunigung, Feedback-Karte mit °/s (#123). Offen: Kraft-Referenz mit echtem Wurf messen (W_REF)"
     },
     "hilo": {
-      "status": "in Arbeit",
-      "notes": "Wird zu Busfahrer: alle im Bus, 4 verdeckte Karten – Rot/Schwarz (1), Höher/Tiefer/Gleich (2), Dazwischen/Außerhalb/Gleich (3), Symbol schon gehabt? (4 Schlücke)"
+      "status": "umgesetzt",
+      "notes": "Jetzt Busfahrer: alle im Doppeldecker, 4 Karten – Rot/Schwarz (1), Höher/Tiefer/Gleich (2), Dazwischen/Außerhalb/Gleich (3), Symbol schon gehabt? (4 Schlücke), aufgedeckt erst wenn alle getippt haben oder der VIP aufdeckt (#123)"
     },
     "rhythm": {
       "status": "in Arbeit",
@@ -853,11 +879,11 @@
       "status": "umgesetzt"
     },
     {
-      "title": "Bewegen per Stick statt ◀ ▶-Knöpfen als Standard (Regel in CLAUDE.md, #122) – Igel-Krieg wird umgestellt, Volleyball fliegt raus",
-      "status": "in Arbeit"
+      "title": "Bewegen per Stick statt ◀ ▶-Knöpfen als Standard (Regel in CLAUDE.md #122; Igel-Krieg umgestellt, Volleyball ersetzt durch Kopfball mit Stick #123)",
+      "status": "umgesetzt"
     },
     {
-      "title": "TV läuft per AirPlay (Mac → Apple TV): Bild und Ton kommen verzögert – erklärt Takt-Versatz und Ruckel-Gefühl; Ausgleich/Kalibrierung in Arbeit",
+      "title": "TV läuft per AirPlay (Mac → Apple TV): Bild und Ton kommen verzögert – Glättung/Verzögerung im eigenen Code reduziert (#123), Kalibrierung fürs Rhythmusspiel in Arbeit; Empfehlung für Action-Spiele: HDMI",
       "status": "in Arbeit"
     }
   ]
