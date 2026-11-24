@@ -5,7 +5,7 @@
 import '@fontsource/press-start-2p/400.css';
 import {
   ASSIGN_SCENES, type Assignment, CHANNELS, type ChannelId, MAX_BARS, NOTE_NAMES, STEPS_PER_BAR, STYLES, type Song, type SongInfo, WAVES,
-  type SceneSource, emptySong, sceneSource, slugId, styleName, validateSong,
+  type SceneSource, emptySong, overrideIdFor, sceneSource, slugId, styleName, validateSong,
 } from '../../shared/music';
 import { BUILTIN_IDS } from '../../shared/musicBuiltin';
 import { assignScene, deleteSong, getAssignment, getSong, listSongs, saveSong } from '../music/api';
@@ -247,12 +247,13 @@ window.addEventListener('keydown', (e) => {
 
 async function save(asNew = false): Promise<boolean> {
   const s = store.song;
-  if (asNew || BUILTIN_IDS.has(s.id)) {
-    const name = window.prompt('Unter welchem Titel speichern?', BUILTIN_IDS.has(s.id) ? `${s.title} (meins)` : s.title);
+  if (asNew) {
+    const name = window.prompt('Als neuer Song – Titel?', `${s.title} (Kopie)`);
     if (name === null) return false;
     store.edit((song) => {
       song.title = name.trim() || song.title;
       song.id = uniqueId(slugId(song.title));
+      delete song.overrides;
     });
     if (asNew && ctx.scene) ctx.mode = 'copy';
   }
@@ -268,7 +269,7 @@ async function save(asNew = false): Promise<boolean> {
     // Neue Kopie gleich der Szene zuordnen, aus der man kam
     if (ctx.mode !== 'direct' && ctx.scene) await assignScene(ctx.scene, saved.id);
     ctx.mode = 'direct';
-    setHash(editHash(ctx.scene, saved.id), true);
+    setHash(editHash(ctx.scene, saved.overrides ?? saved.id), true);
     await refreshLibrary();
     const where = scenesPlaying(saved.id, assignment, library);
     status(where.length ? `Gespeichert – läuft jetzt in ${sceneList(where, ctx.scene ?? undefined)}` : `Gespeichert: ${saved.title} (läuft noch nirgends)`, 'ok');
@@ -294,8 +295,32 @@ $('new').addEventListener('click', () => {
   store.load(s, false);
   status('Neuer Song', 'ok');
 });
+/** Überschreibung löschen → der eingebaute Song läuft wieder überall, wo er vorher lief */
+async function restoreOriginal(id: string) {
+  const info = library.find((x) => x.id === id);
+  const base = info?.overrides;
+  if (!info || !base) return;
+  if (!window.confirm(`Deine Änderungen an „${info.title}“ verwerfen und das Original wiederherstellen?`)) return;
+  try {
+    stopListening();
+    await deleteSong(id);
+    await refreshLibrary();
+    const where = scenesPlaying(base, assignment, library);
+    status(`Original wiederhergestellt${where.length ? ` – läuft wieder in ${sceneList(where, ctx.scene ?? undefined)}` : ''}`, 'ok');
+    // Im Editor: frischer Entwurf vom Original
+    if (!$('editorView').hidden && store.song.id === id) {
+      const { song } = await loadForEdit(base);
+      store.load(song, true);
+    }
+  } catch (e) {
+    status((e as Error).message, 'err');
+  }
+}
+$('restore').addEventListener('click', () => void restoreOriginal(store.song.id));
+
 $('delete').addEventListener('click', async () => {
   const s = store.song;
+  if (s.overrides) return void restoreOriginal(s.id);
   if (BUILTIN_IDS.has(s.id)) return status('Eingebaute Songs kann man nicht löschen', 'err');
   if (!library.some((x) => x.id === s.id)) return status('Dieser Song ist noch nicht gespeichert', 'err');
   if (!window.confirm(`„${s.title}“ wirklich löschen?`)) return;
@@ -530,7 +555,8 @@ function render() {
   ($('undo') as HTMLButtonElement).disabled = !store.canUndo;
   ($('redo') as HTMLButtonElement).disabled = !store.canRedo;
   ($('pasteBar') as HTMLButtonElement).disabled = !store.hasClip;
-  ($('delete') as HTMLButtonElement).disabled = BUILTIN_IDS.has(s.id);
+  ($('delete') as HTMLButtonElement).disabled = BUILTIN_IDS.has(s.id) || !library.some((x) => x.id === s.id);
+  $('restore').hidden = !(s.overrides && library.some((x) => x.id === s.id));
   document.title = `${store.dirty ? '● ' : ''}${s.title} – Musik-Werkstatt`;
   $<HTMLInputElement>('singBars').max = String(s.bars);
   $<HTMLInputElement>('singFrom').max = String(s.bars);
@@ -593,9 +619,10 @@ const overview = new Overview($('ovList'), $('ovOwn'), {
   copy: (scene) => go(`szene=${scene}&kopie=1`),
   edit(scene) {
     const src = sceneSource(scene, assignment, library);
-    if (src.kind === 'song') go(editHash(scene, src.id));
+    if (src.kind === 'song') go(editHash(scene, library.find((x) => x.id === src.id)?.overrides ?? src.id));
   },
-  editSong: (id) => go(editHash(null, id)),
+  editSong: (id) => go(editHash(null, library.find((x) => x.id === id)?.overrides ?? id)),
+  restore: (id) => void restoreOriginal(id),
   async deleteSong(id) {
     const s = library.find((x) => x.id === id);
     if (!s || !window.confirm(`„${s.title}“ wirklich löschen?`)) return;
@@ -658,6 +685,21 @@ function showEditor(song: Song, saved: boolean, c: EditCtx) {
   roll.scrollToMidi(70);
 }
 
+/**
+ * Song zum direkten Bearbeiten: eigene Songs wie sie sind; eingebaute als Überschreibung
+ * (vorhandene laden, sonst Entwurf mit `overrides` – der TV nimmt ihn nach dem Speichern statt des Originals).
+ */
+async function loadForEdit(id: string): Promise<{ song: Song; saved: boolean }> {
+  if (!BUILTIN_IDS.has(id)) return { song: await getSong(id), saved: true };
+  const ov = library.find((x) => x.overrides === id);
+  if (ov) return { song: await getSong(ov.id), saved: true };
+  const song = await getSong(id);
+  song.id = overrideIdFor(id);
+  song.overrides = id;
+  delete song.updated;
+  return { song, saved: true };
+}
+
 /** Kopie des Songs, der in der Szene läuft – mit freiem Namen „<Titel> (Kopie)“ */
 async function makeCopy(scene: string): Promise<Song | null> {
   const src = sceneSource(scene, assignment, library);
@@ -670,6 +712,7 @@ async function makeCopy(scene: string): Promise<Song | null> {
   song.title = title;
   song.id = uniqueId(slugId(title));
   delete song.updated;
+  delete song.overrides;
   return song;
 }
 
@@ -696,8 +739,9 @@ async function route() {
       showEditor(song, false, { scene, mode: 'copy' });
       status(`Kopie angelegt – nach dem Speichern läuft sie in ${sceneName(scene)}`);
     } else if (p.get('song') || (!h && legacy)) {
-      const id = p.get('song') ?? legacy!;
-      showEditor(await getSong(id), true, { scene, mode: 'direct' });
+      const { song, saved } = await loadForEdit(p.get('song') ?? legacy!);
+      showEditor(song, saved, { scene, mode: 'direct' });
+      if (song.overrides && !library.some((x) => x.id === song.id)) status('Eingebauter Song – beim Speichern ersetzt er das Original überall (zurück per „Original wiederherstellen“)');
     } else if (p.has('neu')) {
       const s = emptySong(uniqueId(`song-${Date.now().toString(36)}`), 'Neuer Song');
       // Startpunkt: ein einfacher Beat, damit sofort etwas zu hören ist

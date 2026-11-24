@@ -93,6 +93,11 @@ export interface Song {
   harmony: MelodicChannel;
   drums: DrumChannel;
   updated?: number;
+  /**
+   * Überschreibung eines eingebauten Songs („Direkt bearbeiten“ in der Werkstatt): Wo der
+   * eingebaute Song laufen würde, läuft stattdessen dieser eigene Song (`applyOverride`).
+   */
+  overrides?: string;
 }
 
 /** Kurzinfo für Listen */
@@ -105,11 +110,27 @@ export interface SongInfo {
   bars: number;
   builtin?: boolean;
   updated?: number;
+  /** ID des eingebauten Songs, den dieser eigene Song ersetzt */
+  overrides?: string;
 }
 
 export const songInfo = (s: Song, builtin = false): SongInfo => ({
   id: s.id, title: s.title, author: s.author, style: s.style, bpm: s.bpm, bars: s.bars, builtin: builtin || undefined, updated: s.updated,
+  overrides: builtin ? undefined : s.overrides,
 });
+
+/** ID der eigenen Überschreibung eines eingebauten Songs (eine pro eingebautem Song) */
+export const overrideIdFor = (builtinId: string) => `${builtinId.slice(0, 38)}-angepasst`;
+
+/** Läuft statt `id` eine Überschreibung? Dann deren ID, sonst `id` selbst. */
+export function applyOverride(id: string, songs: SongInfo[]): string {
+  return songs.find((s) => !s.builtin && s.overrides === id)?.id ?? id;
+}
+
+/** Song-IDs eines Stils für die Rotation – überschriebene eingebaute Songs durch ihre Überschreibung ersetzt */
+export function styleSongIds(style: string, songs: SongInfo[]): string[] {
+  return songs.filter((s) => s.style === style && !s.overrides).map((s) => applyOverride(s.id, songs));
+}
 
 export function emptySong(id = 'neuer-song', title = 'Neuer Song'): Song {
   return {
@@ -226,11 +247,10 @@ export function resolveSceneSong(scene: string, assign: Assignment, songs: SongI
   const raw = assign[scene] ?? assign.standard ?? defaultSongForScene(scene);
   if (raw === 'none') return null;
   if (raw.startsWith('style:')) {
-    const style = raw.slice(6);
-    const ids = songs.filter((s) => s.style === style).map((s) => s.id);
-    return ids.length ? pick(ids) : defaultSongForScene(scene);
+    const ids = styleSongIds(raw.slice(6), songs);
+    return ids.length ? pick(ids) : applyOverride(defaultSongForScene(scene), songs);
   }
-  return songs.some((s) => s.id === raw) ? raw : defaultSongForScene(scene);
+  return applyOverride(songs.some((s) => s.id === raw) ? raw : defaultSongForScene(scene), songs);
 }
 
 /**
@@ -253,11 +273,12 @@ export function sceneSource(scene: string, assign: Assignment, songs: SongInfo[]
   if (raw === 'none') return { kind: 'none', via };
   if (raw.startsWith('style:')) {
     const style = raw.slice(6) as StyleId;
-    const ids = songs.filter((s) => s.style === style).map((s) => s.id);
+    const ids = styleSongIds(style, songs);
     if (ids.length) return { kind: 'style', style, ids, via };
-    return { kind: 'song', id: defaultSongForScene(scene), via: 'eingebaut' };
+    return { kind: 'song', id: applyOverride(defaultSongForScene(scene), songs), via: 'eingebaut' };
   }
-  return songs.some((s) => s.id === raw) ? { kind: 'song', id: raw, via } : { kind: 'song', id: defaultSongForScene(scene), via: 'eingebaut' };
+  const id = songs.some((s) => s.id === raw) ? raw : defaultSongForScene(scene);
+  return { kind: 'song', id: applyOverride(id, songs), via: id === raw ? via : 'eingebaut' };
 }
 
 export function validateAssignment(raw: unknown, songExists: (id: string) => boolean): { ok: true; assign: Assignment } | { ok: false; error: string } {
@@ -331,6 +352,7 @@ export function validateSong(raw: unknown): Res {
   if (r.stepsPerBar !== undefined && r.stepsPerBar !== 16) return { ok: false, error: 'Nur 16 Schritte pro Takt' };
   const k = r.key as Record<string, unknown> | undefined;
   const key = k && isNum(k.root, 0, 11) && Number.isInteger(k.root) ? { root: k.root, minor: !!k.minor } : { root: 0, minor: false };
+  if (r.overrides !== undefined && (typeof r.overrides !== 'string' || !SONG_ID_RE.test(r.overrides) || r.overrides === r.id)) return { ok: false, error: 'Ungültige Überschreibung' };
   const total = r.bars * STEPS_PER_BAR;
   const lead = checkChannel(r.lead, 'Melodie', total);
   if (typeof lead === 'string') return { ok: false, error: lead };
@@ -352,6 +374,7 @@ export function validateSong(raw: unknown): Res {
       v: 2, id: r.id, title: r.title.trim(), author, style, bpm: r.bpm, swing, bars: r.bars, stepsPerBar: 16, key,
       lead, bass, harmony, drums: { volume: dv, kick: kick as number[], snare: snare as number[], hat: hat as number[] },
       updated: typeof r.updated === 'number' ? r.updated : undefined,
+      ...(typeof r.overrides === 'string' ? { overrides: r.overrides } : {}),
     },
   };
 }

@@ -66,6 +66,7 @@ export interface OverviewHandlers {
   edit(scene: string): void;
   editSong(id: string): void;
   deleteSong(id: string): void;
+  restore(id: string): void;
   filter(text: string): void;
 }
 
@@ -105,6 +106,7 @@ export class Overview {
     const s = this.info(id);
     if (!s) return { label: '?', cls: '' };
     if (s.builtin) return { label: 'eingebaut', cls: 'tag-builtin' };
+    if (s.overrides) return { label: 'eingebaut · angepasst', cls: 'tag-override' };
     return { label: 'eigen', cls: 'tag-own' };
   }
 
@@ -201,10 +203,10 @@ export class Overview {
     else opt(sel, '', `Eingebaut: ${this.title(defaultSongForScene(scene))}`);
     const gB = el('optgroup') as HTMLOptGroupElement;
     gB.label = 'Eingebaute Songs';
-    for (const s of this.songs.filter((x) => x.builtin)) opt(gB, s.id, s.title);
+    for (const s of this.songs.filter((x) => x.builtin)) opt(gB, s.id, `${s.title}${this.songs.some((o) => o.overrides === s.id) ? ' (angepasst)' : ''}`);
     const gO = el('optgroup') as HTMLOptGroupElement;
     gO.label = 'Eigene Songs';
-    for (const s of this.songs.filter((x) => !x.builtin)) opt(gO, s.id, s.title);
+    for (const s of this.songs.filter((x) => !x.builtin && !x.overrides)) opt(gO, s.id, s.title);
     const gS = el('optgroup') as HTMLOptGroupElement;
     gS.label = 'Stil (wechselt reihum)';
     for (const st of STYLES) {
@@ -235,6 +237,7 @@ export class Overview {
       r.dataset.song = s.id;
       const name = el('div', 'ov-name');
       name.append(el('b', '', s.title));
+      if (s.overrides) name.append(el('span', 'tag tag-override', 'ersetzt das eingebaute Original'));
       name.append(el('small', '', `${styleName(s.style)} · ${s.bpm} BPM · ${s.bars} Takte${s.author ? ` · von ${s.author}` : ''}`));
       const where = scenesPlaying(s.id, this.assign, this.songs);
       const now = el('div', 'ov-now');
@@ -243,8 +246,8 @@ export class Overview {
       listen.addEventListener('click', () => this.h.listenSong(s.id, listen));
       const edit = btn('Bearbeiten', 'primary');
       edit.addEventListener('click', () => this.h.editSong(s.id));
-      const del = btn('Löschen', 'danger');
-      del.addEventListener('click', () => this.h.deleteSong(s.id));
+      const del = s.overrides ? btn('↺ Original', '', 'Original wiederherstellen') : btn('Löschen', 'danger');
+      del.addEventListener('click', () => (s.overrides ? this.h.restore(s.id) : this.h.deleteSong(s.id)));
       const acts = el('div', 'ov-acts');
       acts.append(listen, edit, del);
       r.append(el('span', 'ov-icon', '♪'), name, now, acts);
