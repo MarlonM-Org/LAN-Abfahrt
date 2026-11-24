@@ -1,52 +1,77 @@
 /**
- * Darts: Umrechnung eines kurzen Schnippens mit dem Handy in einen Wurf.
- * Reine Funktion (kein DOM) – lässt sich mit Testdaten prüfen.
+ * Darts: Zielen am Handy – reine Funktionen (ohne DOM), damit sie sich mit Testdaten prüfen lassen.
  *
- * Haltung: Handy aufrecht wie einen Dart halten, Knopf gedrückt halten, aus dem Handgelenk
- * nach vorn schnippen und dabei loslassen.
- * - Kraft: Spitze der Drehrate (°/s) bzw. Beschleunigung ohne Schwerkraft in den letzten 600 ms
- * - Seite: Drehung um die Hochachse (Kompass) zwischen Drücken und Loslassen
+ * - Touch: Finger gedrückt halten und ziehen verschiebt das Fadenkreuz RELATIV (langsam = fein, schnell = weit),
+ *   Loslassen wirft. Was beim Abheben des Fingers noch verrutscht, zählt nicht (Position von kurz davor).
+ * - Sensor: Handy wie eine Fernbedienung auf den TV richten; Drehen/Neigen verschiebt das Fadenkreuz
+ *   (kalibrierte Mitte = Bull), Tippen wirft.
+ * Das „Atmen“ (shared/darts.ts) liegt in beiden Fällen die ganze Zeit obendrauf.
  */
-import { type MotionSample, type SwingScale, swingAcc, swingRot } from './motion';
-import { type ThrowResult, wrapDeg } from './bowlingThrow';
+import type { Point } from '../../shared/types';
+import { type AimCalib, wrapDeg } from './aim';
 
-const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-const r2 = (v: number) => Math.round(v * 100) / 100;
-const dead = (v: number, zone: number) => (Math.abs(v) < zone ? 0 : (v - Math.sign(v) * zone) / (1 - zone));
-const median = (vals: number[]) => {
-  const s = [...vals].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)] ?? 0;
+export const DARTS_AIM = {
+  /** mm pro CSS-Pixel bei langsamem Ziehen (Triple-Ring 8 mm ≈ 18 px Fingerweg) */
+  SLOW_MM_PER_PX: 0.45,
+  /** zusätzliche mm/px pro px/ms Fingertempo … */
+  SPEED_GAIN: 1.1,
+  /** … bis höchstens so viel (ein schneller Wisch quer über die Scheibe) */
+  MAX_MM_PER_PX: 2.2,
+  /** Zielpunkt bleibt in ± LIMIT mm (sichtbarer Ausschnitt am Handy) */
+  LIMIT: 200,
+  /** Sensor: mm pro Grad Drehung/Neigung (± 22° = ganze Scheibe) */
+  MM_PER_DEG: 9,
+  /** kürzer gehalten = kein Wurf (versehentliches Antippen) */
+  MIN_HOLD_MS: 250,
+  /** Beim Loslassen zählt die Zielposition von so viel ms vorher (Abheben verwackelt sonst) */
+  RELEASE_LOOKBACK_MS: 60,
+  /** Sensor: Tippen ruckelt das Handy – es zählt die Position von so viel ms vor dem Tipp */
+  TAP_LOOKBACK_MS: 40,
+  /** Pause nach einem Wurf, bevor der nächste geht (Doppel-Tipp im Sensor-Modus) */
+  COOLDOWN_MS: 500,
 };
 
-/** Ergebnis: `speed` = Kraft 0 … 1 (Ideal ≈ 0,6), `angle` = seitlicher Fehler −1 … 1, `spin` = 0 */
-export function flickToThrow(samples: MotionSample[]): ThrowResult {
-  if (samples.length < 3) return { ok: false, reason: 'Zu kurz – halten, schnippen, loslassen!' };
-  const tEnd = samples[samples.length - 1].t;
-  if (tEnd - samples[0].t < 120) return { ok: false, reason: 'Zu kurz – halten, schnippen, loslassen!' };
-  const win = samples.filter((s) => s.t >= tEnd - 600);
-  let peakW = 0;
-  let peakA = 0;
-  for (const s of win) {
-    peakW = Math.max(peakW, Math.hypot(s.rotAlpha, s.rotBeta, s.rotGamma));
-    peakA = Math.max(peakA, Math.abs(Math.hypot(s.ax, s.ay, s.az) - 9.81));
-  }
-  if (peakW < 90 && peakA < 2.5) return { ok: false, reason: 'Kein Wurf erkannt – Handy nach vorn schnippen!' };
-  // Ein lockeres Schnippen (~700 °/s bzw. ~16 m/s²) ergibt die Idealkraft 0,6
-  const raw = Math.max((peakW - 120) / 960, (peakA - 2.5) / 22);
-  const speed = clamp(raw, 0.05, 1);
+export const clampAim = (p: Point): Point => {
+  const L = DARTS_AIM.LIMIT;
+  return { x: Math.max(-L, Math.min(L, p.x)), y: Math.max(-L, Math.min(L, p.y)) };
+};
 
-  const head = samples.slice(0, 3);
-  const tail = samples.slice(-3);
-  let yaw = wrapDeg(median(tail.map((s) => s.alpha)) - median(head.map((s) => s.alpha)));
-  if (Math.abs(yaw) > 60) yaw = 0; // Kompass springt → ignorieren
-  // alpha wächst bei Drehung nach links → negative Seite
-  const angle = clamp(dead(-yaw / 25, 0.12), -1, 1);
-  return { ok: true, t: { speed: r2(speed), angle: r2(angle), spin: 0 } };
+/** Fingerweg (CSS-px) in `dtMs` → Weg des Fadenkreuzes in mm: langsam fein, schnell weit */
+export function dragToMm(dx: number, dy: number, dtMs: number): Point {
+  const speed = Math.hypot(dx, dy) / Math.max(1, dtMs); // px/ms
+  const gain = Math.min(DARTS_AIM.MAX_MM_PER_PX, DARTS_AIM.SLOW_MM_PER_PX + speed * DARTS_AIM.SPEED_GAIN);
+  return { x: dx * gain, y: dy * gain };
 }
 
-/** Feedback-Skala zu flickToThrow (gleiche Schwellen) */
-export const FLICK_SCALE: SwingScale = {
-  level: (s) => Math.max((swingRot(s) - 120) / 960, (swingAcc(s) - 2.5) / 22),
-  windowMs: 600,
-  yawLimit: 60,
-};
+/**
+ * Sensor: Ausrichtung → Zielpunkt (mm). Die kalibrierte Ausrichtung zeigt aufs Bull.
+ * Nach links drehen → alpha wächst → Fadenkreuz nach links; Oberkante heben → beta wächst → nach oben.
+ */
+export function sensorAim(o: { alpha: number; beta: number }, calib: AimCalib): Point {
+  const yaw = wrapDeg(o.alpha - calib.alpha);
+  const pitch = wrapDeg(o.beta - calib.beta);
+  return clampAim({ x: -yaw * DARTS_AIM.MM_PER_DEG, y: -pitch * DARTS_AIM.MM_PER_DEG });
+}
+
+/** Verlauf der Zielposition der letzten Augenblicke (für „Position kurz vor dem Loslassen“) */
+export class AimTrail {
+  private pts: { t: number; p: Point }[] = [];
+
+  reset(t: number, p: Point) {
+    this.pts = [{ t, p: { ...p } }];
+  }
+
+  push(t: number, p: Point) {
+    this.pts.push({ t, p: { ...p } });
+    // nur die letzte halbe Sekunde behalten (mindestens einen Punkt davor)
+    while (this.pts.length > 2 && this.pts[1].t < t - 500) this.pts.shift();
+  }
+
+  /** Position zum Zeitpunkt `t`: der letzte Stand davor – oder der älteste bekannte, wenn `t` noch früher liegt */
+  at(t: number): Point | null {
+    if (!this.pts.length) return null;
+    let best = this.pts[0];
+    for (const x of this.pts) if (x.t <= t) best = x;
+    return { ...best.p };
+  }
+}

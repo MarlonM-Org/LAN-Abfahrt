@@ -1,8 +1,8 @@
 import type { IgelState, IgelWeapon } from '../../../shared/types';
-import { GRENADE, IGEL, IGEL_TAUNTS, IGEL_THEMES, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, isTool, squadOf, surfaceY, windArrows } from '../../../shared/igel';
+import { GRENADE, IGEL, IGEL_TAUNTS, IGEL_THEMES, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, isTool, squadOf, stickRearmed, stickUp, surfaceY, windArrows } from '../../../shared/igel';
 import { type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
 import { haptic } from '../haptic';
-import { onInputReset, localPoint } from '../stick';
+import { onInputReset, localPoint, stickZone } from '../stick';
 
 const igel = () => (store.state?.mini?.kind === 'igel' ? store.state.mini.state : null);
 /** Spielerfarbe des Abends – wie `colorOf` in der IgelScene */
@@ -33,7 +33,7 @@ export function pickIgel(s: IgelState): Screen {
     const team = sq >= 0 ? ` Du spielst für Team ${s.squads![sq].name} – mit ${s.squads![sq].members.filter((m) => m !== id).map(nameOf).join(', ') || 'dir allein'}.` : '';
     const mode = s.simul
       ? 'ALLE GLEICHZEITIG: 15 s zielen, FEUER drücken – dann fliegt alles zugleich!'
-      : 'Wenn du dran bist: laufen, Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER.';
+      : 'Wenn du dran bist: mit dem Stick links laufen (nach oben = Sprung), Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER.';
     const th = IGEL_THEMES[s.theme];
     const card = th ? `Themenkarte ${th.icon} ${th.name}: ${th.text} ` : '';
     return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der ${s.w > IGEL.W ? 'großen ' : ''}Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
@@ -55,22 +55,19 @@ function windText(w: number) {
 // ------------------------------------------------------------------ Aktiver Spieler
 
 function buildActive(turn: number) {
-  // Quer wie bei Worms: links Waffenraster + laufen/springen, Mitte Minikarte, rechts Ziel-Pad + FEUER
+  // Quer wie bei Worms: links Waffenraster + schwebender Stick (laufen, hoch = Sprung), Mitte Minikarte,
+  // rechts Ziel-Pad + SPRUNG/FEUER (der rechte Daumen ist beim Laufen frei)
   const me = store.playerId!;
   const root = el(`
     <div class="lx ig-lx ig-m">
       <div class="lx-head"><span class="timer"></span><b class="ig-head grow"></b><span class="ig-wind"></span><button class="ig-done hidden">Fertig ✓</button></div>
       <div class="lx-left ig-left-col">
         <div class="ig-weapons ig-grid"></div>
-        <p class="ig-winfo"></p>
-        <div class="ig-move">
-          <button class="ig-left">◀</button>
-          <button class="ig-jump">SPRUNG</button>
-          <button class="ig-right">▶</button>
-        </div>
+        <div class="ig-stick"><span class="st-label"></span></div>
       </div>
       <div class="lx-mid">
         <canvas class="ig-map" width="480" height="270"></canvas>
+        <p class="ig-winfo"></p>
         <p class="ig-sd"></p>
       </div>
       <div class="lx-right ig-aim">
@@ -80,6 +77,7 @@ function buildActive(turn: number) {
           <div class="ig-wait hidden"><b>Bereit ✓</b><div class="ig-taunts"></div><small class="ig-tcd"></small></div>
           <p class="pad-text"></p>
         </div>
+        <button class="big-btn ig-jump">SPRUNG</button>
         <button class="big-btn ig-fire" disabled>FEUER</button>
       </div>
     </div>
@@ -118,28 +116,20 @@ function buildActive(turn: number) {
   }
   const taunts = tauntRow(q(root, '.ig-taunts'), q(root, '.ig-tcd'));
 
-  // Laufen + Springen (gedrückt halten)
-  const hold = (btn: HTMLElement, dir: -1 | 1) => {
-    let down = false;
-    btn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      btn.setPointerCapture(e.pointerId);
-      down = true;
-      send('move', { dir });
-    });
-    const up = () => {
-      if (!down) return;
-      down = false;
-      send('move', { dir: 0 });
-    };
-    btn.addEventListener('pointerup', up);
-    btn.addEventListener('pointercancel', up);
-    btn.addEventListener('lostpointercapture', up);
-    btn.addEventListener('contextmenu', (e) => e.preventDefault());
-    onInputReset(btn, up);
-  };
-  hold(q(root, '.ig-left'), -1);
-  hold(q(root, '.ig-right'), 1);
+  // Schwebender Stick: waagerecht = laufen (analog), deutlich nach oben = Sprung, an der Liane hoch/runter = klettern,
+  // seitlich = schwingen, am Schirm seitlich = steuern. Der Server deutet die Werte (Schwellen in IGEL_STICK);
+  // stickZone() lässt bei input-reset los und wiederholt alle 250 ms (der Raum setzt nach 700 ms ohne Nachschub auf 0).
+  const stickEl = q(root, '.ig-stick');
+  const stickLabel = q(stickEl, '.st-label');
+  let stickHigh = false;
+  stickZone(stickEl, (x, y) => {
+    send('stick', { x, y });
+    // Rückmeldung beim Hochschnippen (nicht an der Liane – da heißt oben klettern)
+    if (stickUp(y) && !stickHigh) {
+      stickHigh = true;
+      if (!roped() && !stickEl.classList.contains('off')) haptic(10);
+    } else if (stickRearmed(y)) stickHigh = false;
+  });
   tapButton(q(root, '.ig-jump'), () => {
     send('jump');
     haptic(10);
@@ -235,24 +225,10 @@ function buildActive(turn: number) {
   };
   const aimKind = () => WEAPONS[weapon].aim;
   const sendAim = (angle: number, power: number) => send('aim', { angle: Math.round(angle * 100) / 100, power: Math.round(power * 100) / 100 });
-  /** Am Seil: Pad oben = hochklettern, unten = runterlassen (gedrückt halten) */
-  let climbing: number | null = null;
-  const stopClimb = () => {
-    if (climbing === null) return;
-    climbing = null;
-    send('climb', { dir: 0 });
-  };
   pad.addEventListener('pointerdown', (e) => {
     e.preventDefault();
-    if (roped()) {
-      pad.setPointerCapture(e.pointerId);
-      climbing = e.pointerId;
-      const p = localPoint(pad, e);
-      send('climb', { dir: p.y < pad.clientHeight / 2 ? 1 : -1 });
-      haptic(6);
-      return;
-    }
-    if (!canAim() || drag || aimKind() === 'map' || aimKind() === 'none') return;
+    // An der Liane klettert der Stick – das Pad zielt erst wieder am Boden (FEUER = LOSLASSEN)
+    if (roped() || !canAim() || drag || aimKind() === 'map' || aimKind() === 'none') return;
     pad.setPointerCapture(e.pointerId);
     const p = localPoint(pad, e);
     drag = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y };
@@ -291,9 +267,9 @@ function buildActive(turn: number) {
     draw();
     haptic(8);
   };
-  pad.addEventListener('pointerup', (e) => (e.pointerId === climbing ? stopClimb() : release(e)));
-  pad.addEventListener('pointercancel', (e) => (e.pointerId === climbing ? stopClimb() : release(e, true)));
-  onInputReset(pad, () => (stopClimb(), release(null, true)));
+  pad.addEventListener('pointerup', (e) => release(e));
+  pad.addEventListener('pointercancel', (e) => release(e, true));
+  onInputReset(pad, () => release(null, true));
 
   // Möwen-Luftschlag: Ziel auf der Minikarte antippen (die Karte zeigt immer die ganze Insel, Canvas-Breite = Inselbreite)
   mapCanvas.addEventListener('pointerdown', (e) => {
@@ -314,7 +290,6 @@ function buildActive(turn: number) {
   tapButton(fireBtn, () => {
     // Am Seil wird FEUER zu LOSLASSEN
     if (roped()) {
-      stopClimb();
       send('jump');
       haptic(20);
       return;
@@ -403,13 +378,14 @@ function buildActive(turn: number) {
     }
     const kind = aimKind();
     const onRope = !!hog?.rope && (hog.owner === me || !st.simul);
-    if (!onRope) stopClimb();
     const armed = onRope || (aiming && (kind === 'none' || (kind === 'map' ? target !== null : !!ready)));
-    pad.classList.toggle('off', !aiming && !locked && !onRope);
-    pad.classList.toggle('ig-climb', onRope);
+    pad.classList.toggle('off', (!aiming && !locked) || onRope);
     fireBtn.disabled = !armed;
     fireBtn.classList.toggle('armed', armed);
-    fireBtn.textContent = onRope ? 'LOSLASSEN' : weapon === 'rope' ? 'LIANE!' : weapon === 'parasol' ? 'SCHIRM AUF' : weapon === 'shovel' ? 'GRABEN' : kind === 'none' ? 'ABLEGEN' : kind === 'map' ? 'MÖWEN LOS' : 'FEUER';
+    // LOSLASSEN mit weichem Trennstrich; lange Wörter kleiner, damit sie in die schmale Knopfspalte passen
+    const fireLabel = onRope ? 'LOS\u00adLASSEN' : weapon === 'rope' ? 'LIANE!' : weapon === 'parasol' ? 'SCHIRM AUF' : weapon === 'shovel' ? 'GRABEN' : kind === 'none' ? 'ABLEGEN' : kind === 'map' ? 'MÖWEN LOS' : 'FEUER';
+    if (fireBtn.textContent !== fireLabel) fireBtn.textContent = fireLabel;
+    fireBtn.classList.toggle('ig-long', fireLabel.length > 5);
     // Simultan: nach FEUER warten – mit Sprüchen für die Wartezeit
     const wait = q(root, '.ig-wait');
     wait.classList.toggle('hidden', !locked || st.sub !== 'aimAll');
@@ -429,7 +405,7 @@ function buildActive(turn: number) {
     if (!drag) {
       const shotgun2 = st.sub === 'aim' && st.shotsLeft > 0;
       padText.textContent = onRope
-        ? '▲ oben halten = hochklettern\n▼ unten halten = runter\n◀ ▶ = schwingen · LOSLASSEN'
+        ? 'An der Liane: Stick ▲ ▼ = klettern,\n◀ ▶ = schwingen · LOSLASSEN = abspringen'
         : locked
         ? ''
         : aiming
@@ -440,7 +416,7 @@ function buildActive(turn: number) {
                 ? 'Tippe auf der Karte das Ziel an!'
                 : `Ziel gesetzt – MÖWEN LOS!\nKarte antippen = neues Ziel`
               : weapon === 'parasol'
-                ? `${WEAPONS[weapon].hint}\nSCHIRM AUF – dann mit ◀ ▶ steuern`
+                ? `${WEAPONS[weapon].hint}\nSCHIRM AUF – dann mit dem Stick steuern`
               : kind === 'none'
                 ? `${WEAPONS[weapon].hint}\nABLEGEN drücken, dann weglaufen`
                 : ready
@@ -451,7 +427,9 @@ function buildActive(turn: number) {
             : 'Schau auf den Fernseher!';
     }
     const moveOk = st.simul ? (st.sub === 'aimAll' && !locked) || st.sub === 'retreatAll' : st.sub === 'aim' || st.sub === 'retreat';
-    for (const sel of ['.ig-left', '.ig-right', '.ig-jump']) q<HTMLButtonElement>(root, sel).disabled = !moveOk;
+    q<HTMLButtonElement>(root, '.ig-jump').disabled = !moveOk || !hog || hog.state !== 'ok';
+    stickEl.classList.toggle('off', !moveOk || !hog || hog.state !== 'ok');
+    stickLabel.textContent = onRope ? '▲ ▼ klettern · ◀ ▶ schwingen' : hog?.chute ? '◀ ▶ Schirm steuern' : '◀ ▶ laufen · ▲ springen';
   };
 }
 
@@ -480,21 +458,24 @@ function tauntRow(box: HTMLElement, cd: HTMLElement) {
   };
 }
 
+/**
+ * Zuschauen/Warten (nicht dran, Igel raus): im Querlayout `.lx` ohne Scrollen – links Karte + was gerade passiert,
+ * Mitte „gleich dran“ + Teams (schrumpft bei vielen Spielern über fit.ts), rechts große Spruch-Knöpfe.
+ */
 function buildWatch() {
   const root = el(`
-    <div class="ig-watchw">
-      <canvas class="ig-map" width="480" height="270"></canvas>
-      <div class="ig-side">
-        <div class="top-row"><span class="timer"></span><span class="ig-wind"></span></div>
-        <div class="ig-turn">
-          <h2 class="ig-who"></h2>
-          <p class="ig-what"></p>
-        </div>
-        <p class="ig-next"></p>
-        <div class="ig-tbox"><div class="ig-taunts"></div><small class="ig-tcd"></small></div>
-        <div class="ig-teams"></div>
+    <div class="lx ig-lx ig-wx">
+      <div class="lx-head"><span class="timer"></span><b class="ig-who grow"></b><span class="ig-wind"></span></div>
+      <div class="lx-left ig-wx-left">
+        <div class="ig-wx-map"><canvas class="ig-map" width="480" height="270"></canvas></div>
+        <p class="ig-what"></p>
         <p class="ig-sd"></p>
       </div>
+      <div class="lx-mid ig-wx-mid">
+        <p class="ig-next"></p>
+        <div class="ig-teams"></div>
+      </div>
+      <div class="lx-right ig-tbox"><small class="ig-tcd"></small><div class="ig-taunts"></div></div>
     </div>
   `);
   app.append(root);
@@ -685,9 +666,17 @@ function ensureStyle() {
   s.id = 'ig-m-style';
   s.textContent = `
 .lx.ig-lx.ig-m { --lx-l: 34%; --lx-r: 38%; }
-.ig-m .ig-left-col { grid-template-rows: minmax(0, 1fr) auto minmax(0, 0.55fr); gap: 4px; }
+/* links: Waffenraster oben, darunter der schwebende Stick (Daumen irgendwo aufsetzen) */
+.ig-m .ig-left-col { grid-template-rows: minmax(0, 0.8fr) minmax(0, 1fr); gap: 6px; }
 .ig-m .ig-weapons.ig-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 3px; }
-.ig-pad.ig-climb { background: linear-gradient(#d8f0c0 0 50%, #f0dcb0 50% 100%); }
+.ig-m .ig-stick { min-height: 0; }
+.ig-m .ig-stick.off { filter: grayscale(0.7); opacity: 0.5; }
+/* rechts: Ziel-Pad über die ganze Höhe, daneben SPRUNG (klein) über FEUER */
+.ig-m .ig-aim { grid-template-columns: minmax(0, 1fr) 72px; grid-template-rows: minmax(0, 0.55fr) minmax(0, 1fr); }
+.ig-m .ig-pad { grid-row: 1 / 3; }
+.lx .big-btn.ig-jump { font-size: 9px; background: #6b8fd6; box-shadow: inset 0 4px 0 #9db8ee, inset 0 -6px 0 #3f62a8, 0 3px 0 var(--outline); }
+.lx .big-btn.ig-jump:disabled { filter: grayscale(0.7); opacity: 0.5; }
+.lx .big-btn.ig-fire.ig-long { font-size: 8px; line-height: 1.6; hyphens: manual; }
 .ig-m .ig-weapon { position: relative; padding: 0; justify-content: center; flex-direction: column; gap: 0; }
 .ig-m .ig-weapon .ig-ico { font-size: 16px; line-height: 1; filter: drop-shadow(1px 1px 0 rgba(45, 27, 18, 0.5)); }
 .ig-m .ig-weapon small { position: absolute; right: 2px; bottom: 1px; font-size: 7px; }
@@ -699,19 +688,43 @@ function ensureStyle() {
 .ig-fuse button { padding: 4px 6px; font-size: 8px; min-height: 0; background: var(--paper-dark); color: var(--ink); text-shadow: none; }
 .ig-fuse button.sel { background: var(--gold); border-color: var(--red); }
 .ig-wait { position: absolute; inset: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(255, 246, 220, 0.9); color: var(--green-dark, #2f7d32); font-size: 10px; }
-.ig-taunts { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; width: 100%; }
+/* Spruch-Knöpfe: zwei Spalten, wenn „Volltreffer!“ hineinpasst, sonst eine – nie über den Rand hinaus */
+.ig-taunts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 92px), 1fr)); gap: 4px; width: 100%; }
 .ig-taunt { padding: 6px 4px; min-height: 0; font-size: 7px; line-height: 1.3; background: #f07aa8; box-shadow: inset 0 3px 0 #f6a3c3, inset 0 -3px 0 #b0306a, 0 2px 0 var(--outline); }
 .ig-taunt:disabled { filter: grayscale(0.8); opacity: 0.6; }
 .ig-tcd { font-size: 7px; color: var(--ink-soft); }
-.ig-tbox { display: flex; flex-direction: column; gap: 4px; }
 .ig-squad { display: flex; flex-direction: column; gap: 3px; padding: 3px; border: 3px solid; background: rgba(255, 255, 255, 0.25); }
 .ig-squad.out { opacity: 0.5; }
 .ig-sqhead { display: flex; align-items: center; gap: 6px; font-size: 9px; color: var(--ink); }
 .ig-sqhead b { width: 12px; height: 12px; border: 2px solid var(--outline); flex: none; }
 .ig-sqbar { width: 60px; }
 .ig-squad .ig-team { font-size: 8px; padding: 1px 6px; }
-/* Breite Insel (ab 6 Spielern): Karte zuschauen quer in voller Breite statt voller Höhe */
-:where(html.land) .ig-watchw .ig-map.ig-wide { width: 62%; height: auto; max-width: 62%; }
+/* Zuschauen/Warten: Querlayout ohne Scrollen (links Karte, Mitte Teams, rechts Sprüche) */
+.lx.ig-wx { --lx-l: 40%; --lx-r: 30%; }
+.ig-wx .ig-who { font-weight: normal; font-size: 9px; color: var(--ink); }
+.ig-wx-left { display: flex; flex-direction: column; gap: 4px; }
+.ig-wx-map { flex: 0 1 auto; min-height: 0; display: flex; justify-content: center; }
+.ig-wx .ig-map { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+.ig-wx-left p { margin: 0; text-align: center; font-size: 7px; line-height: 1.5; }
+.ig-wx .ig-what { color: var(--ink); min-height: 1.5em; }
+.ig-wx-mid { justify-content: flex-start; gap: 4px; }
+.ig-wx .ig-next { margin: 0; min-height: 0; font-size: 8px; line-height: 1.5; }
+.ig-wx .ig-next:empty { display: none; }
+/* Pulsieren statt Wackeln: Wackeln ragt über die Spalte hinaus und ließe fit.ts die Spalte immer kleiner zoomen */
+.ig-wx .ig-next.ig-soon { padding: 4px; animation: ig-pulse 0.7s infinite alternate; }
+.ig-wx .ig-teams { gap: 3px; }
+.ig-wx .ig-team { padding: 1px 4px; font-size: 7px; gap: 4px; text-align: left; }
+.ig-wx .ig-team b { width: 9px; height: 9px; }
+.ig-wx .ig-bar { width: 26px; height: 8px; }
+.ig-wx .ig-hp { width: 22px; }
+.ig-wx .ig-squad { padding: 2px; gap: 2px; border-width: 2px; }
+.ig-wx .ig-sqhead { font-size: 7px; gap: 4px; }
+.ig-wx .ig-sqbar { width: 36px; }
+/* Sprüche: Knöpfe füllen die rechte Spalte, Abklingzeit darüber */
+.ig-wx .ig-tbox { display: flex; flex-direction: column; gap: 4px; }
+.ig-wx .ig-tcd { text-align: center; }
+.ig-wx .ig-taunts { flex: 1; min-height: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 104px), 1fr)); grid-auto-rows: minmax(0, 1fr); }
+.ig-wx .ig-taunt { min-height: 0; font-size: 8px; }
 `;
   document.head.append(s);
 }

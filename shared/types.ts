@@ -3,6 +3,7 @@ import type { PropType } from './verstecken';
 import type { GrillState } from './grill';
 import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
+import type { KbState } from './kopfball';
 import type { WolfPrivate, WolfState } from './werwolf';
 import type { WrPrivate, WrState } from './wolfrunde';
 import type { LexPrivate, LexState } from './lexikon';
@@ -74,7 +75,8 @@ export type MiniKind =
   | 'grill'
   | 'boule'
   | 'sumo'
-  | 'volley'
+  | 'kopfball'
+  | 'kopfkorb'
   | 'tourist'
   | 'sprueche'
   | 'bogen'
@@ -115,6 +117,15 @@ export interface ThrowResult {
   from: Point;
   to: Point;
   hit: boolean;
+  /** Flasche beim Wurf */
+  bottle: Point;
+  /** Richtung inkl. Wurf-Abweichung (rad, + = TV unten), Kraft 0 … 1, Wind beim Wurf */
+  aim: number;
+  power: number;
+  wind: number;
+  /** Abweichung von der Flasche (px, Werfersicht): along + = dahinter, lat + = am TV unten */
+  along: number;
+  lat: number;
 }
 
 /** aim → flight → (chug → reset) → aim … → over */
@@ -127,12 +138,27 @@ export interface FlunkyState {
   turnTeam: Team;
   throwerId: string;
   sub: FlunkySub;
-  /** -1 … 1, positiv = Wind treibt nach rechts */
+  /** -1 … 1, positiv = Wind treibt den Ball am TV nach unten */
   wind: number;
   runnerId: string | null;
   runProgress: number;
   winner: Team | null;
   lastThrow: ThrowResult | null;
+  /** Wurfpunkt des aktuellen Werfers (jeder Wurf woanders in der Wurfzone) */
+  spot: Point;
+  /** Flasche – nach jedem Treffer etwas versetzt wieder aufgestellt */
+  bottle: Point;
+  /** Zielpfeil des Werfers (rad, 0 = geradeaus, + = am TV nach unten) – live vom Handy */
+  aim: number;
+  /** Runde 1 … rounds (jedes Team wirft einmal pro Runde); > rounds = Verlängerung */
+  round: number;
+  rounds: number;
+  throws: Record<Team, number>;
+  hits: Record<Team, number>;
+  /** Trinken: bis hierhin darf jeder Trinker in diesem Treffer trinken (Schluck-Limit) */
+  sipFloor: Record<string, number>;
+  /** Wie das Spiel ausging: ausgetrunken, nach Runden mehr getrunken, Unentschieden, Team weg */
+  reason: 'empty' | 'rounds' | 'draw' | 'forfeit' | null;
 }
 
 // ------------------------------------------------------------------ Wer würde eher …?
@@ -170,20 +196,10 @@ export interface NhieState {
   sips: Record<string, number>;
 }
 
-// ------------------------------------------------------------------ Trinkspiel: Höher oder Tiefer
+// ------------------------------------------------------------------ Trinkspiel: Busfahrer (MiniKind `hilo`)
 
-export interface HiloState {
-  round: number;
-  rounds: number;
-  sub: 'guess' | 'reveal' | 'over';
-  endsIn: number;
-  card: number;
-  nextCard: number | null;
-  guessed: string[];
-  guesses: Record<string, 'higher' | 'lower'> | null;
-  roundSips: Record<string, number> | null;
-  sips: Record<string, number>;
-}
+/** Zustand und Regeln in `shared/busfahrer.ts` */
+export type HiloState = import('./busfahrer').BusState;
 
 // ------------------------------------------------------------------ Trinkspiel: Tick-Tack-Bumm
 
@@ -428,18 +444,26 @@ export interface SupState {
 export interface TidyPlayer {
   x: number;
   y: number;
+  /** Blickrichtung = Richtung des Besens (rad, 0 = nach rechts, dreht weich zur Stick-Richtung) */
+  a: number;
   team: Team;
-  /** Blickrichtung (für die Figur) */
+  /** Figur nach links/rechts gespiegelt (folgt `a`, mit etwas Spiel, damit sie beim Hoch-/Runterlaufen nicht flattert) */
   dir: 1 | -1;
   moving: boolean;
+  /** Sprint läuft gerade */
+  dash?: boolean;
+  /** ms bis SPRINT wieder geht */
   dashLeft: number;
 }
 
 export interface TidyState {
   sub: 'countdown' | 'play' | 'over';
+  /** Serverzeit des Physik-Takts zu diesem Stand (TV interpoliert damit, `SnapBuffer`) */
+  t: number;
   endsIn: number;
   players: Record<string, TidyPlayer>;
-  items: { id: number; x: number; y: number; type: string }[];
+  /** Herumliegende Sachen – die Art steckt in der id (`tidyItemType()` in shared/games.ts) */
+  items: { id: number; x: number; y: number }[];
   baskets: { team: Team; x: number; y: number; r: number }[];
   score: Record<Team, number>;
   /** Kurzer Jubel, wenn ein Teil im Korb landet */
@@ -1815,54 +1839,6 @@ export interface GeistState {
   points: Record<string, number>;
 }
 
-// ------------------------------------------------------------------ Strand-Volleyball
-
-export interface VolleyPlayer {
-  team: Team;
-  /** Gerade im Feld (sonst auf der Bank, wechselt nach dem nächsten Punkt ein) */
-  court: boolean;
-  /** Füße (Weltpixel) */
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  /** In der Luft */
-  air: boolean;
-  /** Schmetterarm ist gerade draußen */
-  spike: boolean;
-  /** Restliche Abklingzeit fürs Schmettern (ms) */
-  cd: number;
-  /** Laufrichtung (−1, 0, 1) für das Sprite */
-  dir: number;
-  touches: number;
-  spikes: number;
-}
-
-export interface VolleyState {
-  sub: 'intro' | 'serve' | 'rally' | 'point' | 'over';
-  /** Serverzeit (Date.now()) dieses Standes – Wiedergabe-Uhr am TV (`client/host/interp.ts`) */
-  t: number;
-  /** Restzeit der aktuellen Phase (Intro, Aufschlag, Punkt) */
-  endsIn: number;
-  /** Restliche Spielzeit (ms) */
-  clock: number;
-  score: Record<Team, number>;
-  target: number;
-  cap: number;
-  serving: Team;
-  server: string | null;
-  /** Zeit abgelaufen bei Gleichstand: der nächste Punkt entscheidet */
-  golden: boolean;
-  ball: { x: number; y: number; vx: number; vy: number };
-  players: Record<string, VolleyPlayer>;
-  /** Zählt bei jedem Ballkontakt hoch (für Effekte) */
-  hitSeq: number;
-  lastHit: { id: string; spike: boolean } | null;
-  pointSeq: number;
-  lastPoint: { team: Team; x: number } | null;
-  winner: Team | null;
-}
-
 // ------------------------------------------------------------------ Sumo-Steg
 
 export interface SumoPlayer {
@@ -2284,7 +2260,8 @@ export type MiniSnapshot =
   | { kind: 'grill'; state: GrillState }
   | { kind: 'boule'; state: BouleState }
   | { kind: 'sumo'; state: SumoState }
-  | { kind: 'volley'; state: VolleyState }
+  | { kind: 'kopfball'; state: KbState }
+  | { kind: 'kopfkorb'; state: KbState }
   | { kind: 'tourist'; state: TourState }
   | { kind: 'sprueche'; state: SpruecheState }
   | { kind: 'bogen'; state: BogenState }

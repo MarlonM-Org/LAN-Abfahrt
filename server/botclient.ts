@@ -10,7 +10,7 @@ import { BAZOOKA, GRENADE, IGEL, IGEL_TAUNTS, PUNCH, type Mask, applyOp, buildTe
 import { randomLook } from '../shared/avatar';
 import { BOULE, bouleAim, bouleDist, boulePowerFor } from '../shared/boule';
 import type { BouleState } from '../shared/types';
-import { BOTTLE, RANGE, THROW_SPOT, WIND_K } from '../shared/flunky';
+import { FLUNKY_THROWERS, flunkyBotThrow } from '../shared/flunky';
 import { ARCADE_GROUPS, ITEM_INFO, KURVE, ROOMS, TTT, TURM, turmCellOffsets, turmSnapX } from '../shared/games';
 import { type TrailCursor, ingestTrail, walkLine } from '../shared/kurve';
 import { lightSwitch, lineFree, nextWaypoint, roomAt, roomInner } from '../shared/house';
@@ -26,6 +26,7 @@ import { golfBot } from './golfbot';
 import { spionBot } from './spionbot';
 import { maexBot } from './maexchenbot';
 import { werwarsBot } from './werwarsbot';
+import { busBotTipp } from '../shared/busfahrer';
 import { WACKEL, type WackelPlatform, type WackelState, wackelPlatformUnder, wackelStage, wackelSurfaceY } from '../shared/wackel';
 import { POST, POST_COLORS, POST_PROMPTS } from '../shared/stillepost';
 import type { PostDrawing } from '../shared/types';
@@ -33,15 +34,13 @@ import { WALK_TILES, bfsFrom, distAt, isWalkTile, nextStepTowards, tileCenter, t
 import type { FangenState } from '../shared/types';
 import type { SumoState } from '../shared/types';
 import { SUMO, sumoIdx, sumoCellAt } from '../shared/sumo';
-import type { VolleyState } from '../shared/types';
-import { VOLLEY, vollPredict, vollSide, vollSpot } from '../shared/volley';
 import type { TourState } from '../shared/types';
 import { TOUR_LOCATIONS } from '../shared/tourist';
 import type { SpruecheState } from '../shared/types';
 import { SPRUECHE } from '../shared/sprueche';
 import type { BogenState } from '../shared/types';
 import { BOGEN, BOGEN_DIRS, BOGEN_STAGES, bogenDx, bogenDy, bogenLineFree, bogenRectSolid, bogenTile } from '../shared/bogen';
-import { DARTS, type DartsState, dartsTarget } from '../shared/darts';
+import { DARTS, type DartsState, dartsAimFor, dartsBump, dartsCalm, dartsDone, dartsLeft, dartsNoise, dartsTarget } from '../shared/darts';
 import { AFB, AFB_CX, AFB_CY, type AfbState } from '../shared/autoball';
 import type { WolfState } from '../shared/werwolf';
 import type { PixelState } from '../shared/types';
@@ -58,10 +57,12 @@ import { wolfrundeBot } from './wolfrundebot';
 import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
 import { lexikonBot } from './lexikonbot';
+import { type TidyBotMem, tidyBot } from './tidybot';
 import { liederBot } from './liederbot';
 import { sektBot } from './sektbot';
 import { bandBot } from './bandbot';
 import { malerBot } from './malerbot';
+import { kopfBot } from './kopfbot';
 import { type BotSkill, asBotSkill } from '../shared/players';
 
 export interface BotOptions {
@@ -118,9 +119,13 @@ export class Bot {
   priv: PrivateState = null;
   busy = new Set<string>();
   phasesSeen = new Set<string>();
+  /** Aufräumen: welche Sache der Bot gerade zum Korb schiebt */
+  private tidyMem: TidyBotMem = { target: null };
 
   leader: boolean;
   private human = HUMAN.normal;
+  /** Flunkyball: Zug, in dem dieser Bot schon geworfen hat (Team-Wurfzahl) */
+  private fkThrown = '';
   /** Eingaben bleiben in Reihenfolge: nie früher als die vorige */
   private sendAt = 0;
   private resultCount = 0;
@@ -214,25 +219,48 @@ export class Bot {
     });
   }
 
-  /** Darts: meist auf die Triple 20, ab und zu aufs Bull – mit menschlicher Streuung bei Kraft und Ruhe */
+  /** Darts: Zielpunkt (mm) des Bots – bleibt wie am Handy von Dart zu Dart stehen */
+  private dartsAim = dartsTarget(20, 'triple');
+
+  /**
+   * Darts (301 Single Out): Fadenkreuz in ein paar Schritten zum Ziel ziehen (der TV zeigt es live), kurz ruhig
+   * halten, dann loslassen. Ziel = leichtester Checkout-Weg, sonst Triple 20 – mit menschlicher Streuung beim
+   * Zielen und ohne Gefühl fürs Atmen (der Server rechnet es zum Wurf-Zeitpunkt dazu).
+   */
   private dartsPlay(st: DartsState) {
     const me = st.players.find((p) => p.id === this.id);
-    if (!me || me.thrown >= DARTS.DARTS_PER_ROUND) return;
+    if (!me || dartsDone(me)) return;
     const n = me.thrown;
     this.once(`darts-${st.round}-${n}`, async () => {
-      await sleep(rand(1500, 4500));
-      const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
-      if (!cur || cur.sub !== 'throw' || cur.round !== st.round) return;
-      const target = Math.random() < 0.7 ? dartsTarget(20, 'triple') : { x: 0, y: 0 };
-      this.send('throw', {
-        n,
-        ax: target.x + rand(-4, 4),
-        ay: target.y + rand(-4, 4),
-        t: Math.round(rand(500, 6000)),
-        amp: rand(DARTS.AMP_MIN, DARTS.AMP_MIN + 16),
-        power: DARTS.POWER_IDEAL + rand(-0.2, 0.2),
-        side: rand(-0.15, 0.15),
-      });
+      await sleep(rand(400, 1400));
+      const fresh = () => {
+        const cur = this.state?.mini?.kind === 'darts' ? this.state.mini.state : null;
+        const p = cur?.players.find((x) => x.id === this.id);
+        return cur && cur.sub === 'throw' && cur.round === st.round && p && !dartsDone(p) && p.thrown === n ? p : null;
+      };
+      const p = fresh();
+      if (!p) return;
+      const target = dartsAimFor(p.rest, dartsLeft(p));
+      const [nx, ny] = dartsNoise((Math.random() * 2 ** 32) >>> 0);
+      const goal = { x: target.x + nx * 9, y: target.y + ny * 9 };
+      // Ziehen: ein paar Zwischenschritte, das Atmen wird dabei unruhiger
+      let amp = n === 0 ? DARTS.AMP_START : DARTS.AMP_AFTER;
+      const from = { ...this.dartsAim };
+      const steps = 4 + Math.floor(Math.random() * 4);
+      for (let i = 1; i <= steps; i++) {
+        const pos = { x: from.x + ((goal.x - from.x) * i) / steps, y: from.y + ((goal.y - from.y) * i) / steps };
+        amp = dartsBump(dartsCalm(amp, 90), Math.hypot(pos.x - this.dartsAim.x, pos.y - this.dartsAim.y));
+        this.dartsAim = pos;
+        this.send('aim', { x: Math.round(pos.x * 10) / 10, y: Math.round(pos.y * 10) / 10, amp: Math.round(amp * 10) / 10, on: true });
+        await sleep(90);
+      }
+      // ruhig halten …
+      const hold = rand(700, 2200);
+      await sleep(hold);
+      if (!fresh()) return;
+      amp = dartsCalm(amp, hold);
+      // … und loslassen (Serverzeit = eigene Uhr, Bots laufen meist auf demselben Rechner)
+      this.send('throw', { n, ax: Math.round(goal.x * 10) / 10, ay: Math.round(goal.y * 10) / 10, amp: Math.round(amp * 10) / 10, at: Date.now() });
     });
   }
 
@@ -864,16 +892,30 @@ export class Bot {
     spectatorBot(this, s);
     if (m.kind === 'flunky') {
       const f = m.state;
-      if (f.sub === 'aim' && f.throwerId === this.id) {
-        this.once(`throw-${f.lastThrow?.seq ?? 0}`, async () => {
-          await sleep(rand(800, 1800));
-          const team = f.teams.A.includes(this.id) ? 'A' : 'B';
-          const power = Math.abs(BOTTLE.x - THROW_SPOT[team].x) / RANGE + rand(-0.07, 0.07);
-          this.send('throw', { angle: -f.wind * WIND_K + rand(-0.1, 0.1), power });
+      const turn = `${s.miniSeq ?? 0}-${f.turnTeam}-${f.throws[f.turnTeam]}`;
+      if (f.sub === 'aim' && f.throwerId === this.id && this.fkThrown !== turn) {
+        this.once('fk-throw', async () => {
+          this.fkThrown = turn;
+          // Zielen wie ein Mensch: Pfeil in ein paar Schritten auf die Flasche drehen (TV zeigt ihn), dann werfen –
+          // Genauigkeit je nach Bot-Stärke (leicht ≈ Anfänger, profi ≈ geübt)
+          const skill = (Object.keys(HUMAN) as BotSkill[]).find((k) => HUMAN[k] === this.human) ?? 'normal';
+          const plan = flunkyBotThrow(f, FLUNKY_THROWERS[skill]);
+          await sleep(rand(400, 900));
+          const steps = 3 + Math.floor(rand(0, 4));
+          for (let i = 1; i <= steps; i++) {
+            const now = this.state?.mini;
+            if (now?.kind !== 'flunky' || now.state.sub !== 'aim' || now.state.throwerId !== this.id) return;
+            this.send('aim', { aim: Math.round(((plan.aim * i) / steps) * 1000) / 1000 });
+            await sleep(rand(140, 280));
+          }
+          await sleep(rand(300, 900));
+          const now = this.state?.mini;
+          if (now?.kind !== 'flunky' || now.state.sub !== 'aim' || now.state.throwerId !== this.id) return;
+          this.send('throw', plan);
         });
       }
       if (f.sub === 'chug') {
-        const drinking = f.teams[f.turnTeam].includes(this.id) && f.beer[this.id] > 0;
+        const drinking = f.teams[f.turnTeam].includes(this.id) && f.beer[this.id] > (f.sipFloor[this.id] ?? 0);
         if (drinking || f.runnerId === this.id) {
           this.once('tap', async () => {
             for (let i = 0; i < 6; i++) {
@@ -968,11 +1010,12 @@ export class Bot {
         this.send('answer', { have: Math.random() < 0.45 });
       });
     }
-    if (m.kind === 'hilo' && m.state.sub === 'guess' && !m.state.guessed.includes(this.id)) {
-      const card = m.state.card;
-      this.once(`hilo-${m.state.round}`, async () => {
-        await sleep(rand(800, 3000));
-        this.send('guess', { dir: card < 8 ? 'higher' : card > 8 ? 'lower' : Math.random() < 0.5 ? 'higher' : 'lower' });
+    // Busfahrer: meist die wahrscheinlichste Antwort, ab und zu aus dem Bauch heraus
+    if (m.kind === 'hilo' && m.state.sub === 'guess' && m.state.sips[this.id] !== undefined && !m.state.chosen.includes(this.id)) {
+      const st = m.state;
+      this.once(`hilo-${st.round}`, async () => {
+        await sleep(rand(800, 3500));
+        this.send('guess', { round: st.round, tipp: busBotTipp(st.fragen[st.step], st.cards, st.options) });
       });
     }
     if (m.kind === 'bomb' && m.state.sub === 'pass' && m.state.holder === this.id) {
@@ -1063,28 +1106,16 @@ export class Bot {
       }
     }
 
-    if (m.kind === 'tidy' && m.state.sub === 'play') {
-      const t = m.state;
-      const me2 = t.players[this.id];
-      const basket = t.baskets.find((bk) => bk.team === me2?.team) ?? t.baskets[0];
-      if (me2 && basket) {
-        this.once('tidy', async () => {
-          await sleep(90);
-          const item = [...t.items].sort((a, b) => Math.hypot(a.x - me2.x, a.y - me2.y) + Math.hypot(a.x - basket.x, a.y - basket.y) * 0.5 - (Math.hypot(b.x - me2.x, b.y - me2.y) + Math.hypot(b.x - basket.x, b.y - basket.y) * 0.5))[0];
-          if (!item) return this.send('stick', { x: 0, y: 0 });
-          const ux = basket.x - item.x;
-          const uy = basket.y - item.y;
-          const ul = Math.hypot(ux, uy) || 1;
-          const px = item.x - (ux / ul) * 13;
-          const py = item.y - (uy / ul) * 13;
-          const dx = px - me2.x;
-          const dy = py - me2.y;
-          const dl = Math.hypot(dx, dy);
-          if (dl > 5) this.send('stick', { x: dx / dl, y: dy / dl });
-          else this.send('stick', { x: ux / ul, y: uy / ul });
-          if (Math.random() < 0.02) this.send('dash');
-        });
-      }
+    if (m.kind === 'tidy' && m.state.sub === 'play' && m.state.players[this.id]) {
+      // Besen voran: hinter die Sache, dann zum Korb schieben (server/tidybot.ts) – mit frischem Stand nach der Reaktionszeit
+      this.once('tidy', async () => {
+        await sleep(90);
+        const cur = this.state?.mini?.kind === 'tidy' ? this.state.mini.state : null;
+        if (!cur || cur.sub !== 'play') return;
+        const mv = tidyBot(cur, this.id, this.tidyMem);
+        this.send('stick', { x: Math.round(mv.x * 100) / 100, y: Math.round(mv.y * 100) / 100 });
+        if (mv.dash) this.send('dash');
+      });
     }
 
     if (m.kind === 'flieger' && m.state.sub === 'fly') {
@@ -1312,7 +1343,7 @@ export class Bot {
 
     if (m.kind === 'autoball') afbBot(this, m.state);
 
-    if (m.kind === 'volley') vballBot(this, m.state);
+    if (m.kind === 'kopfball' || m.kind === 'kopfkorb') kopfBot(this, m.state);
 
     if (m.kind === 'geist' && m.state.sub === 'play') {
       const g = m.state;
@@ -1965,22 +1996,22 @@ async function igelTool(bot: Bot, st: IgelState, hogId: number, still: () => Ige
     bot.send('fire', { angle, power: 1 });
     await sleep(500);
   } else if (w === 'parasol') {
+    // Schirm auf, dann mit dem Stick seitlich Richtung Gegner steuern
     bot.send('fire', {});
     await sleep(200);
-    bot.send('move', { dir: toward });
+    bot.send('stick', { x: toward * rand(0.5, 1), y: 0 });
     await sleep(rand(1000, 2000));
-    bot.send('move', { dir: 0 });
+    bot.send('stick', { x: 0, y: 0 });
   } else {
     const angle = ropeAngles[Math.floor(Math.random() * ropeAngles.length)];
     bot.send('aim', { angle, power: 1 });
     await sleep(250);
     bot.send('fire', { angle, power: 1 });
     await sleep(300);
-    bot.send('move', { dir: toward });
-    bot.send('climb', { dir: Math.random() < 0.6 ? 1 : -1 });
+    // An der Liane: Stick seitlich = schwingen, hoch/runter = klettern; dann loslassen
+    bot.send('stick', { x: toward * 0.9, y: Math.random() < 0.6 ? -0.9 : 0.9 });
     await sleep(rand(800, 1800));
-    bot.send('climb', { dir: 0 });
-    bot.send('move', { dir: 0 });
+    bot.send('stick', { x: 0, y: 0 });
     bot.send('jump');
     // Im Fall manchmal noch den Schirm aufspannen
     if (ammo.parasol !== 0 && Math.random() < 0.4) {
@@ -2018,10 +2049,17 @@ async function igelWalk(bot: Bot, st: IgelState, hog: IgelState['hogs'][number])
     if (sy > st.water - 12 || Math.abs(sy - hog.y) > 20) safe = false;
   }
   if (!safe || (!crate && Math.random() >= 0.4)) return;
-  bot.send('move', { dir });
+  // Laufen per Stick (zur Kiste mit vollem Ausschlag, sonst auch mal gemächlich)
+  bot.send('stick', { x: crate ? dir : dir * rand(0.3, 1), y: 0 });
   await sleep(crate ? Math.min(3000, (dist / IGEL.WALK) * 1000) : rand(300, 900));
-  bot.send('move', { dir: 0 });
-  if (!crate && Math.random() < 0.2) bot.send('jump');
+  bot.send('stick', { x: 0, y: 0 });
+  if (!crate && Math.random() < 0.2) {
+    // Sprung: Stick kurz deutlich nach oben schnippen
+    await sleep(150);
+    bot.send('stick', { x: 0, y: -0.95 });
+    await sleep(120);
+    bot.send('stick', { x: 0, y: 0 });
+  }
   await sleep(600);
 }
 
@@ -2880,91 +2918,6 @@ function angelBot(bot: Bot, st: AngelnState) {
   }
   mem.hold = false;
   mem.tilt = 0;
-}
-
-// ------------------------------------------------------------------ Strand-Volleyball
-
-interface VballBotMemory {
-  nextAt: number;
-  dir: number;
-  jumpAt: number;
-  /** Eigene Ungenauigkeit (px), damit nicht alle Bots gleich spielen */
-  slop: number;
-  /** Wie gern der Bot schmettert */
-  spikeChance: number;
-}
-
-const vballMem = new WeakMap<Bot, VballBotMemory>();
-
-/**
- * Volleyball-Bot: rechnet aus, wo der Ball auf Schlaghöhe herunterkommt, und läuft
- * knapp dahinter (dann prallt der Ball Richtung Netz ab). Von mehreren im Team geht nur,
- * wer am nächsten dran ist – die anderen halten ihre Position. Springt, wenn der Ball nah
- * ist und fällt, und schmettert manchmal, wenn er in der Luft nah am Netz ist.
- */
-function vballBot(bot: Bot, st: VolleyState) {
-  let mem = vballMem.get(bot);
-  if (!mem) vballMem.set(bot, (mem = { nextAt: 0, dir: 0, jumpAt: 0, slop: rand(-4, 4), spikeChance: rand(0.2, 0.55) }));
-  const me = st.players[bot.id];
-  const setDir = (d: number) => {
-    if (d === mem!.dir) return;
-    mem!.dir = d;
-    bot.send('move', { dir: d });
-  };
-  if (!me || !me.court || (st.sub !== 'serve' && st.sub !== 'rally')) {
-    setDir(0);
-    return;
-  }
-  const now = Date.now();
-  if (now < mem.nextAt) return;
-  mem.nextAt = now + rand(50, 90);
-
-  const V = VOLLEY;
-  const d = me.team === 'A' ? 1 : -1;
-  const [lo, hi] = vollSide(me.team);
-  const ownSide = (x: number) => d * (V.NET_X - x) > 0;
-  const b = st.ball;
-  const mates = Object.entries(st.players)
-    .filter(([, p]) => p.team === me.team && p.court)
-    .sort((a, c) => (a[0] < c[0] ? -1 : 1));
-  const home = vollSpot(me.team, Math.max(0, mates.findIndex(([id]) => id === bot.id)));
-
-  let target = home;
-  // Abstand Ball–Körpermitte bei Kontakt bzw. Ballhöhe über den Füßen bei Kontakt im Stehen (skaliert mit Ball/Spieler)
-  const touch = V.P_R + V.BALL_R;
-  const stand = V.P_BODY + touch;
-  const hitY = V.GROUND - stand + 4;
-  const pred = st.sub === 'serve' ? { x: b.x, t: 1 } : vollPredict(b, hitY);
-  if (pred && ownSide(pred.x)) {
-    const closest = mates.reduce((best, cur) => (Math.abs(cur[1].x - pred.x) < Math.abs(best[1].x - pred.x) ? cur : best), mates[0]);
-    if (!closest || closest[0] === bot.id) {
-      // Etwas hinter den Ball (vom Netz aus gesehen), damit er nach vorn abprallt
-      target = pred.x - d * (touch * 0.375 + mem.slop);
-    }
-  } else if (!ownSide(b.x)) {
-    // Ball drüben: auf die Grundposition, leicht zur Mitte der eigenen Hälfte
-    target = home + d * 10;
-  }
-  target = Math.max(lo, Math.min(hi, target));
-  const dx = target - me.x;
-  setDir(Math.abs(dx) < 3 ? 0 : dx > 0 ? 1 : -1);
-
-  // Springen: Ball nah über einem und fällt (oder steigt nur noch langsam).
-  // Nah am Netz springt der Bot früher ab, um von oben zu schmettern.
-  const bx = Math.abs(b.x - me.x);
-  const above = me.y - b.y;
-  const falling = b.vy > -60 || st.sub === 'serve';
-  const nearNet = Math.abs(b.x - V.NET_X) < 80 && ownSide(b.x) && me.cd <= 0;
-  const [jLo, jHi] = nearNet && mem.spikeChance > 0.3 ? [stand + 21, stand + 71] : [stand - 3, stand + 49];
-  if (!me.air && bx < touch + 6 && above > jLo && above < jHi && falling && now - mem.jumpAt > 350 && Math.random() < 0.85) {
-    mem.jumpAt = now;
-    bot.send('jump');
-  }
-  // Schmettern: in der Luft, Ball in Reichweite, oberhalb der Netzkante und nicht zu weit vom Netz
-  const reach = Math.hypot(b.x - me.x, b.y - (me.y - V.P_BODY));
-  if (me.air && me.cd <= 0 && reach < touch + 20 && b.y < V.NET_TOP - 4 && Math.abs(b.x - V.NET_X) < 90 && ownSide(b.x) && Math.random() < mem.spikeChance + 0.2) {
-    bot.send('spike');
-  }
 }
 
 // ------------------------------------------------------------------ Wer ist der Tourist?

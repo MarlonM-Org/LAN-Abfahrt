@@ -1,13 +1,15 @@
 /**
  * Snapshot-Puffer mit Wiedergabe-Uhr für die Echtzeit-Spiele auf dem TV.
  *
- * Der Server stempelt jeden Stand mit seiner Zeit `t` (Date.now()). Der TV zeichnet `delay` ms
+ * Der Server stempelt jeden Stand mit seiner Zeit `t` (Date.now()). Der TV zeichnet `lag` ms
  * hinter der Serverzeit und interpoliert zwischen den zwei Ständen, zwischen denen die
  * Wiedergabe-Uhr gerade steht. Das ist bildratenunabhängig (60 und 144 Hz sehen gleich aus),
- * kennt kein 20-/30-Hz-„Pumpen“ und springt bei Richtungswechseln nicht.
+ * kennt kein 20-/30-Hz-„Pumpen“ und springt bei Richtungswechseln nicht. `lag` ist so knapp wie
+ * möglich: ein Takt-Abstand + Jitter + 4 ms (30 Hz im Heimnetz ≈ 40 ms), höchstens `delay` (60 ms) –
+ * jede ms zählt, der Weg zum Fernseher (AirPlay & Co.) verzögert ohnehin.
  *
  * Die Uhr lässt sich anhalten (Hit-Stop: `rate = 0`), verlangsamen (Zeitlupe: `rate = 0.3`) und
- * holt danach mit 1,25× wieder auf, bis sie wieder `delay` ms hinter dem Server liegt – der Server
+ * holt danach mit 1,25× wieder auf, bis sie wieder `lag` ms hinter dem Server liegt – der Server
  * simuliert derweil ganz normal weiter (`Juice.hitStop()`/`slowMo()` setzen `rate`, wenn die Szene
  * den Puffer als `clock` übergibt). Der Puffer hält `keep` ms (8 s): genug für eine Wiederholung
  * (`replay()`), die alte Stände noch einmal abspielt und danach auf live zurückspringt.
@@ -32,7 +34,7 @@ export interface Sample<S> {
 }
 
 export class SnapBuffer<S> {
-  /** So viele ms hinter der Serverzeit wird gezeichnet (bei 30 Hz reicht etwas mehr als ein Takt) */
+  /** Höchstens so viele ms hinter der Serverzeit wird gezeichnet – bei gleichmäßigem Takt weniger, siehe `lag` */
   delay = 60;
   /** Wiedergabe-Tempo: 0 = Hit-Stop, 0.3 = Zeitlupe, 1 = normal (danach wird automatisch aufgeholt) */
   rate = 1;
@@ -50,6 +52,15 @@ export class SnapBuffer<S> {
   private replayUntil = 0;
   private replayRate = 1;
   private queue: { t: number; fn: () => void }[] = [];
+  /** Typischer Abstand zweier Stände (Serverzeit, ms) – Pausen über 120 ms (Spiel ruht) zählen nicht */
+  private gap = 40;
+  /** So viel später als das schnellste kamen die Pakete zuletzt (ms) – springt hoch, klingt mit 10 ms/s ab */
+  private jitter = 0;
+
+  /** Tatsächliche Verzögerung (ms): ein Takt-Abstand + Jitter + 4 ms Luft, damit zwischen echten Ständen interpoliert wird – höchstens `delay` */
+  get lag(): number {
+    return Math.min(this.delay, this.gap + this.jitter + 4);
+  }
 
   /** Neuester Stand (für HUD, Phasen, Zähler – alles, was nicht mit den Figuren mitlaufen muss) */
   get latest(): S | null {
@@ -84,6 +95,8 @@ export class SnapBuffer<S> {
     const o = t - now;
     // Das schnellste Paket bestimmt die Uhr; ganz leicht abfallen lassen, damit Drift nicht festklebt
     this.offset = this.offset === null ? o : Math.max(o, this.offset - (now - this.lastPush) * 0.001);
+    this.jitter = Math.min(100, Math.max(this.offset - o, this.jitter - (now - this.lastPush) * 0.01));
+    if (last && t - last.t <= 120) this.gap += (t - last.t - this.gap) * 0.1;
     this.lastPush = now;
   }
 
@@ -115,7 +128,7 @@ export class SnapBuffer<S> {
     const now = performance.now();
     const dt = this.lastReal ? Math.min(100, now - this.lastReal) : 0;
     this.lastReal = now;
-    const want = now + this.offset - this.delay;
+    const want = now + this.offset - this.lag;
     if (this.replayUntil) {
       this.playT += dt * this.replayRate;
       if (this.playT >= this.replayUntil) {

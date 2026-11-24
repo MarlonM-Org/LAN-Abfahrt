@@ -4,7 +4,7 @@
  *
  * - `camera`: die Szene bewegt/zoomt ihre Hauptkamera (Smash, Igel) – die Ebenen bekommen `setScrollFactor`.
  *   Ebenen in Weltgröße reichen, solange der Faktor ≤ 0.5 bleibt und die Kamera innerhalb der Welt bleibt.
- * - `manual`: die Kamera steht (Volley, Bogen mit Wrap-Kameras) – die Ebenen sind TileSprites, deren Textur
+ * - `manual`: die Kamera steht (z. B. Bogen mit Wrap-Kameras) – die Ebenen sind TileSprites, deren Textur
  *   mit dem Blickpunkt (`lookAt`, z. B. Ball oder Schwerpunkt der Spieler) leicht gegenläufig verschoben wird.
  *
  *   const px = new Parallax(this, { mode: 'manual', strength: 0.15 });

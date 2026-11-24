@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD, TEAM_INFO } from '../../shared/flunky';
-import { SUP, TIDY } from '../../shared/games';
+import { SUP, TIDY, tidyItemType } from '../../shared/games';
 import { C } from '../art/palette';
 import * as O from '../art/objects';
 import { paintSand, paintShore, paintTiles, paintWater, paintWoodFloor } from '../art/ground';
 import { basket, buoy, clutter, jellyfish, seaRock, supBoard } from '../art/props2';
 import { bus, getState, playerById } from './store';
-import { figure, playAvatar } from './textures';
-import { BLUE_INK, NameTags, RED_INK, background, ensureTex, ink, panel, prop, tagName, txt } from './ui';
+import { type Figure, figure } from './textures';
+import { BLUE_INK, Countdown, NameTags, RED_INK, background, ensureTex, ink, panel, prop, tagName, txt } from './ui';
+import { Pix } from '../art/pix';
+import { SnapBuffer, lerpAngle, lerpJump } from './interp';
 import { Juice } from './juice';
 import { sfx } from './sfx';
 import { daylight, foam, gulls, sway } from './ambient';
@@ -209,16 +211,65 @@ export class SupScene extends Phaser.Scene {
 
 // ================================================================== Aufräumen
 
+/**
+ * Besenkopf in Draufsicht, Kante nach rechts (= Blickrichtung): Rücken in Teamfarbe, davor die Borsten.
+ * 24 px quer (= Besenbreite 2 × BROOM_HALF + 2) + 1 px Rand für die Kontur.
+ */
+function broomHead(team: string): Pix {
+  const L = TIDY.BROOM_HALF * 2 + 2;
+  const p = new Pix(9, L + 2);
+  p.rect(1, 2, 3, L - 2, team);
+  p.rect(2, 1 + L / 2 - 2, 2, 4, C.woodDark);
+  p.rect(4, 1, 4, L, '#e8c46a');
+  for (let y = 2; y < L; y += 2) p.hline(5, y, 3, '#c99a3e');
+  p.vline(7, 1, L, '#f6dc8e');
+  p.outline(C.outline);
+  return p;
+}
+
+/** Tiefe auf dem Fußboden (Figuren, Besen, Sachen nach y sortiert) */
+const tdDepth = (y: number) => 100 + y;
+
+type TidySnap = import('../../shared/types').TidyState;
+type TidyItemSnap = TidySnap['items'][number];
+
+/** Sachen eines Standes nach id (pro Stand einmal gebaut) */
+const tidyItemIndex = new WeakMap<TidySnap, Map<number, TidyItemSnap>>();
+function itemsOf(s: TidySnap) {
+  let m = tidyItemIndex.get(s);
+  if (!m) {
+    m = new Map(s.items.map((it) => [it.id, it]));
+    tidyItemIndex.set(s, m);
+  }
+  return m;
+}
+
+interface TidyFig {
+  f: Figure;
+  head: Phaser.GameObjects.Image;
+  stick: Phaser.GameObjects.Graphics;
+  dash: boolean;
+  dustAt: number;
+}
+
+/**
+ * Aufräumen: Figuren mit Besen, Sachen und Körbe laufen über den SnapBuffer – 40 ms hinter dem Server zwischen
+ * zwei echten Ständen interpoliert (früher: Figuren pro Bild nachgezogen, Sachen hart auf den 20-Hz-Stand gesetzt).
+ */
 export class TidyScene extends Phaser.Scene {
-  private figs = new Map<string, { f: Phaser.GameObjects.Container; x: number; y: number }>();
+  private figs = new Map<string, TidyFig>();
   private items = new Map<number, Phaser.GameObjects.Image>();
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
-  private latest: GameState | null = null;
+  private latest: TidySnap | null = null;
+  private buf = new SnapBuffer<TidySnap>();
+  private clock = new Countdown();
+  private phase = '';
   private hudKey = '';
   private lastScore = 0;
   private builtBaskets = false;
   private tags!: NameTags;
+  private juice!: Juice;
   private names = new Map<string, { name: string; color: string }>();
 
   constructor() {
@@ -230,6 +281,11 @@ export class TidyScene extends Phaser.Scene {
     this.names.clear();
     this.figs.clear();
     this.items.clear();
+    this.latest = null;
+    this.buf = new SnapBuffer();
+    this.juice = new Juice(this, { depth: 950, clock: this.buf });
+    this.clock = new Countdown();
+    this.phase = '';
     this.hudKey = '';
     this.lastScore = 0;
     this.builtBaskets = false;
@@ -261,75 +317,122 @@ export class TidyScene extends Phaser.Scene {
   }
 
   update() {
-    const s = this.latest;
-    if (s?.mini?.kind !== 'tidy') return;
+    const st = this.latest;
+    const s = this.buf.sample();
+    if (!st || !s) return;
+    if (st.sub === 'countdown') this.banner.setText(String(Math.max(1, this.clock.seconds)));
+    const now = this.time.now;
     const specs: { id: string; x: number; y: number; name: string; color: string; dot?: number }[] = [];
-    for (const [id, p] of Object.entries(s.mini.state.players)) {
+    for (const [id, p] of Object.entries(s.b.players)) {
       const a = this.figs.get(id);
       if (!a) continue;
-      a.x += (p.x - a.x) * 0.35;
-      a.y += (p.y - a.y) * 0.35;
+      const pa = s.a.players[id] ?? p;
+      const x = lerpJump(pa.x, p.x, s.f, 30);
+      const y = lerpJump(pa.y, p.y, s.f, 30);
+      const ang = lerpAngle(pa.a, p.a, Math.min(1, s.f));
       const img = a.f.getData('img') as Phaser.GameObjects.Image;
       img.setFlipX(p.dir < 0);
-      playAvatar(img, p.moving ? 'walk' : 'idle');
-      a.f.setPosition(a.x, a.y + 6).setDepth(a.y + 6);
+      a.f.play(p.moving || p.dash ? 'walk' : 'idle', p.dash ? 2 : 1);
+      // Füße (Schatten) genau auf der Physik-Position – Besen und Sachen liegen auf derselben Ebene
+      const d = tdDepth(y);
+      a.f.setPosition(x, y + 1).setDepth(d);
+      const c = Math.cos(ang);
+      const sn = Math.sin(ang);
+      const front = sn > -0.2;
+      const hx = x + c * (TIDY.BROOM_D + 0.5);
+      const hy = y + sn * (TIDY.BROOM_D + 0.5);
+      a.head.setPosition(hx, hy).setRotation(ang).setDepth(d + (front ? 0.6 : -0.6));
+      // Stiel: vom Besenrücken schräg hoch zu den Händen
+      const bx = x + c * (TIDY.BROOM_D - 6);
+      const by = y + sn * (TIDY.BROOM_D - 6);
+      const handX = x + c * 3;
+      const handY = y - 10 + sn * 2;
+      a.stick.clear().lineStyle(3, 0x2d1b12).lineBetween(bx, by, handX, handY).lineStyle(1, 0xc08a4a).lineBetween(bx, by, handX, handY);
+      a.stick.setDepth(d + (front ? 0.5 : -0.7));
+      if (p.dash && !a.dash) {
+        sfx('whoosh', { x, vol: 0.5 });
+        this.juice.burst(x - c * 4, y - sn * 4, 'puff', 6);
+      }
+      if (p.dash && now - a.dustAt > 60) {
+        a.dustAt = now;
+        this.juice.burst(x - c * 5, y + 1 - sn * 5, 'puff', 1);
+      }
+      a.dash = !!p.dash;
       const n = this.names.get(id);
-      if (n) specs.push({ id, x: a.x, y: a.y - 30, name: n.name, color: pcol(id).hex, dot: TEAM_INFO[p.team].colorNum });
+      if (n) specs.push({ id, x, y: y - 35, name: n.name, color: pcol(id).hex, dot: TEAM_INFO[p.team].colorNum });
     }
     this.tags.update(specs);
+    // Sachen: zwischen den Ständen gleiten; was im gezeigten Stand fehlt, ist im Korb gelandet
+    const ia = itemsOf(s.a);
+    const ib = itemsOf(s.b);
+    for (const [id, it] of ib) {
+      const prev = ia.get(id) ?? it;
+      const x = lerpJump(prev.x, it.x, s.f, 30);
+      const y = lerpJump(prev.y, it.y, s.f, 30);
+      let img = this.items.get(id);
+      if (!img) {
+        const type = tidyItemType(id);
+        img = this.add.image(x, y, ensureTex(this, `clutter_${type}`, () => clutter(type))).setAngle((id * 37) % 360);
+        this.items.set(id, img);
+      }
+      img.setPosition(x, y).setDepth(tdDepth(y) - 0.2);
+    }
+    for (const [id, img] of this.items) {
+      if (ib.has(id)) continue;
+      this.items.delete(id);
+      const bk = st.baskets.reduce((best, b) => (Math.hypot(b.x - img.x, b.y - img.y) < Math.hypot(best.x - img.x, best.y - img.y) ? b : best), st.baskets[0]);
+      this.tweens.add({ targets: img, x: bk?.x ?? img.x, y: (bk?.y ?? img.y) - 2, scale: 0, duration: 220, ease: 'Quad.in', onComplete: () => img.destroy() });
+    }
   }
 
-  private onState(s: GameState) {
-    this.latest = s;
-    if (s.mini?.kind !== 'tidy') return;
-    const t = s.mini.state;
+  private onState(gs: GameState) {
+    if (gs.mini?.kind !== 'tidy') return;
+    const t = gs.mini.state;
+    this.latest = t;
+    this.buf.push(t.t, t);
+    if (t.sub !== this.phase) {
+      this.phase = t.sub;
+      this.clock.set(t.endsIn);
+    }
     if (!this.builtBaskets) {
       this.builtBaskets = true;
-      for (const b of t.baskets) this.add.image(b.x, b.y, ensureTex(this, `basket_${b.team}`, () => basket(TEAM_INFO[b.team].color))).setDepth(b.y - 6);
+      for (const b of t.baskets) this.add.image(b.x, b.y, ensureTex(this, `basket_${b.team}`, () => basket(TEAM_INFO[b.team].color))).setDepth(tdDepth(b.y) - 6);
     }
     for (const [id, p] of Object.entries(t.players)) {
       if (this.figs.has(id)) continue;
       const pl = playerById(id);
       if (!pl) continue;
-      const f = figure(this, pl.look, p.x, p.y);
+      const f = figure(this, pl.look, p.x, p.y + 1);
+      const head = this.add.image(p.x, p.y, ensureTex(this, `tidy_broom_${p.team}`, () => broomHead(TEAM_INFO[p.team].color))).setOrigin(1, 0.5);
+      const stick = this.add.graphics();
       this.names.set(id, { name: pl.name, color: TEAM_INFO[p.team].color });
-      this.figs.set(id, { f, x: p.x, y: p.y });
-    }
-    const alive = new Set(t.items.map((i) => i.id));
-    for (const [id, img] of this.items) {
-      if (!alive.has(id)) {
-        this.tweens.add({ targets: img, scale: 0, duration: 200, onComplete: () => img.destroy() });
-        this.items.delete(id);
-      }
-    }
-    for (const it of t.items) {
-      let img = this.items.get(it.id);
-      if (!img) {
-        img = this.add.image(it.x, it.y, ensureTex(this, `clutter_${it.type}`, () => clutter(it.type))).setAngle((it.id * 37) % 360);
-        this.items.set(it.id, img);
-      }
-      img.setPosition(it.x, it.y).setDepth(it.y);
+      this.figs.set(id, { f, head, stick, dash: false, dustAt: 0 });
     }
     if (t.lastScore && t.lastScore.seq !== this.lastScore) {
       this.lastScore = t.lastScore.seq;
-      const b = t.baskets.find((bk) => bk.team === t.lastScore!.team);
-      if (b) {
-        sfx('coin', { x: b.x, vol: 0.6 });
-        const plus = txt(this, b.x, b.y - 24, '+1', { color: TEAM_INFO[b.team].color }).setDepth(2000);
-
-        this.tweens.add({ targets: plus, y: plus.y - 16, alpha: 0, duration: 700, onComplete: () => plus.destroy() });
-      }
+      const team = t.lastScore.team;
+      const b = t.baskets.find((bk) => bk.team === team);
+      // Jubel, wenn die Wiedergabe den Stand erreicht (gleichzeitig mit dem Verschwinden der Sache)
+      if (b)
+        this.buf.after(t.t, () => {
+          sfx('coin', { x: b.x, vol: 0.6 });
+          this.juice.burst(b.x, b.y - 8, 'confetti', 8);
+          const plus = txt(this, b.x, b.y - 24, '+1', { color: TEAM_INFO[team].color }).setDepth(2000);
+          this.tweens.add({ targets: plus, y: plus.y - 16, alpha: 0, duration: 700, onComplete: () => plus.destroy() });
+        });
     }
-    if (t.sub === 'countdown') this.banner.setText(String(Math.max(1, Math.ceil(t.endsIn / 1000))));
-    else if (t.sub === 'play') this.banner.setText('');
-    else this.banner.setText('Aufgeräumt!');
+    if (t.sub === 'play') this.banner.setText('');
+    else if (t.sub === 'over') this.banner.setText('Aufgeräumt!');
 
-    const key = JSON.stringify([Math.ceil(t.endsIn / 1000), t.score]);
+    // Aufwärmrunde: kein Zeitlimit → keine Sekunden
+    const secs = t.sub === 'play' && t.endsIn > 0 ? Math.ceil(t.endsIn / 1000) : -1;
+    const key = JSON.stringify([secs, t.score]);
     if (key === this.hudKey) return;
     this.hudKey = key;
     this.hud.removeAll(true);
     this.hud.add(panel(this, 120, 2, 240, 30));
-    const text = t.baskets.length > 1 ? `Sonne ${t.score.A}  ·  ${Math.ceil(t.endsIn / 1000)}s  ·  ${t.score.B} Meer` : `${t.score.A} Teile  ·  ${Math.ceil(t.endsIn / 1000)}s`;
+    const time = secs >= 0 ? `  ·  ${secs}s  ·  ` : '  ·  ';
+    const text = t.baskets.length > 1 ? `Sonne ${t.score.A}${time}${t.score.B} Meer` : `${t.score.A} Teile${secs >= 0 ? `  ·  ${secs}s` : ''}`;
     this.hud.add(ink(this, WORLD.W / 2, 13, text, { color: t.score.A >= t.score.B ? RED_INK : BLUE_INK }));
   }
 }

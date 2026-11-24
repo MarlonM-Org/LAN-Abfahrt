@@ -109,18 +109,20 @@ export function pickTidy(s: TidyState): Screen {
   const me = s.players[store.playerId!];
   if (!me) return ['spectate', message('Du schaust zu')];
   if (s.sub === 'over') return ['td-over', message('Aufgeräumt!', 'Schau auf den Fernseher!')];
-  return [`td-${s.sub}`, () => {
+  // Countdown und Spiel auf demselben Screen: wer den Stick schon hält, läuft beim Start sofort los
+  return ['td-ctl', () => {
     const team = TEAM_INFO[me.team];
-    // Quer: zwei Daumen – links Stick, rechts SPRINT (früher Stick und Knopf übereinander für einen Daumen)
+    // Quer: zwei Daumen – links Stick, rechts SPRINT
     const root = el(`
       <div class="lx td-lx">
         <div class="lx-head"><span class="lx-tag team-${me.team}">${team.name} · Korb ${me.team === 'A' ? 'links' : 'rechts'}</span><span class="timer"></span><span class="score grow"></span></div>
         <div class="lx-left td-stick"><span class="st-label">LAUFEN · Daumen irgendwo aufsetzen</span></div>
-        <div class="lx-mid"><p class="hint">${s.sub === 'countdown' ? 'Gleich geht’s los! Schiebt die Sachen in euren Korb.' : 'Lauf gegen die Sachen, um sie zu schieben!'}</p></div>
+        <div class="lx-mid"><p class="hint"></p></div>
         <div class="lx-right"><button class="big-btn dash">SPRINT</button></div>
       </div>
     `);
-    stickZone(q(root, '.td-stick'), (x, y) => send('stick', { x, y }));
+    // Stick-Änderungen alle 33 ms (passt zum 30-Hz-Stand am TV), große Richtungswechsel sofort
+    stickZone(q(root, '.td-stick'), (x, y) => send('stick', { x, y }), { every: 33 });
     const dash = q<HTMLButtonElement>(root, '.dash');
     tapButton(dash, () => {
       send('dash');
@@ -130,8 +132,10 @@ export function pickTidy(s: TidyState): Screen {
     return () => {
       const st = store.state?.mini?.kind === 'tidy' ? store.state.mini.state : null;
       if (!st) return;
-      q(root, '.timer').textContent = `${Math.ceil(st.endsIn / 1000)}s`;
+      q(root, '.timer').textContent = st.endsIn > 0 ? `${Math.ceil(st.endsIn / 1000)}s` : '';
       q(root, '.score').textContent = st.baskets.length > 1 ? `Sonne ${st.score.A} : ${st.score.B} Meer` : `${st.score.A} Teile`;
+      q(root, '.hint').textContent =
+        st.sub === 'countdown' ? 'Gleich geht’s los! Fegt die Sachen in euren Korb.' : 'Besen voran: Sachen vor dir herschieben – im Bogen laufen nimmt sie mit. SPRINT schießt sie geradeaus.';
       const pl = st.players[store.playerId!];
       dash.disabled = !!pl && pl.dashLeft > 0;
     };

@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import type { GameState } from '../../shared/types';
 import { WORLD } from '../../shared/flunky';
-import { cardLabel } from '../../shared/games';
 import { C } from '../art/palette';
 import { Pix, rng } from '../art/pix';
 import { paintWoodFloor } from '../art/ground';
@@ -10,6 +9,7 @@ import { figure } from './textures';
 import { GREEN_INK, RED_INK, background, ensureTex, fitText, ink, nameTag, panel, tagName, txt } from './ui';
 import { Juice } from './juice';
 import { sfx } from './sfx';
+import { BusfahrerScene } from './BusfahrerScene';
 
 /** Gemütliche Strandbar am Abend */
 function paintBar(p: Pix) {
@@ -36,19 +36,6 @@ function paintBar(p: Pix) {
   p.rect(0, 120, WORLD.W, 30, C.woodDark);
   p.rect(0, 118, WORLD.W, 4, C.woodLight);
   for (let x = 0; x < WORLD.W; x += 30) p.vline(x, 122, 28, C.woodDarker);
-}
-
-function card(value: number | null): Pix {
-  const p = new Pix(30, 42);
-  if (value === null) {
-    p.rect(0, 0, 30, 42, '#3f62a8');
-    for (let y = 3; y < 39; y += 4) for (let x = 3 + ((y / 4) % 2) * 2; x < 27; x += 4) p.px(x, y, '#7fa0e0');
-  } else {
-    p.rect(0, 0, 30, 42, C.white);
-    p.map(10, 15, ['.rr.rr.', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'], { r: C.red });
-  }
-  p.outline(C.outline);
-  return p;
 }
 
 abstract class DrinkScene extends Phaser.Scene {
@@ -157,62 +144,6 @@ export class NhieScene extends DrinkScene {
   }
 }
 
-export class HiloScene extends DrinkScene {
-  constructor() {
-    super('hilo');
-  }
-  create() {
-    this.base();
-  }
-  protected stateKey(s: GameState) {
-    return s.mini?.kind === 'hilo' ? JSON.stringify([s.mini.state.round, s.mini.state.sub, s.mini.state.guessed]) : '';
-  }
-  protected draw(s: GameState) {
-    if (s.mini?.kind !== 'hilo') return;
-    const h = s.mini.state;
-    this.layer.add(panel(this, 140, 4, 200, 24));
-    this.layer.add(ink(this, WORLD.W / 2, 12, `Höher oder Tiefer · ${h.round}/${h.rounds}`, { color: RED_INK }));
-    const face = ensureTex(this, 'card_face', () => card(1));
-    const back = ensureTex(this, 'card_back', () => card(null));
-    this.layer.add(this.add.image(205, 96, face).setScale(2));
-    this.layer.add(ink(this, 205, 60, cardLabel(h.card), { size: 16 }));
-    if (h.nextCard === null) {
-      this.layer.add(this.add.image(275, 96, back).setScale(2));
-    } else {
-      const c = this.add.image(275, 96, face).setScale(2);
-      this.layer.add(c);
-      this.layer.add(ink(this, 275, 60, cardLabel(h.nextCard), { size: 16 }));
-      c.setScale(0, 2);
-      this.tweens.add({ targets: c, scaleX: 2, duration: 250 });
-    }
-    const ids = Object.keys(h.sips);
-    if (h.nextCard !== null && h.sub !== 'guess') this.juice.burst(275, 96, 'spark', 10);
-    if (h.sub === 'guess') this.row(ids, (id) => (h.guessed.includes(id) ? { text: 'OK!', color: GREEN_INK } : null));
-    else this.row(ids, (id) => {
-      const g = h.guesses?.[id];
-      const drink = h.roundSips?.[id];
-      return { text: `${g === 'higher' ? '▲' : g === 'lower' ? '▼' : '?'}${drink ? '+1' : 'ok'}`, color: drink ? RED_INK : GREEN_INK };
-    });
-  }
-  private guessed = 0;
-  protected onChange(s: GameState) {
-    if (s.mini?.kind !== 'hilo') return;
-    const h = s.mini.state;
-    if (h.sub === 'guess') {
-      if (h.guessed.length > this.guessed) sfx('tick', { pitch: 1 + h.guessed.length * 0.05 });
-      else sfx('select');
-      this.guessed = h.guessed.length;
-      return;
-    }
-    // Karte umdrehen: Wisch + Pling; viele Trinker = Lacher
-    this.guessed = 0;
-    sfx('whoosh', { pitch: 1.4 });
-    const drinkers = Object.values(h.roundSips ?? {}).filter(Boolean).length;
-    sfx(drinkers ? 'pop' : 'coin', { delay: 0.25 });
-    if (drinkers >= Math.max(2, Object.keys(h.sips).length / 2)) sfx('cheer', { delay: 0.35, vol: 0.7 });
-  }
-}
-
 export class BombScene extends DrinkScene {
   private sparks?: Phaser.Time.TimerEvent;
 
@@ -267,4 +198,4 @@ function bombPix(): Pix {
   return p;
 }
 
-export const DRINK_SCENES = [NhieScene, HiloScene, BombScene];
+export const DRINK_SCENES = [NhieScene, BusfahrerScene, BombScene];

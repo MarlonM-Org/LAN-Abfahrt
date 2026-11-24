@@ -156,6 +156,31 @@ button:disabled { opacity: 0.45; filter: grayscale(0.4); }
 @keyframes bob { to { transform: translateY(-12px); } }
 
 .wind { text-align: center; color: var(--ink-soft); }
+
+/* ---------------------------------------------------------------- Flunkyball (screens/flunky.ts) */
+.fk-aim { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+.fk-head { display: flex; justify-content: space-between; align-items: baseline; }
+.fk-head b { font-weight: normal; font-size: 14px; }
+.fk-head span { font-size: 8px; color: var(--ink-soft); }
+.fk-info, .fk-wind { margin: 0; text-align: center; font-size: 9px; line-height: 1.5; }
+.fk-wind { color: var(--ink-soft); min-height: 1.5em; }
+.fk-aimrow { display: grid; grid-template-columns: 58px 1fr 58px; gap: 6px; align-items: stretch; }
+.fk-turn { font-size: 20px; padding: 0; min-height: 58px; touch-action: none; background: #f2a33a; box-shadow: inset 0 3px 0 #ffd27a, inset 0 -5px 0 #c06a1f, 0 3px 0 var(--outline); }
+.fk-turn:active { transform: translateY(2px); }
+.fk-dialbox { display: flex; flex-direction: column; gap: 2px; align-items: stretch; }
+.fk-dial { width: 100%; height: 46px; border: 3px solid var(--wood-darker); touch-action: none; image-rendering: pixelated; }
+.fk-aimtxt { font-size: 8px; text-align: center; color: var(--ink); }
+.fk-aimhint { margin: 0; font-size: 7px; line-height: 1.6; color: var(--ink-soft); text-align: center; }
+.fk-aim.fk-thrown .fk-aimrow, .fk-aim.fk-thrown .fk-aimhint { opacity: 0.4; pointer-events: none; }
+.fk-aim .big-btn.bw-swing { min-height: 30vh; }
+.fk-aim .bw-pad.fk-pad { min-height: 32vh; }
+.fk-meter { position: relative; }
+.fk-floor { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1px; background: var(--outline); box-shadow: 0 0 0 1px var(--paper-light); }
+.center.fk-watch { flex: 0 0 auto; min-height: 18vh; }
+.fk-teams { display: flex; flex-direction: column; gap: 6px; }
+.fk-trow { display: grid; grid-template-columns: 88px 1fr 40px; gap: 6px; align-items: center; font-size: 8px; }
+.fk-trow b { font-weight: normal; text-align: right; }
+.fk-round { margin: 0; font-size: 7px; color: var(--ink-soft); text-align: center; }
 .center { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
 
 .toast {
@@ -364,21 +389,29 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .big-btn.su-dash:disabled { filter: saturate(0.4) brightness(0.9); }
 .su-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
 
-/* ---------------------------------------------------------------- Strand-Volleyball (quer) */
-.lx.vb-lx { --lx-l: 40%; --lx-r: 36%; }
-.vb-av canvas { display: block; height: 22px; width: auto; }
-.vb-score { font-size: 8px; }
-.vb-status { color: var(--ink); text-align: center; margin: 0; }
-.vb-lx.bench .vb-btn { opacity: 0.4; }
-.vb-move { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; touch-action: none; }
-.vb-act { grid-template-rows: minmax(0, 2fr) minmax(0, 3fr); touch-action: none; }
-.big-btn.vb-btn { -webkit-touch-callout: none; position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
-.big-btn.vb-left, .big-btn.vb-right { font-size: 26px; background: #e8a14a; box-shadow: inset 0 4px 0 #f6c27a, inset 0 -6px 0 #b0702a, 0 3px 0 var(--outline); }
-.big-btn.vb-jump { font-size: 14px; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
-.big-btn.vb-spike { font-size: 10px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
-.big-btn.vb-spike.ready { filter: brightness(1.15); }
-.big-btn.vb-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
-.vb-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
+/* ---------------------------------------------------------------- Kopfball-Duell + Kopf-Korb (quer: Stick links, SPRUNG + SCHUSS rechts) */
+.lx.kb-lx { --lx-l: 38%; --lx-r: 38%; }
+.lx.kb-A { box-shadow: inset 0 5px 0 #f4c542, inset 0 0 0 2px var(--wood); }
+.lx.kb-B { box-shadow: inset 0 5px 0 #3fa7e0, inset 0 0 0 2px var(--wood); }
+.kb-av canvas { display: block; height: 22px; width: auto; }
+.kb-dir { font-size: 7px; color: var(--ink-soft); }
+.kb-mid { gap: 8px; }
+.kb-score { font-size: 28px; line-height: 1; color: var(--ink); white-space: nowrap; }
+.kb-score .sa { color: #c8961c; }
+.kb-score .sb { color: #2a86c0; }
+.kb-score i { font-style: normal; margin: 0 6px; color: var(--ink-soft); }
+.kb-center { min-height: 34px; display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1.4; color: var(--ink); }
+.kb-center.count { font-size: 34px; color: #c8961c; }
+.kb-center.go { font-size: 22px; color: #2f7d32; }
+.kb-center.hit { font-size: 14px; color: var(--red); }
+.kb-msg { min-height: 4.8em; font-size: 7px; line-height: 1.6; color: var(--ink); }
+.kb-lx.off .kb-btn, .kb-lx.off .kb-stick { opacity: 0.4; }
+.lx-right.kb-pad { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-auto-rows: auto; grid-template-rows: minmax(0, 1fr); gap: 10px; touch-action: none; }
+.big-btn.kb-btn { position: relative; overflow: hidden; font-size: 13px; line-height: 1.6; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.big-btn.kb-jump { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.big-btn.kb-kick { font-size: 14px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.big-btn.kb-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+.kb-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.4); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
 
 /* ---------------------------------------------------------------- Bowling */
 .bw-start { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
@@ -443,23 +476,43 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .bo-sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--outline); }
 .bo-dots { font-size: 10px; letter-spacing: 1px; text-shadow: 0 0 1px #2d1b12; }
 
-/* ---------------------------------------------------------------- Darts an der Strandbar */
+/* ---------------------------------------------------------------- Darts (301 Single Out) */
+#app:has(.da-play) { gap: 0; padding-left: 12px; padding-right: 12px; padding-bottom: 10px; }
+.da-play { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; user-select: none; -webkit-user-select: none; }
+.da-rest { color: var(--red); font-size: 14px; }
 .da-board-wrap { display: flex; justify-content: center; }
 .da-board { border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); touch-action: none; }
 .da-quick { display: flex; gap: 6px; }
-.da-quick button { flex: 1; padding: 8px 4px; }
+.da-quick button { flex: 1; padding: 7px 4px; }
 .da-result { margin: 0; min-height: 1.7em; text-align: center; color: var(--ink-soft); font-size: 10px; }
-.da-result.big { color: var(--red); font-size: 13px; }
+.da-result.big { color: var(--red); font-size: 12px; }
+.da-result.bad { color: #fff4d6; background: var(--red); padding: 3px 4px; }
+.da-result.win { color: var(--outline); background: #ffd25e; padding: 3px 4px; }
 .da-result.flash { animation: da-flash 0.5s ease-out; }
-@keyframes da-flash { from { transform: scale(1.6); } to { transform: scale(1); } }
-.da-area { gap: 6px; }
-.da-area .bw-pad.da-pad { min-height: 22vh; padding-top: 10px; background: repeating-linear-gradient(90deg, #c9a35a 0 12px, #b88f48 12px 14px); }
-.da-area .big-btn.bw-swing { min-height: 22vh; }
-.da-area .bw-ball { width: 30px; height: 30px; margin: -15px 0 0 -15px; background: radial-gradient(circle at 40% 40%, #ffffff 0 3px, #c9ced6 5px, #6c727b 13px); }
-.da-area .center { gap: 6px; }
-.da-area .center h2 { margin: 0; }
+@keyframes da-flash { from { transform: scale(1.4); } to { transform: scale(1); } }
+.da-hint { margin: 0; min-height: 1.4em; text-align: center; color: var(--ink); font-size: 10px; }
+.da-pad {
+  flex: 1; min-height: 20vh; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px; text-align: center; border: 3px dashed var(--wood-dark); -webkit-touch-callout: none;
+  background: repeating-linear-gradient(90deg, #c9a35a 0 12px, #b88f48 12px 14px);
+}
+.da-pad b { font-size: 15px; color: var(--ink); background: rgba(255, 244, 214, 0.88); padding: 6px 8px; pointer-events: none; }
+.da-pad span { font-size: 8px; line-height: 1.6; color: var(--ink); background: rgba(255, 244, 214, 0.8); padding: 4px 6px; pointer-events: none; }
+.da-pad span:empty { display: none; }
+.da-pad.hold { border-style: solid; border-color: var(--red); background: repeating-linear-gradient(90deg, #e0b86a 0 12px, #cfa257 12px 14px); }
+.da-pad.hold b { color: var(--red); }
+.da-pad.sensor { border-style: solid; }
+.da-pad.sensor:active { background: #e0b86a; }
+.da-pad.out b { background: #ffd25e; }
+.da-pad.bust b { color: #fff4d6; background: var(--red); }
+.da-pad.done, .da-pad.skip, .da-pad.out, .da-pad.bust, .da-pad.fly { border-style: dotted; opacity: 0.9; }
+.da-tools { display: flex; gap: 6px; justify-content: center; }
+.da-tools button { flex: 1; padding: 7px 4px; }
+.da-note { font-size: 8px; }
+.da-intro p { line-height: 1.7; }
 .da-list { gap: 4px; padding: 8px; }
 .da-rd { color: var(--ink-soft); }
+.da-rd.bad { color: var(--red); }
 
 /* ---------------------------------------------------------------- Ententeich */
 .en-status { display: flex; align-items: center; gap: 10px; min-height: 26px; }
@@ -797,7 +850,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .big-btn.turm-btn svg { filter: drop-shadow(2px 2px 0 rgba(45, 27, 18, 0.6)); }
 .turm-btn.shift svg { width: 44px; height: 44px; }
 
-/* ---------------------------------------------------------------- Igel-Krieg (quer: links Waffen + laufen, Mitte Karte, rechts Ziel-Pad + FEUER) */
+/* ---------------------------------------------------------------- Igel-Krieg (quer: links Waffen + Stick, Mitte Karte, rechts Ziel-Pad + SPRUNG/FEUER) */
 .lx.ig-lx { --lx-l: 31%; --lx-r: 41%; }
 .ig-head { color: var(--red); font-weight: normal; font-size: 9px; }
 .ig-lx .ig-wind { color: #2d64a8; }
@@ -807,9 +860,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .ig-weapon { padding: 2px 6px; font-size: 8px; display: flex; justify-content: space-between; align-items: center; gap: 4px; background: var(--paper-dark); color: var(--ink); text-shadow: none; box-shadow: inset 0 3px 0 #f3dcaa, inset 0 -3px 0 #cfae6f, 0 2px 0 var(--wood-darker); touch-action: none; }
 .ig-weapon small { font-size: 7px; color: var(--ink-soft); }
 .ig-weapon.sel { background: var(--gold); border-color: var(--red); box-shadow: inset 0 3px 0 #ffd98a, inset 0 -3px 0 #c08316, 0 2px 0 var(--outline); }
-.ig-move { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 6px; }
-.ig-move button { min-height: 0; font-size: 18px; padding: 2px; touch-action: none; }
-.ig-move .ig-jump { font-size: 9px; background: #6b8fd6; box-shadow: inset 0 3px 0 #9db8ee, inset 0 -4px 0 #3f62a8, 0 3px 0 var(--outline); }
 .ig-aim { grid-template-columns: minmax(0, 1fr) 72px; grid-template-rows: minmax(0, 1fr); }
 .ig-pad {
   position: relative; min-height: 0; touch-action: none;
@@ -824,7 +874,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 @keyframes ig-pulse { to { filter: brightness(1.2); } }
 .ig-lx .ig-map { max-height: 100%; }
 .ig-lx .ig-sd { font-size: 7px; color: var(--ink-soft); }
-.ig-turn { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--paper-light); border: 3px solid var(--wood-dark); }
 .ig-next { min-height: 1.7em; }
 .ig-next.ig-soon { color: var(--paper-light); background: var(--red); padding: 6px; border: 3px solid var(--wood-darker); animation: shake 0.4s infinite; }
 .ig-teams { display: flex; flex-direction: column; gap: 6px; }
@@ -839,19 +888,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .ig-hp { width: 28px; text-align: right; color: var(--ink); }
 .ig-sd { font-size: 8px; }
 .ig-map { width: 100%; aspect-ratio: 480 / 270; image-rendering: pixelated; border: 3px solid var(--wood-darker); object-fit: contain; }
-.ig-watchw { display: flex; flex-direction: column; gap: 12px; }
-.ig-watchw .ig-map { order: 1; }
-.ig-side { display: contents; }
-.ig-side .ig-teams { order: 2; }
-.ig-side .ig-sd { order: 3; }
-/* Zuschauen quer: Karte groß links, Zug + Teams rechts */
-/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
-:where(html.land) .ig-watchw { flex-direction: row; align-items: flex-start; gap: 12px; height: calc(100svh - 50px); }
-:where(html.land) .ig-watchw .ig-map { order: 0; width: auto; height: 100%; max-width: 62%; }
-:where(html.land) .ig-side { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; overflow-y: auto; max-height: 100%; }
-:where(html.land) .ig-side .ig-teams, :where(html.land) .ig-side .ig-sd { order: 0; }
-:where(html.land) .ig-turn { padding: 6px; gap: 4px; }
-:where(html.land) .ig-team { padding: 2px 6px; }
 
 /* ---------------------------------------------------------------- Smash-Arena */
 #app:has(.smash) { padding: 8px; gap: 6px; }
@@ -1476,10 +1512,7 @@ button.wr-win-liebe { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, in
 /* mit Feedback-Karte: Wurf-Knopf/Wischfeld etwas kleiner, damit alles auf den Bildschirm passt */
 .mf:not(.hidden) + .bw-area .big-btn.bw-swing,
 .mf:not(.hidden) + .bw-area .bw-pad { min-height: 26vh; }
-.mf:not(.hidden) + .da-area .big-btn.bw-swing,
-.mf:not(.hidden) + .da-area .bw-pad.da-pad { min-height: 15vh; }
-/* Darts/Boule: der Tipp der Karte ersetzt den langen Hinweis über dem Knopf */
-.mf:not(.hidden) + .da-area .bw-hint,
+/* Boule: der Tipp der Karte ersetzt den langen Hinweis über dem Knopf */
 .mf:not(.hidden) + .bo-area .bw-hint { display: none; }
 .mf:not(.hidden) + .big-btn.gf-swing { min-height: 16vh; }
 
@@ -1543,6 +1576,45 @@ button.fav-star:active { transform: scale(1.2); box-shadow: none; }
 .kc-deck.drawn .kc-back { transform: translateY(-60vh) rotate(-12deg); transition: transform 0.35s ease-in; animation: none; }
 @keyframes kc-wiggle { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg) translateY(-4px); } }
 .big-btn.kc-race { min-height: 62vh; font-size: 26px; }
+
+/* Busfahrer (hilo) */
+.bf-head { font-size: 9px; }
+.bf-row { display: flex; justify-content: center; gap: 10px; }
+.bf-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.bf-cell b { font-weight: normal; font-size: 9px; color: var(--ink-soft); }
+.bf-card { width: 46px; height: 64px; background: var(--paper-light); border: 3px solid var(--outline); box-shadow: 0 3px 0 var(--wood-darker); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #2d2d3a; line-height: 1.15; }
+.bf-card.red { color: #c0392b; }
+.bf-card span { font-size: 16px; }
+.bf-card small { font-size: 18px; font-family: serif; }
+.bf-card.back { background-color: #3f62a8; background-image: radial-gradient(circle, #7fa0e0 0 1.5px, transparent 2.5px); background-size: 8px 8px; color: #fff4d6; text-shadow: 1px 1px 0 var(--outline); }
+.bf-card.cur { outline: 3px solid var(--gold); outline-offset: 2px; }
+.bf-card.back.cur { animation: bf-bob 1.2s ease-in-out infinite; }
+.bf-card.flip { animation: kc-flip 0.35s ease-out; }
+.bf-card.big { width: 96px; height: 134px; margin: 0 auto; }
+.bf-card.big span { font-size: 34px; }
+.bf-card.big small { font-size: 32px; }
+@keyframes bf-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.bf-stake { font-size: 9px; }
+.bf-stake b { color: var(--red); font-weight: normal; }
+.bf-opts { flex: 1; display: grid; gap: 10px; grid-auto-rows: 1fr; }
+.bf-opts.n2 { grid-template-columns: 1fr 1fr; }
+.big-btn.bf-opt { min-height: 13vh; font-size: 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 10px 6px; }
+.bf-opts.n2 .big-btn.bf-opt { min-height: 30vh; }
+.big-btn.bf-opt small { font-size: 8px; opacity: 0.9; line-height: 1.5; }
+.big-btn.bf-opt.picked { outline: 4px solid var(--gold); outline-offset: -8px; }
+.bf-opt.t-rot { background: #c0392b; box-shadow: inset 0 4px 0 #e86a5c, inset 0 -6px 0 #8a2419, 0 3px 0 var(--outline); }
+.bf-opt.t-schwarz { background: #2d2d3a; box-shadow: inset 0 4px 0 #55556a, inset 0 -6px 0 #15151d, 0 3px 0 var(--outline); }
+.big-btn.bf-opt.t-rot small, .big-btn.bf-opt.t-schwarz small, .big-btn.bf-opt.t-ja small, .big-btn.bf-opt.t-nein small { font-size: 22px; font-family: serif; letter-spacing: 4px; }
+.bf-opt.t-hoeher, .bf-opt.t-zwischen, .bf-opt.t-ja { background: var(--green); box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.bf-opt.t-gleich { background: #f0973a; box-shadow: inset 0 4px 0 #ffb867, inset 0 -6px 0 #c06a1f, 0 3px 0 var(--outline); }
+.bf-opt.t-tiefer, .bf-opt.t-ausserhalb, .bf-opt.t-nein { background: var(--sea); box-shadow: inset 0 4px 0 #7fbcf0, inset 0 -6px 0 #2d64a8, 0 3px 0 var(--outline); }
+.bf-note { font-size: 7px; }
+.bf-result h1 { font-size: 26px; }
+.bf-result.drink h1 { color: var(--red); }
+.bf-result.safe h1 { color: #2f7d32; }
+.bf-result.out h1 { color: var(--ink-soft); }
+.bf-result b { color: var(--ink); font-weight: normal; }
+.bf-total { font-size: 9px; }
 .big-btn.kc-race.wait { background: #6e6a62; box-shadow: inset 0 -6px 0 #4a4740, 0 3px 0 var(--outline); }
 .big-btn.kc-race.go { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); animation: kc-pulse 0.3s ease-in-out infinite alternate; }
 .big-btn.kc-race.done { background: var(--wood); }

@@ -34,11 +34,11 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   wrap: { title: 'Wraps mit Sriracha-Mayo', icon: '🌯', tagline: 'Zutaten in der richtigen Reihenfolge greifen!', minPlayers: 1 , orientation: 'portrait' },
   stars: { title: 'Tanz unter den Sternen', icon: '✨', tagline: 'Verbindet die Sterne zu Sternbildern!', minPlayers: 1, maxPlayers: 2 , orientation: 'any' },
   nhie: { title: 'Ich hab noch nie ...', icon: '🙊', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2 , orientation: 'portrait' },
-  hilo: { title: 'Höher oder Tiefer', icon: '🃏', tagline: 'Falsch geraten? Schluck!', minPlayers: 2 , orientation: 'portrait' },
+  hilo: { title: 'Busfahrer', icon: '🚌', tagline: 'Vier Karten, vier Fragen – falsch getippt? Schlucken!', minPlayers: 2 , orientation: 'portrait' },
   bomb: { title: 'Tick-Tack-Bumm', icon: '⏰', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 , orientation: 'portrait' },
   kingscup: { title: 'Kings Cup', icon: '👑', tagline: 'Karte ziehen, Regel befolgen – auf den König!', minPlayers: 2 , orientation: 'portrait' },
   sup: { title: 'SUP-Rennen', icon: '🏄', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 , orientation: 'portrait' },
-  tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 , orientation: 'landscape' },
+  tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Fegt das Chaos mit dem Besen in euren Korb!', minPlayers: 1 , orientation: 'landscape' },
   flieger: { title: 'Urlaubsflieger', icon: '✈️', inspiredBy: 'Spaceteam', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2 , orientation: 'portrait' },
   kurve: { title: 'Kurven-Duell', icon: '🌀', inspiredBy: '„Achtung, die Kurve!“', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2 , orientation: 'landscape' },
   arena: { title: 'Bomben-Arena', icon: '💣', inspiredBy: 'Bomberman', tagline: 'Kokosnüsse legen, Sandburgen sprengen – wer bleibt trocken?', minPlayers: 2 , orientation: 'landscape' },
@@ -59,12 +59,14 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   grill: { title: 'Grill-Chaos', icon: '🔥', inspiredBy: 'Overcooked', tagline: 'Schnippeln, grillen, servieren – bevor die Gäste meckern!', minPlayers: 2 , orientation: 'landscape' },
   boule: { title: 'Boule', icon: '🥥', tagline: 'Legen oder schießen – wer liegt am Schweinchen?', minPlayers: 2 , orientation: 'portrait' },
   sumo: { title: 'Sumo-Steg', icon: '🤼', tagline: 'Rempeln, schubsen, platsch – wer bleibt auf dem Steg?', minPlayers: 2 , orientation: 'landscape' },
-  volley: { title: 'Strand-Volleyball', icon: '🏐', inspiredBy: 'Slime Volleyball', tagline: 'Baggern, springen, schmettern – Team Sonne gegen Team Meer!', minPlayers: 2 , orientation: 'landscape' },
+  // max. 8 (4 gegen 4): das Feld wächst mit der Teamgröße (shared/kopfball.ts), bei 6 pro Seite stünden sie sich nur noch auf den Füßen
+  kopfball: { title: 'Kopfball-Duell', icon: '🥅', inspiredBy: 'Head Soccer', tagline: 'Riesenköpfe, kleiner Ball – köpfen, kicken, Tor!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
+  kopfkorb: { title: 'Kopf-Korb', icon: '🏀', inspiredBy: 'Head Basketball', tagline: 'Köpfen, werfen, dunken – ab in den Korb!', minPlayers: 2, maxPlayers: 8, orientation: 'landscape' },
   tourist: { title: 'Wer ist der Tourist?', icon: '🧳', inspiredBy: 'Spyfall', tagline: 'Alle kennen den Ort – nur einer nicht. Fragt euch durch!', minPlayers: 4 , orientation: 'portrait' },
   sprueche: { title: 'Sprüche-Duell', icon: '🗯️', inspiredBy: 'Quiplash', tagline: 'Schreibt die lustigste Antwort – die anderen stimmen ab!', minPlayers: 3 , orientation: 'portrait' },
   pixel: { title: 'Pixel-Galerie', icon: '🖼️', tagline: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage entscheidet!', minPlayers: 3 , orientation: 'portrait' },
   bogen: { title: 'Bogen-Arena', icon: '🏹', inspiredBy: 'TowerFall', tagline: 'Saugnapfpfeile, ein Treffer – und du bist raus!', minPlayers: 2, maxPlayers: 8 , orientation: 'landscape' },
-  darts: { title: 'Darts', icon: '🎯', tagline: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', minPlayers: 2 , orientation: 'portrait' },
+  darts: { title: 'Darts', icon: '🎯', tagline: '301 Single Out – wer kommt zuerst genau auf 0?', minPlayers: 2 , orientation: 'portrait' },
   golf: { title: 'Urlaubs-Minigolf', icon: '⛳', tagline: 'Alle putten gleichzeitig – Leuchtturm, Looping, Lagune!', minPlayers: 2 , orientation: 'landscape' },
   autoball: { title: 'Auto-Fußball', icon: '⚽', inspiredBy: 'Rocket League', tagline: 'Stick, Gas, Boost – schiebt den Wasserball ins Tor!', minPlayers: 2 , orientation: 'landscape' },
   wpistole: { title: 'Wasserpistolen-Duell', icon: '🔫', inspiredBy: 'Wild Gunman', tagline: 'Hand ans Holster ... ZIEHT! Wer zuerst spritzt, bleibt trocken.', minPlayers: 2 , orientation: 'portrait' },
@@ -111,7 +113,7 @@ export interface HowToControl {
  * Pflicht für jedes neue Minispiel – Texte kurz halten (eine Zeile ≈ 34 Zeichen, höchstens 3 Steuer-Zeilen).
  */
 export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl[] }> = {
-  flunky: { goal: 'Trefft die Flasche – dann trinkt, bis die anderen sie wieder aufgestellt haben.', controls: [{ icon: '🎯', text: 'Schwung/Wischen: werfen (Wind!)' }, { icon: '🍺', text: 'TRINKEN!: schnell tippen' }, { icon: '🏃', text: 'LAUFEN!: Flasche aufstellen' }] },
+  flunky: { goal: 'Trefft die Flasche und trinkt, bis sie wieder steht – wer zuerst leer ist (oder nach 10 Runden vorn), gewinnt.', controls: [{ icon: '🎯', text: 'Pfeil hoch/runter (Wind vorhalten)' }, { icon: '💪', text: 'Schwung/Wischen: Kraft = Weite' }, { icon: '🍺', text: 'Treffer: TRINKEN! / LAUFEN! tippen' }] },
   wwe: { goal: 'Wer würde eher …? Stimmt geheim ab – Punkte gibt’s für die Mehrheit.', controls: [{ icon: '🗳️', text: 'Spieler antippen = Stimme' }, { icon: '🤫', text: 'Geheim – niemand sieht es' }, { icon: '📺', text: 'Auflösung auf dem TV' }] },
   sprint: { goal: 'Sobald die Sonne aufgeht: als Erster das Handtuch auf den Liegestuhl!', controls: [{ icon: '🌙', text: 'Warten, bis die Sonne kommt' }, { icon: '👆', text: 'JETZT!: so schnell wie möglich' }, { icon: '⚠️', text: 'Zu früh = Fehlstart' }] },
   murder: { goal: 'Erledigt Aufgaben im Ferienhaus – und entlarvt den Mörder, bevor er alle erwischt.', controls: [{ icon: '🤫', text: 'Rolle geheim (gedrückt halten)' }, { icon: '🚪', text: 'Raum antippen = hingehen' }, { icon: '🚨', text: 'Leiche melden, dann abstimmen' }] },
@@ -120,11 +122,11 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   wrap: { goal: 'Greift die Zutaten in der richtigen Reihenfolge vom Rad.', controls: [{ icon: '📺', text: 'Reihenfolge steht auf dem TV' }, { icon: '✋', text: 'GREIFEN!: wenn die Zutat oben ist' }] },
   stars: { goal: 'Verbindet die Sterne gemeinsam zu Sternbildern.', controls: [{ icon: '✨', text: 'Wischen: von Stern zu Stern' }, { icon: '📺', text: 'Vorlage auf dem TV' }] },
   nhie: { goal: 'Ich hab noch nie … – wer es schon getan hat, trinkt!', controls: [{ icon: '👆', text: '„Noch nie!“ oder „Hab ich schon!“' }, { icon: '🍻', text: 'Als Einziger? Doppelt trinken' }] },
-  hilo: { goal: 'Ist die nächste Karte höher oder tiefer? Falsch geraten = Schluck.', controls: [{ icon: '🃏', text: 'HÖHER / TIEFER: tippen' }, { icon: '🍻', text: 'Falsch geraten = trinken' }] },
+  hilo: { goal: 'Vier verdeckte Karten, alle tippen gleichzeitig – falsch bei Karte n = n Schlücke.', controls: [{ icon: '🃏', text: 'Rot/Schwarz · Höher/Tiefer/Gleich' }, { icon: '↔️', text: 'Dazwischen/Außerhalb · Symbol?' }, { icon: '🍻', text: 'Falsch: 1, 2, 3, 4 Schlücke' }] },
   bomb: { goal: 'Sagt einen Begriff zur Kategorie und gebt die Bombe weiter – bevor sie knallt!', controls: [{ icon: '🗣️', text: 'Begriff laut sagen' }, { icon: '💣', text: 'WEITERGEBEN!: Bombe abgeben' }, { icon: '💥', text: 'Knall bei dir = 3 Schlücke' }] },
   kingscup: { goal: 'Reihum Karte ziehen und die Regel befolgen – auf den König!', controls: [{ icon: '🃏', text: 'Du bist dran: Karte ziehen' }, { icon: '📺', text: 'Die Regel steht auf dem TV' }, { icon: '⚡', text: 'Knopf-Rennen: schnell sein!' }] },
   sup: { goal: 'Paddelt zu zweit ins Ziel – gleichmäßig, sonst kippt das Board!', controls: [{ icon: '🚣', text: 'LINKS / RECHTS: paddeln' }, { icon: '⚖️', text: 'Gleichmäßig – sonst PLATSCH' }, { icon: '🪨', text: 'Felsen und Quallen ausweichen' }] },
-  tidy: { goal: 'Schiebt das Chaos in den Korb eures Teams!', controls: [{ icon: '🕹️', text: 'Stick: laufen und schieben' }, { icon: '💨', text: 'SPRINT: kurz schneller' }, { icon: '🧺', text: 'Alles in euren Korb' }] },
+  tidy: { goal: 'Fegt das Chaos mit dem Besen in den Korb eures Teams!', controls: [{ icon: '🕹️', text: 'Stick: laufen, der Besen dreht mit' }, { icon: '🧹', text: 'Besen voran schieben – auch im Bogen' }, { icon: '💨', text: 'SPRINT: Sachen geradeaus schießen' }] },
   flieger: { goal: 'Ruft euch die Anweisungen zu – sie betreffen meist ein anderes Handy!', controls: [{ icon: '📣', text: 'Anweisung oben laut vorlesen' }, { icon: '🎛️', text: 'Eigene Knöpfe und Schalter' }, { icon: '⛽', text: 'Verpasst = weniger Sprit' }] },
   kurve: { goal: 'Zieht eure Spur und rammt keine Spur! Am Rand geht’s auf der anderen Seite weiter.', controls: [{ icon: '↩️', text: 'LINKS / RECHTS: halten = lenken' }, { icon: '⭐', text: 'Power-ups einsammeln' }, { icon: '🏆', text: 'Wer überlebt, punktet' }] },
   arena: { goal: 'Sprengt euch den Weg frei und erwischt die anderen – wer trocken bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💣', text: 'BOMBE: Kokosnuss legen' }, { icon: '🌊', text: 'Nach 60 s kommt die Flut' }] },
@@ -136,7 +138,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   parcours: { goal: 'Baut Fallen in die Strecke – und schafft es selbst zur Cocktailbar.', controls: [{ icon: '🕹️', text: 'Stick: Teil setzen, laufen' }, { icon: '🧱', text: 'PLATZIEREN: Teil einbauen' }, { icon: '⤴️', text: 'SPRINGEN: länger = höher' }] },
   kart: { goal: 'Drei Runden mit Items aus den ?-Boxen – wer kommt zuerst ins Ziel?', controls: [{ icon: '🏎️', text: 'GAS antippen = fährt, BREMSE = aus' }, { icon: '🕹️', text: 'Stick: lenken' }, { icon: '✨', text: 'DRIFT halten, loslassen = Turbo' }] },
   turm: { goal: 'Stapelt euer Gepäck bis zum Gipfelkreuz und haltet den Turm 2 s.', controls: [{ icon: '↔️', text: '◀ / ▶: verschieben' }, { icon: '🔄', text: '⟳: drehen' }, { icon: '⬇️', text: '▼: halten = schneller fallen' }] },
-  igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦔', text: '◀ / ▶ / SPRUNG: laufen' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '🪢', text: 'Liane, Schirm, Schaufel: Zug geht weiter' }] },
+  igel: { goal: 'Werft reihum Kokosnüsse und Wasserbomben – wer bleibt auf der Insel? Jede Partie zieht eine Themenkarte.', controls: [{ icon: '🦔', text: 'Stick links: laufen, nach oben = Sprung' }, { icon: '🎯', text: 'Ziel-Pad ziehen, dann FEUER' }, { icon: '🪢', text: 'Liane, Schirm, Schaufel: Zug geht weiter' }] },
   smash: { goal: 'Haut die anderen von der Bühne – je höher die Prozente, desto weiter fliegen sie.', controls: [{ icon: '🕹️', text: 'Stick: laufen, Richtung = Schlag' }, { icon: '🥊', text: 'SCHLAG / SPEZIAL: hauen' }, { icon: '🛡️', text: 'SPRUNG / SCHILD: springen, blocken' }] },
   stillepost: { goal: 'Schreiben, malen, raten – reihum wandert alles weiter. Am Ende wird gelacht.', controls: [{ icon: '✍️', text: 'Satz schreiben' }, { icon: '🖍️', text: 'Das Bild dazu malen' }, { icon: '🤔', text: 'Bild beschreiben' }] },
   fangen: { goal: 'Der Animateur ist unsichtbar – fangt ihn gemeinsam (oder entkommt als Animateur)!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💨', text: 'SPRINT / ABLENKUNG: Spezialknopf' }, { icon: '👣', text: 'Auf Fußspuren achten, rufen!' }] },
@@ -144,12 +146,13 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   grill: { goal: 'Arbeitet die Bestellungen ab: schnippeln, grillen, servieren!', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '🥕', text: 'NEHMEN: aufheben, ablegen' }, { icon: '🔪', text: 'AKTION: halten = schneiden, löschen' }] },
   boule: { goal: 'Bringt eure Kugeln am nächsten ans Schweinchen.', controls: [{ icon: '🥥', text: 'Legen oder Schießen wählen' }, { icon: '📱', text: 'Knopf halten, Handy schwingen' }, { icon: '👆', text: 'Ohne Sensor: nach oben wischen' }] },
   sumo: { goal: 'Schubst die anderen vom Steg – wer zuletzt steht, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💥', text: 'REMPELN: kurzer Sprint' }, { icon: '🌊', text: 'Der Steg bricht weg!' }] },
-  volley: { goal: 'Team Sonne gegen Team Meer – der Ball darf nicht in eurem Sand landen.', controls: [{ icon: '↔️', text: '◀ / ▶: laufen' }, { icon: '⤴️', text: 'SPRUNG: Ball treffen' }, { icon: '💥', text: 'SCHMETTERN: nur in der Luft' }] },
+  kopfball: { goal: 'Team Sonne gegen Team Meer: köpft und kickt den Ball ins gegnerische Tor!', controls: [{ icon: '🕹️', text: 'Stick: laufen (hoch = springen)' }, { icon: '⤴️', text: 'SPRUNG: hoch zum Kopfball' }, { icon: '🦶', text: 'SCHUSS: Fuß raus – Richtung Tor' }] },
+  kopfkorb: { goal: 'Team Sonne gegen Team Meer: Ball in den gegnerischen Korb – von hinter der Mitte zählt er 3!', controls: [{ icon: '🕹️', text: 'Stick: laufen (hoch = springen)' }, { icon: '⤴️', text: 'SPRUNG: köpfen und dunken' }, { icon: '🏀', text: 'WURF: im hohen Bogen zum Korb' }] },
   tourist: { goal: 'Alle kennen den Urlaubsort – nur der Tourist nicht. Findet ihn durch Fragen!', controls: [{ icon: '🃏', text: 'Karte zeigt Ort + Rolle (geheim)' }, { icon: '🗣️', text: 'Reihum fragen: Spieler antippen' }, { icon: '☝️', text: 'Verdacht? Anklagen!' }] },
   sprueche: { goal: 'Schreibt die lustigste Antwort – die anderen stimmen ab.', controls: [{ icon: '✍️', text: 'Lücke lustig füllen' }, { icon: '🗳️', text: 'Lieblingsantwort wählen' }, { icon: '🏆', text: 'Stimmen = Punkte' }] },
   pixel: { goal: 'Malt das Thema in 16 × 16 Pixeln – die Vernissage stimmt ab.', controls: [{ icon: '🎨', text: 'Farbe wählen, tippen oder wischen' }, { icon: '🪣', text: 'Eimer, Radierer, Zurück' }, { icon: '🗳️', text: 'Lieblingsbild wählen' }] },
   bogen: { goal: 'Ein Treffer und du bist raus – verschossene Pfeile wieder einsammeln!', controls: [{ icon: '🕹️', text: 'Stick: laufen und zielen' }, { icon: '🏹', text: 'SCHUSS: Pfeil abfeuern' }, { icon: '⤴️', text: 'SPRUNG / DASH: springen, ausweichen' }] },
-  darts: { goal: 'Alle werfen gleichzeitig – Triple 20 oder Bullseye?', controls: [{ icon: '🎯', text: 'Ziehen: Fadenkreuz setzen' }, { icon: '✋', text: 'Ruhig halten = ruhiger' }, { icon: '👆', text: 'Wischen oder schnippen: werfen' }] },
+  darts: { goal: 'Von 301 genau auf 0 – alle werfen gleichzeitig, unter 0 ist überworfen.', controls: [{ icon: '👆', text: 'Finger halten + ziehen: zielen' }, { icon: '🎯', text: 'Loslassen: werfen (Atmen abpassen!)' }, { icon: '📱', text: 'Sensor: Handy bewegen, tippen' }] },
   golf: { goal: 'Alle putten gleichzeitig, Bälle stoßen sich an – wer braucht die wenigsten Schläge?', controls: [{ icon: '⛳', text: 'Zurückziehen wie Schleuder' }, { icon: '📏', text: 'Ziehweg = Kraft' }, { icon: '📱', text: 'Mit Sensor: Handy pendeln' }] },
   autoball: { goal: 'Team Sonne gegen Team Meer: schiebt den Wasserball ins gegnerische Tor!', controls: [{ icon: '🕹️', text: 'Stick: Richtung wie am TV' }, { icon: '🏎️', text: 'GAS / BREMSE: fahren' }, { icon: '🚀', text: 'BOOST: Turbo (lädt nach)' }] },
   wpistole: { goal: 'Wer nach „ZIEHT!“ zuerst trifft, bleibt trocken – wer zuckt, kriegt den Eimer.', controls: [{ icon: '✋', text: 'Hand ans Holster, warten' }, { icon: '📣', text: 'Erst bei „ZIEHT!“ ziehen' }, { icon: '💦', text: 'Zielen und spritzen' }] },
@@ -183,7 +186,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
  * (oder VIP/Laptop starten), beginnt das echte Spiel frisch mit Countdown.
  * Nicht hier: rundenbasierte, Quiz-, Abstimmungs-, Geheimrollen- und Balance-Board-Spiele.
  */
-export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint'];
+export const WARMUP_KINDS: MiniKind[] = ['arena', 'sumo', 'kart', 'smash', 'autoball', 'kurve', 'bogen', 'zauber', 'wackel', 'tidy', 'suess', 'umzug', 'grill', 'koffer', 'turm', 'sprint', 'kopfball', 'kopfkorb'];
 export const isWarmupKind = (kind: MiniKind) => WARMUP_KINDS.includes(kind);
 
 /** Minispiele im Trinkspiel-Modus */
@@ -193,7 +196,7 @@ export const DRINK_KINDS: MiniKind[] = ['wwe', 'nhie', 'hilo', 'bomb', 'kingscup
 export const fitsPlayers = (kind: MiniKind, n: number) => n >= MINI_INFO[kind].minPlayers && n <= (MINI_INFO[kind].maxPlayers ?? Infinity);
 
 /** Minispiele, die im Party-Modus vorkommen */
-export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'volley', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
+export const PARTY_KINDS: MiniKind[] = ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'murder', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'stillepost', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'kopfball', 'kopfkorb', 'tourist', 'sprueche', 'werwolf', 'wolfrunde', 'pixel', 'bogen', 'darts', 'golf', 'autoball', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'funk', 'lexikon', 'maler', 'band'];
 /** Versteckte-Rollen-Spiele: eines davon ist das Finale im Party-Modus */
 export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
 /**
@@ -201,7 +204,7 @@ export const FINALE_KINDS: MiniKind[] = ['murder', 'ttt'];
  * Ohne Igel/Turm (zu lang) und ohne Date-Night-Kapitel (Abstieg, Wraps). Lange Spiele (`MINI_LENGTH`)
  * zieht das Brett nur mit der VIP-Option „Lange Spiele“.
  */
-export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'parcours', 'kart', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz', 'lexikon'];
+export const BOARD_KINDS: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'parcours', 'kart', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'kopfball', 'kopfkorb', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'schaetz', 'lexikon'];
 
 export type MiniLength = 'kurz' | 'mittel' | 'lang';
 /**
@@ -248,7 +251,9 @@ export const MINI_LENGTH: Record<MiniKind, MiniLength> = {
   grill: 'mittel',
   boule: 'mittel',
   sumo: 'kurz',
-  volley: 'mittel',
+  // 2 min (bzw. 5 Tore / 15 Punkte) + höchstens 1 min Golden Goal + Anstöße
+  kopfball: 'mittel',
+  kopfkorb: 'mittel',
   tourist: 'lang',
   sprueche: 'lang',
   pixel: 'mittel',
@@ -409,9 +414,9 @@ export const FIELD_COINS = { blue: 3, red: -3 };
  */
 export const BOARD_TEAM_CHANCE = 0.65;
 /** Minispiele, die feste Teams übernehmen können (gleich große Teams, z. B. 2 gegen 2) */
-export const TEAM_KINDS: MiniKind[] = ['flunky', 'volley', 'autoball', 'grill'];
+export const TEAM_KINDS: MiniKind[] = ['flunky', 'autoball', 'grill', 'kopfball', 'kopfkorb'];
 /** … und davon die, die auch mit ungleichen Teams funktionieren (1 gegen 3; Flunky/Grill nicht) */
-export const UNEVEN_TEAM_KINDS: MiniKind[] = ['volley', 'autoball'];
+export const UNEVEN_TEAM_KINDS: MiniKind[] = ['autoball', 'kopfball', 'kopfkorb'];
 
 /** „2 gegen 2“, „1 gegen 3“ – das kleinere Team zuerst */
 export const teamLabel = (a: number, b: number) => `${Math.min(a, b)} gegen ${Math.max(a, b)}`;
@@ -432,7 +437,7 @@ export function teamHandicapText(teams: MiniTeams, kind: MiniKind): string {
   const t: Team | null = hc.A ? 'A' : hc.B ? 'B' : null;
   if (!t) return '';
   const n = hc[t];
-  const unit = kind === 'autoball' ? (n === 1 ? 'Tor' : 'Toren') : n === 1 ? 'Punkt' : 'Punkten';
+  const unit = kind === 'autoball' || kind === 'kopfball' ? (n === 1 ? 'Tor' : 'Toren') : n === 1 ? 'Punkt' : 'Punkten';
   return `${t === 'A' ? 'Team Sonne' : 'Team Meer'} startet mit ${n} ${unit} Vorsprung`;
 }
 
@@ -527,7 +532,6 @@ export const SPRINT_POINTS = [3, 2, 1];
  * geantwortet haben – oder wenn der VIP im Menü überspringt. Auflösungen schalten großzügig von selbst weiter.
  */
 export const NHIE = { ROUNDS: 6, QUESTION_MS: null as number | null, REVEAL_MS: 15000 };
-export const HILO = { ROUNDS: 7, GUESS_MS: null as number | null, REVEAL_MS: 12000 };
 /** Tick-Tack-Bumm: die Lunte ist Spielzeit (bleibt), nur die Pause nach dem Knall ist länger */
 export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 9000, SIPS: 3, MIN_HOLD_MS: 900 };
 
@@ -581,11 +585,26 @@ export const SUP = {
 };
 
 export const TIDY = {
+  /** Physik mit 60 Hz (kurze Wartezeit für Eingaben), Snapshot jeden 2. Takt (≈ 30 Hz, passt zur Bündelung im Raum) */
+  TICK_MS: 16,
+  SEND_EVERY: 2,
   SPEED: 78,
   DASH_SPEED: 150,
   DASH_MS: 450,
   DASH_COOLDOWN: 1800,
+  /** Sprint: Sachen vor dem Besen fliegen mit diesem Tempo geradeaus davon (px/s) */
+  DASH_SHOT: 175,
+  /** Spieler gegen Spieler (Kreis, Schubsen) */
   PLAYER_R: 7,
+  /** Eigener Körper gegen Sachen: kleines Quadrat (halbe Kantenlänge), dreht sich mit – schiebt nur sanft beiseite */
+  BODY_H: 4,
+  /** Besen: gerade Kante quer vor dem Spieler – Abstand der Kante vor der Körpermitte und halbe Breite (Figur ≈ 16 px) */
+  BROOM_D: 9,
+  BROOM_HALF: 11,
+  /** So schnell dreht der Besen zur Stick-Richtung (rad/s – 180° in ≈ 0,3 s) */
+  TURN: 10,
+  /** Geschobene Sachen behalten so viel vom Besen-Tempo und gleiten nach dem Stehenbleiben noch ein Stück */
+  CARRY_KEEP: 0.4,
   ITEM_R: 5,
   ITEMS: 26,
   TIME_MS: 60000,
@@ -593,6 +612,9 @@ export const TIDY = {
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
 };
+
+/** Art einer herumliegenden Sache – hängt nur an ihrer id (spart den Namen in jedem Snapshot) */
+export const tidyItemType = (id: number) => TIDY.ITEM_TYPES[id % TIDY.ITEM_TYPES.length];
 
 // ------------------------------------------------------------------ Urlaubsflieger
 
@@ -896,11 +918,11 @@ const SERIES_WORD: Partial<Record<MiniKind, string>> = { kart: 'Rennen', sup: 'R
 export const seriesLabel = (kind: MiniKind, round: number) => `${SERIES_WORD[kind] ?? 'Runde'} ${round}`;
 
 /** Zufallsauswahl im Arcade-Modus (ohne reine Trinkspiele und ohne Date-Night-Kapitel) */
-export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'volley', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'lieder', 'funk', 'lexikon', 'maler', 'band'];
+export const ARCADE_RANDOM: MiniKind[] = ['flunky', 'sprint', 'sup', 'tidy', 'murder', 'wwe', 'flieger', 'kurve', 'arena', 'bowling', 'sekt', 'enten', 'ttt', 'verstecken', 'parcours', 'kart', 'turm', 'igel', 'smash', 'fangen', 'geist', 'grill', 'boule', 'sumo', 'bogen', 'darts', 'golf', 'autoball', 'kopfball', 'kopfkorb', 'pixel', 'wpistole', 'zauber', 'angeln', 'koffer', 'suess', 'spion', 'umzug', 'wackel', 'werwars', 'maexchen', 'schaetz', 'funk', 'lexikon', 'maler', 'band'];
 
 /** Alle Spiele, nach Kategorie sortiert (für das Arcade-Menü) */
 export const ARCADE_GROUPS: { title: string; kinds: MiniKind[] }[] = [
-  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'sumo', 'bogen', 'autoball', 'volley', 'zauber', 'suess', 'wackel'] },
+  { title: 'Action', kinds: ['flunky', 'sprint', 'descent', 'wrap', 'sup', 'tidy', 'kurve', 'arena', 'kart', 'smash', 'parcours', 'sumo', 'bogen', 'autoball', 'kopfball', 'kopfkorb', 'zauber', 'suess', 'wackel'] },
   { title: 'Zielen & Werfen', kinds: ['bowling', 'sekt', 'boule', 'darts', 'golf', 'enten', 'wpistole', 'angeln', 'igel', 'turm', 'koffer'] },
   { title: 'Gemeinsam', kinds: ['rhythm', 'stars', 'flieger', 'grill', 'umzug', 'band'] },
   { title: 'Geheime Rollen', kinds: ['murder', 'ttt', 'verstecken', 'fangen', 'geist', 'spion', 'tourist', 'werwolf', 'wolfrunde'] },

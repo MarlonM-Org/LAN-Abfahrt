@@ -11,7 +11,8 @@ import { pickWwe } from './screens/wwe';
 import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
-import { pickBomb, pickHilo, pickNhie } from './screens/drink';
+import { pickBomb, pickNhie } from './screens/drink';
+import { pickBusfahrer } from './screens/busfahrer';
 import { pickKingsCup } from './screens/kingscup';
 import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
@@ -33,7 +34,7 @@ import { pickSpion } from './screens/spion';
 import { pickGeist } from './screens/geist';
 import { pickGrill } from './screens/grill';
 import { pickSumo } from './screens/sumo';
-import { pickVolley } from './screens/volley';
+import { pickKopfball } from './screens/kopfball';
 import { pickTourist } from './screens/tourist';
 import { pickSprueche } from './screens/sprueche';
 import { pickPixel } from './screens/pixel';
@@ -328,7 +329,7 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
     case 'nhie':
       return pickNhie(m.state);
     case 'hilo':
-      return pickHilo(m.state);
+      return pickBusfahrer(m.state);
     case 'bomb':
       return pickBomb(m.state);
     case 'kingscup':
@@ -375,8 +376,9 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickBoule(m.state);
     case 'sumo':
       return pickSumo(m.state);
-    case 'volley':
-      return pickVolley(m.state);
+    case 'kopfball':
+    case 'kopfkorb':
+      return pickKopfball(m.state);
     case 'tourist':
       return pickTourist(m.state);
     case 'sprueche':
