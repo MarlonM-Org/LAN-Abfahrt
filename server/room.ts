@@ -51,6 +51,7 @@ import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
 import { DateRun } from './date';
 import { DescentGame } from './descent';
 import { RhythmGame } from './rhythm';
+import { BandGame } from './band';
 import { WrapGame } from './wrap';
 import { StarsGame } from './stars';
 import { Board, type PartySave, partyResumeInfo, resumeSave } from './board';
@@ -86,16 +87,19 @@ import { SpruecheGame } from './sprueche';
 import { PixelGame } from './pixel';
 import { WpistoleGame } from './wpistole';
 import { AngelnGame } from './angeln';
+import { SektGame } from './sekt';
 import { KofferGame } from './koffer';
 import { WackelGame } from './wackel';
 import { SuessGame } from './suess';
 import { UmzugGame } from './umzug';
 import { FunkGame } from './funk';
 import { SchaetzGame } from './schaetz';
+import { LexikonGame } from './lexikon';
 import { LiederGame } from './lieder';
 import { liederTon } from './liederton';
 import { MaexGame } from './maexchen';
 import { WerwarsGame } from './werwars';
+import { MalerGame } from './maler';
 import { KickList, OFFLINE_REMOVE_MS } from './players';
 import { EmoteFeed } from './spectator';
 import { FxLog } from './fx';
@@ -928,6 +932,7 @@ export class Room {
       lookOf: (id) => this.players.get(id)?.look,
       colorOf: (id) => this.players.get(id)?.color,
       mode: this.dateRun ? 'date' : this.drinkRun ? 'drink' : this.mode,
+      board: !!this.board,
       teams: opts?.teams ?? null,
       warmTeams: opts?.warmTeams ?? null,
       ...(practice ? { practice: true } : {}),
@@ -999,6 +1004,8 @@ export class Room {
         return new ArenaGame(ids, ctx);
       case 'bowling':
         return new BowlingGame(ids, ctx);
+      case 'sekt':
+        return new SektGame(ids, ctx);
       case 'enten':
         return new EntenGame(ids, ctx);
       case 'ttt':
@@ -1075,12 +1082,18 @@ export class Room {
         return new FunkGame(ids, ctx);
       case 'schaetz':
         return new SchaetzGame(ids, ctx);
+      case 'lexikon':
+        return new LexikonGame(ids, ctx);
       case 'lieder':
         return new LiederGame(ids, ctx, liederTon);
       case 'maexchen':
         return new MaexGame(ids, ctx);
       case 'werwars':
         return new WerwarsGame(ids, ctx, this.werwarsQ.all);
+      case 'band':
+        return new BandGame(ids, ctx);
+      case 'maler':
+        return new MalerGame(ids, ctx);
     }
   }
 

@@ -168,7 +168,10 @@ export function defaultSongForScene(scene: string): string {
     case 'flunky': case 'grill':
       return 'poolparty';
     case 'schaetz':
+    case 'lexikon':
     case 'pixel':
+    // Strand-Band: nur bei der Instrument-Wahl – im Song spielt die Szene selbst (Hintergrundmusik geduckt)
+    case 'band':
       return 'strandpromenade';
     case 'sprint': case 'tidy': case 'kurve': case 'koffer': case 'umzug':
       return 'pixel-arcade';
@@ -198,10 +201,14 @@ export function defaultSongForScene(scene: string): string {
       return 'sport';
     case 'wasser': case 'angeln': case 'sup':
       return 'wasser';
+    case 'sekt':
+      return 'poolparty';
     case 'maexchen':
       return 'poolparty';
     case 'werwars':
-      return 'bar';
+      return 'party';
+    case 'maler':
+      return 'party';
     // Guess the Song: läuft nur bei der Genre-Wahl – in den Runden spielt die Szene selbst (Hintergrundmusik geduckt)
     case 'lieder':
       return 'strandpromenade';

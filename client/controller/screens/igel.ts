@@ -1,5 +1,5 @@
 import type { IgelState, IgelWeapon } from '../../../shared/types';
-import { GRENADE, IGEL, IGEL_TAUNTS, IGEL_THEMES, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, isTool, squadOf, windArrows } from '../../../shared/igel';
+import { GRENADE, IGEL, IGEL_TAUNTS, IGEL_THEMES, WEAPONS, WEAPON_ORDER, type Mask, applyOp, buildTerrain, isTool, squadOf, surfaceY, windArrows } from '../../../shared/igel';
 import { type Screen, app, colorOfId, el, escapeHtml, message, nameOf, q, send, store, tapButton } from '../core';
 import { haptic } from '../haptic';
 import { onInputReset, localPoint } from '../stick';
@@ -36,7 +36,7 @@ export function pickIgel(s: IgelState): Screen {
       : 'Wenn du dran bist: laufen, Waffe wählen, im Zielfeld ziehen (Richtung = Winkel, Länge = Kraft), dann FEUER.';
     const th = IGEL_THEMES[s.theme];
     const card = th ? `Themenkarte ${th.icon} ${th.name}: ${th.text} ` : '';
-    return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
+    return ['ig-count', message('Igel-Krieg!', `${card}Du hast ${n === 1 ? 'einen Igel' : `${n} Igel`} auf der ${s.w > IGEL.W ? 'großen ' : ''}Insel.${team} ${mode} Neu: Liane, Sonnenschirm und Schaufel – Werkzeuge beenden den Zug nicht. Wasser = raus!`)];
   }
   if (s.sub === 'replay') return ['ig-over-replay', message('Schuss des Abends!', 'Die Wiederholung läuft am Fernseher.')];
   if (s.sub === 'over') {
@@ -295,16 +295,17 @@ function buildActive(turn: number) {
   pad.addEventListener('pointercancel', (e) => (e.pointerId === climbing ? stopClimb() : release(e, true)));
   onInputReset(pad, () => (stopClimb(), release(null, true)));
 
-  // Möwen-Luftschlag: Ziel auf der Minikarte antippen
+  // Möwen-Luftschlag: Ziel auf der Minikarte antippen (die Karte zeigt immer die ganze Insel, Canvas-Breite = Inselbreite)
   mapCanvas.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     if (!canAim() || aimKind() !== 'map') return;
     // Karte ist per object-fit: contain eingepasst (clientWidth/Height: Layoutmaße, auch bei Pseudo-Quer)
     const w = mapCanvas.clientWidth;
     const h = mapCanvas.clientHeight;
-    const k = Math.min(w / IGEL.W, h / IGEL.H);
-    const ox = (w - IGEL.W * k) / 2;
-    const tx = Math.round(Math.max(6, Math.min(IGEL.W - 6, (localPoint(mapCanvas, e).x - ox) / k)));
+    const cw = mapCanvas.width;
+    const k = Math.min(w / cw, h / mapCanvas.height);
+    const ox = (w - cw * k) / 2;
+    const tx = Math.round(Math.max(6, Math.min(cw - 6, (localPoint(mapCanvas, e).x - ox) / k)));
     target = tx;
     send('aim', { tx });
     haptic(10);
@@ -567,45 +568,70 @@ function buildWatch() {
 
 // ------------------------------------------------------------------ Mini-Karte
 
-/** Kleine Inselkarte fürs Handy: Terrain aus Seed + Operationen, Igel als farbige Punkte (Teamfarbe als Ring) */
+/** Breite Inseln: Karte höchstens so breit (Seitenverhältnis) – dafür etwas überhöht, sonst wird sie am Handy ein dünner Strich */
+const MAP_ASPECT = 2.4;
+
+/**
+ * Kleine Inselkarte fürs Handy: immer die ganze Insel (Canvas-Breite = Inselbreite), Terrain aus Seed + Operationen,
+ * Igel als farbige Punkte (Teamfarbe als Ring). Breite Inseln werden höchstens 2,4 : 1 – senkrecht gestreckt um `sy`.
+ */
 function miniMap(canvas: HTMLCanvasElement) {
   const g = canvas.getContext('2d')!;
+  const off = document.createElement('canvas');
+  const og = off.getContext('2d')!;
   let seed = -1;
   let n = 0;
+  let w = 0;
+  /** Überhöhung (1 = unverzerrt) und Strichstärken-Faktor (Punkte wirken auf jeder Breite gleich groß) */
+  let sy = 1;
+  let u = 1;
   let mask: Mask | null = null;
-  let img: ImageData | null = null;
   const paint = () => {
-    img = g.createImageData(IGEL.W, IGEL.H);
-    for (let i = 0; i < IGEL.W * IGEL.H; i++) {
+    const img = og.createImageData(w, IGEL.H);
+    for (let i = 0; i < w * IGEL.H; i++) {
       const solid = mask![i] === 1;
-      const top = solid && (i < IGEL.W || mask![i - IGEL.W] === 0);
+      const top = solid && (i < w || mask![i - w] === 0);
       const [r, gg, b] = top ? [95, 164, 55] : solid ? [201, 154, 94] : [169, 220, 246];
       img.data.set([r, gg, b, 255], i * 4);
     }
+    og.putImageData(img, 0, 0);
   };
   return (st: IgelState, target: number | null) => {
-    if (st.seed !== seed || st.ops.length < n) {
+    const sw = st.w ?? IGEL.W;
+    if (st.seed !== seed || sw !== w || st.ops.length < n) {
       seed = st.seed;
-      mask = buildTerrain(st.seed, st.ops);
+      w = sw;
+      mask = buildTerrain(st.seed, st.ops, w);
       n = st.ops.length;
+      sy = Math.max(1, w / IGEL.H / MAP_ASPECT);
+      u = (w / IGEL.W) ** 0.8;
+      off.width = w;
+      off.height = IGEL.H;
+      canvas.width = w;
+      canvas.height = Math.round(IGEL.H * sy);
+      canvas.style.aspectRatio = `${canvas.width} / ${canvas.height}`;
+      canvas.classList.toggle('ig-wide', w > IGEL.W);
       paint();
     } else if (st.ops.length > n) {
       for (; n < st.ops.length; n++) applyOp(mask!, st.ops[n]);
       paint();
     }
-    g.putImageData(img!, 0, 0);
+    const Y = (y: number) => y * sy;
+    const H = canvas.height;
+    g.imageSmoothingEnabled = false;
+    g.drawImage(off, 0, 0, w, H);
     g.fillStyle = 'rgba(55,132,194,0.9)';
-    g.fillRect(0, st.water, IGEL.W, IGEL.H - st.water);
+    g.fillRect(0, Y(st.water), w, H - Y(st.water));
     for (const o of st.objs) {
       g.fillStyle = o.type === 'mine' ? '#5b2a6e' : o.type === 'barrel' ? '#d8473c' : '#a5602a';
       g.strokeStyle = '#2d1b12';
-      g.lineWidth = 2;
+      g.lineWidth = 2 * u;
       if (o.type === 'crate') {
-        g.fillRect(o.x - 6, o.y - 12, 12, 12);
-        g.strokeRect(o.x - 6, o.y - 12, 12, 12);
+        g.fillRect(o.x - 6 * u, Y(o.y) - 12 * u, 12 * u, 12 * u);
+        g.strokeRect(o.x - 6 * u, Y(o.y) - 12 * u, 12 * u, 12 * u);
       } else {
         g.beginPath();
-        g.arc(o.x, o.y - 4, 5, 0, Math.PI * 2);
+        g.arc(o.x, Y(o.y) - 4 * u, 5 * u, 0, Math.PI * 2);
         g.fill();
         g.stroke();
       }
@@ -613,46 +639,42 @@ function miniMap(canvas: HTMLCanvasElement) {
     for (const h of st.hogs) {
       if (h.state === 'drowned') continue;
       const ring = squadColor(st, h.owner);
+      const cy = Y(h.y) - 5 * u;
       g.fillStyle = h.state === 'dead' ? '#f1d49a' : teamColor(st, h.owner);
       g.strokeStyle = ring ?? '#2d1b12';
-      g.lineWidth = ring ? 4 : 3;
+      g.lineWidth = (ring ? 4 : 3) * u;
       g.beginPath();
-      g.arc(h.x, h.y - 5, h.owner === store.playerId ? 9 : 7, 0, Math.PI * 2);
+      g.arc(h.x, cy, (h.owner === store.playerId ? 9 : 7) * u, 0, Math.PI * 2);
       g.fill();
       g.stroke();
       const mine = st.simul ? h.owner === store.playerId && h.state === 'ok' : h.id === st.activeHog && h.state === 'ok';
       if (mine) {
         g.strokeStyle = '#fdf7ea';
-        g.lineWidth = 3;
+        g.lineWidth = 3 * u;
         g.beginPath();
-        g.arc(h.x, h.y - 5, 15, 0, Math.PI * 2);
+        g.arc(h.x, cy, 15 * u, 0, Math.PI * 2);
         g.stroke();
       }
     }
     for (const p of st.projs) {
       g.fillStyle = '#3d2414';
-      g.fillRect(p.x - 4, p.y - 4, 8, 8);
+      g.fillRect(p.x - 4 * u, Y(p.y) - 4 * u, 8 * u, 8 * u);
     }
     if (target !== null) {
       // Luftschlag-Ziel: Fadenkreuz über die ganze Höhe
       g.strokeStyle = '#e0503f';
-      g.lineWidth = 4;
-      g.setLineDash([10, 8]);
+      g.lineWidth = 4 * u;
+      g.setLineDash([10 * u, 8 * u]);
       g.beginPath();
       g.moveTo(target, 0);
-      g.lineTo(target, IGEL.H);
+      g.lineTo(target, H);
       g.stroke();
       g.setLineDash([]);
       g.beginPath();
-      g.arc(target, surfaceAt(mask!, target) - 6, 14, 0, Math.PI * 2);
+      g.arc(target, Y(surfaceY(mask!, target)) - 6 * u, 14 * u, 0, Math.PI * 2);
       g.stroke();
     }
   };
-}
-
-function surfaceAt(m: Mask, x: number) {
-  for (let y = 0; y < IGEL.H; y++) if (m[y * IGEL.W + Math.round(x)] === 1) return y;
-  return IGEL.H;
 }
 
 // ------------------------------------------------------------------ Styles (Waffenraster, Zünder, Sprüche, Teams)
@@ -688,6 +710,8 @@ function ensureStyle() {
 .ig-sqhead b { width: 12px; height: 12px; border: 2px solid var(--outline); flex: none; }
 .ig-sqbar { width: 60px; }
 .ig-squad .ig-team { font-size: 8px; padding: 1px 6px; }
+/* Breite Insel (ab 6 Spielern): Karte zuschauen quer in voller Breite statt voller Höhe */
+:where(html.land) .ig-watchw .ig-map.ig-wide { width: 62%; height: auto; max-width: 62%; }
 `;
   document.head.append(s);
 }

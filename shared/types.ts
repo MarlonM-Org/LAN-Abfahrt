@@ -6,6 +6,7 @@ import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
 import type { WolfPrivate, WolfState } from './werwolf';
 import type { WrPrivate, WrState } from './wolfrunde';
+import type { LexPrivate, LexState } from './lexikon';
 import type { KingsState } from './kingscup';
 import type { WpistoleState } from './wpistole';
 import type { AngelnState } from './angeln';
@@ -14,8 +15,11 @@ import type { WackelState } from './wackel';
 import type { SkiState } from './skisprung';
 import type { TepState } from './teppich';
 import type { KugelState } from './kugel';
+import type { BandState } from './band';
 import type { SuessState } from './suess';
 import type { UmzugState } from './umzug';
+import type { SektState } from './sekt';
+import type { MalerPrivate, MalerState } from './maler';
 
 export interface Look {
   skin: number;
@@ -56,6 +60,7 @@ export type MiniKind =
   | 'sup' | 'tidy'
   | 'flieger' | 'kurve' | 'arena'
   | 'bowling'
+  | 'sekt'
   | 'enten'
   | 'ttt'
   | 'verstecken'
@@ -94,9 +99,12 @@ export type MiniKind =
   | 'lieder'
   | 'maexchen'
   | 'werwars'
+  | 'lexikon'
   | 'skisprung'
   | 'teppich'
-  | 'kugel';
+  | 'kugel'
+  | 'band'
+  | 'maler';
 
 export type GameMode = 'party' | 'date' | 'drink' | 'arcade' | 'turnier';
 
@@ -1324,8 +1332,10 @@ export interface IgelState {
   /** true = Modus „Alle gleichzeitig“ */
   simul: boolean;
   endsIn: number;
-  /** Terrain = genTerrain(seed) + alle Operationen in Reihenfolge */
+  /** Terrain = genTerrain(seed, w) + alle Operationen in Reihenfolge */
   seed: number;
+  /** Inselbreite in Welt-Pixeln (480 bis 5 Spieler, dann mit der Spielerzahl bis 960 – `igelWidth()`); Höhe bleibt 270 */
+  w: number;
   ops: IgelOp[];
   water: number;
   /** −1 … 1, positiv = nach rechts */
@@ -2260,6 +2270,7 @@ export type MiniSnapshot =
   | { kind: 'kurve'; state: KurveState }
   | { kind: 'arena'; state: ArenaState }
   | { kind: 'bowling'; state: BowlingState }
+  | { kind: 'sekt'; state: SektState }
   | { kind: 'enten'; state: EntenState }
   | { kind: 'ttt'; state: TttState }
   | { kind: 'verstecken'; state: VerstState }
@@ -2298,9 +2309,12 @@ export type MiniSnapshot =
   | { kind: 'lieder'; state: LiederState }
   | { kind: 'maexchen'; state: MaexState }
   | { kind: 'werwars'; state: WerwarsState }
+  | { kind: 'lexikon'; state: LexState }
   | { kind: 'skisprung'; state: SkiState }
   | { kind: 'teppich'; state: TepState }
-  | { kind: 'kugel'; state: KugelState };
+  | { kind: 'kugel'; state: KugelState }
+  | { kind: 'band'; state: BandState }
+  | { kind: 'maler'; state: MalerState };
 
 /**
  * Selten wechselnde Daten (Spielerliste, Leaderboards, Beitritts-Link, Zähler).
@@ -2484,6 +2498,8 @@ export type PrivateState =
   | { kind: 'lieder'; state: LiederPrivate }
   | { kind: 'maexchen'; state: MaexPrivate }
   | { kind: 'werwars'; state: WerwarsPrivate }
+  | { kind: 'maler'; state: MalerPrivate }
+  | { kind: 'lexikon'; state: LexPrivate }
   | { kind: 'board'; state: BoardPrivate }
   | null;
 

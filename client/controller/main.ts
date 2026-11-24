@@ -17,6 +17,7 @@ import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
 import { pickArena, pickSup, pickTidy } from './screens/controller';
 import { pickBowling } from './screens/bowling';
+import { pickSekt } from './screens/sekt';
 import { pickBoule } from './screens/boule';
 import { pickEnten } from './screens/enten';
 import { pickTtt } from './screens/ttt';
@@ -44,6 +45,7 @@ import { pickSuess } from './screens/suess';
 import { pickUmzug } from './screens/umzug';
 import { pickWackel } from './screens/wackel';
 import { pickSchaetz } from './screens/schaetz';
+import { pickLexikon } from './screens/lexikon';
 import { pickLieder } from './screens/lieder';
 import { pickMaexchen } from './screens/maexchen';
 import { pickBogen } from './screens/bogen';
@@ -54,6 +56,7 @@ import { pickAutoball } from './screens/autoball';
 import { pickWerwolf } from './screens/werwolf';
 import { pickWolfrunde } from './screens/wolfrunde';
 import { pickWerwars } from './screens/werwars';
+import { pickMaler } from './screens/maler';
 import { pickIntro } from './screens/intro';
 import { WARM_PREFIX, pickWarmup, syncWarmup } from './warmup';
 import { buildKicked, initVipPlayersButton } from './players';
@@ -62,6 +65,7 @@ import { onRotate, syncOrientation } from './orientation';
 import { attachSpectator } from './spectator';
 import { pickFunk } from './screens/funk';
 import { pickKugel, pickSkisprung, pickTeppich } from './screens/balance';
+import { pickBand } from './screens/band';
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -338,6 +342,8 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickArena(m.state);
     case 'bowling':
       return pickBowling(m.state);
+    case 'sekt':
+      return pickSekt(m.state);
     case 'enten':
       return pickEnten(m.state);
     case 'ttt':
@@ -414,12 +420,18 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickKugel(m.state);
     case 'schaetz':
       return pickSchaetz(m.state, vip);
+    case 'lexikon':
+      return pickLexikon(m.state, vip);
     case 'lieder':
       return pickLieder(m.state, vip);
     case 'maexchen':
       return pickMaexchen(m.state);
     case 'werwars':
       return pickWerwars(m.state, vip);
+    case 'band':
+      return pickBand(m.state);
+    case 'maler':
+      return pickMaler(m.state);
   }
   return outdatedScreen();
 }

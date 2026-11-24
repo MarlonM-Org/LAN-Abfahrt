@@ -58,6 +58,8 @@ export function unlockMusic() {
 
 export const audioReady = () => !!synth && synth.ctx.state === 'running';
 export const audioCtx = () => synth?.ctx ?? null;
+/** Der Synth selbst – für Szenen mit eigenem Sequencer (Strand-Band: eigener `SongPlayer` mit Ausgängen pro Spur) */
+export const audioSynth = () => synth;
 export const audioOut = () => synth?.master ?? null;
 /** Musik-Bus (Regler „Musik“) – z. B. für einen Equalizer, der die Musik mithört */
 export const audioMusic = () => synth?.musicBus ?? null;

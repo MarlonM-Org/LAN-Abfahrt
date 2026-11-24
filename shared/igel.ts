@@ -1,13 +1,19 @@
 /**
  * Igel-Krieg: gemeinsame Konstanten, Insel-Generator und Physik-Helfer.
  * Server (autoritativ), TV (eigene Terrain-Kopie) und Bots (Zielsimulation)
- * benutzen denselben Code – das Terrain wird nur als Seed + Kraterliste übertragen.
+ * benutzen denselben Code – das Terrain wird nur als Seed + Breite + Kraterliste übertragen.
+ * Die Inselbreite wächst mit der Spielerzahl (`igelWidth()`); die Maske kennt ihre Breite (`Mask.w`).
  */
 import type { IgelOp, IgelSquad, IgelThemeId, IgelWeapon } from './types';
 
 export const IGEL = {
+  /** Grundbreite der Insel (bis 5 Spieler) und Bildbreite am TV – breitere Inseln: `igelWidth()` */
   W: 480,
   H: 270,
+  /** Größte Inselbreite (ab 11 Spielern) */
+  W_MAX: 960,
+  /** Inselbreite pro Spieler ab 6 Spielern */
+  W_PER_PLAYER: 90,
   /** Anfangs-Wasserspiegel (y) */
   WATER_Y: 248,
   /** Zugzeit bis 4 Spieler – darüber siehe `igelTurnMs()` */
@@ -94,6 +100,13 @@ export const isTool = (w: IgelWeapon) => !!WEAPONS[w].tool;
 export const igelTurnMs = (n: number) => (n <= 4 ? IGEL.TURN_MS : n <= 8 ? 20000 : 15000);
 export const igelMaxHp = (n: number) => (n >= 8 ? IGEL.HP_BIG : IGEL.HP);
 export const igelSuddenMs = (n: number) => (n >= 7 ? IGEL.SUDDEN_MS_BIG : IGEL.SUDDEN_MS);
+
+/**
+ * Inselbreite nach Spielerzahl: bis 5 Spieler 480 wie bisher (bis 4 hat jeder 2 Igel – also höchstens 8 Igel),
+ * darüber 90 px pro Spieler (auf 40 gerundet, höchstens 960): 6 → 560, 7 → 640, 8 → 720, 9 → 840, 10 → 920, ab 11 → 960.
+ * So bleibt bei „Alle gleichzeitig“ Platz zwischen den Igeln, obwohl alle zugleich schießen.
+ */
+export const igelWidth = (n: number) => (n <= 5 ? IGEL.W : Math.min(IGEL.W_MAX, Math.max(IGEL.W, Math.ceil((n * IGEL.W_PER_PLAYER) / 40) * 40)));
 
 /** Zuschauer-Sprüche (Action `taunt` mit `{ i }` = Index in diese Liste) */
 export const IGEL_TAUNTS = ['Rache!', 'Feigling!', 'Ups.', 'Für die Strandbar!', 'Daneben!', 'Volltreffer!'];
@@ -183,7 +196,11 @@ export const sameSide = (st: { squads: IgelSquad[] | null }, a: string, b: strin
 
 // ------------------------------------------------------------------ Terrain
 
-export type Mask = Uint8Array;
+/** Terrain-Bitmaske (1 = fest), zeilenweise `w` breit und `IGEL.H` hoch */
+export type Mask = Uint8Array & { w: number };
+
+/** Leere Maske der Breite w */
+export const newMask = (w: number): Mask => Object.assign(new Uint8Array(w * IGEL.H), { w });
 
 /** Deterministischer Zufall (mulberry32) */
 export function seeded(seed: number) {
@@ -199,15 +216,15 @@ export function seeded(seed: number) {
 export function isSolid(m: Mask, x: number, y: number): boolean {
   const xi = Math.floor(x);
   const yi = Math.floor(y);
-  if (xi < 0 || xi >= IGEL.W || yi < 0) return false;
+  if (xi < 0 || xi >= m.w || yi < 0) return false;
   if (yi >= IGEL.H) return true;
-  return m[yi * IGEL.W + xi] === 1;
+  return m[yi * m.w + xi] === 1;
 }
 
 /** Sprengt einen Kreis aus dem Terrain */
 export function carve(m: Mask, cx: number, cy: number, r: number) {
   const x0 = Math.max(0, Math.floor(cx - r));
-  const x1 = Math.min(IGEL.W - 1, Math.ceil(cx + r));
+  const x1 = Math.min(m.w - 1, Math.ceil(cx + r));
   const y0 = Math.max(0, Math.floor(cy - r));
   const y1 = Math.min(IGEL.H - 1, Math.ceil(cy + r));
   const r2 = r * r;
@@ -215,19 +232,22 @@ export function carve(m: Mask, cx: number, cy: number, r: number) {
     for (let x = x0; x <= x1; x++) {
       const dx = x + 0.5 - cx;
       const dy = y + 0.5 - cy;
-      if (dx * dx + dy * dy <= r2) m[y * IGEL.W + x] = 0;
+      if (dx * dx + dy * dy <= r2) m[y * m.w + x] = 0;
     }
   }
 }
 
 /**
- * Urlaubsinsel aus Höhenprofil + Höhlen. Manchmal zwei Inseln mit einer Bucht dazwischen.
- * Unterhalb des Wassers bleibt alles fest (sieht man eh nicht).
+ * Urlaubsinsel aus Höhenprofil + Höhlen. Manchmal zwei Inseln mit einer Bucht dazwischen,
+ * auf breiten Inseln (`w` > 480) bis zu drei – Höhlen und Felsbrocken wachsen mit der Breite.
+ * Bei 480 entsteht aus demselben Seed genau die bisherige Insel. Unterhalb des Wassers bleibt alles fest.
  */
-export function genTerrain(seed: number): Mask {
-  const { W, H, WATER_Y } = IGEL;
+export function genTerrain(seed: number, w: number = IGEL.W): Mask {
+  const { H, WATER_Y } = IGEL;
+  const W = Math.round(w);
+  const wide = W > IGEL.W;
   const r = seeded(seed);
-  const m = new Uint8Array(W * H);
+  const m = newMask(W);
   const left = 18 + r() * 30;
   const right = W - 18 - r() * 30;
   const twoIslands = r() < 0.45;
@@ -235,22 +255,28 @@ export function genTerrain(seed: number): Mask {
   const gapW = 22 + r() * 18;
   const waves = Array.from({ length: 4 }, (_, i) => ({ a: (28 - i * 6) * (0.6 + r() * 0.6), f: (i + 1) * (0.012 + r() * 0.01), p: r() * Math.PI * 2 }));
   const base = 150 + r() * 25;
+  let gaps = twoIslands ? [{ x: gapX, w: gapW }] : [];
+  if (wide) {
+    // Breite Insel: 0–2 Buchten, gleichmäßig verteilt (so entstehen bis zu drei Inseln)
+    const k = r() < 0.25 ? 0 : W >= 800 && r() < 0.55 ? 2 : 1;
+    gaps = Array.from({ length: k }, (_, i) => ({ x: left + (right - left) * ((i + 1) / (k + 1) + (r() - 0.5) * 0.12), w: 22 + r() * 18 }));
+  }
   const heights: number[] = [];
   for (let x = 0; x < W; x++) {
     let h = base;
-    for (const w of waves) h += Math.sin(x * w.f + w.p) * w.a;
+    for (const wv of waves) h += Math.sin(x * wv.f + wv.p) * wv.a;
     // Ränder fallen ins Meer ab
     const edge = Math.min(x - left, right - x);
     if (edge < 50) h += ((50 - edge) / 50) ** 1.6 * 140;
-    if (twoIslands) {
-      const d = Math.abs(x - gapX);
-      if (d < gapW) h += ((gapW - d) / gapW) ** 0.8 * 130;
+    for (const g of gaps) {
+      const d = Math.abs(x - g.x);
+      if (d < g.w) h += ((g.w - d) / g.w) ** 0.8 * 130;
     }
     heights.push(Math.max(70, Math.min(H + 5, h)));
   }
   for (let x = 0; x < W; x++) for (let y = Math.floor(heights[x]); y < H; y++) if (y >= 0) m[y * W + x] = 1;
-  // Höhlen und Tunnel
-  const caves = 2 + Math.floor(r() * 4);
+  // Höhlen und Tunnel (mehr auf breiten Inseln)
+  const caves = Math.round((2 + Math.floor(r() * 4)) * (W / IGEL.W));
   for (let i = 0; i < caves; i++) {
     const cx = left + 40 + r() * (right - left - 80);
     const top = heights[Math.max(0, Math.min(W - 1, Math.floor(cx)))];
@@ -265,8 +291,9 @@ export function genTerrain(seed: number): Mask {
       y += (r() - 0.5) * 10;
     }
   }
-  // Ein paar schwebende Felsbrocken / Überhänge
-  if (r() < 0.6) {
+  // Ein paar schwebende Felsbrocken / Überhänge (je 480 px Breite ein Versuch)
+  for (let k = Math.max(1, Math.round(W / IGEL.W)); k > 0; k--) {
+    if (r() >= 0.6) continue;
     const cx = left + 60 + r() * (right - left - 120);
     const cy = 60 + r() * 40;
     const rx = 14 + r() * 14;
@@ -284,7 +311,7 @@ export function genTerrain(seed: number): Mask {
 /** Schüttet einen Kreis auf (Surfbrett-Brücke) */
 export function fill(m: Mask, cx: number, cy: number, r: number) {
   const x0 = Math.max(0, Math.floor(cx - r));
-  const x1 = Math.min(IGEL.W - 1, Math.ceil(cx + r));
+  const x1 = Math.min(m.w - 1, Math.ceil(cx + r));
   const y0 = Math.max(0, Math.floor(cy - r));
   const y1 = Math.min(IGEL.H - 1, Math.ceil(cy + r));
   const r2 = r * r;
@@ -292,7 +319,7 @@ export function fill(m: Mask, cx: number, cy: number, r: number) {
     for (let x = x0; x <= x1; x++) {
       const dx = x + 0.5 - cx;
       const dy = y + 0.5 - cy;
-      if (dx * dx + dy * dy <= r2) m[y * IGEL.W + x] = 1;
+      if (dx * dx + dy * dy <= r2) m[y * m.w + x] = 1;
     }
   }
 }
@@ -302,15 +329,15 @@ export function applyOp(m: Mask, op: IgelOp) {
   else carve(m, op[0], op[1], op[2]);
 }
 
-/** Terrain = Seed + alle Operationen (Krater und Bretter, Reihenfolge wichtig!) */
-export function buildTerrain(seed: number, ops: IgelOp[]): Mask {
-  const m = genTerrain(seed);
+/** Terrain = Seed + Breite + alle Operationen (Krater und Bretter, Reihenfolge wichtig!) */
+export function buildTerrain(seed: number, ops: IgelOp[], w: number = IGEL.W): Mask {
+  const m = genTerrain(seed, w);
   for (const op of ops) applyOp(m, op);
   return m;
 }
 
 /** Surfbrett-Brücke vor dem Igel (Fußpunkt x/y): „add“-Scheiben entlang der Zielrichtung, Neigung höchstens ±MAX_TILT */
-export function plankOps(x: number, y: number, angle: number): IgelOp[] {
+export function plankOps(x: number, y: number, angle: number, w: number = IGEL.W): IgelOp[] {
   const dir = Math.cos(angle) >= 0 ? 1 : -1;
   let tilt = dir > 0 ? angle : Math.PI - angle;
   tilt = Math.atan2(Math.sin(tilt), Math.cos(tilt));
@@ -323,21 +350,21 @@ export function plankOps(x: number, y: number, angle: number): IgelOp[] {
   for (let d = 0; d <= BRIDGE.LEN; d += BRIDGE.STEP) {
     const px = Math.round((sx + ux * d) * 2) / 2;
     const py = Math.round((sy + uy * d) * 2) / 2;
-    if (px < 1 || px > IGEL.W - 1 || py < 4) break;
+    if (px < 1 || px > w - 1 || py < 4) break;
     ops.push([px, py, BRIDGE.THICK, 'add']);
   }
   return ops;
 }
 
 /** Schaufel: Tunnel vor dem Igel (Körpermitte x/y) in Grabrichtung */
-export function shovelOps(x: number, y: number, angle: number): IgelOp[] {
+export function shovelOps(x: number, y: number, angle: number, w: number = IGEL.W): IgelOp[] {
   const ops: IgelOp[] = [];
   const ux = Math.cos(angle);
   const uy = Math.sin(angle);
   for (let d = 2; d <= SHOVEL.LEN; d += SHOVEL.STEP) {
     const px = Math.round(x + ux * d);
     const py = Math.round(y + uy * d);
-    if (px < 0 || px > IGEL.W || py < 0 || py > IGEL.H) break;
+    if (px < 0 || px > w || py < 0 || py > IGEL.H) break;
     ops.push([px, py, SHOVEL.R, 'carve']);
   }
   return ops;
@@ -350,7 +377,7 @@ export function ropeAnchor(m: Mask, x: number, y: number, angle: number): { x: n
   for (let d = 6; d <= ROPE.RANGE; d += 1) {
     const px = x + ux * d;
     const py = y + uy * d;
-    if (px < 0 || px >= IGEL.W || py < 0) return null;
+    if (px < 0 || px >= m.w || py < 0) return null;
     if (isSolid(m, px, py)) return { x: Math.round((px - ux) * 10) / 10, y: Math.round((py - uy) * 10) / 10 };
   }
   return null;
@@ -416,7 +443,7 @@ export function simulateBazooka(
   for (let t = 0; t < 8; t += IGEL.DT) {
     stepBallistic(p, IGEL.DT, wind, opts.grav ?? 1);
     if (path && k++ % 4 === 0) path.push({ x: p.x, y: p.y });
-    if (p.x < -60 || p.x > IGEL.W + 60 || p.y > water) return null;
+    if (p.x < -60 || p.x > m.w + 60 || p.y > water) return null;
     if (isSolid(m, p.x, p.y)) return { x: p.x, y: p.y };
     for (const h of hogs) {
       if (h.self && t * 1000 < BAZOOKA.ARM_MS) continue;

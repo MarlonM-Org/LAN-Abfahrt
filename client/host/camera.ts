@@ -56,7 +56,8 @@ export class CameraRig {
     cam.setBounds(0, 0, opts.w, opts.h);
     if (opts.hud !== false) {
       const hud = scene.cameras.add(0, 0, cam.width, cam.height).setZoom(cam.zoom);
-      hud.centerOn(opts.w / 2, opts.h / 2);
+      // HUD zeigt immer einen Bildschirm (0 … Breite/Zoom) – auch wenn die Welt breiter ist als der Bildschirm
+      hud.centerOn(cam.width / cam.zoom / 2, cam.height / cam.zoom / 2);
       // Alles Bisherige gehört zur Welt
       for (const go of scene.children.list) hud.ignore(go);
       this.hudCam = hud;
@@ -148,7 +149,7 @@ export class CameraRig {
       // Basis-Zoom erst im ersten Frame übernehmen (falls die Szene ihn nach create() noch setzt)
       this.ready = true;
       this.base = cam.zoom;
-      this.hudCam?.setSize(cam.width, cam.height).setZoom(this.base).centerOn(this.opts.w / 2, this.opts.h / 2);
+      this.hudCam?.setSize(cam.width, cam.height).setZoom(this.base).centerOn(cam.width / this.base / 2, cam.height / this.base / 2);
     }
     if (this.pending && !this.holding) {
       const fn = this.pending;
