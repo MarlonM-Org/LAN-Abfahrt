@@ -468,23 +468,43 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .bo-sw { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--outline); }
 .bo-dots { font-size: 10px; letter-spacing: 1px; text-shadow: 0 0 1px #2d1b12; }
 
-/* ---------------------------------------------------------------- Darts an der Strandbar */
+/* ---------------------------------------------------------------- Darts (301 Single Out) */
+#app:has(.da-play) { gap: 0; padding-left: 12px; padding-right: 12px; padding-bottom: 10px; }
+.da-play { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; user-select: none; -webkit-user-select: none; }
+.da-rest { color: var(--red); font-size: 14px; }
 .da-board-wrap { display: flex; justify-content: center; }
 .da-board { border: 3px solid var(--wood-darker); box-shadow: 0 3px 0 var(--outline); touch-action: none; }
 .da-quick { display: flex; gap: 6px; }
-.da-quick button { flex: 1; padding: 8px 4px; }
+.da-quick button { flex: 1; padding: 7px 4px; }
 .da-result { margin: 0; min-height: 1.7em; text-align: center; color: var(--ink-soft); font-size: 10px; }
-.da-result.big { color: var(--red); font-size: 13px; }
+.da-result.big { color: var(--red); font-size: 12px; }
+.da-result.bad { color: #fff4d6; background: var(--red); padding: 3px 4px; }
+.da-result.win { color: var(--outline); background: #ffd25e; padding: 3px 4px; }
 .da-result.flash { animation: da-flash 0.5s ease-out; }
-@keyframes da-flash { from { transform: scale(1.6); } to { transform: scale(1); } }
-.da-area { gap: 6px; }
-.da-area .bw-pad.da-pad { min-height: 22vh; padding-top: 10px; background: repeating-linear-gradient(90deg, #c9a35a 0 12px, #b88f48 12px 14px); }
-.da-area .big-btn.bw-swing { min-height: 22vh; }
-.da-area .bw-ball { width: 30px; height: 30px; margin: -15px 0 0 -15px; background: radial-gradient(circle at 40% 40%, #ffffff 0 3px, #c9ced6 5px, #6c727b 13px); }
-.da-area .center { gap: 6px; }
-.da-area .center h2 { margin: 0; }
+@keyframes da-flash { from { transform: scale(1.4); } to { transform: scale(1); } }
+.da-hint { margin: 0; min-height: 1.4em; text-align: center; color: var(--ink); font-size: 10px; }
+.da-pad {
+  flex: 1; min-height: 20vh; touch-action: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 8px; text-align: center; border: 3px dashed var(--wood-dark); -webkit-touch-callout: none;
+  background: repeating-linear-gradient(90deg, #c9a35a 0 12px, #b88f48 12px 14px);
+}
+.da-pad b { font-size: 15px; color: var(--ink); background: rgba(255, 244, 214, 0.88); padding: 6px 8px; pointer-events: none; }
+.da-pad span { font-size: 8px; line-height: 1.6; color: var(--ink); background: rgba(255, 244, 214, 0.8); padding: 4px 6px; pointer-events: none; }
+.da-pad span:empty { display: none; }
+.da-pad.hold { border-style: solid; border-color: var(--red); background: repeating-linear-gradient(90deg, #e0b86a 0 12px, #cfa257 12px 14px); }
+.da-pad.hold b { color: var(--red); }
+.da-pad.sensor { border-style: solid; }
+.da-pad.sensor:active { background: #e0b86a; }
+.da-pad.out b { background: #ffd25e; }
+.da-pad.bust b { color: #fff4d6; background: var(--red); }
+.da-pad.done, .da-pad.skip, .da-pad.out, .da-pad.bust, .da-pad.fly { border-style: dotted; opacity: 0.9; }
+.da-tools { display: flex; gap: 6px; justify-content: center; }
+.da-tools button { flex: 1; padding: 7px 4px; }
+.da-note { font-size: 8px; }
+.da-intro p { line-height: 1.7; }
 .da-list { gap: 4px; padding: 8px; }
 .da-rd { color: var(--ink-soft); }
+.da-rd.bad { color: var(--red); }
 
 /* ---------------------------------------------------------------- Ententeich */
 .en-status { display: flex; align-items: center; gap: 10px; min-height: 26px; }
@@ -1501,10 +1521,7 @@ button.wr-win-liebe { background: #e46e98; box-shadow: inset 0 3px 0 #f59ab9, in
 /* mit Feedback-Karte: Wurf-Knopf/Wischfeld etwas kleiner, damit alles auf den Bildschirm passt */
 .mf:not(.hidden) + .bw-area .big-btn.bw-swing,
 .mf:not(.hidden) + .bw-area .bw-pad { min-height: 26vh; }
-.mf:not(.hidden) + .da-area .big-btn.bw-swing,
-.mf:not(.hidden) + .da-area .bw-pad.da-pad { min-height: 15vh; }
-/* Darts/Boule: der Tipp der Karte ersetzt den langen Hinweis über dem Knopf */
-.mf:not(.hidden) + .da-area .bw-hint,
+/* Boule: der Tipp der Karte ersetzt den langen Hinweis über dem Knopf */
 .mf:not(.hidden) + .bo-area .bw-hint { display: none; }
 .mf:not(.hidden) + .big-btn.gf-swing { min-height: 16vh; }
 
