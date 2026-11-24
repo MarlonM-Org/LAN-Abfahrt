@@ -37,6 +37,9 @@ html, body {
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
+  /* iOS Safari vergrößert Schrift beim Querdrehen automatisch – dann passen die Quer-Layouts nicht mehr */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
