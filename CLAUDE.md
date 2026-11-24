@@ -10,6 +10,10 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run online` – Build + Server + Cloudflare-Quick-Tunnel (`server/online.ts`), Freunde spielen über `https://….trycloudflare.com` mit; feste Adresse per `ONLINE_URL`
 - `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
 - `npm run test:records` – Tests ohne Browser für die ewigen Bestleistungen der Board-Spiele (`server/records.ts`)
+- `npm run test:kopfball` – Tests ohne Browser für Kopfball-Duell + Kopf-Korb (Anstoß per Los und Wechsel nach Tor/Korb, Hälfte-Regel, Latte, 2/3 Punkte, Sprung per Knopf/Stick, Ende, Aufwärmrunde, Dauerlauf 2–8 Spieler)
+- `npm run test:aufraeumen` – Tests ohne Browser für Aufräumen! (Besen schiebt geradeaus und im Bogen ohne seitliches Wegrutschen, Körper ohne Schwung, Sprint, Wand/Ecke/Korb, SnapBuffer-Verzögerung)
+- `npm run test:flunky` – Tests ohne Browser für Flunkyball (Sensor-/Wisch-Kraftkurve, Trefferquoten nach Können, Schluck-Limit pro Treffer, komplette Partien auf virtueller Uhr)
+- `npm run test:busfahrer` – Tests ohne Browser für Busfahrer (`hilo`: Kartenvergleiche inkl. gleich/Ass, mögliche Tipps, Schlücke 1–4, Ablauf mit VIP-Aufdecken und Offline-Spieler)
 - `npm run test:physik` – Tests ohne Browser für die Physik: Kofferpacken + Wackelturm (abgestützte Stapel bleiben liegen, auch bei Aufprall; Hochkant-Teile stehen; Überhänge kippen; Kofferraum bis unters Dach → kein neues Teil) und Sumo-Rempler-Weite. Stapelphysik gemeinsam in `server/stapelphysik.ts` (Trägheit mit Steiner-Anteil, 2 Unterschritte, kein Einschlafen beim Kippen) – neue Stapelspiele nutzen sie
 - `npm run test:lieder` – Tests ohne Browser für Guess the Song (Genres/Runden, Dateien → Genre, Deezer-Trefferwahl, kompletter Rundenablauf)
 - `npm run test:wolfrunde` – Tests ohne Browser für Werwolf mit Erzähler (Stapel-Regeln, Geheimhaltung: TV ohne Karten, jeder nur seine, Erzähler alle; Dieb, Totenkopf, Ergebnis)
