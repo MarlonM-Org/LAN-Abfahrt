@@ -1,8 +1,6 @@
-import type { DescentState, DateRunState, RhythmState, StarsState, WrapState } from '../../../shared/types';
-import { INGREDIENT_NAMES, RHYTHM, WRAP_RECIPE } from '../../../shared/dategames';
+import type { DescentState, DateRunState, StarsState, WrapState } from '../../../shared/types';
+import { INGREDIENT_NAMES, WRAP_RECIPE } from '../../../shared/dategames';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, socket, store, tapButton } from '../core';
-import { PENTA, pluck, unlockAudio } from '../audio';
-import { toLocalPerf } from '../../timesync';
 import { ingredient } from '../../art/food';
 import { Pix } from '../../art/pix';
 
@@ -71,130 +69,7 @@ function buildJump() {
   };
 }
 
-// ------------------------------------------------------------------ Gespräch (Rhythmus)
-
-export function pickRhythm(s: RhythmState): Screen {
-  const id = store.playerId!;
-  if (!s.charts[id]) return ['spectate', message('Du schaust zu')];
-  if (s.sub === 'ready') {
-    return s.ready.includes(id) ? ['rh-wait', message('Bereit!', `Warte auf ${other()} ...`)] : ['rh-ready', buildReady];
-  }
-  if (s.sub === 'play') return [`rh-play-${s.playSeq}`, () => buildRhythm(s)];
-  return ['rh-over', message('Gespräch vorbei', 'Schau auf den Fernseher!')];
-}
-
-function buildReady() {
-  const root = el(`
-    <div class="center">
-      <h2>Das erste Gespräch</h2>
-      <p>Die Musik kommt vom Laptop/Fernseher – dreht auf! Tippe im Takt auf LINKS und RECHTS, wenn die Noten unten ankommen.</p>
-      <p>Wer gerade redet, hat mehr zu tun – wer zuhört, nickt nur ab und zu.</p>
-    </div>
-    <button>Bereit!</button>
-  `);
-  root.querySelector('button')!.addEventListener('click', () => {
-    unlockAudio();
-    send('ready');
-  });
-  app.append(root);
-  return null;
-}
-
-function buildRhythm(s: RhythmState) {
-  const id = store.playerId!;
-  const notes = s.charts[id];
-  const judged = new Array(notes.length).fill(false);
-  const beatMs = 60000 / s.bpm;
-  // Die Musik kommt vom TV/Laptop; Start per synchronisierter Serverzeit
-  const t0 = toLocalPerf(s.startAt);
-
-  const root = el(`
-    <p class="talk"></p>
-    <canvas class="lanes"></canvas>
-    <div class="lane-btns"><button class="lane l0">LINKS</button><button class="lane l1">RECHTS</button></div>
-    <p class="fb">&nbsp;</p>
-  `);
-  const canvas = q<HTMLCanvasElement>(root, 'canvas');
-  const fb = q(root, '.fb');
-  app.append(root);
-  const W = (canvas.width = 240);
-  const H = (canvas.height = 300);
-  const g = canvas.getContext('2d')!;
-  const hitY = H - 30;
-  let combo = 0;
-
-  const judge = (lane: 0 | 1) => {
-    const now = performance.now() - t0;
-    let best = -1;
-    let bestD = Infinity;
-    notes.forEach((n, i) => {
-      if (judged[i] || n.lane !== lane) return;
-      const dd = Math.abs(n.t - now);
-      if (dd < bestD) (bestD = dd), (best = i);
-    });
-    if (best < 0 || bestD > RHYTHM.GOOD_MS) {
-      fb.textContent = '...';
-      return;
-    }
-    judged[best] = true;
-    const qv = bestD <= RHYTHM.PERFECT_MS ? 2 : 1;
-    combo++;
-    fb.textContent = qv === 2 ? `Perfekt! x${combo}` : `Gut x${combo}`;
-    pluck(PENTA[(best + lane * 2) % PENTA.length]);
-    send('hit', { i: best, q: qv });
-  };
-  root.querySelectorAll<HTMLButtonElement>('.lane').forEach((b, lane) =>
-    tapButton(b, () => {
-      judge(lane as 0 | 1);
-      navigator.vibrate?.(6);
-    }),
-  );
-
-  const frame = () => {
-    if (!canvas.isConnected) return;
-    const now = performance.now() - t0;
-    g.fillStyle = '#26304f';
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = '#2e3a62';
-    g.fillRect(W / 2, 0, W / 2, H);
-    // Taktlinien
-    for (let b = Math.floor((now - s.leadIn) / beatMs); b < Math.floor((now - s.leadIn) / beatMs) + 4; b++) {
-      const bt = s.leadIn + b * beatMs;
-      const y = hitY - ((bt - now) / RHYTHM.FALL_MS) * hitY;
-      g.fillStyle = 'rgba(255,255,255,0.08)';
-      g.fillRect(0, y, W, 1);
-    }
-    g.fillStyle = '#f7e4b5';
-    g.fillRect(0, hitY - 2, W, 4);
-    notes.forEach((n, i) => {
-      if (judged[i]) return;
-      if (now - n.t > RHYTHM.GOOD_MS + 40) {
-        judged[i] = true;
-        combo = 0;
-        fb.textContent = 'verpasst';
-        send('hit', { i, q: 0 });
-        return;
-      }
-      const y = hitY - ((n.t - now) / RHYTHM.FALL_MS) * hitY;
-      if (y < -20) return;
-      const x = n.lane === 0 ? W / 4 : (3 * W) / 4;
-      g.fillStyle = '#2d1b12';
-      g.fillRect(x - 22, y - 9, 44, 18);
-      g.fillStyle = n.lane === 0 ? '#f07aa8' : '#f0b13a';
-      g.fillRect(x - 20, y - 7, 40, 14);
-      g.fillStyle = 'rgba(255,255,255,0.5)';
-      g.fillRect(x - 20, y - 7, 40, 3);
-    });
-    const phrase = s.phrases.find((p) => now >= p.from && now < p.to);
-    const talk = q(root, '.talk');
-    if (now < s.leadIn) talk.textContent = `Gleich geht’s los ... ${Math.ceil((s.leadIn - now) / 1000)}`;
-    else if (phrase) talk.textContent = phrase.speaker === id ? `Du redest: „${phrase.topic}“` : `${nameOf(phrase.speaker)} redet – nick mit!`;
-    else talk.textContent = '';
-    requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
-  return null;
-}
+// Gespräch (Rhythmus): eigene Datei (screens/rhythmus.ts)
 
 // ------------------------------------------------------------------ Wrap
 

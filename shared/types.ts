@@ -329,31 +329,10 @@ export interface DescentState {
   obstacles: { s: number; type: 'bottle' | 'pigeon' | 'puddle' }[];
 }
 
-// ------------------------------------------------------------------ Date Night: Gespräch (Rhythmus)
+// ------------------------------------------------------------------ Date Night: Gespräch (Rhythmus) – Zustand in shared/rhythmus.ts
 
-export interface RhythmNote {
-  t: number;
-  lane: 0 | 1;
-}
-
-export interface RhythmState {
-  sub: 'ready' | 'play' | 'over';
-  /** Server-Zeit (ms), zu der der Song startet – TV und Handys gleichen ihre Uhr ab */
-  startAt: number;
-  /** Wer schon bereit ist (Audio entsperrt) */
-  ready: string[];
-  playSeq: number;
-  bpm: number;
-  leadIn: number;
-  duration: number;
-  charts: Record<string, RhythmNote[]>;
-  /** Abschnitte: wer gerade "redet" */
-  phrases: { from: number; to: number; speaker: string; topic: string }[];
-  score: Record<string, number>;
-  combo: Record<string, number>;
-  lastHit: Record<string, { q: 0 | 1 | 2; seq: number }>;
-  sympathy: number;
-}
+import type { RhythmState } from './rhythmus';
+export type { RhythmState };
 
 // ------------------------------------------------------------------ Date Night: Wrap
 

@@ -10,7 +10,8 @@ import { pickFlunky } from './screens/flunky';
 import { pickWwe } from './screens/wwe';
 import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
-import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
+import { pickDescent, pickStars, pickStory, pickWrap } from './screens/date';
+import { pickRhythm } from './screens/rhythmus';
 import { pickBomb, pickHilo, pickNhie } from './screens/drink';
 import { pickKingsCup } from './screens/kingscup';
 import { pickFlieger } from './screens/flieger';
@@ -320,7 +321,7 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
     case 'descent':
       return pickDescent(m.state);
     case 'rhythm':
-      return pickRhythm(m.state);
+      return pickRhythm(m.state, vip);
     case 'wrap':
       return pickWrap(m.state);
     case 'stars':

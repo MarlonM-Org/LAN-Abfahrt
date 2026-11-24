@@ -1,40 +1,47 @@
 import type { Socket } from 'socket.io-client';
+import { Uhrabgleich } from '../shared/zeitabgleich';
 
 /**
- * Uhrabgleich mit dem Server (wie NTP, nur simpel):
- * Mehrere Pings, die mit der kürzesten Laufzeit gewinnt.
- * Damit starten TV und Handys z. B. den Rhythmus-Song auf ~10 ms genau gleichzeitig.
+ * Uhrabgleich mit dem Server (wie NTP, nur simpel) – die Schätzung selbst steht in `shared/zeitabgleich.ts`:
+ * gleitendes Fenster, schnellste Messungen, Median, sanftes Nachführen. Gemessen wird gegen `performance.now()`
+ * (monoton, springt nicht wie `Date.now()` bei einer Uhrkorrektur des Geräts).
+ * Damit starten TV und Handys z. B. den Song im Gespräch oder bei der Strand-Band auf wenige ms genau gleichzeitig.
  */
-let offset = 0; // serverZeit − Date.now()
-let bestRtt = Infinity;
+const uhr = new Uhrabgleich();
 
 export function startTimeSync(socket: Socket) {
   const ping = () => {
-    const t0 = Date.now();
+    if (!socket.connected) return;
+    const t0 = performance.now();
     socket.emit('time:ping', t0, (r: { t0: number; server: number }) => {
-      const t1 = Date.now();
-      const rtt = t1 - r.t0;
-      // Neue Messung nur übernehmen, wenn sie mindestens so gut ist (oder die alte veraltet)
-      if (rtt <= bestRtt * 1.2) {
-        bestRtt = Math.min(bestRtt, rtt);
-        offset = r.server - (r.t0 + rtt / 2);
-      }
+      // Antwort auf einen anderen Ping (z. B. nach Neuverbindung) passt nicht zu t0 → verwerfen
+      if (!r || r.t0 !== t0) return;
+      uhr.probe(t0, r.server, performance.now());
     });
   };
+  // Nach dem Verbinden schnell ein paar Messungen, danach eine alle 2 s (das Fenster hält ≈ 1 min)
   const burst = () => {
-    bestRtt = Infinity;
-    for (let i = 0; i < 6; i++) setTimeout(ping, i * 120);
+    for (let i = 0; i < 8; i++) setTimeout(ping, i * 150);
   };
   socket.on('connect', burst);
   if (socket.connected) burst();
-  setInterval(burst, 15000);
+  setInterval(ping, 2000);
 }
 
 /** Beste gemessene Laufzeit hin und zurück (ms) – für die Vorhersage am Handy */
-export const rttMs = () => (Number.isFinite(bestRtt) ? bestRtt : 40);
+export const rttMs = () => {
+  const r = uhr.bestRtt();
+  return Number.isFinite(r) ? r : 40;
+};
 
 /** Aktuelle Serverzeit in ms */
-export const serverNow = () => Date.now() + offset;
+export const serverNow = () => {
+  const now = performance.now();
+  return now + uhr.offset(now);
+};
+
+/** Wandelt einen performance.now()-Zeitpunkt (z. B. `event.timeStamp`) in Serverzeit um */
+export const toServerMs = (perf: number) => perf + uhr.offset(performance.now());
 
 /** Wandelt einen Server-Zeitpunkt in performance.now()-Zeit um */
-export const toLocalPerf = (serverMs: number) => performance.now() + (serverMs - serverNow());
+export const toLocalPerf = (serverMs: number) => serverMs - uhr.offset(performance.now());

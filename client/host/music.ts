@@ -9,7 +9,7 @@ import type { Socket } from 'socket.io-client';
 import { type Assignment, type Song, type SongInfo, resolveSceneSong } from '../../shared/music';
 import { BUILTIN_INFOS, builtinSong } from '../../shared/musicBuiltin';
 import { getAssignment, getSong, listSongs } from '../music/api';
-import { SongPlayer, Synth, midiHz } from '../music/player';
+import { SongPlayer, Synth } from '../music/player';
 
 const LS_VOL = 'lan-abfahrt.musik.volume';
 const LS_MUTE = 'lan-abfahrt.musik.mute';
@@ -105,7 +105,7 @@ export function setMuted(m: boolean) {
 
 export const toggleMute = () => setMuted(!muted);
 
-/** Musik leiser drehen (z. B. während der Rhythmus-Song läuft) */
+/** Musik leiser drehen (z. B. während das Gespräch oder die Strand-Band ihren eigenen Song spielt) */
 export function duckMusic(on: boolean) {
   ducked = on;
   synth?.setMusicVolume(on ? 0 : musicVol);
@@ -241,44 +241,3 @@ export function stopPreview() {
 }
 
 export const isPreviewing = () => previewing;
-
-// ------------------------------------------------------------------ Rhythmus-Song (geteiltes Gerät)
-
-const C = [60, 64, 67];
-const G = [55, 59, 62];
-const Am = [57, 60, 64];
-const F = [53, 57, 60];
-
-/**
- * Spielt den Gesprächs-Song auf dem TV. `startPerf` ist der lokale performance.now()-Zeitpunkt
- * von Beat 0 (nach dem Vorlauf) – aus der synchronisierten Serverzeit berechnet.
- */
-export function playRhythmSong(startPerf: number, bpm: number, beats: number, leadIn: number) {
-  if (!synth) return;
-  const s = synth;
-  const ctx = s.ctx;
-  const out = ctx.createGain();
-  out.gain.value = 1;
-  out.connect(s.fxBus);
-  // performance.now() → AudioContext-Zeit
-  const base = ctx.currentTime + (startPerf - performance.now()) / 1000;
-  const beat = 60 / bpm;
-  const chords = [C, Am, F, G];
-  // Einzähler im Vorlauf
-  for (let i = 0; i < 4; i++) {
-    const t = base + leadIn / 1000 - (4 - i) * beat;
-    if (t > ctx.currentTime) s.tone(midiHz(84), t, 0.08, 'square', 0.05, out);
-  }
-  for (let b = 0; b < beats; b++) {
-    const t = base + leadIn / 1000 + b * beat;
-    if (t < ctx.currentTime) continue;
-    const chord = chords[Math.floor(b / 4) % 4];
-    if (b % 2 === 0) s.kick(t, out);
-    s.noise(t + beat / 2, 0.03, 8000, 0.05, out);
-    if (b % 4 === 2) s.noise(t, 0.1, 2500, 0.1, out);
-    s.tone(midiHz(chord[0] - 12), t, beat * 0.9, 'triangle', 0.18, out);
-    s.tone(midiHz(chord[b % 3] + 12), t, beat * 0.45, 'pulse25', 0.04, out);
-    s.tone(midiHz(chord[(b + 1) % 3] + 12), t + beat / 2, beat * 0.45, 'pulse25', 0.03, out);
-  }
-  return () => out.disconnect();
-}

@@ -61,6 +61,7 @@ import { lexikonBot } from './lexikonbot';
 import { liederBot } from './liederbot';
 import { sektBot } from './sektbot';
 import { bandBot } from './bandbot';
+import { rhythmusBot } from './rhythmusbot';
 import { malerBot } from './malerbot';
 import { type BotSkill, asBotSkill } from '../shared/players';
 
@@ -916,23 +917,7 @@ export class Bot {
       }
     }
 
-    if (m.kind === 'rhythm') {
-      const rs = m.state;
-      if (rs.sub === 'ready' && !rs.ready.includes(this.id)) this.once('rh-ready', () => this.send('ready'));
-      if (rs.sub === 'play') {
-        this.once(`rh-play-${rs.playSeq}`, async () => {
-          const t0 = Date.now();
-          const notes = rs.charts[this.id] ?? [];
-          for (let i = 0; i < notes.length; i++) {
-            const wait = notes[i].t - (Date.now() - t0);
-            if (wait > 0) await sleep(wait);
-            const roll = Math.random();
-            this.send('hit', { i, q: roll < 0.6 ? 2 : roll < 0.85 ? 1 : 0 });
-          }
-          await sleep(5000);
-        });
-      }
-    }
+    if (m.kind === 'rhythm') rhythmusBot(this, m.state, this.human.noise);
 
     if (m.kind === 'wrap' && m.state.sub === 'build') {
       const p = m.state.players[this.id];
