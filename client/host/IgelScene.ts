@@ -108,7 +108,10 @@ export class IgelScene extends Phaser.Scene {
   private ls = 1;
   private clouds!: Phaser.GameObjects.TileSprite;
   private specks: { r: Phaser.GameObjects.Rectangle; x: number; y: number; ph: number }[] = [];
-  private bubbles: { t: Phaser.GameObjects.Text; hog: number; until: number; born: number }[] = [];
+  /** Zuschauer-Sprüche: Text, Igel, Spruch und ob gerade der Name davorsteht (Igel nicht im Bild) */
+  private bubbles: { t: Phaser.GameObjects.Text; hog: number; until: number; born: number; text: string; named: boolean }[] = [];
+  /** Spitzen/Pfeile der Sprechblasen */
+  private bubbleG!: Phaser.GameObjects.Graphics;
   private windG!: Phaser.GameObjects.Graphics;
   private juice!: Juice;
   private objViews = new Map<number, { img: Phaser.GameObjects.Image; chute: Phaser.GameObjects.Image | null; x: number; y: number; type: IgelObj['type'] }>();
@@ -215,6 +218,7 @@ export class IgelScene extends Phaser.Scene {
     daylight(this, { strength: 0.7, w: IGEL.W, h: IGEL.H, layer: this.bgLayer });
     this.ropeG = this.add.graphics().setDepth(9);
     this.aimG = this.add.graphics().setDepth(25);
+    this.bubbleG = this.add.graphics().setDepth(45);
     this.waterG = this.add.graphics().setDepth(30);
     this.activeName = txt(this, 0, 0, '', {}).setDepth(26);
     this.hudBuilding = true;
@@ -843,11 +847,113 @@ export class IgelScene extends Phaser.Scene {
         this.bubbles = this.bubbles.filter((b) => b.hog !== f.hog);
         const t = ink(this, f.x, f.y - 22 - 8 * this.ls, f.text, { origin: [0.5, 1] }).setBackgroundColor('#fff6dc').setPadding(3, 2, 3, 2).setDepth(45).setScale(0.3 * this.ls);
         this.tweens.add({ targets: t, scale: this.ls, duration: 160, ease: 'Back.out' });
-        this.bubbles.push({ t, hog: f.hog, until: this.time.now + IGEL.TAUNT_SHOW_MS, born: this.time.now });
+        this.bubbles.push({ t, hog: f.hog, until: this.time.now + IGEL.TAUNT_SHOW_MS, born: this.time.now, text: f.text, named: false });
         sfx('pop', { x: this.sx(f.x), vol: 0.4, pitch: 1.3 });
         break;
       }
     }
+  }
+
+  // ---------------------------------------------------------------- Zuschauer-Sprechblasen
+
+  /**
+   * Sprechblasen der Zuschauer folgen ihrem Igel, stehen aber immer ganz im Bild: an den Bildrand geklemmt, nicht unter
+   * HUD-Leisten oder Minikarte. Ist der Igel selbst nicht im Bild (Kamera beim aktiven Igel), steht sein Name in der
+   * Blase und ein Pfeil in Spielerfarbe zeigt zu ihm; sonst zeigt eine kleine Spitze auf den Igel.
+   */
+  private updateBubbles(st: IgelState, time: number) {
+    const g = this.bubbleG;
+    g.clear();
+    if (!this.bubbles.length) return;
+    const z = this.view.z;
+    const vw = IGEL.W / z;
+    const vh = IGEL.H / z;
+    const L = this.view.x - vw / 2;
+    const T = this.view.y - vh / 2;
+    /** Bildschirm-Pixel → Welt; Rand so groß, dass auch der Pfeil noch ins Bild passt */
+    const px = 1 / z;
+    const m = 10 * this.ls;
+    const hudBottom = st.squads ? 14 : 14 + (Math.ceil(st.teams.length / 6) - 1) * 11;
+    const box = { l: L + m, r: L + vw - m, t: T + 24 * px + m, b: T + vh - hudBottom * px - m };
+    type Box = { l: number; r: number; t: number; b: number };
+    /** Feste Hindernisse: Minikarte oben rechts (breite Insel) und das Ansage-Banner („Lena ist dran“, Bildschirm-y 92 … 132) */
+    const fixed: Box[] = [];
+    if (this.mapBox.visible) fixed.push({ l: L + (this.mapRect.x - 4) * px, r: Infinity, t: -Infinity, b: T + (this.mapRect.y + this.mapRect.h + 4) * px });
+    if (this.banner.text) fixed.push({ l: -Infinity, r: Infinity, t: T + 88 * px, b: T + (this.bannerSub.text ? 134 : 118) * px });
+    /** Schon platzierte Blasen (eine neue legt sich nie darüber) */
+    const placed: Box[] = [];
+    const gap = 2 * this.ls;
+    this.bubbles = this.bubbles.filter((b) => {
+      const v = this.hogs.get(b.hog);
+      if (time >= b.until || !v) {
+        this.tweens.add({ targets: b.t, alpha: 0, duration: 250, onComplete: () => b.t.destroy() });
+        return false;
+      }
+      const hs = st.hogs[b.hog];
+      const hx = v.x;
+      const hy = hs?.state === 'drowned' ? this.waterY : v.y;
+      // Kopf des Igels sichtbar (nicht unter den Leisten)?
+      const inView = hx >= L && hx <= L + vw && hy - 8 >= T + 22 * px && hy - 8 <= T + vh - hudBottom * px;
+      if (inView === b.named) {
+        b.named = !inView;
+        const name = hs ? (playerById(hs.owner)?.name ?? '') : '';
+        b.t.setText(b.named && name ? `${name}:\n${b.text}` : b.text);
+      }
+      if (time > b.born + 170) b.t.setScale(this.ls);
+      // Endgröße (die Aufpopp-Animation wächst nur hinein); Ursprung der Blase = Mitte unten
+      const w = b.t.width * this.ls;
+      const h = b.t.height * this.ls;
+      let x = hx;
+      let y = hy - 22 - 8 * this.ls;
+      // Oben kein Platz (Igel am oberen Bildrand) → unter den Igel
+      if (inView && y - h < box.t) y = hy + 6 * this.ls + h;
+      x = w >= box.r - box.l ? (box.l + box.r) / 2 : Phaser.Math.Clamp(x, box.l + w / 2, box.r - w / 2);
+      y = h >= box.b - box.t ? box.t + h : Phaser.Math.Clamp(y, box.t + h, box.b);
+      // Nicht unter Minikarte, Ansage-Banner oder eine schon platzierte Blase: kürzester Ausweichweg (hoch, runter,
+      // links, rechts), der im Bild bleibt – bevorzugt einer, der dabei nichts anderes verdeckt
+      const hit = (cx: number, cy: number, o: Box) => cx - w / 2 < o.r + gap && cx + w / 2 > o.l - gap && cy - h < o.b + gap && cy > o.t - gap;
+      const fits = (c: { x: number; y: number }) => c.x - w / 2 >= box.l - 0.5 && c.x + w / 2 <= box.r + 0.5 && c.y - h >= box.t - 0.5 && c.y <= box.b + 0.5;
+      for (let n = 0; n < 6; n++) {
+        const obstacles = [...fixed, ...placed];
+        const o = obstacles.find((o) => hit(x, y, o));
+        if (!o) break;
+        const options = [
+          { x, y: o.t - gap },
+          { x, y: o.b + gap + h },
+          { x: o.l - gap - w / 2, y },
+          { x: o.r + gap + w / 2, y },
+        ].filter((c) => Number.isFinite(c.x) && Number.isFinite(c.y) && fits(c));
+        if (!options.length) break;
+        const cost = (c: { x: number; y: number }) => Math.abs(c.x - x) + Math.abs(c.y - y) + (obstacles.some((q) => hit(c.x, c.y, q)) ? 1e4 : 0);
+        options.sort((a, c) => cost(a) - cost(c));
+        ({ x, y } = options[0]);
+      }
+      placed.push({ l: x - w / 2, r: x + w / 2, t: y - h, b: y });
+      b.t.setPosition(Math.round(x), Math.round(y));
+      if (time <= b.born + 170 || !hs) return true;
+      // Spitze bzw. Pfeil: vom Rand der Blase Richtung Igel-Kopf
+      const cx = Math.round(x);
+      const cy = Math.round(y) - h / 2;
+      const dx = hx - cx;
+      const dy = hy - 8 - cy;
+      const d = Math.hypot(dx, dy);
+      if (d < 1) return true;
+      const ux = dx / d;
+      const uy = dy / d;
+      const edge = Math.min(Math.abs(ux) > 1e-3 ? w / 2 / Math.abs(ux) : Infinity, Math.abs(uy) > 1e-3 ? h / 2 / Math.abs(uy) : Infinity);
+      if (d <= edge) return true;
+      const ex = cx + ux * edge;
+      const ey = cy + uy * edge;
+      const len = Math.min((b.named ? 8 : 5) * this.ls, d - edge);
+      const half = (b.named ? 5 : 3) * this.ls;
+      const tri = (grow: number) =>
+        [ex - uy * (half + grow) - ux * grow, ey + ux * (half + grow) - uy * grow, ex + uy * (half + grow) - ux * grow, ey - ux * (half + grow) - uy * grow, ex + ux * (len + grow), ey + uy * (len + grow)] as const;
+      if (b.named) {
+        g.fillStyle(0x2d1b12).fillTriangle(...tri(1.5 * this.ls));
+        g.fillStyle(colorNum(colorOf(st, hs.owner))).fillTriangle(...tri(0));
+      } else g.fillStyle(0xfff6dc).fillTriangle(...tri(0));
+      return true;
+    });
   }
 
   // ---------------------------------------------------------------- Themenkarte, Sprecher
@@ -904,6 +1010,7 @@ export class IgelScene extends Phaser.Scene {
     for (const r of this.rings) r.img.setVisible(false);
     for (const b of this.bubbles) b.t.destroy();
     this.bubbles = [];
+    this.bubbleG.clear();
     this.activeName.setVisible(false);
     this.aimG.clear();
     this.ropeG.clear();
@@ -1360,19 +1467,7 @@ export class IgelScene extends Phaser.Scene {
     this.layoutBg();
     this.drawMiniMap(st, time);
 
-    // Sprechblasen der Zuschauer folgen ihrem Igel
-    this.bubbles = this.bubbles.filter((b) => {
-      const v = this.hogs.get(b.hog);
-      if (time >= b.until || !v) {
-        this.tweens.add({ targets: b.t, alpha: 0, duration: 250, onComplete: () => b.t.destroy() });
-        return false;
-      }
-      const hs = st.hogs[b.hog];
-      const drowned = hs?.state === 'drowned';
-      if (time > b.born + 170) b.t.setScale(this.ls);
-      b.t.setPosition(Math.round(drowned ? b.t.x : v.x), Math.round(drowned ? this.waterY - 12 : v.y - 22 - 8 * this.ls));
-      return true;
-    });
+    this.updateBubbles(st, time);
 
     // Aktiver Igel: Pfeil + Name (Rundlauf) bzw. alle Ziellinien in Spielerfarbe (Alle gleichzeitig)
     this.aimG.clear();
