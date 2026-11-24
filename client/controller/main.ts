@@ -63,9 +63,12 @@ import { buildKicked, initVipPlayersButton } from './players';
 import { initVipMenu } from './vipMenu';
 import { onRotate, syncOrientation } from './orientation';
 import { attachSpectator } from './spectator';
+import { initZoomGuard, setInGame } from './zoom';
 import { pickFunk } from './screens/funk';
 import { pickKugel, pickSkisprung, pickTeppich } from './screens/balance';
 import { pickBand } from './screens/band';
+
+initZoomGuard();
 
 let screenKey = '';
 let updater: (() => void) | null = null;
@@ -247,6 +250,7 @@ function renderNow() {
       message('Hoppla!', 'Anzeigefehler – lade die Seite neu.')();
     }
   }
+  setInGame(store.state?.phase === 'mini' || (store.state?.phase === 'intro' && !!store.state.intro?.warm));
   syncVipAbort();
   syncWarmup(key);
   syncOrientation(screen);
