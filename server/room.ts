@@ -62,7 +62,7 @@ import { BogenGame } from './bogen';
 import { ZauberGame } from './zauber';
 import { DartsGame } from './darts';
 import { AutoballGame } from './autoball';
-import { VolleyGame } from './volley';
+import { KopfballGame } from './kopfball';
 import { type MiniCtx, type MiniGame, type MiniResult, PRACTICE_OUT_MS, asRecord, splitTeams } from './minigame';
 import { MurderGame } from './murder';
 import { QuestionStore } from './questions';
@@ -127,7 +127,7 @@ const FLUSH_MS = 30;
  * Gehaltene Eingaben, die ohne Nachschub auf „neutral“ fallen (z. B. Handy gesperrt, während der Daumen
  * auf dem Stick lag). Nur Aktionen, deren Handy-Screen regelmäßig wiederholt (Keepalive < 700 ms):
  * Stick (Fix-Pad 300 ms, schwebender Stick 250 ms), Kart/Autoball-Lenkung (300 ms),
- * Kurven-Duell `turn` (400 ms), Volleyball `move` (500 ms). Igel `move` wiederholt nicht → nicht dabei.
+ * Kurven-Duell `turn` (400 ms), Kopfball-Duell/Kopf-Korb `pad` (Stick 250 ms, Knöpfe 280 ms). Igel `move` wiederholt nicht → nicht dabei.
  */
 function holdRelease(kind: MiniKind, action: string, payload: unknown): { active: boolean; neutral: unknown } | null {
   const pl = asRecord(payload);
@@ -139,7 +139,10 @@ function holdRelease(kind: MiniKind, action: string, payload: unknown): { active
       neutral: { x: 0, gas: false, brake: false, drift: false, boost: false },
     };
   }
-  if ((action === 'turn' && kind === 'kurve') || (action === 'move' && kind === 'volley')) return { active: num(pl.dir) !== 0, neutral: { dir: 0 } };
+  if (action === 'turn' && kind === 'kurve') return { active: num(pl.dir) !== 0, neutral: { dir: 0 } };
+  if (action === 'pad' && (kind === 'kopfball' || kind === 'kopfkorb')) {
+    return { active: num(pl.x) !== 0 || num(pl.y) !== 0 || pl.jump === true || pl.kick === true, neutral: { x: 0, y: 0, jump: false, kick: false } };
+  }
   return null;
 }
 
@@ -1061,8 +1064,9 @@ export class Room {
         return new BogenGame(ids, ctx);
       case 'darts':
         return new DartsGame(ids, ctx);
-      case 'volley':
-        return new VolleyGame(ids, ctx);
+      case 'kopfball':
+      case 'kopfkorb':
+        return new KopfballGame(ids, ctx, kind);
       case 'tourist':
         return new TouristGame(ids, ctx);
       case 'sprueche':

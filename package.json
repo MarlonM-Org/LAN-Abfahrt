@@ -18,6 +18,7 @@
     "test:golf": "tsx scripts/test-golf.ts",
     "test:turm": "tsx scripts/test-turm.ts",
     "test:physik": "tsx scripts/test-physik.ts",
+    "test:kopfball": "tsx scripts/test-kopfball.ts",
     "test:records": "tsx scripts/test-records.ts",
     "test:lieder": "tsx scripts/test-lieder.ts",
     "test:wolfrunde": "tsx scripts/test-wolfrunde.ts",

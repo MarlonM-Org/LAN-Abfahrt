@@ -389,21 +389,29 @@ canvas.sky { width: 100%; image-rendering: auto; border: 3px solid var(--wood-da
 .big-btn.su-dash:disabled { filter: saturate(0.4) brightness(0.9); }
 .su-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
 
-/* ---------------------------------------------------------------- Strand-Volleyball (quer) */
-.lx.vb-lx { --lx-l: 40%; --lx-r: 36%; }
-.vb-av canvas { display: block; height: 22px; width: auto; }
-.vb-score { font-size: 8px; }
-.vb-status { color: var(--ink); text-align: center; margin: 0; }
-.vb-lx.bench .vb-btn { opacity: 0.4; }
-.vb-move { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; touch-action: none; }
-.vb-act { grid-template-rows: minmax(0, 2fr) minmax(0, 3fr); touch-action: none; }
-.big-btn.vb-btn { -webkit-touch-callout: none; position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
-.big-btn.vb-left, .big-btn.vb-right { font-size: 26px; background: #e8a14a; box-shadow: inset 0 4px 0 #f6c27a, inset 0 -6px 0 #b0702a, 0 3px 0 var(--outline); }
-.big-btn.vb-jump { font-size: 14px; background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
-.big-btn.vb-spike { font-size: 10px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
-.big-btn.vb-spike.ready { filter: brightness(1.15); }
-.big-btn.vb-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
-.vb-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.45); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
+/* ---------------------------------------------------------------- Kopfball-Duell + Kopf-Korb (quer: Stick links, SPRUNG + SCHUSS rechts) */
+.lx.kb-lx { --lx-l: 38%; --lx-r: 38%; }
+.lx.kb-A { box-shadow: inset 0 5px 0 #f4c542, inset 0 0 0 2px var(--wood); }
+.lx.kb-B { box-shadow: inset 0 5px 0 #3fa7e0, inset 0 0 0 2px var(--wood); }
+.kb-av canvas { display: block; height: 22px; width: auto; }
+.kb-dir { font-size: 7px; color: var(--ink-soft); }
+.kb-mid { gap: 8px; }
+.kb-score { font-size: 28px; line-height: 1; color: var(--ink); white-space: nowrap; }
+.kb-score .sa { color: #c8961c; }
+.kb-score .sb { color: #2a86c0; }
+.kb-score i { font-style: normal; margin: 0 6px; color: var(--ink-soft); }
+.kb-center { min-height: 34px; display: flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1.4; color: var(--ink); }
+.kb-center.count { font-size: 34px; color: #c8961c; }
+.kb-center.go { font-size: 22px; color: #2f7d32; }
+.kb-center.hit { font-size: 14px; color: var(--red); }
+.kb-msg { min-height: 4.8em; font-size: 7px; line-height: 1.6; color: var(--ink); }
+.kb-lx.off .kb-btn, .kb-lx.off .kb-stick { opacity: 0.4; }
+.lx-right.kb-pad { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); grid-auto-rows: auto; grid-template-rows: minmax(0, 1fr); gap: 10px; touch-action: none; }
+.big-btn.kb-btn { position: relative; overflow: hidden; font-size: 13px; line-height: 1.6; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.big-btn.kb-jump { background: #46b04a; box-shadow: inset 0 4px 0 #7fd47f, inset 0 -6px 0 #2f7d32, 0 3px 0 var(--outline); }
+.big-btn.kb-kick { font-size: 14px; background: #e0503f; box-shadow: inset 0 4px 0 #f08a7d, inset 0 -6px 0 #a8342a, 0 3px 0 var(--outline); }
+.big-btn.kb-btn.held { transform: translateY(3px); filter: brightness(1.15); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 0 var(--outline); }
+.kb-cd { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; background: rgba(45, 27, 18, 0.4); transform-origin: bottom; transform: scaleY(0); pointer-events: none; }
 
 /* ---------------------------------------------------------------- Bowling */
 .bw-start { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }

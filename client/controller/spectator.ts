@@ -50,7 +50,7 @@ function readStand(s: GameState | null): Stand {
     const entries = Object.entries(alive as Record<string, unknown>).filter(([id, v]) => known.has(id) && typeof v === 'boolean');
     if (entries.length >= 2) return { kind: 'alive', ids: entries.map(([id]) => id), alive: new Set(entries.filter(([, v]) => v).map(([id]) => id)), spec: null };
   }
-  // Teamstand: score { A, B } (Volleyball, Autoball …)
+  // Teamstand: score { A, B } (Autoball, Kopfball …)
   const score = st.score as Record<string, unknown> | undefined;
   if (score && typeof score === 'object' && typeof score.A === 'number' && typeof score.B === 'number') {
     return { kind: 'teams', teams: (['A', 'B'] as Team[]).map((team) => ({ team, score: score[team] as number })) };
