@@ -421,7 +421,8 @@ export interface SupState {
   endsIn: number;
   length: number;
   boards: SupBoard[];
-  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly' }[];
+  /** `gone`: Boje/Qualle wurde gerammt und ist weg (Steine bleiben immer liegen) */
+  obstacles: { x: number; y: number; r: number; type: 'buoy' | 'rock' | 'jelly'; gone?: boolean }[];
 }
 
 // ------------------------------------------------------------------ Controller-Spiele: Aufräumen

@@ -1056,7 +1056,7 @@ export class Bot {
       if (b && !b.finished && !b.fallen) {
         this.once('sup', async () => {
           await sleep(rand(230, 380));
-          const ahead = m.state.obstacles.find((o) => o.x > b.x && o.x - b.x < 70 && Math.abs(o.y - b.y) < o.r + 14);
+          const ahead = m.state.obstacles.find((o) => !o.gone && o.x > b.x && o.x - b.x < 70 && Math.abs(o.y - b.y) < o.r + 14);
           const targetY = ahead ? (ahead.y > b.y ? ahead.y - 34 : ahead.y + 34) : b.y;
           const want = Math.max(-0.5, Math.min(0.5, (targetY - b.y) / 60));
           const sides: ('left' | 'right')[] = b.left === b.right ? [b.strokes.left <= b.strokes.right ? 'left' : 'right'] : [b.left === this.id ? 'left' : 'right'];
