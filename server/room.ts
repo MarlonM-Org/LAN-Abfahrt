@@ -127,7 +127,7 @@ const FLUSH_MS = 30;
  * Gehaltene Eingaben, die ohne Nachschub auf „neutral“ fallen (z. B. Handy gesperrt, während der Daumen
  * auf dem Stick lag). Nur Aktionen, deren Handy-Screen regelmäßig wiederholt (Keepalive < 700 ms):
  * Stick (Fix-Pad 300 ms, schwebender Stick 250 ms), Kart/Autoball-Lenkung (300 ms),
- * Kurven-Duell `turn` (400 ms), Kopfball-Duell/Kopf-Korb `pad` (Stick 250 ms, Knöpfe 280 ms). Igel `move` wiederholt nicht → nicht dabei.
+ * Kurven-Duell `turn` (400 ms), Kopfball-Duell/Kopf-Korb `pad` (Stick 250 ms, Knöpfe 280 ms). Der Igel-Krieg läuft über `stick`.
  */
 function holdRelease(kind: MiniKind, action: string, payload: unknown): { active: boolean; neutral: unknown } | null {
   const pl = asRecord(payload);
