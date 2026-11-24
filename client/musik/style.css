@@ -104,3 +104,45 @@ canvas { image-rendering: pixelated; }
 .menu { position: absolute; background: var(--paper); border: 3px solid var(--wood-darker); box-shadow: 2px 2px 0 var(--outline); z-index: 30; display: flex; flex-direction: column; }
 .menu button { font: 13px var(--body); background: none; border: 0; padding: 8px 14px; text-align: left; cursor: pointer; color: var(--ink); }
 .menu button:hover { background: var(--paper-dark); }
+
+/* ---------------------------------------------------------------- Übersicht „Wo läuft was?“ */
+#editorView { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+#overview { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ov-head { display: flex; align-items: center; gap: 12px; padding: 8px 14px; flex-wrap: wrap; background: var(--wood); border-bottom: 4px solid var(--wood-darker); box-shadow: inset 0 -3px 0 var(--wood-light); }
+.ov-lead { font: 10px var(--pixel); color: var(--paper); text-shadow: 1px 1px var(--outline); }
+.ov-head input[type=search] { flex: 1; min-width: 160px; max-width: 360px; font: 14px var(--body); background: var(--paper-light); border: 2px solid var(--wood-darker); padding: 6px 8px; color: var(--ink); }
+.ov-body { flex: 1; overflow: auto; padding: 12px 14px 60px; }
+.ov-group, .ov-h2 { font: 10px var(--pixel); color: var(--paper-light); text-shadow: 2px 2px var(--outline); margin: 16px 2px 8px; }
+.ov-h2 { font-size: 12px; margin-top: 26px; }
+#ovList > .ov-group:first-child { margin-top: 2px; }
+.ov-row {
+  display: grid; grid-template-columns: 34px minmax(140px, 1fr) minmax(200px, 1.6fr) auto; gap: 10px; align-items: center;
+  background: var(--paper); border: 3px solid var(--wood-dark); box-shadow: 0 0 0 2px var(--outline); padding: 6px 10px; margin-bottom: 6px;
+}
+.ov-row.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { from { background: var(--gold); } }
+.ov-icon { font-size: 22px; text-align: center; }
+.ov-name b { display: block; }
+.ov-name small, .ov-sub { font-size: 12px; color: var(--ink-soft); }
+.ov-now { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.ov-song { font-weight: bold; }
+.ov-song.quiet { font-weight: normal; color: var(--ink-soft); }
+.tag { font-size: 11px; padding: 1px 6px; border: 2px solid var(--wood-darker); background: var(--paper-light); white-space: nowrap; }
+.tag-builtin { background: var(--paper-dark); }
+.tag-own { background: #d9f0c6; }
+.tag-override { background: #ffe1a6; }
+.tag-style { color: var(--paper-light); border-color: var(--outline); }
+.ov-count { font: 11px var(--body); background: var(--gold); border: 2px solid var(--wood-darker); padding: 1px 6px; cursor: pointer; color: var(--ink); }
+.ov-acts { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.ov-acts .btn { padding: 6px 8px; font-size: 9px; }
+.ov-play { min-width: 34px; }
+.ov-switch { max-width: 160px; }
+.ov-empty { padding: 12px; color: var(--paper-light); text-shadow: 1px 1px var(--outline); }
+#status { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 60; margin: 0; font-size: 14px; padding: 8px 14px; box-shadow: 3px 3px 0 var(--outline); max-width: 92vw; }
+@media (max-width: 760px) {
+  .ov-row { grid-template-columns: 30px 1fr; }
+  .ov-now, .ov-acts { grid-column: 1 / -1; }
+  .ov-acts { justify-content: flex-start; }
+  .ov-head h1 { font-size: 11px; }
+}
+.ov-play { font-size: 14px !important; line-height: 1; padding: 4px 8px !important; }

@@ -233,6 +233,33 @@ export function resolveSceneSong(scene: string, assign: Assignment, songs: SongI
   return songs.some((s) => s.id === raw) ? raw : defaultSongForScene(scene);
 }
 
+/**
+ * Was läuft in einer Szene – für die Übersicht der Werkstatt (ohne Zufall): ein bestimmter Song,
+ * ein Stil (Rotation über `ids`), Stille oder – nur bei „standard“ ohne Eintrag – der eingebaute
+ * Song jeder Szene. `via`: eigene Zuordnung der Szene, geerbt von „standard“ oder eingebaut.
+ */
+export type SceneSource =
+  | { kind: 'song'; id: string; via: SceneVia }
+  | { kind: 'style'; style: StyleId; ids: string[]; via: SceneVia }
+  | { kind: 'none'; via: SceneVia }
+  | { kind: 'perScene'; via: 'eingebaut' };
+export type SceneVia = 'szene' | 'standard' | 'eingebaut';
+
+export function sceneSource(scene: string, assign: Assignment, songs: SongInfo[]): SceneSource {
+  if (scene === 'standard' && !assign.standard) return { kind: 'perScene', via: 'eingebaut' };
+  const own = assign[scene];
+  const via: SceneVia = own ? 'szene' : assign.standard ? 'standard' : 'eingebaut';
+  const raw = own ?? assign.standard ?? defaultSongForScene(scene);
+  if (raw === 'none') return { kind: 'none', via };
+  if (raw.startsWith('style:')) {
+    const style = raw.slice(6) as StyleId;
+    const ids = songs.filter((s) => s.style === style).map((s) => s.id);
+    if (ids.length) return { kind: 'style', style, ids, via };
+    return { kind: 'song', id: defaultSongForScene(scene), via: 'eingebaut' };
+  }
+  return songs.some((s) => s.id === raw) ? { kind: 'song', id: raw, via } : { kind: 'song', id: defaultSongForScene(scene), via: 'eingebaut' };
+}
+
 export function validateAssignment(raw: unknown, songExists: (id: string) => boolean): { ok: true; assign: Assignment } | { ok: false; error: string } {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: 'Zuordnung muss ein Objekt sein' };
   const out: Assignment = {};

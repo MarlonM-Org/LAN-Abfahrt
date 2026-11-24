@@ -7,7 +7,24 @@
     <link rel="stylesheet" href="./musik/style.css" />
   </head>
   <body>
+    <section id="overview" hidden>
+      <header class="ov-head">
+        <h1>♪ Musik-Werkstatt</h1>
+        <span class="ov-lead">Wo läuft was?</span>
+        <input id="ovSearch" type="search" placeholder="Spiel oder Song suchen …" />
+        <button id="ovNew" class="btn">+ Neuer Song</button>
+        <a class="btn link" href="/tv.html" target="_blank">TV</a>
+      </header>
+      <div class="ov-body">
+        <div id="ovList"></div>
+        <h2 class="ov-h2">Eigene Songs</h2>
+        <div id="ovOwn"></div>
+      </div>
+    </section>
+
+    <div id="editorView" hidden>
     <header id="top">
+      <button id="back" class="btn">← Übersicht</button>
       <h1>♪ Musik-Werkstatt</h1>
       <div class="meta">
         <label>Titel <input id="title" maxlength="60" /></label>
@@ -46,7 +63,6 @@
       <span class="sep"></span>
       <label class="toggle"><input id="snap" type="checkbox" /> Skalen-Snap</label>
       <label>Gesamt <input id="master" type="range" min="0" max="1" step="0.01" /></label>
-      <span id="status" class="status"></span>
     </section>
 
     <main>
@@ -93,6 +109,8 @@
         <p class="help">Klick = Note setzen (ziehen = länger) · Note ziehen = verschieben · rechter Rand = Länge · Rechtsklick/Entf = löschen · Umschalt+Klick = mehrere · Leertaste = Play/Stopp · Strg+Z/Y · Strg+C/V = Takt kopieren/einfügen</p>
       </section>
     </main>
+    </div>
+    <div id="status" class="status"></div>
 
     <div id="libraryDlg" class="modal-bg" hidden>
       <div class="modal">
