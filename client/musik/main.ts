@@ -14,7 +14,7 @@ import { SongPlayer, Synth } from '../music/player';
 import { DrumGrid } from './drumgrid';
 import { Singer } from './einsingen';
 import { openMidiImport } from './midiImport';
-import { Overview, sceneList, sceneName, scenesPlaying } from './overview';
+import { Overview, sceneList, sceneName, sceneRows, scenesPlaying } from './overview';
 import { PianoRoll } from './pianoroll';
 import { Store } from './store';
 
@@ -25,7 +25,6 @@ let player: SongPlayer | null = null;
 let singer: Singer | null = null;
 let library: SongInfo[] = [];
 let assignment: Assignment = {};
-let libFilter: string | null = null;
 
 /**
  * Woher kommt der Song im Editor? `scene`: aus welcher Szene der Übersicht man kam;
@@ -110,7 +109,6 @@ const drumMute = $<HTMLInputElement>('drumMute');
 for (const s of STYLES) styleSel.append(new Option(s.name, s.id));
 NOTE_NAMES.forEach((n, i) => keyRoot.append(new Option(n, String(i))));
 for (const w of WAVES) wave.append(new Option(w.name, w.id));
-for (const sc of ASSIGN_SCENES) $<HTMLSelectElement>('assignScene').append(new Option(sc.name, sc.id));
 master.value = localStorage.getItem('lan-abfahrt.werkstatt.volume') ?? '0.8';
 
 /** Kleine Änderung an Song-Eigenschaften (kein eigener Undo-Schritt für jedes Zeichen im Titel) */
@@ -187,6 +185,7 @@ $('copyBar').addEventListener('click', () => {
   store.copyBar();
   status(`Takt ${store.cursorBar + 1} kopiert`, 'ok');
 });
+
 $('pasteBar').addEventListener('click', () => store.pasteBar());
 $('clearBar').addEventListener('click', () => store.clearBar());
 
@@ -234,7 +233,6 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     void save();
   } else if (e.key === 'Escape') {
-    $('libraryDlg').hidden = true;
     document.querySelector('.menu')?.remove();
   } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !typing && e.altKey) {
     e.preventDefault();
@@ -288,13 +286,6 @@ function uniqueId(base: string) {
 }
 $('save').addEventListener('click', () => void save());
 $('saveAs').addEventListener('click', () => void save(true));
-$('new').addEventListener('click', () => {
-  if (store.dirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
-  const s = emptySong(`song-${Date.now().toString(36)}`, 'Neuer Song');
-  s.author = author.value;
-  store.load(s, false);
-  status('Neuer Song', 'ok');
-});
 /** Überschreibung löschen → der eingebaute Song läuft wieder überall, wo er vorher lief */
 async function restoreOriginal(id: string) {
   const info = library.find((x) => x.id === id);
@@ -326,9 +317,9 @@ $('delete').addEventListener('click', async () => {
   if (!window.confirm(`„${s.title}“ wirklich löschen?`)) return;
   try {
     await deleteSong(s.id);
-    status('Gelöscht', 'ok');
-    await refreshLibrary();
-    store.load(emptySong(`song-${Date.now().toString(36)}`), false);
+    status(`„${s.title}“ gelöscht`, 'ok');
+    store.markSaved();
+    go('');
   } catch (e) {
     status((e as Error).message, 'err');
   }
@@ -338,89 +329,8 @@ async function refreshLibrary() {
   [library, assignment] = await Promise.all([listSongs(), getAssignment()]);
   overview.songs = library;
   overview.assign = assignment;
-  renderLibrary();
   if (!$('overview').hidden) overview.render();
 }
-async function loadFromLibrary(id: string) {
-  if (store.dirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
-  try {
-    const song = await getSong(id);
-    store.load(song, true);
-    $('libraryDlg').hidden = true;
-    status(`Geladen: ${song.title}${BUILTIN_IDS.has(id) ? ' (eingebaut – zum Speichern bekommt er einen neuen Namen)' : ''}`, 'ok');
-    roll.scrollToMidi(70);
-  } catch (e) {
-    status((e as Error).message, 'err');
-  }
-}
-function renderLibrary() {
-  const chips = $('libChips');
-  chips.replaceChildren();
-  const chip = (label: string, id: string | null) => {
-    const c = document.createElement('span');
-    c.className = `chip ${libFilter === id ? 'on' : ''}`;
-    c.textContent = label;
-    c.addEventListener('click', () => {
-      libFilter = id;
-      renderLibrary();
-    });
-    chips.append(c);
-  };
-  chip('Alle', null);
-  for (const s of STYLES) chip(s.name, s.id);
-  const list = $('libList');
-  list.replaceChildren();
-  for (const s of library.filter((x) => !libFilter || x.style === libFilter)) {
-    const st = STYLES.find((x) => x.id === s.style);
-    const item = document.createElement('div');
-    item.className = 'lib-item';
-    const info = document.createElement('div');
-    info.innerHTML = `<span class="t"></span><span class="badge"></span><div class="s"></div>`;
-    (info.querySelector('.t') as HTMLElement).textContent = s.title;
-    const badge = info.querySelector('.badge') as HTMLElement;
-    badge.textContent = st?.name ?? s.style;
-    badge.style.background = st?.color ?? '#7a5a3a';
-    (info.querySelector('.s') as HTMLElement).textContent = `${s.bpm} BPM · ${s.bars} Takte${s.builtin ? ' · eingebaut' : s.author ? ` · von ${s.author}` : ''}`;
-    const hear = document.createElement('button');
-    hear.className = 'btn';
-    hear.textContent = '▶';
-    hear.title = 'Anhören';
-    hear.addEventListener('click', async () => {
-      const { player } = audio();
-      if (player.playing && player.current?.id === s.id) {
-        player.stop();
-        hear.textContent = '▶';
-        return;
-      }
-      player.play(await getSong(s.id), { loop: true });
-      list.querySelectorAll('button').forEach((b) => b.textContent === '■' && (b.textContent = '▶'));
-      hear.textContent = '■';
-    });
-    const load = document.createElement('button');
-    load.className = 'btn primary';
-    load.textContent = 'Laden';
-    load.addEventListener('click', () => {
-      player?.stop();
-      updatePlayButton();
-      void loadFromLibrary(s.id);
-    });
-    item.append(info, hear, load);
-    list.append(item);
-  }
-}
-$('library').addEventListener('click', () => {
-  $('libraryDlg').hidden = false;
-  void refreshLibrary();
-});
-$('libClose').addEventListener('click', () => {
-  $('libraryDlg').hidden = true;
-  player?.stop();
-  updatePlayButton();
-});
-$('libraryDlg').addEventListener('click', (e) => {
-  if (e.target === $('libraryDlg')) $('libClose').click();
-});
-
 // ------------------------------------------------------------------ MIDI & Export
 
 $('midiBtn').addEventListener('click', () => $('midiFile').click());
@@ -517,19 +427,6 @@ store.on(() => {
   if (!singer?.active && document.activeElement !== $('singFrom')) $<HTMLInputElement>('singFrom').value = String(store.cursorBar + 1);
 });
 
-// ------------------------------------------------------------------ Zuordnung
-
-$('assignBtn').addEventListener('click', async () => {
-  if (!(await save())) return;
-  const scene = $<HTMLSelectElement>('assignScene').value;
-  try {
-    await assignScene(scene, store.song.id);
-    status(`„${store.song.title}“ läuft jetzt bei: ${ASSIGN_SCENES.find((s) => s.id === scene)?.name}`, 'ok');
-  } catch (e) {
-    status((e as Error).message, 'err');
-  }
-});
-
 // ------------------------------------------------------------------ Anzeige aktualisieren
 
 function render() {
@@ -558,8 +455,58 @@ function render() {
   ($('delete') as HTMLButtonElement).disabled = BUILTIN_IDS.has(s.id) || !library.some((x) => x.id === s.id);
   $('restore').hidden = !(s.overrides && library.some((x) => x.id === s.id));
   document.title = `${store.dirty ? '● ' : ''}${s.title} – Musik-Werkstatt`;
+  renderCrumbs();
+  $('chName').textContent = `· ${CHANNELS.find((c) => c.id === store.channel)?.name ?? ''}`;
   $<HTMLInputElement>('singBars').max = String(s.bars);
   $<HTMLInputElement>('singFrom').max = String(s.bars);
+}
+
+/** Brotkrumen „Kart-Rennen · Turbo-Runde (Kopie)“ + Etikett + wo der Song läuft */
+function renderCrumbs() {
+  const s = store.song;
+  const row = ctx.scene ? sceneRows().find((r) => r.id === ctx.scene) : null;
+  const crumb = $<HTMLAnchorElement>('crumbScene');
+  crumb.textContent = row ? `${row.icon} ${row.name}` : 'Eigene Songs';
+  $('crumbSong').textContent = s.title;
+  const stored = library.some((x) => x.id === s.id);
+  const tag = $('crumbTag');
+  const [label, cls] = s.overrides
+    ? [stored ? 'eingebaut · angepasst' : 'eingebaut', stored ? 'tag-override' : 'tag-builtin']
+    : ctx.mode === 'copy' && !stored ? ['neue Kopie', 'tag-own'] : !stored ? ['neu', 'tag-own'] : ['eigen', 'tag-own'];
+  tag.textContent = label;
+  tag.className = `tag ${cls}`;
+  $('dirty').hidden = !store.dirty;
+  const where = stored ? scenesPlaying(s.id, assignment, library) : [];
+  $('where').textContent = where.length
+    ? `läuft in ${sceneList(where, ctx.scene ?? undefined)}`
+    : !stored && ctx.scene && ctx.mode !== 'direct'
+      ? `Speichern → läuft in ${sceneName(ctx.scene)}`
+      : s.overrides && !stored && scenesPlaying(s.overrides, assignment, library).length
+        ? `Speichern → läuft statt des Originals in ${sceneList(scenesPlaying(s.overrides, assignment, library), ctx.scene ?? undefined)}`
+        : 'läuft noch nirgends – in der Übersicht zuordnen';
+}
+$('crumbScene').addEventListener('click', (e) => {
+  e.preventDefault();
+  $('back').click();
+});
+
+// Mehr-Menü (Einsingen, MIDI, Klang, Takt-Werkzeuge …) – Zustand pro Gerät merken
+function setMore(open: boolean) {
+  $('more').hidden = !open;
+  $('moreBtn').textContent = open ? 'Mehr ▴' : 'Mehr ▾';
+  $('moreBtn').setAttribute('aria-expanded', String(open));
+  $('moreBtn').classList.toggle('on', open);
+  try {
+    localStorage.setItem('lan-abfahrt.werkstatt.mehr', open ? '1' : '0');
+  } catch {
+    /* egal */
+  }
+}
+$('moreBtn').addEventListener('click', () => setMore($('more').hidden));
+try {
+  setMore(localStorage.getItem('lan-abfahrt.werkstatt.mehr') === '1');
+} catch {
+  setMore(false);
 }
 
 // Vor dem Verlassen warnen
@@ -741,7 +688,7 @@ async function route() {
     } else if (p.get('song') || (!h && legacy)) {
       const { song, saved } = await loadForEdit(p.get('song') ?? legacy!);
       showEditor(song, saved, { scene, mode: 'direct' });
-      if (song.overrides && !library.some((x) => x.id === song.id)) status('Eingebauter Song – beim Speichern ersetzt er das Original überall (zurück per „Original wiederherstellen“)');
+      if (song.overrides && !library.some((x) => x.id === song.id)) status('Eingebauter Song: Speichern ersetzt das Original überall – zurück geht’s mit „Original wiederherstellen“.');
     } else if (p.has('neu')) {
       const s = emptySong(uniqueId(`song-${Date.now().toString(36)}`), 'Neuer Song');
       // Startpunkt: ein einfacher Beat, damit sofort etwas zu hören ist
