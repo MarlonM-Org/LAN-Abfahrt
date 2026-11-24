@@ -1,6 +1,8 @@
 import { MINI_INFO, ORIENT_TEXT, type PhoneOrientation } from '../../shared/games';
 import type { MiniKind } from '../../shared/types';
 import { LS, type Screen, escapeHtml, store } from './core';
+// Infospalte der Quer-Layouts passt sich der Bildschirmhöhe an (läuft von selbst)
+import './fit';
 
 /**
  * Handy-Ausrichtung – ein zentraler Baustein für alle Spiele (Haltung steht in `MINI_INFO[kind].orientation`,

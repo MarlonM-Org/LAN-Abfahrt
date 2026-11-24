@@ -112,7 +112,7 @@ export interface HowToControl {
  * Pflicht für jedes neue Minispiel – Texte kurz halten (eine Zeile ≈ 34 Zeichen, höchstens 3 Steuer-Zeilen).
  */
 export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl[] }> = {
-  flunky: { goal: 'Trefft die Flasche – dann trinkt, bis die anderen sie wieder aufgestellt haben.', controls: [{ icon: '🎯', text: 'Wischen: Ball werfen (Wind!)' }, { icon: '🍺', text: 'TRINKEN!: schnell tippen' }, { icon: '🏃', text: 'LAUFEN!: Flasche aufstellen' }] },
+  flunky: { goal: 'Trefft die Flasche – dann trinkt, bis die anderen sie wieder aufgestellt haben.', controls: [{ icon: '🎯', text: 'Schwung/Wischen: werfen (Wind!)' }, { icon: '🍺', text: 'TRINKEN!: schnell tippen' }, { icon: '🏃', text: 'LAUFEN!: Flasche aufstellen' }] },
   wwe: { goal: 'Wer würde eher …? Stimmt geheim ab – Punkte gibt’s für die Mehrheit.', controls: [{ icon: '🗳️', text: 'Spieler antippen = Stimme' }, { icon: '🤫', text: 'Geheim – niemand sieht es' }, { icon: '📺', text: 'Auflösung auf dem TV' }] },
   sprint: { goal: 'Sobald die Sonne aufgeht: als Erster das Handtuch auf den Liegestuhl!', controls: [{ icon: '🌙', text: 'Warten, bis die Sonne kommt' }, { icon: '👆', text: 'JETZT!: so schnell wie möglich' }, { icon: '⚠️', text: 'Zu früh = Fehlstart' }] },
   murder: { goal: 'Erledigt Aufgaben im Ferienhaus – und entlarvt den Mörder, bevor er alle erwischt.', controls: [{ icon: '🤫', text: 'Rolle geheim (gedrückt halten)' }, { icon: '🚪', text: 'Raum antippen = hingehen' }, { icon: '🚨', text: 'Leiche melden, dann abstimmen' }] },

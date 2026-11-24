@@ -99,7 +99,10 @@ export function pickParcours(s: ParcoursState): Screen {
     if (!b) return [`pc-watch-${s.round}`, () => buildWait(s, 'Du schaust zu', 'Nächste Runde bist du wieder dabei.')];
     if (b.stage === 'done') {
       return b.skipped
-        ? [`pc-skip-${s.round}`, () => buildWait(s, 'Übersprungen', 'Du warst zu lange untätig – diese Runde ohne dein Teil.')]
+        ? [
+            `pc-skip-${s.round}`,
+            () => buildWait(s, b.pass ? 'Ausgesetzt' : 'Übersprungen', b.pass ? 'Diese Runde ohne dein Teil – warte auf die anderen ...' : 'Du warst zu lange untätig – diese Runde ohne dein Teil.'),
+          ]
         : [`pc-done-${s.round}`, () => buildWait(s, 'Eingebaut!', 'Warte auf die anderen ...')];
     }
     if (b.stage === 'pick') return [`pc-pick-${s.round}`, () => buildPick(s)];
@@ -111,6 +114,8 @@ export function pickParcours(s: ParcoursState): Screen {
     if (r.st === 'dead') {
       const why = r.zzz
         ? 'Eingeschlafen – du warst zu lange untätig.'
+        : r.quit
+          ? 'Aufgegeben.'
         : r.by && r.by !== id
           ? `${nameOf(r.by)}s Falle hat dich erwischt.`
           : r.by === id
@@ -172,6 +177,7 @@ function buildPlace(s: ParcoursState, type: PartType) {
       <b>${d.name}</b>
       <small class="pc-status"></small>
       <small class="pcq-hint"></small>
+      <button class="secondary small pc-skip" style="font-size:8px">Passt nirgends? Aussetzen</button>
     </div>
   `,
     `
@@ -185,6 +191,7 @@ function buildPlace(s: ParcoursState, type: PartType) {
   q(root, '.pc-card-icon').append(partIcon(type, 64));
   stickZone(q(root, '.pc-stick'), (x, y) => send('stick', { x, y }));
   tapButton(q(root, '.pc-back'), () => (send('unpick'), haptic('tick')));
+  confirmTap(q(root, '.pc-skip'), 'Wirklich? Nochmal tippen', () => send('skip'));
   const rot = root.querySelector<HTMLButtonElement>('.pc-rot');
   if (rot) tapButton(rot, () => (send('rotate'), haptic('tick')));
   const place = q<HTMLButtonElement>(root, '.pc-place');
@@ -211,12 +218,34 @@ function buildPlace(s: ParcoursState, type: PartType) {
   };
 }
 
+/** Knopf, der erst beim zweiten Tippen (innerhalb von 3 s) auslöst – gegen versehentliches Aufgeben/Aussetzen */
+function confirmTap(btn: HTMLElement, ask: string, fn: () => void) {
+  const label = btn.textContent ?? '';
+  let armedUntil = 0;
+  tapButton(btn, () => {
+    const now = performance.now();
+    if (now < armedUntil) {
+      armedUntil = 0;
+      btn.textContent = label;
+      haptic('hit');
+      fn();
+      return;
+    }
+    armedUntil = now + 3000;
+    btn.textContent = ask;
+    haptic('tick');
+    setTimeout(() => {
+      if (performance.now() >= armedUntil) btn.textContent = label;
+    }, 3100);
+  });
+}
+
 function buildRun(s: ParcoursState) {
   const { root, head } = lxFrame(
     s,
     'run',
     '<span class="st-label">LAUFEN ◀ ▶ · Daumen irgendwo aufsetzen</span>',
-    '<p class="pcq-hint pc-run-hint"></p>',
+    '<p class="pcq-hint pc-run-hint"></p><button class="secondary small pc-giveup" style="font-size:8px">Festgesteckt? Aufgeben</button>',
     '<button class="big-btn jump pc-jump">SPRINGEN</button>',
   );
   stickZone(q(root, '.pc-stick'), (x) => send('stick', { x, y: 0 }), { axis: 'x' });
@@ -246,9 +275,12 @@ function buildRun(s: ParcoursState) {
 
   jump.addEventListener('contextmenu', (e) => e.preventDefault());
   const hint = q(root, '.pc-run-hint');
+  const giveup = q(root, '.pc-giveup');
+  confirmTap(giveup, 'Wirklich? Nochmal tippen', () => send('giveup'));
   return () => {
     const st = head();
     if (!st) return;
+    giveup.classList.toggle('hidden', st.sub !== 'run');
     const warn = st.sub === 'run' ? afkText(st.runners[store.playerId!]?.afk ?? 0, 'run') : '';
     hint.textContent = st.sub === 'countdown' ? `Gleich geht’s los! ${secs(st.endsIn)}` : warn || 'Ab zur Cocktailbar! Länger drücken = höher springen';
     hint.classList.toggle('warn', !!warn);

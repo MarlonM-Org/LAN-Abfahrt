@@ -22,7 +22,7 @@ import type {
   TurnierState,
 } from '../shared/types';
 import { sanitizeLook } from '../shared/avatar';
-import { freePlayerColor } from '../shared/players';
+import { type BotSkill, asBotSkill, freePlayerColor } from '../shared/players';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, isWarmupKind, placeCoins, teamLabel } from '../shared/games';
 import { BombGame, HiloGame, NhieGame } from './drinkgames';
 import { KingsCupGame } from './kingscup';
@@ -212,6 +212,8 @@ export class Room {
   private holds = new Map<string, { id: string; action: string; at: number; neutral: unknown }>();
 
   private bots: Bot[] = [];
+  /** Stärke der Lobby-Bots (VIP schaltet um) */
+  private botSkill: BotSkill = 'normal';
   /** Ewige Tabelle (data/arcade.json) */
   private leaderboard = new Leaderboard();
   /** Bestleistungen der Board-Spiele (Weite, Zeiten) über alle Abende */
@@ -458,7 +460,15 @@ export class Room {
       if (!isVip() || this.phase !== 'lobby' || this.connectedIds().length >= MAX_PLAYERS) return;
       const used = new Set([...this.players.values()].map((p) => p.name));
       const name = BOT_NAMES.find((n) => !used.has(n)) ?? `Bot ${this.bots.length + 1}`;
-      this.bots.push(new Bot(name, { url: this.localUrl }));
+      this.bots.push(new Bot(name, { url: this.localUrl, skill: this.botSkill }));
+    });
+
+    // Bot-Stärke (leicht / normal / profi) – gilt sofort auch für schon beigetretene Bots
+    socket.on('vip:botSkill', (v: unknown) => {
+      if (!isVip()) return;
+      this.botSkill = asBotSkill(v);
+      for (const b of this.bots) b.setSkill(this.botSkill);
+      this.changed();
     });
 
     // Ewige Tabelle (alle Abende) löschen
@@ -1856,6 +1866,7 @@ export class Room {
       onlineUrl: this.onlineUrl,
       customNhieCount: this.nhie.all.length,
       botCount: this.bots.length,
+      botSkill: this.botSkill,
       leaderboard: this.leaderboard.list,
       customQuestionCount: this.questions.all.length,
       customPostCount: this.posts.all.length,

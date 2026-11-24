@@ -20,6 +20,8 @@ const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 export class SupScene extends Phaser.Scene {
   private boards = new Map<number, { root: Phaser.GameObjects.Container; board: Phaser.GameObjects.Image; figs: Phaser.GameObjects.Container[]; x: number; y: number; strokes: number }>();
+  /** Hindernis-Bilder (Index wie im State) – gerammte Bojen/Quallen verschwinden */
+  private obstacleImgs: (Phaser.GameObjects.Image | null)[] = [];
   private hud!: Phaser.GameObjects.Container;
   private banner!: Phaser.GameObjects.Text;
   private latest: GameState | null = null;
@@ -35,6 +37,7 @@ export class SupScene extends Phaser.Scene {
 
   create() {
     this.boards.clear();
+    this.obstacleImgs = [];
     this.built = false;
     this.hudKey = '';
     this.supFx.clear();
@@ -81,7 +84,8 @@ export class SupScene extends Phaser.Scene {
     this.built = true;
     for (const o of s.mini.state.obstacles) {
       const key = o.type === 'buoy' ? ensureTex(this, 'buoy', buoy) : o.type === 'rock' ? ensureTex(this, 'searock', seaRock) : ensureTex(this, 'jelly', jellyfish);
-      const img = this.add.image(o.x, o.y, key).setDepth(o.y);
+      const img = this.add.image(o.x, o.y, key).setDepth(o.y).setVisible(!o.gone);
+      this.obstacleImgs.push(o.gone ? null : img);
       if (o.type !== 'rock') this.tweens.add({ targets: img, y: o.y - 1.5, duration: 700 + Math.random() * 400, yoyo: true, repeat: -1 });
     }
     for (const b of s.mini.state.boards) {
@@ -124,6 +128,16 @@ export class SupScene extends Phaser.Scene {
     if (s.mini?.kind !== 'sup') return;
     this.build(s);
     const st = s.mini.state;
+    st.obstacles.forEach((o, i) => {
+      const img = this.obstacleImgs[i];
+      if (!o.gone || !img) return;
+      // Gerammt: Platscher, Boje treibt weg bzw. Qualle taucht ab
+      this.obstacleImgs[i] = null;
+      this.tweens.killTweensOf(img);
+      this.juice.burst(o.x, o.y, 'splash', 8);
+      this.tweens.add({ targets: img, alpha: 0, scale: 0.4, y: o.y + 6, duration: 380, onComplete: () => img.destroy() });
+      sfx('splash', { vol: 0.4, pitch: o.type === 'jelly' ? 1.4 : 1 });
+    });
     for (const b of st.boards) {
       const a = this.boards.get(b.id);
       if (!a) continue;

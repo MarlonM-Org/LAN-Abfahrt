@@ -9,8 +9,14 @@ interface Runner {
   hits: number;
   finished: boolean;
   finishMs: number | null;
+  /** Hindernisse, über die der Läufer schon gestolpert ist – danach klettert er drüber statt erneut hängenzubleiben */
+  cleared: Set<number>;
+  /** Sprung zu früh gedrückt (beim Aufstehen / kurz vor der Landung) → wird bis hierhin nachgeholt */
+  jumpQueuedUntil: number;
 }
 
+/** So lange gilt ein zu früh gedrückter Sprung noch (ms) */
+const JUMP_BUFFER_MS = 250;
 const TICK_MS = 50;
 
 /**
@@ -33,7 +39,7 @@ export class DescentGame implements MiniGame {
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    ids.forEach((id, i) => this.runners.set(id, { s: 18 - i * 16, jumpUntil: 0, stunUntil: 0, hits: 0, finished: false, finishMs: null }));
+    ids.forEach((id, i) => this.runners.set(id, { s: 18 - i * 16, jumpUntil: 0, stunUntil: 0, hits: 0, finished: false, finishMs: null, cleared: new Set(), jumpQueuedUntil: 0 }));
     this.deadline = Date.now() + DESCENT.COUNTDOWN_MS;
     this.timers.later(DESCENT.COUNTDOWN_MS, () => this.start());
   }
@@ -57,15 +63,22 @@ export class DescentGame implements MiniGame {
     // Läufer
     for (const r of this.runners.values()) {
       if (r.finished || now < r.stunUntil) continue;
+      // Gepufferter Sprung – sobald man wieder auf den Beinen bzw. gelandet ist
+      if (r.jumpQueuedUntil && now >= r.jumpUntil) {
+        if (now <= r.jumpQueuedUntil) r.jumpUntil = now + DESCENT.JUMP_MS;
+        r.jumpQueuedUntil = 0;
+      }
       const prev = r.s;
       r.s += DESCENT.SPEED * dt;
       const airborne = now < r.jumpUntil;
       if (!airborne) {
-        const ob = DESCENT_OBSTACLES.find((o) => prev < o.s - 4 && r.s >= o.s - 4);
-        if (ob) {
-          r.s = ob.s - 6;
+        const i = DESCENT_OBSTACLES.findIndex((o, k) => !r.cleared.has(k) && prev < o.s - 4 && r.s >= o.s - 4);
+        if (i >= 0) {
+          // Gestolpert: kurz liegen, dann über das Hindernis klettern (nie zweimal am selben hängen bleiben)
+          r.s = DESCENT_OBSTACLES[i].s - 6;
           r.stunUntil = now + DESCENT.STUN_OBSTACLE_MS;
           r.hits += 1;
+          r.cleared.add(i);
         }
       }
       if (r.s >= DESCENT_LENGTH) {
@@ -102,7 +115,12 @@ export class DescentGame implements MiniGame {
     const r = this.runners.get(id);
     if (!r || action !== 'jump' || this.sub !== 'run' || r.finished) return;
     const now = Date.now();
-    if (now < r.jumpUntil || now < r.stunUntil) return;
+    if (now < r.jumpUntil || now < r.stunUntil) {
+      // Zu früh gedrückt (beim Aufstehen bzw. kurz vor der Landung): merken statt verschlucken
+      const ready = Math.max(r.jumpUntil, r.stunUntil);
+      if (ready - now <= 200) r.jumpQueuedUntil = ready + JUMP_BUFFER_MS;
+      return;
+    }
     r.jumpUntil = now + DESCENT.JUMP_MS;
     this.ctx.onChange();
   }
