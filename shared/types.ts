@@ -2331,6 +2331,8 @@ export interface GameMeta {
   onlineUrl: string | null;
   customNhieCount: number;
   botCount: number;
+  /** Stärke der Lobby-Bots (VIP schaltet um) */
+  botSkill: import('./players').BotSkill;
   /** Ewige Tabelle: Punkte pro Spielername über alle Abende (dauerhaft gespeichert, ohne Bots) */
   leaderboard: LeaderEntry[];
   customQuestionCount: number;

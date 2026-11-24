@@ -326,7 +326,7 @@ Der Server ist die einzige Quelle der Wahrheit: Handys schicken nur Eingaben (`b
 
 ## Testen ohne Freunde
 
-**Bots direkt am Handy:** Als VIP in der Lobby auf „+ Bot“ tippen – die Bots spielen alles automatisch mit (auch Date Night, Trinkspiel usw.). „Bots entfernen“ wirft sie wieder raus.
+**Bots direkt am Handy:** Als VIP in der Lobby auf „+ Bot“ tippen – die Bots spielen alles automatisch mit (auch Date Night, Trinkspiel usw.). „Bots entfernen“ wirft sie wieder raus. „Bot-Stärke“ schaltet zwischen **Leicht**, **Normal** (Standard: in Action-Spielen mit menschlicher Reaktionszeit, zittrigem Daumen und ab und zu einem verpassten Knopf) und **Profi** (sofort und exakt) um – im Terminal per `--skill=leicht|normal|profi`.
 
 **Bots per Terminal:** In einem zweiten Terminal `npm run bots` starten – dann treten 3 Testspieler bei und spielen alles automatisch mit. Du bleibst VIP und steuerst mit deinem Handy.
 
