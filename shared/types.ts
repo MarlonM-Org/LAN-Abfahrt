@@ -115,6 +115,15 @@ export interface ThrowResult {
   from: Point;
   to: Point;
   hit: boolean;
+  /** Flasche beim Wurf */
+  bottle: Point;
+  /** Richtung inkl. Wurf-Abweichung (rad, + = TV unten), Kraft 0 … 1, Wind beim Wurf */
+  aim: number;
+  power: number;
+  wind: number;
+  /** Abweichung von der Flasche (px, Werfersicht): along + = dahinter, lat + = am TV unten */
+  along: number;
+  lat: number;
 }
 
 /** aim → flight → (chug → reset) → aim … → over */
@@ -127,12 +136,27 @@ export interface FlunkyState {
   turnTeam: Team;
   throwerId: string;
   sub: FlunkySub;
-  /** -1 … 1, positiv = Wind treibt nach rechts */
+  /** -1 … 1, positiv = Wind treibt den Ball am TV nach unten */
   wind: number;
   runnerId: string | null;
   runProgress: number;
   winner: Team | null;
   lastThrow: ThrowResult | null;
+  /** Wurfpunkt des aktuellen Werfers (jeder Wurf woanders in der Wurfzone) */
+  spot: Point;
+  /** Flasche – nach jedem Treffer etwas versetzt wieder aufgestellt */
+  bottle: Point;
+  /** Zielpfeil des Werfers (rad, 0 = geradeaus, + = am TV nach unten) – live vom Handy */
+  aim: number;
+  /** Runde 1 … rounds (jedes Team wirft einmal pro Runde); > rounds = Verlängerung */
+  round: number;
+  rounds: number;
+  throws: Record<Team, number>;
+  hits: Record<Team, number>;
+  /** Trinken: bis hierhin darf jeder Trinker in diesem Treffer trinken (Schluck-Limit) */
+  sipFloor: Record<string, number>;
+  /** Wie das Spiel ausging: ausgetrunken, nach Runden mehr getrunken, Unentschieden, Team weg */
+  reason: 'empty' | 'rounds' | 'draw' | 'forfeit' | null;
 }
 
 // ------------------------------------------------------------------ Wer würde eher …?
