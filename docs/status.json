@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T14:00+00:00",
+  "updated": "2026-11-24T14:10+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -137,7 +137,7 @@
   "done": [
     {
       "title": "Neue Spiele: Sektkorken (Schütteln, PLOPP!, fürs Brett), Montagsmaler live (à la skribbl.io), Strand-Band (jedes Handy ein Instrument), Lügen-Lexikon (à la Fibbage, 200 Einträge) + Igel-Krieg mit größerer Insel ab 6 Spielern – lagen seit 9.11. fertig auf Branch, jetzt gemergt",
-      "pr": null,
+      "pr": 114,
       "date": "2026-11-24"
     },
     {
