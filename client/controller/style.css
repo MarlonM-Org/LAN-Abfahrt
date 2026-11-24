@@ -797,7 +797,7 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .big-btn.turm-btn svg { filter: drop-shadow(2px 2px 0 rgba(45, 27, 18, 0.6)); }
 .turm-btn.shift svg { width: 44px; height: 44px; }
 
-/* ---------------------------------------------------------------- Igel-Krieg (quer: links Waffen + laufen, Mitte Karte, rechts Ziel-Pad + FEUER) */
+/* ---------------------------------------------------------------- Igel-Krieg (quer: links Waffen + Stick, Mitte Karte, rechts Ziel-Pad + SPRUNG/FEUER) */
 .lx.ig-lx { --lx-l: 31%; --lx-r: 41%; }
 .ig-head { color: var(--red); font-weight: normal; font-size: 9px; }
 .ig-lx .ig-wind { color: #2d64a8; }
@@ -807,9 +807,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .ig-weapon { padding: 2px 6px; font-size: 8px; display: flex; justify-content: space-between; align-items: center; gap: 4px; background: var(--paper-dark); color: var(--ink); text-shadow: none; box-shadow: inset 0 3px 0 #f3dcaa, inset 0 -3px 0 #cfae6f, 0 2px 0 var(--wood-darker); touch-action: none; }
 .ig-weapon small { font-size: 7px; color: var(--ink-soft); }
 .ig-weapon.sel { background: var(--gold); border-color: var(--red); box-shadow: inset 0 3px 0 #ffd98a, inset 0 -3px 0 #c08316, 0 2px 0 var(--outline); }
-.ig-move { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 6px; }
-.ig-move button { min-height: 0; font-size: 18px; padding: 2px; touch-action: none; }
-.ig-move .ig-jump { font-size: 9px; background: #6b8fd6; box-shadow: inset 0 3px 0 #9db8ee, inset 0 -4px 0 #3f62a8, 0 3px 0 var(--outline); }
 .ig-aim { grid-template-columns: minmax(0, 1fr) 72px; grid-template-rows: minmax(0, 1fr); }
 .ig-pad {
   position: relative; min-height: 0; touch-action: none;
@@ -824,7 +821,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 @keyframes ig-pulse { to { filter: brightness(1.2); } }
 .ig-lx .ig-map { max-height: 100%; }
 .ig-lx .ig-sd { font-size: 7px; color: var(--ink-soft); }
-.ig-turn { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: var(--paper-light); border: 3px solid var(--wood-dark); }
 .ig-next { min-height: 1.7em; }
 .ig-next.ig-soon { color: var(--paper-light); background: var(--red); padding: 6px; border: 3px solid var(--wood-darker); animation: shake 0.4s infinite; }
 .ig-teams { display: flex; flex-direction: column; gap: 6px; }
@@ -839,19 +835,6 @@ canvas.vs-prop { width: 40px; height: 44px; image-rendering: pixelated; }
 .ig-hp { width: 28px; text-align: right; color: var(--ink); }
 .ig-sd { font-size: 8px; }
 .ig-map { width: 100%; aspect-ratio: 480 / 270; image-rendering: pixelated; border: 3px solid var(--wood-darker); object-fit: contain; }
-.ig-watchw { display: flex; flex-direction: column; gap: 12px; }
-.ig-watchw .ig-map { order: 1; }
-.ig-side { display: contents; }
-.ig-side .ig-teams { order: 2; }
-.ig-side .ig-sd { order: 3; }
-/* Zuschauen quer: Karte groß links, Zug + Teams rechts */
-/* war: @media (orientation: landscape) – jetzt Klasse von orientation.ts (gilt auch bei Pseudo-Quer) */
-:where(html.land) .ig-watchw { flex-direction: row; align-items: flex-start; gap: 12px; height: calc(100svh - 50px); }
-:where(html.land) .ig-watchw .ig-map { order: 0; width: auto; height: 100%; max-width: 62%; }
-:where(html.land) .ig-side { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; overflow-y: auto; max-height: 100%; }
-:where(html.land) .ig-side .ig-teams, :where(html.land) .ig-side .ig-sd { order: 0; }
-:where(html.land) .ig-turn { padding: 6px; gap: 4px; }
-:where(html.land) .ig-team { padding: 2px 6px; }
 
 /* ---------------------------------------------------------------- Smash-Arena */
 #app:has(.smash) { padding: 8px; gap: 6px; }

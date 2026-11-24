@@ -173,6 +173,45 @@ export const ROPE = { RANGE: 120, MIN: 12, MAX: 130, CLIMB: 55, PUSH: 160, VMAX:
 export const PARASOL = { HOP_VY: -150, FALL: 26, STEER: 45, WIND: 30 };
 /** Schaufel: Tunnel aus „carve“-Scheiben (Radius, Länge, Schrittweite) */
 export const SHOVEL = { R: 6, LEN: 26, STEP: 4 };
+
+/**
+ * Schwebender Stick links am Handy (Werte wie von `stickZone()`: −1 … 1, y < 0 = oben, Totzone schon abgezogen):
+ * waagerecht = laufen (analog – wenig Ausschlag = langsam, zum genauen Hinstellen), deutlich nach oben = Sprung
+ * (einmal pro Hochdrücken), an der Liane senkrecht = klettern und waagerecht = schwingen, am Schirm waagerecht = steuern.
+ */
+export const IGEL_STICK = {
+  /** Ab dieser waagerechten Auslenkung wird gelaufen */
+  WALK: 0.12,
+  /** Lauftempo bei kleinstem Ausschlag (Anteil von IGEL.WALK) … */
+  SLOW: 0.35,
+  /** … volles Tempo ab diesem Ausschlag (gilt auch fürs Klettern) */
+  FULL: 0.8,
+  /** Stick so weit nach oben = Sprung; scharf erst wieder, wenn er unter REARM zurück ist */
+  JUMP: 0.65,
+  REARM: 0.35,
+  /** An der Liane: ab dieser senkrechten Auslenkung klettern */
+  CLIMB: 0.3,
+};
+
+const stickRamp = (a: number, from: number, slow: number) => slow + (1 - slow) * Math.min(1, (a - from) / (IGEL_STICK.FULL - from));
+
+/** Laufen aus der waagerechten Auslenkung: Vorzeichen = Richtung, Betrag = Tempo-Anteil (0 = stehen bleiben) */
+export function stickWalk(x: number): number {
+  const a = Math.abs(x);
+  if (!Number.isFinite(x) || a < IGEL_STICK.WALK) return 0;
+  return Math.sign(x) * stickRamp(a, IGEL_STICK.WALK, IGEL_STICK.SLOW);
+}
+
+/** Klettern an der Liane aus der senkrechten Auslenkung: > 0 = hoch (Stick oben), < 0 = runter */
+export function stickClimb(y: number): number {
+  const a = Math.abs(y);
+  if (!Number.isFinite(y) || a < IGEL_STICK.CLIMB) return 0;
+  return -Math.sign(y) * stickRamp(a, IGEL_STICK.CLIMB, 0.4);
+}
+
+/** Stick „deutlich nach oben“ (= Sprung) bzw. wieder weit genug zurück (Sprung wieder scharf) */
+export const stickUp = (y: number) => y <= -IGEL_STICK.JUMP;
+export const stickRearmed = (y: number) => y > -IGEL_STICK.REARM;
 /** „Schuss des Abends“: Mindestwert (Schaden + 30 je K.O.), Zeitlupe, längstes Stück Echtzeit */
 export const REPLAY = { MIN_SCORE: 30, KO_BONUS: 30, RATE: 0.5, MAX_MS: 3600, PRE_MS: 450, POST_MS: 900, LEAD_MS: 1800, TAIL_MS: 900 };
 /** Modus „Alle gleichzeitig“ */

@@ -1965,22 +1965,22 @@ async function igelTool(bot: Bot, st: IgelState, hogId: number, still: () => Ige
     bot.send('fire', { angle, power: 1 });
     await sleep(500);
   } else if (w === 'parasol') {
+    // Schirm auf, dann mit dem Stick seitlich Richtung Gegner steuern
     bot.send('fire', {});
     await sleep(200);
-    bot.send('move', { dir: toward });
+    bot.send('stick', { x: toward * rand(0.5, 1), y: 0 });
     await sleep(rand(1000, 2000));
-    bot.send('move', { dir: 0 });
+    bot.send('stick', { x: 0, y: 0 });
   } else {
     const angle = ropeAngles[Math.floor(Math.random() * ropeAngles.length)];
     bot.send('aim', { angle, power: 1 });
     await sleep(250);
     bot.send('fire', { angle, power: 1 });
     await sleep(300);
-    bot.send('move', { dir: toward });
-    bot.send('climb', { dir: Math.random() < 0.6 ? 1 : -1 });
+    // An der Liane: Stick seitlich = schwingen, hoch/runter = klettern; dann loslassen
+    bot.send('stick', { x: toward * 0.9, y: Math.random() < 0.6 ? -0.9 : 0.9 });
     await sleep(rand(800, 1800));
-    bot.send('climb', { dir: 0 });
-    bot.send('move', { dir: 0 });
+    bot.send('stick', { x: 0, y: 0 });
     bot.send('jump');
     // Im Fall manchmal noch den Schirm aufspannen
     if (ammo.parasol !== 0 && Math.random() < 0.4) {
@@ -2018,10 +2018,17 @@ async function igelWalk(bot: Bot, st: IgelState, hog: IgelState['hogs'][number])
     if (sy > st.water - 12 || Math.abs(sy - hog.y) > 20) safe = false;
   }
   if (!safe || (!crate && Math.random() >= 0.4)) return;
-  bot.send('move', { dir });
+  // Laufen per Stick (zur Kiste mit vollem Ausschlag, sonst auch mal gemächlich)
+  bot.send('stick', { x: crate ? dir : dir * rand(0.3, 1), y: 0 });
   await sleep(crate ? Math.min(3000, (dist / IGEL.WALK) * 1000) : rand(300, 900));
-  bot.send('move', { dir: 0 });
-  if (!crate && Math.random() < 0.2) bot.send('jump');
+  bot.send('stick', { x: 0, y: 0 });
+  if (!crate && Math.random() < 0.2) {
+    // Sprung: Stick kurz deutlich nach oben schnippen
+    await sleep(150);
+    bot.send('stick', { x: 0, y: -0.95 });
+    await sleep(120);
+    bot.send('stick', { x: 0, y: 0 });
+  }
   await sleep(600);
 }
 

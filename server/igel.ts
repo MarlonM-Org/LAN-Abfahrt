@@ -44,6 +44,10 @@ import {
   shovelOps,
   speedScale,
   stepBallistic,
+  stickClimb,
+  stickRearmed,
+  stickUp,
+  stickWalk,
   supported,
   surfaceY,
   themeGrav,
@@ -66,13 +70,14 @@ interface Hog extends IgelHog {
   vx: number;
   vy: number;
   walkAcc: number;
-  walkDir: -1 | 0 | 1;
+  /** Laufen vom Stick: Vorzeichen = Richtung, Betrag = Tempo-Anteil (0 = steht) – lenkt auch Schirm und Lianen-Schwung */
+  walk: number;
   /** Rest für das Herunterzählen der HP-Anzeige */
   shownAcc: number;
   /** Lianen-Seil: Ankerpunkt + aktuelle Seillänge */
   anchor: { x: number; y: number; len: number } | null;
-  /** Klettern am Seil: 1 = hoch, −1 = runter */
-  climb: -1 | 0 | 1;
+  /** Klettern am Seil vom Stick: > 0 = hoch, < 0 = runter (Betrag = Tempo-Anteil) */
+  climb: number;
 }
 
 /** Laufende Aufnahme eines Zugs / einer Simultan-Runde (Kandidat für den „Schuss des Abends“) */
@@ -191,6 +196,8 @@ export class IgelGame implements MiniGame {
   private suddenMs: number;
   /** Zuschauer-Sprüche: wann darf der Spieler wieder? */
   private tauntReady: Record<string, number> = {};
+  /** Wessen Stick gerade oben steht (Sprung ausgelöst) – erst nach dem Zurückziehen springt er wieder */
+  private stickHigh = new Set<string>();
   /** Themenkarte der Partie und ihre Faktoren */
   private theme: IgelThemeId;
   private grav: number;
@@ -260,7 +267,7 @@ export class IgelGame implements MiniGame {
     for (let i = 0; i < perPlayer; i++) {
       for (const owner of this.teams) {
         const s = spots[k++];
-        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < this.w / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, walkDir: 0, shownAcc: 0, anchor: null, climb: 0 });
+        this.hogs.push({ id: this.hogs.length, owner, x: s.x, y: s.y, hp: this.maxHp, shown: this.maxHp, dir: s.x < this.w / 2 ? 1 : -1, state: 'ok', flying: true, walking: false, vx: 0, vy: 0, walkAcc: 0, walk: 0, shownAcc: 0, anchor: null, climb: 0 });
       }
     }
     // Umgebung: Gaskartuschen vom Grill und scharfe Seeigel-Minen – nicht direkt neben einem Igel
@@ -376,7 +383,7 @@ export class IgelGame implements MiniGame {
     if (this.turn > 1) this.wind = Math.round(clamp(this.wind + (Math.random() - 0.5) * IGEL.WIND_DRIFT * this.windMul, -1, 1) * 100) / 100;
     this.quipBudget = 3;
     this.pre = [];
-    for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0), (h.walkDir = 0), (h.climb = 0);
+    for (const h of this.hogs) (h.shown = Math.max(0, h.hp)), (h.shownAcc = 0), (h.walk = 0), (h.climb = 0);
     for (const id of this.ids) if (this.ammo[id][this.weaponOf[id]] === 0) this.weaponOf[id] = 'bazooka';
     this.aim = null;
     this.aims = {};
@@ -443,7 +450,7 @@ export class IgelGame implements MiniGame {
         if (Math.random() < 0.1) this.quip(h, 'fire');
       }
     }
-    for (const h of this.hogs) h.walkDir = 0;
+    for (const h of this.hogs) h.walk = 0;
     this.aims = {};
     this.sub = 'flightAll';
     this.deadline = Date.now() + SIMUL.FLIGHT_MAX_MS;
@@ -453,7 +460,7 @@ export class IgelGame implements MiniGame {
   private toSettle() {
     this.sub = 'settle';
     this.settleAt = Date.now() + IGEL.SETTLE_MIN_MS;
-    for (const h of this.hogs) (h.walkDir = 0), (h.climb = 0), this.detach(h);
+    for (const h of this.hogs) (h.walk = 0), (h.climb = 0), this.detach(h);
     this.aim = null;
     this.aims = {};
     this.dirty = true;
@@ -528,17 +535,17 @@ export class IgelGame implements MiniGame {
     // Laufen (Rundlauf: der aktive Igel, simultan: jeder mit eigenem Igel)
     for (const h of this.hogs) {
       h.walking = false;
-      if (!h.walkDir || h.state !== 'ok' || h.flying) continue;
+      if (!h.walk || h.state !== 'ok' || h.flying) continue;
       const ctrl = this.simul ? h.owner : this.active;
       if (!ctrl || this.ctrlHog(ctrl) !== h || !this.canMove(ctrl)) {
-        h.walkDir = 0;
+        h.walk = 0;
         continue;
       }
-      h.dir = h.walkDir;
-      h.walkAcc += IGEL.WALK * dt;
+      h.dir = h.walk > 0 ? 1 : -1;
+      h.walkAcc += IGEL.WALK * Math.abs(h.walk) * dt;
       while (h.walkAcc >= 1 && !h.flying) {
         h.walkAcc -= 1;
-        if (!this.walkStep(h, h.walkDir)) {
+        if (!this.walkStep(h, h.dir)) {
           h.walkAcc = 0;
           break;
         }
@@ -692,7 +699,7 @@ export class IgelGame implements MiniGame {
       if (h.chute) {
         // Sonnenschirm: langsam sinken, mit dem Stick steuern, der Wind schiebt
         h.vy = Math.min(PARASOL.FALL, h.vy + IGEL.GRAVITY * this.grav * dt);
-        const want = h.walkDir * PARASOL.STEER + this.wind * this.windMul * PARASOL.WIND;
+        const want = h.walk * PARASOL.STEER + this.wind * this.windMul * PARASOL.WIND;
         h.vx += (want - h.vx) * Math.min(1, dt * 3);
       } else h.vy = Math.min(420, h.vy + IGEL.GRAVITY * this.grav * dt);
       const nx = h.x + h.vx * dt;
@@ -738,7 +745,7 @@ export class IgelGame implements MiniGame {
     h.hp = 0;
     h.shown = 0;
     h.flying = false;
-    h.walkDir = 0;
+    h.walk = 0;
     h.anchor = null;
     h.chute = false;
     h.y = this.water;
@@ -848,7 +855,7 @@ export class IgelGame implements MiniGame {
       const nx = d < 1 ? 0 : (cx - x) / d;
       const ny = d < 1 ? -1 : (cy - y) / d;
       h.flying = true;
-      h.walkDir = 0;
+      h.walk = 0;
       h.anchor = null;
       h.chute = false;
       h.vx = nx * 210 * f;
@@ -1002,35 +1009,33 @@ export class IgelGame implements MiniGame {
       this.dirty = true;
       return;
     }
+    // Stick: Sprung nur beim Hochdrücken (Flanke) – merken, auch wenn gerade kein Igel steuerbar ist
+    let flick = false;
+    if (action === 'stick') {
+      const y = Number(pl.y) || 0;
+      flick = stickUp(y) && !this.stickHigh.has(id);
+      if (stickUp(y)) this.stickHigh.add(id);
+      else if (stickRearmed(y)) this.stickHigh.delete(id);
+    }
     const h = this.ctrlHog(id);
     if (!h) return;
     const canMove = this.canMove(id);
     const canAim = this.canAim(id);
     switch (action) {
-      case 'move': {
-        const d = Number(pl.dir);
-        h.walkDir = canMove ? (d > 0 ? 1 : d < 0 ? -1 : 0) : 0;
-        if (h.walkDir) h.dir = h.walkDir;
-        break;
-      }
-      case 'climb': {
-        // Am Lianen-Seil: 1 = hochklettern, −1 = runterlassen
-        const d = Number(pl.dir);
-        h.climb = canMove && h.anchor ? (d > 0 ? 1 : d < 0 ? -1 : 0) : 0;
+      case 'stick': {
+        // Schwebender Stick (Handy links): waagerecht = laufen / schwingen / Schirm steuern,
+        // an der Liane senkrecht = klettern, sonst deutlich nach oben = Sprung. 700 ms ohne Nachschub → (0, 0) (Room)
+        const x = clamp(Number(pl.x) || 0, -1, 1);
+        const y = clamp(Number(pl.y) || 0, -1, 1);
+        h.walk = canMove ? stickWalk(x) : 0;
+        if (h.walk) h.dir = h.walk > 0 ? 1 : -1;
+        h.climb = canMove && h.anchor ? stickClimb(y) : 0;
+        if (flick && !h.anchor && !h.chute) this.jump(h, canMove);
         break;
       }
       case 'jump':
-        if (h.anchor) {
-          // Liane loslassen: Schwung mitnehmen, kleiner Schubs nach oben
-          this.detach(h);
-          h.vy -= 40;
-          break;
-        }
-        if (canMove && !h.flying && supported(this.mask, h.x, h.y)) {
-          h.flying = true;
-          h.vx = h.dir * IGEL.JUMP_VX;
-          h.vy = IGEL.JUMP_VY;
-        }
+        // SPRUNG-Knopf bzw. LOSLASSEN an der Liane
+        this.jump(h, canMove);
         break;
       case 'weapon': {
         const w = String(pl.weapon) as IgelWeapon;
@@ -1069,7 +1074,7 @@ export class IgelGame implements MiniGame {
           this.locked.add(id);
           const a = this.readAim(pl);
           if (a) this.aims[id] = a;
-          h.walkDir = 0;
+          h.walk = 0;
           h.climb = 0;
         } else this.fireNow(h, id, shot);
         break;
@@ -1138,7 +1143,7 @@ export class IgelGame implements MiniGame {
       // Böller: so lange weglaufen, bis er fast hochgeht
       this.deadline = now + (res === 'long' ? DYNAMITE.FUSE_MS - 400 : IGEL.RETREAT_MS);
     }
-    h.walkDir = 0;
+    h.walk = 0;
     this.aim = null;
     this.dirty = true;
   }
@@ -1258,7 +1263,7 @@ export class IgelGame implements MiniGame {
           const dx = (o.x - h.x) * dir;
           if (dx < -3 || dx > reach || Math.abs(o.y - h.y) > 12) continue;
           o.flying = true;
-          o.walkDir = 0;
+          o.walk = 0;
           o.anchor = null;
           o.chute = false;
           if (paddle) {
@@ -1359,6 +1364,21 @@ export class IgelGame implements MiniGame {
     this.dirty = true;
   }
 
+  /** Sprung nach vorn (Blickrichtung) – an der Liane heißt das: loslassen */
+  private jump(h: Hog, canMove: boolean) {
+    if (h.anchor) {
+      // Liane loslassen: Schwung mitnehmen, kleiner Schubs nach oben
+      this.detach(h);
+      h.vy -= 40;
+      return;
+    }
+    if (canMove && !h.flying && supported(this.mask, h.x, h.y)) {
+      h.flying = true;
+      h.vx = h.dir * IGEL.JUMP_VX;
+      h.vy = IGEL.JUMP_VY;
+    }
+  }
+
   private detach(h: Hog) {
     if (!h.anchor) return;
     h.anchor = null;
@@ -1366,7 +1386,7 @@ export class IgelGame implements MiniGame {
     h.flying = true;
   }
 
-  /** Pendel am Lianen-Seil: Schwerkraft, Schwung per ◀ ▶, Klettern, Seil bleibt gespannt */
+  /** Pendel am Lianen-Seil: Schwerkraft, Schwung per Stick seitlich, Klettern per Stick hoch/runter, Seil bleibt gespannt */
   private swingHog(h: Hog) {
     const a = h.anchor!;
     const ctrl = this.simul ? h.owner : this.active;
@@ -1378,13 +1398,14 @@ export class IgelGame implements MiniGame {
       const cx = h.x - a.x;
       const cy = h.y - 4 - a.y;
       const d = Math.hypot(cx, cy) || 1;
-      if (h.walkDir) {
-        // Schwung quer zum Seil, in Stick-Richtung
+      if (h.walk) {
+        // Schwung quer zum Seil, in Stick-Richtung (stärker, je weiter der Stick ausschlägt)
         let tx = -cy / d;
         let ty = cx / d;
-        if (tx * h.walkDir < 0) (tx = -tx), (ty = -ty);
-        h.vx += tx * ROPE.PUSH * dt;
-        h.vy += ty * ROPE.PUSH * dt;
+        if (tx * h.walk < 0) (tx = -tx), (ty = -ty);
+        const push = ROPE.PUSH * Math.abs(h.walk) * dt;
+        h.vx += tx * push;
+        h.vy += ty * push;
       }
       h.vy += IGEL.GRAVITY * this.grav * dt;
       let nx = h.x + h.vx * dt;
@@ -1675,11 +1696,11 @@ export class IgelGame implements MiniGame {
 
   playerDisconnected(id: string) {
     if (!this.simul && id === this.active && this.sub === 'aim') {
-      if (this.activeHog !== null) this.hogs[this.activeHog].walkDir = 0;
+      if (this.activeHog !== null) this.hogs[this.activeHog].walk = 0;
       this.deadline = Math.min(this.deadline, Date.now() + IGEL.OFFLINE_TURN_MS);
     }
     const h = this.ownHog(id);
-    if (h && this.simul) (h.walkDir = 0), (h.climb = 0);
+    if (h && this.simul) (h.walk = 0), (h.climb = 0);
   }
 
   dispose() {
