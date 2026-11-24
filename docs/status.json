@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T15:40+00:00",
+  "updated": "2026-11-24T15:50+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -170,7 +170,7 @@
   "done": [
     {
       "title": "Startseite: TV-Lobby zeigt die anwesenden Spieler (Figur, VIP-Krone, offline grau) statt Leaderboard; Arcade/Turnier mit Tagespunkten unter den Namen; Tabellen nur mit Anwesenden, Punkte bleiben bei Rückkehr erhalten (lag seit 9.11. auf Branch)",
-      "pr": null,
+      "pr": 115,
       "date": "2026-11-24"
     },
     {
