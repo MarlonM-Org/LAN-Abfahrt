@@ -236,7 +236,7 @@ export class Bot {
     });
   }
 
-  /** Boule am Strand: aufs Schweinchen legen – oder ab und zu die beste Gegnerkugel wegschießen */
+  /** Boule: aufs Schweinchen legen – oder ab und zu die beste Gegnerkugel wegschießen */
   private boulePlay(st: BouleState) {
     this.once(`boule-${st.aimSeq}`, async () => {
       const jack = st.jack;

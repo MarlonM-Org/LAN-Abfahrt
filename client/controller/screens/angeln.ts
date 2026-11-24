@@ -385,14 +385,16 @@ function buildReel(seq: number) {
   const root = el(`
     <div class="top-row"><span class="an-clock"></span><span class="an-score"></span></div>
     <h2 class="an-head">Drill!</h2>
-    <div class="an-tension">
-      <div class="an-zone" style="left:${ANGELN.GREEN_LO * 100}%;width:${(ANGELN.GREEN_HI - ANGELN.GREEN_LO) * 100}%"></div>
-      <div class="an-needle"></div>
-      <span class="an-lbl l">locker</span><span class="an-lbl r">reißt!</span>
-    </div>
     <div class="an-pull"><span class="an-arrow"></span></div>
     <div class="an-dist"><div></div></div>
-    <div class="big-btn an-reel"><b>HALTEN</b><small>= kurbeln</small></div>
+    <div class="an-drill">
+      <div class="an-tension">
+        <div class="an-zone" style="bottom:${ANGELN.GREEN_LO * 100}%;height:${(ANGELN.GREEN_HI - ANGELN.GREEN_LO) * 100}%"></div>
+        <div class="an-needle"></div>
+        <span class="an-lbl r">reißt!</span><span class="an-lbl l">locker</span>
+      </div>
+      <div class="big-btn an-reel"><b>HALTEN</b><small>= kurbeln</small></div>
+    </div>
     ${mode === 'motion' ? '<p class="hint">Zieht der Fisch zur Seite? Handy in die andere Richtung kippen!</p>' : ''}
   `);
   app.append(root);
@@ -460,7 +462,8 @@ function buildReel(seq: number) {
     header(root);
     const p = mine();
     if (!p || p.st !== 'reel') return;
-    needle.style.left = `${p.tension * 100}%`;
+    // Senkrecht wie beim Ziehen an der Rute: unten locker, oben reißt die Schnur
+    needle.style.bottom = `${p.tension * 100}%`;
     const high = p.tension > ANGELN.GREEN_HI;
     const low = p.tension < ANGELN.GREEN_LO;
     tensionEl.classList.toggle('high', high);

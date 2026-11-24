@@ -312,19 +312,19 @@ export class AngelnScene extends Phaser.Scene {
     g.strokePoints(pts);
   }
 
-  /** Spannungsbalken über dem Kopf */
+  /** Spannungsbalken senkrecht neben dem Kopf – wie am Handy: unten locker, oben reißt die Schnur */
   private drawBar(a: Angler, p: AngelPlayer) {
     const b = a.bar;
-    const w = 22;
-    const x = a.x - w / 2;
-    const y = FEET - 40;
-    b.fillStyle(0x2d1b12, 1).fillRect(x - 1, y - 1, w + 2, 6);
-    b.fillStyle(0x6e3a2a, 1).fillRect(x, y, w, 4);
-    b.fillStyle(0x2f7d32, 1).fillRect(x + w * ANGELN.GREEN_LO, y, w * (ANGELN.GREEN_HI - ANGELN.GREEN_LO), 4);
+    const h = 22;
+    const x = a.x + 10;
+    const y = FEET - 46;
+    b.fillStyle(0x2d1b12, 1).fillRect(x - 1, y - 1, 6, h + 2);
+    b.fillStyle(0x6e3a2a, 1).fillRect(x, y, 4, h);
+    b.fillStyle(0x2f7d32, 1).fillRect(x, y + h * (1 - ANGELN.GREEN_HI), 4, h * (ANGELN.GREEN_HI - ANGELN.GREEN_LO));
     const danger = p.tension > ANGELN.GREEN_HI || p.tension < ANGELN.GREEN_LO;
-    b.fillStyle(danger ? 0xffd25e : 0xfff4d6, 1).fillRect(x + Math.round(p.tension * (w - 2)), y - 1, 2, 6);
-    // Reststrecke als dünner Balken darunter
-    b.fillStyle(0x93d3f3, 1).fillRect(x, y + 6, Math.round(w * (1 - p.prog)), 1);
+    b.fillStyle(danger ? 0xffd25e : 0xfff4d6, 1).fillRect(x - 1, y + h - 2 - Math.round(p.tension * (h - 2)), 6, 2);
+    // Reststrecke als dünner Balken über dem Kopf
+    b.fillStyle(0x93d3f3, 1).fillRect(a.x - 11, y - 4, Math.round(22 * (1 - p.prog)), 1);
   }
 
   // ---------------------------------------------------------------- Effekte

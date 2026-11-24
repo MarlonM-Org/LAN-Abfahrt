@@ -197,7 +197,7 @@ function collide(a: Body, b: Body) {
 // ================================================================== Spiel
 
 /**
- * Strand-Bowling: reihum werfen alle am Handy (Schwung mit dem Bewegungssensor oder Wischen),
+ * Bowling: reihum werfen alle am Handy (Schwung mit dem Bewegungssensor oder Wischen),
  * der Server simuliert Kugel und Pins, der TV spielt die Aufzeichnung ab.
  */
 export class BowlingGame implements MiniGame {

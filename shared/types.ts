@@ -631,7 +631,7 @@ export interface BowlingState {
   last: BowlingRoll | null;
 }
 
-// ------------------------------------------------------------------ Boule am Strand
+// ------------------------------------------------------------------ Boule
 
 /** Aufzeichnung eines Boule-Wurfs, damit der TV ihn abspielen kann */
 export interface BouleTrack {
