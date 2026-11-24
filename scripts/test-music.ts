@@ -3,8 +3,14 @@
  * MIDI-Parser (erzeugte .mid) und alle eingebauten Songs (Gültigkeit, Zuordnung, Offline-Rendern).
  * Aufruf: `npm run test:music`
  */
-import { ASSIGN_SCENES, MAX_BARS, STEPS_PER_BAR, STYLES, defaultSongForScene, emptySong, validateSong } from '../shared/music';
-import { BUILTIN_IDS, BUILTIN_SONGS } from '../shared/musicBuiltin';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  ASSIGN_SCENES, MAX_BARS, STEPS_PER_BAR, STYLES, type Song, defaultSongForScene, emptySong, overrideIdFor, resolveSceneSong, sceneSource, songInfo, validateSong,
+} from '../shared/music';
+import { BUILTIN_IDS, BUILTIN_INFOS, BUILTIN_SONGS, builtinSong } from '../shared/musicBuiltin';
+import { MusicStore } from '../server/music';
 import { THEME_SONGS } from '../shared/musicThemen';
 import { db, longestSilence, peakOf, renderSong, rmsOf } from './musicRender';
 import { midiToSong, parseMidi, songToMidi } from '../client/music/midi';
@@ -223,6 +229,45 @@ console.log('\nEingebaute Songs:');
 
 function styleOf(id: string) {
   return STYLES.find((x) => x.id === id)?.name ?? id;
+}
+
+// ------------------------------------------------------------------ Überschreibungen („Direkt bearbeiten“)
+
+console.log('\nÜberschreibungen & Szenen-Übersicht:');
+{
+  const songs = [...BUILTIN_INFOS];
+  const rennen = builtinSong('rennen')!;
+  const ov: Song = { ...structuredClone(rennen), id: overrideIdFor('rennen'), title: 'Turbo-Runde', overrides: 'rennen' };
+  check(validateSong(ov).ok && (validateSong(ov) as { song: Song }).song.overrides === 'rennen', 'validateSong behält overrides');
+  check(!validateSong({ ...ov, overrides: ov.id }).ok && !validateSong({ ...ov, overrides: 'A B' }).ok, 'validateSong lehnt kaputte overrides ab');
+  const withOv = [...songs, songInfo(ov)];
+  const first = (ids: string[]) => ids[0];
+  check(resolveSceneSong('kart', {}, songs, first) === 'rennen', 'ohne Überschreibung: Kart → eingebaut');
+  check(resolveSceneSong('kart', {}, withOv, first) === ov.id && resolveSceneSong('autoball', {}, withOv, first) === ov.id, 'Überschreibung ersetzt den eingebauten Song in allen seinen Szenen');
+  check(resolveSceneSong('kart', { kart: 'rennen' }, withOv, first) === ov.id, '… auch bei fester Zuordnung auf den eingebauten Song');
+  check(resolveSceneSong('kart', { kart: 'party' }, withOv, first) === 'party', 'andere Zuordnung bleibt unberührt');
+  const action = resolveSceneSong('kart', { kart: `style:${rennen.style}` }, withOv, (ids) => ids.join(','));
+  check(!!action && action.split(',').includes(ov.id) && !action.split(',').includes('rennen'), 'Stil-Rotation nimmt die Überschreibung statt des Originals');
+  const src = sceneSource('kart', {}, withOv);
+  check(src.kind === 'song' && src.id === ov.id && src.via === 'eingebaut', 'sceneSource: Kart → Überschreibung (eingebaut)');
+  check(sceneSource('standard', {}, songs).kind === 'perScene' && sceneSource('lobby', { standard: 'none' }, songs).via === 'standard', 'sceneSource: Standard je Szene / geerbt');
+  check(sceneSource('lobby', { lobby: 'style:party' }, songs).kind === 'style', 'sceneSource: Stil');
+
+  // Server-Speicher in einem Temp-Ordner
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'musik-test-'));
+  try {
+    const store = new MusicStore(tmp);
+    check(store.save(ov).ok, 'Server speichert Überschreibung');
+    check(!store.save({ ...ov, id: 'zweite', title: 'Zweite' }).ok, 'nur eine Überschreibung pro eingebautem Song');
+    check(!store.save({ ...ov, id: 'falsch', overrides: 'gibtsnicht' }).ok, 'Überschreibung nur für eingebaute Songs');
+    check(store.patchAssignment({ autoball: ov.id }).ok, 'Zuordnung auf die Überschreibung');
+    const again = new MusicStore(tmp);
+    check(again.get(ov.id)?.overrides === 'rennen' && again.list().find((s) => s.id === ov.id)?.overrides === 'rennen', 'Überschreibung übersteht Neustart (Datei + Liste)');
+    check(again.delete(ov.id) && again.assignment.autoball === 'rennen', '„Original wiederherstellen“: Zuordnung zeigt wieder aufs Original');
+    check(resolveSceneSong('kart', again.assignment, again.list(), first) === 'rennen', 'danach läuft wieder das Original');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 console.log(failed ? `\n${failed} Test(s) fehlgeschlagen` : '\nAlle Tests bestanden');

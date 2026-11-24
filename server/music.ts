@@ -73,6 +73,11 @@ export class MusicStore {
     if (!r.ok) return r;
     if (BUILTIN_IDS.has(r.song.id)) return { ok: false, error: 'Eingebaute Songs kann man nicht überschreiben – unter neuem Namen speichern' };
     if (!this.songs.has(r.song.id) && this.songs.size >= MAX_SONGS) return { ok: false, error: `Höchstens ${MAX_SONGS} eigene Songs` };
+    if (r.song.overrides !== undefined) {
+      if (!BUILTIN_IDS.has(r.song.overrides)) return { ok: false, error: 'Überschreiben geht nur bei eingebauten Songs' };
+      const other = [...this.songs.values()].find((s) => s.overrides === r.song.overrides && s.id !== r.song.id);
+      if (other) return { ok: false, error: `„${other.title}“ ersetzt diesen Song schon` };
+    }
     r.song.updated = Date.now();
     this.songs.set(r.song.id, r.song);
     this.write(`${r.song.id}.json`, r.song);
@@ -80,15 +85,21 @@ export class MusicStore {
   }
 
   delete(id: string): boolean {
-    if (!this.songs.delete(id)) return false;
+    const old = this.songs.get(id);
+    if (!old || !this.songs.delete(id)) return false;
     try {
       fs.unlinkSync(path.join(this.dir, `${id}.json`));
     } catch {
       /* schon weg */
     }
-    // Zuordnungen auf den gelöschten Song entfernen
+    // Zuordnungen auf den gelöschten Song entfernen (Überschreibung: zurück auf das Original)
     let changed = false;
-    for (const [k, v] of Object.entries(this.assign)) if (v === id) { delete this.assign[k]; changed = true; }
+    for (const [k, v] of Object.entries(this.assign)) {
+      if (v !== id) continue;
+      if (old.overrides) this.assign[k] = old.overrides;
+      else delete this.assign[k];
+      changed = true;
+    }
     if (changed) this.write('assign.json', this.assign);
     return true;
   }

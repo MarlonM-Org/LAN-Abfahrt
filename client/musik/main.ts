@@ -4,16 +4,17 @@
  */
 import '@fontsource/press-start-2p/400.css';
 import {
-  ASSIGN_SCENES, CHANNELS, type ChannelId, MAX_BARS, NOTE_NAMES, STEPS_PER_BAR, STYLES, type Song, type SongInfo, WAVES,
-  emptySong, slugId, validateSong,
+  ASSIGN_SCENES, type Assignment, CHANNELS, type ChannelId, MAX_BARS, NOTE_NAMES, STEPS_PER_BAR, STYLES, type Song, type SongInfo, WAVES,
+  type SceneSource, emptySong, overrideIdFor, sceneSource, slugId, styleName, validateSong,
 } from '../../shared/music';
 import { BUILTIN_IDS } from '../../shared/musicBuiltin';
-import { assignScene, deleteSong, getSong, listSongs, saveSong } from '../music/api';
+import { assignScene, deleteSong, getAssignment, getSong, listSongs, saveSong } from '../music/api';
 import { songToMidi } from '../music/midi';
 import { SongPlayer, Synth } from '../music/player';
 import { DrumGrid } from './drumgrid';
 import { Singer } from './einsingen';
 import { openMidiImport } from './midiImport';
+import { Overview, sceneList, sceneName, sceneRows, scenesPlaying } from './overview';
 import { PianoRoll } from './pianoroll';
 import { Store } from './store';
 
@@ -23,7 +24,20 @@ let synth: Synth | null = null;
 let player: SongPlayer | null = null;
 let singer: Singer | null = null;
 let library: SongInfo[] = [];
-let libFilter: string | null = null;
+let assignment: Assignment = {};
+
+/**
+ * Woher kommt der Song im Editor? `scene`: aus welcher Szene der Übersicht man kam;
+ * `mode`: 'copy' = neue Kopie (wird beim ersten Speichern der Szene zugeordnet),
+ * 'direct' = vorhandenen Song bearbeiten, 'new' = leerer Song.
+ */
+interface EditCtx {
+  scene: string | null;
+  mode: 'copy' | 'direct' | 'new';
+}
+let ctx: EditCtx = { scene: null, mode: 'new' };
+/** Hash, zu dem der Editor gerade gehört (für „ungespeichert – wirklich weg?“ beim Zurück) */
+let shownHash = '';
 
 /** AudioContext erst nach einer Nutzeraktion anlegen */
 function audio() {
@@ -95,7 +109,6 @@ const drumMute = $<HTMLInputElement>('drumMute');
 for (const s of STYLES) styleSel.append(new Option(s.name, s.id));
 NOTE_NAMES.forEach((n, i) => keyRoot.append(new Option(n, String(i))));
 for (const w of WAVES) wave.append(new Option(w.name, w.id));
-for (const sc of ASSIGN_SCENES) $<HTMLSelectElement>('assignScene').append(new Option(sc.name, sc.id));
 master.value = localStorage.getItem('lan-abfahrt.werkstatt.volume') ?? '0.8';
 
 /** Kleine Änderung an Song-Eigenschaften (kein eigener Undo-Schritt für jedes Zeichen im Titel) */
@@ -172,6 +185,7 @@ $('copyBar').addEventListener('click', () => {
   store.copyBar();
   status(`Takt ${store.cursorBar + 1} kopiert`, 'ok');
 });
+
 $('pasteBar').addEventListener('click', () => store.pasteBar());
 $('clearBar').addEventListener('click', () => store.clearBar());
 
@@ -219,7 +233,6 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     void save();
   } else if (e.key === 'Escape') {
-    $('libraryDlg').hidden = true;
     document.querySelector('.menu')?.remove();
   } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !typing && e.altKey) {
     e.preventDefault();
@@ -232,13 +245,15 @@ window.addEventListener('keydown', (e) => {
 
 async function save(asNew = false): Promise<boolean> {
   const s = store.song;
-  if (asNew || BUILTIN_IDS.has(s.id)) {
-    const name = window.prompt('Unter welchem Titel speichern?', BUILTIN_IDS.has(s.id) ? `${s.title} (meins)` : s.title);
+  if (asNew) {
+    const name = window.prompt('Als neuer Song – Titel?', `${s.title} (Kopie)`);
     if (name === null) return false;
     store.edit((song) => {
       song.title = name.trim() || song.title;
-      song.id = slugId(song.title);
+      song.id = uniqueId(slugId(song.title));
+      delete song.overrides;
     });
+    if (asNew && ctx.scene) ctx.mode = 'copy';
   }
   const v = validateSong(store.song);
   if (!v.ok) {
@@ -249,122 +264,73 @@ async function save(asNew = false): Promise<boolean> {
     const saved = await saveSong(v.song);
     store.song.updated = saved.updated;
     store.markSaved();
-    status(`Gespeichert: ${saved.title}`, 'ok');
+    // Neue Kopie gleich der Szene zuordnen, aus der man kam
+    if (ctx.mode !== 'direct' && ctx.scene) await assignScene(ctx.scene, saved.id);
+    ctx.mode = 'direct';
+    setHash(editHash(ctx.scene, saved.overrides ?? saved.id), true);
     await refreshLibrary();
+    const where = scenesPlaying(saved.id, assignment, library);
+    status(where.length ? `Gespeichert – läuft jetzt in ${sceneList(where, ctx.scene ?? undefined)}` : `Gespeichert: ${saved.title} (läuft noch nirgends)`, 'ok');
+    render();
     return true;
   } catch (e) {
     status(`Speichern fehlgeschlagen: ${(e as Error).message}`, 'err');
     return false;
   }
 }
+/** Freie ID: „turbo-runde-kopie“, „turbo-runde-kopie-2“, … */
+function uniqueId(base: string) {
+  let id = base, n = 2;
+  while (library.some((x) => x.id === id)) id = `${base.slice(0, 44)}-${n++}`;
+  return id;
+}
 $('save').addEventListener('click', () => void save());
 $('saveAs').addEventListener('click', () => void save(true));
-$('new').addEventListener('click', () => {
-  if (store.dirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
-  const s = emptySong(`song-${Date.now().toString(36)}`, 'Neuer Song');
-  s.author = author.value;
-  store.load(s, false);
-  status('Neuer Song', 'ok');
-});
+/** Überschreibung löschen → der eingebaute Song läuft wieder überall, wo er vorher lief */
+async function restoreOriginal(id: string) {
+  const info = library.find((x) => x.id === id);
+  const base = info?.overrides;
+  if (!info || !base) return;
+  if (!window.confirm(`Deine Änderungen an „${info.title}“ verwerfen und das Original wiederherstellen?`)) return;
+  try {
+    stopListening();
+    await deleteSong(id);
+    await refreshLibrary();
+    const where = scenesPlaying(base, assignment, library);
+    status(`Original wiederhergestellt${where.length ? ` – läuft wieder in ${sceneList(where, ctx.scene ?? undefined)}` : ''}`, 'ok');
+    // Im Editor: frischer Entwurf vom Original
+    if (!$('editorView').hidden && store.song.id === id) {
+      const { song } = await loadForEdit(base);
+      store.load(song, true);
+    }
+  } catch (e) {
+    status((e as Error).message, 'err');
+  }
+}
+$('restore').addEventListener('click', () => void restoreOriginal(store.song.id));
+
 $('delete').addEventListener('click', async () => {
   const s = store.song;
+  if (s.overrides) return void restoreOriginal(s.id);
   if (BUILTIN_IDS.has(s.id)) return status('Eingebaute Songs kann man nicht löschen', 'err');
   if (!library.some((x) => x.id === s.id)) return status('Dieser Song ist noch nicht gespeichert', 'err');
   if (!window.confirm(`„${s.title}“ wirklich löschen?`)) return;
   try {
     await deleteSong(s.id);
-    status('Gelöscht', 'ok');
-    await refreshLibrary();
-    store.load(emptySong(`song-${Date.now().toString(36)}`), false);
+    status(`„${s.title}“ gelöscht`, 'ok');
+    store.markSaved();
+    go('');
   } catch (e) {
     status((e as Error).message, 'err');
   }
 });
 
 async function refreshLibrary() {
-  library = await listSongs();
-  renderLibrary();
+  [library, assignment] = await Promise.all([listSongs(), getAssignment()]);
+  overview.songs = library;
+  overview.assign = assignment;
+  if (!$('overview').hidden) overview.render();
 }
-async function loadFromLibrary(id: string) {
-  if (store.dirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
-  try {
-    const song = await getSong(id);
-    store.load(song, true);
-    $('libraryDlg').hidden = true;
-    status(`Geladen: ${song.title}${BUILTIN_IDS.has(id) ? ' (eingebaut – zum Speichern bekommt er einen neuen Namen)' : ''}`, 'ok');
-    roll.scrollToMidi(70);
-  } catch (e) {
-    status((e as Error).message, 'err');
-  }
-}
-function renderLibrary() {
-  const chips = $('libChips');
-  chips.replaceChildren();
-  const chip = (label: string, id: string | null) => {
-    const c = document.createElement('span');
-    c.className = `chip ${libFilter === id ? 'on' : ''}`;
-    c.textContent = label;
-    c.addEventListener('click', () => {
-      libFilter = id;
-      renderLibrary();
-    });
-    chips.append(c);
-  };
-  chip('Alle', null);
-  for (const s of STYLES) chip(s.name, s.id);
-  const list = $('libList');
-  list.replaceChildren();
-  for (const s of library.filter((x) => !libFilter || x.style === libFilter)) {
-    const st = STYLES.find((x) => x.id === s.style);
-    const item = document.createElement('div');
-    item.className = 'lib-item';
-    const info = document.createElement('div');
-    info.innerHTML = `<span class="t"></span><span class="badge"></span><div class="s"></div>`;
-    (info.querySelector('.t') as HTMLElement).textContent = s.title;
-    const badge = info.querySelector('.badge') as HTMLElement;
-    badge.textContent = st?.name ?? s.style;
-    badge.style.background = st?.color ?? '#7a5a3a';
-    (info.querySelector('.s') as HTMLElement).textContent = `${s.bpm} BPM · ${s.bars} Takte${s.builtin ? ' · eingebaut' : s.author ? ` · von ${s.author}` : ''}`;
-    const hear = document.createElement('button');
-    hear.className = 'btn';
-    hear.textContent = '▶';
-    hear.title = 'Anhören';
-    hear.addEventListener('click', async () => {
-      const { player } = audio();
-      if (player.playing && player.current?.id === s.id) {
-        player.stop();
-        hear.textContent = '▶';
-        return;
-      }
-      player.play(await getSong(s.id), { loop: true });
-      list.querySelectorAll('button').forEach((b) => b.textContent === '■' && (b.textContent = '▶'));
-      hear.textContent = '■';
-    });
-    const load = document.createElement('button');
-    load.className = 'btn primary';
-    load.textContent = 'Laden';
-    load.addEventListener('click', () => {
-      player?.stop();
-      updatePlayButton();
-      void loadFromLibrary(s.id);
-    });
-    item.append(info, hear, load);
-    list.append(item);
-  }
-}
-$('library').addEventListener('click', () => {
-  $('libraryDlg').hidden = false;
-  void refreshLibrary();
-});
-$('libClose').addEventListener('click', () => {
-  $('libraryDlg').hidden = true;
-  player?.stop();
-  updatePlayButton();
-});
-$('libraryDlg').addEventListener('click', (e) => {
-  if (e.target === $('libraryDlg')) $('libClose').click();
-});
-
 // ------------------------------------------------------------------ MIDI & Export
 
 $('midiBtn').addEventListener('click', () => $('midiFile').click());
@@ -461,19 +427,6 @@ store.on(() => {
   if (!singer?.active && document.activeElement !== $('singFrom')) $<HTMLInputElement>('singFrom').value = String(store.cursorBar + 1);
 });
 
-// ------------------------------------------------------------------ Zuordnung
-
-$('assignBtn').addEventListener('click', async () => {
-  if (!(await save())) return;
-  const scene = $<HTMLSelectElement>('assignScene').value;
-  try {
-    await assignScene(scene, store.song.id);
-    status(`„${store.song.title}“ läuft jetzt bei: ${ASSIGN_SCENES.find((s) => s.id === scene)?.name}`, 'ok');
-  } catch (e) {
-    status((e as Error).message, 'err');
-  }
-});
-
 // ------------------------------------------------------------------ Anzeige aktualisieren
 
 function render() {
@@ -499,10 +452,61 @@ function render() {
   ($('undo') as HTMLButtonElement).disabled = !store.canUndo;
   ($('redo') as HTMLButtonElement).disabled = !store.canRedo;
   ($('pasteBar') as HTMLButtonElement).disabled = !store.hasClip;
-  ($('delete') as HTMLButtonElement).disabled = BUILTIN_IDS.has(s.id);
+  ($('delete') as HTMLButtonElement).disabled = BUILTIN_IDS.has(s.id) || !library.some((x) => x.id === s.id);
+  $('restore').hidden = !(s.overrides && library.some((x) => x.id === s.id));
   document.title = `${store.dirty ? '● ' : ''}${s.title} – Musik-Werkstatt`;
+  renderCrumbs();
+  $('chName').textContent = `· ${CHANNELS.find((c) => c.id === store.channel)?.name ?? ''}`;
   $<HTMLInputElement>('singBars').max = String(s.bars);
   $<HTMLInputElement>('singFrom').max = String(s.bars);
+}
+
+/** Brotkrumen „Kart-Rennen · Turbo-Runde (Kopie)“ + Etikett + wo der Song läuft */
+function renderCrumbs() {
+  const s = store.song;
+  const row = ctx.scene ? sceneRows().find((r) => r.id === ctx.scene) : null;
+  const crumb = $<HTMLAnchorElement>('crumbScene');
+  crumb.textContent = row ? `${row.icon} ${row.name}` : 'Eigene Songs';
+  $('crumbSong').textContent = s.title;
+  const stored = library.some((x) => x.id === s.id);
+  const tag = $('crumbTag');
+  const [label, cls] = s.overrides
+    ? [stored ? 'eingebaut · angepasst' : 'eingebaut', stored ? 'tag-override' : 'tag-builtin']
+    : ctx.mode === 'copy' && !stored ? ['neue Kopie', 'tag-own'] : !stored ? ['neu', 'tag-own'] : ['eigen', 'tag-own'];
+  tag.textContent = label;
+  tag.className = `tag ${cls}`;
+  $('dirty').hidden = !store.dirty;
+  const where = stored ? scenesPlaying(s.id, assignment, library) : [];
+  $('where').textContent = where.length
+    ? `läuft in ${sceneList(where, ctx.scene ?? undefined)}`
+    : !stored && ctx.scene && ctx.mode !== 'direct'
+      ? `Speichern → läuft in ${sceneName(ctx.scene)}`
+      : s.overrides && !stored && scenesPlaying(s.overrides, assignment, library).length
+        ? `Speichern → läuft statt des Originals in ${sceneList(scenesPlaying(s.overrides, assignment, library), ctx.scene ?? undefined)}`
+        : 'läuft noch nirgends – in der Übersicht zuordnen';
+}
+$('crumbScene').addEventListener('click', (e) => {
+  e.preventDefault();
+  $('back').click();
+});
+
+// Mehr-Menü (Einsingen, MIDI, Klang, Takt-Werkzeuge …) – Zustand pro Gerät merken
+function setMore(open: boolean) {
+  $('more').hidden = !open;
+  $('moreBtn').textContent = open ? 'Mehr ▴' : 'Mehr ▾';
+  $('moreBtn').setAttribute('aria-expanded', String(open));
+  $('moreBtn').classList.toggle('on', open);
+  try {
+    localStorage.setItem('lan-abfahrt.werkstatt.mehr', open ? '1' : '0');
+  } catch {
+    /* egal */
+  }
+}
+$('moreBtn').addEventListener('click', () => setMore($('more').hidden));
+try {
+  setMore(localStorage.getItem('lan-abfahrt.werkstatt.mehr') === '1');
+} catch {
+  setMore(false);
 }
 
 // Vor dem Verlassen warnen
@@ -510,29 +514,202 @@ window.addEventListener('beforeunload', (e) => {
   if (store.dirty) e.preventDefault();
 });
 
+// ------------------------------------------------------------------ Übersicht
+
+let listening: HTMLButtonElement | null = null;
+function stopListening() {
+  if (listening) {
+    listening.textContent = '▶';
+    listening.classList.remove('on');
+  }
+  listening = null;
+  player?.stop();
+  updatePlayButton();
+}
+async function listen(id: string, btn: HTMLButtonElement, note = '') {
+  const { player } = audio();
+  if (listening === btn && player.playing) return stopListening();
+  stopListening();
+  try {
+    player.play(await getSong(id), { loop: true });
+  } catch (e) {
+    return status((e as Error).message, 'err');
+  }
+  listening = btn;
+  btn.textContent = '■';
+  btn.classList.add('on');
+  status(`♪ ${library.find((x) => x.id === id)?.title ?? id}${note}`);
+}
+
+const overview = new Overview($('ovList'), $('ovOwn'), {
+  listen(_scene, src: SceneSource, btn) {
+    if (src.kind === 'song') void listen(src.id, btn);
+    else if (src.kind === 'style') {
+      const id = src.ids[Math.floor(Math.random() * src.ids.length)];
+      void listen(id, btn, ` – einer von ${src.ids.length} im Stil ${styleName(src.style)}`);
+    }
+  },
+  listenSong: (id, btn) => void listen(id, btn),
+  async assign(scene, value) {
+    stopListening();
+    try {
+      assignment = await assignScene(scene, value);
+      overview.assign = assignment;
+      overview.render();
+      flashRow(scene);
+      const now = value === null ? 'eingebaut' : value === 'none' ? 'Stille' : value.startsWith('style:') ? `Stil ${styleName(value.slice(6))}` : `„${library.find((x) => x.id === value)?.title ?? value}“`;
+      status(`${sceneName(scene)}: jetzt ${now}`, 'ok');
+    } catch (e) {
+      status((e as Error).message, 'err');
+    }
+  },
+  copy: (scene) => go(`szene=${scene}&kopie=1`),
+  edit(scene) {
+    const src = sceneSource(scene, assignment, library);
+    if (src.kind === 'song') go(editHash(scene, library.find((x) => x.id === src.id)?.overrides ?? src.id));
+  },
+  editSong: (id) => go(editHash(null, library.find((x) => x.id === id)?.overrides ?? id)),
+  restore: (id) => void restoreOriginal(id),
+  async deleteSong(id) {
+    const s = library.find((x) => x.id === id);
+    if (!s || !window.confirm(`„${s.title}“ wirklich löschen?`)) return;
+    stopListening();
+    try {
+      await deleteSong(id);
+      await refreshLibrary();
+      status('Gelöscht', 'ok');
+    } catch (e) {
+      status((e as Error).message, 'err');
+    }
+  },
+  filter(text) {
+    $<HTMLInputElement>('ovSearch').value = text;
+    overview.query = text;
+    overview.render();
+  },
+});
+$<HTMLInputElement>('ovSearch').addEventListener('input', (e) => {
+  overview.query = (e.target as HTMLInputElement).value;
+  overview.render();
+});
+$('ovNew').addEventListener('click', () => go('neu'));
+function flashRow(scene: string) {
+  document.querySelector<HTMLElement>(`.ov-row[data-scene="${scene}"]`)?.classList.add('flash');
+}
+
+// ------------------------------------------------------------------ Navigation (#szene=…&song=…)
+
+const editHash = (scene: string | null, id: string) => (scene ? `szene=${scene}&song=${id}` : `song=${id}`);
+function setHash(h: string, replace = false) {
+  shownHash = h;
+  if (replace) history.replaceState(null, '', h ? `#${h}` : location.pathname + location.search);
+  else location.hash = h;
+}
+/** Zu einem Ziel wechseln (Hash ändern → `route()` erledigt den Rest) */
+function go(h: string) {
+  if (h === location.hash.slice(1)) void route();
+  else location.hash = h;
+}
+$('back').addEventListener('click', () => {
+  if (store.dirty && !window.confirm('Ungespeicherte Änderungen verwerfen?')) return;
+  store.markSaved();
+  go('');
+});
+
+function showOverview() {
+  $('editorView').hidden = true;
+  $('overview').hidden = false;
+  document.title = 'Musik-Werkstatt – Wo läuft was?';
+  shownHash = '';
+  void refreshLibrary();
+}
+function showEditor(song: Song, saved: boolean, c: EditCtx) {
+  ctx = c;
+  store.load(song, saved);
+  $('overview').hidden = true;
+  $('editorView').hidden = false;
+  render();
+  roll.scrollToMidi(70);
+}
+
+/**
+ * Song zum direkten Bearbeiten: eigene Songs wie sie sind; eingebaute als Überschreibung
+ * (vorhandene laden, sonst Entwurf mit `overrides` – der TV nimmt ihn nach dem Speichern statt des Originals).
+ */
+async function loadForEdit(id: string): Promise<{ song: Song; saved: boolean }> {
+  if (!BUILTIN_IDS.has(id)) return { song: await getSong(id), saved: true };
+  const ov = library.find((x) => x.overrides === id);
+  if (ov) return { song: await getSong(ov.id), saved: true };
+  const song = await getSong(id);
+  song.id = overrideIdFor(id);
+  song.overrides = id;
+  delete song.updated;
+  return { song, saved: true };
+}
+
+/** Kopie des Songs, der in der Szene läuft – mit freiem Namen „<Titel> (Kopie)“ */
+async function makeCopy(scene: string): Promise<Song | null> {
+  const src = sceneSource(scene, assignment, library);
+  if (src.kind !== 'song') return null;
+  const base = await getSong(src.id);
+  const song = structuredClone(base);
+  const plain = base.title.replace(/ \(Kopie( \d+)?\)$/, '');
+  let title = `${plain} (Kopie)`.slice(0, 60);
+  for (let n = 2; library.some((x) => x.title === title); n++) title = `${plain} (Kopie ${n})`.slice(0, 60);
+  song.title = title;
+  song.id = uniqueId(slugId(title));
+  delete song.updated;
+  delete song.overrides;
+  return song;
+}
+
+async function route() {
+  const h = location.hash.slice(1);
+  // Editor offen mit ungespeicherten Änderungen → erst fragen
+  if (!$('editorView').hidden && h !== shownHash && store.dirty) {
+    if (!window.confirm('Ungespeicherte Änderungen verwerfen?')) {
+      history.replaceState(null, '', shownHash ? `#${shownHash}` : location.pathname);
+      return;
+    }
+    store.markSaved();
+  }
+  stopListening();
+  const p = new URLSearchParams(h);
+  const legacy = new URLSearchParams(location.search).get('song');
+  shownHash = h;
+  const scene = p.get('szene');
+  if (scene && !ASSIGN_SCENES.some((x) => x.id === scene)) return go('');
+  try {
+    if (scene && p.get('kopie')) {
+      const song = await makeCopy(scene);
+      if (!song) return go('');
+      showEditor(song, false, { scene, mode: 'copy' });
+      status(`Kopie angelegt – nach dem Speichern läuft sie in ${sceneName(scene)}`);
+    } else if (p.get('song') || (!h && legacy)) {
+      const { song, saved } = await loadForEdit(p.get('song') ?? legacy!);
+      showEditor(song, saved, { scene, mode: 'direct' });
+      if (song.overrides && !library.some((x) => x.id === song.id)) status('Eingebauter Song: Speichern ersetzt das Original überall – zurück geht’s mit „Original wiederherstellen“.');
+    } else if (p.has('neu')) {
+      const s = emptySong(uniqueId(`song-${Date.now().toString(36)}`), 'Neuer Song');
+      // Startpunkt: ein einfacher Beat, damit sofort etwas zu hören ist
+      s.drums.kick = [0, 8, 16, 24, 32, 40, 48, 56];
+      s.drums.snare = [4, 12, 20, 28, 36, 44, 52, 60];
+      s.drums.hat = Array.from({ length: 32 }, (_, i) => i * 2 + 1);
+      showEditor(s, false, { scene, mode: 'new' });
+    } else showOverview();
+  } catch (e) {
+    status(`Nicht gefunden: ${(e as Error).message}`, 'err');
+    showOverview();
+  }
+}
+window.addEventListener('hashchange', () => void route());
+
 // ------------------------------------------------------------------ Start
 
 async function start() {
   await Promise.race([document.fonts.load('8px "Press Start 2P"'), new Promise((r) => setTimeout(r, 1500))]).catch(() => undefined);
-  const params = new URLSearchParams(location.search);
-  const id = params.get('song');
   await refreshLibrary();
-  if (id) {
-    try {
-      store.load(await getSong(id), true);
-    } catch {
-      status('Song nicht gefunden', 'err');
-    }
-  } else {
-    const s = emptySong(`song-${Date.now().toString(36)}`, 'Neuer Song');
-    // Startpunkt: ein einfacher Beat, damit sofort etwas zu hören ist
-    s.drums.kick = [0, 8, 16, 24, 32, 40, 48, 56];
-    s.drums.snare = [4, 12, 20, 28, 36, 44, 52, 60];
-    s.drums.hat = Array.from({ length: 32 }, (_, i) => i * 2 + 1);
-    store.load(s, false);
-  }
-  render();
-  roll.scrollToMidi(70);
+  await route();
   // Ersten Klick/Taste zum Freischalten des Tons nutzen
   const unlock = () => audio();
   window.addEventListener('pointerdown', unlock, { once: true });
