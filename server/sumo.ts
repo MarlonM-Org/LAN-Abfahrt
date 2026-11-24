@@ -29,6 +29,8 @@ interface P extends SumoPlayer {
   dashUntil: number;
   readyAt: number;
   stunUntil: number;
+  /** Rempler kurz vor Ende von Betäubung/Abklingzeit gedrückt → wird bis hierhin nachgeholt (Eingabepuffer) */
+  dashQueuedUntil: number;
   lastHitBy: string | null;
   lastHitAt: number;
   diedAt: number;
@@ -37,6 +39,8 @@ interface P extends SumoPlayer {
 }
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+/** So kurz vor Ende von Betäubung/Abklingzeit zählt ein Rempler-Druck noch (wird dann nachgeholt) */
+const DASH_BUFFER_MS = 150;
 
 /**
  * Sumo-Steg: Alle stehen auf einem Holzsteg im Meer, der nach und nach wegbricht.
@@ -79,7 +83,7 @@ export class SumoGame implements MiniGame {
     for (const id of ids) {
       this.players.set(id, {
         x: SUMO_CX, y: SUMO_CY, f: 1, alive: false, dash: false, cd: 0, stun: false, hits: 0, wins: 0, pushes: 0,
-        vx: 0, vy: 0, sx: 0, sy: 0, lx: 1, ly: 0, dashUntil: 0, readyAt: 0, stunUntil: 0,
+        vx: 0, vy: 0, sx: 0, sy: 0, lx: 1, ly: 0, dashUntil: 0, readyAt: 0, stunUntil: 0, dashQueuedUntil: 0,
         lastHitBy: null, lastHitAt: 0, diedAt: 0, survival: 0,
       });
     }
@@ -125,7 +129,7 @@ export class SumoGame implements MiniGame {
         p.f = p.lx < 0 ? -1 : 1;
       }
       p.vx = p.vy = 0;
-      p.dashUntil = p.readyAt = p.stunUntil = 0;
+      p.dashUntil = p.readyAt = p.stunUntil = p.dashQueuedUntil = 0;
       p.dash = p.stun = false;
       p.cd = 0;
       p.lastHitBy = null;
@@ -222,6 +226,11 @@ export class SumoGame implements MiniGame {
 
   private tick(now: number, dt: number) {
     for (const p of this.players.values()) {
+      // Gepufferter Rempler: sobald Betäubung und Abklingzeit vorbei sind
+      if (p.dashQueuedUntil && now >= p.readyAt && now >= p.stunUntil) {
+        if (now <= p.dashQueuedUntil && this.sub === 'play' && p.alive && !p.away) this.dash(p, now);
+        p.dashQueuedUntil = 0;
+      }
       p.dash = now < p.dashUntil;
       p.stun = now < p.stunUntil;
       p.cd = Math.max(0, p.readyAt - now);
@@ -398,7 +407,7 @@ export class SumoGame implements MiniGame {
     p.away = false;
     p.vx = p.vy = 0;
     p.sx = p.sy = 0;
-    p.dashUntil = 0;
+    p.dashUntil = p.dashQueuedUntil = 0;
     p.diedAt = now;
     this.deaths.push(id);
     // Ab jetzt Geist: nach kurzer Pause darf man alle 5 s eine Welle schicken
@@ -420,7 +429,7 @@ export class SumoGame implements MiniGame {
     const tiles = this.tiles.join('');
     const spots = sumoSpawns(Math.max(2, this.ids.length)).filter((sp) => sumoSolidAt(tiles, sp.x, sp.y));
     const sp = spots.length ? spots.reduce((a, b) => (this.gap(b, others) > this.gap(a, others) ? b : a)) : { x: SUMO_CX, y: SUMO_CY };
-    Object.assign(p, { x: sp.x, y: sp.y, alive: true, away: false, vx: 0, vy: 0, dashUntil: 0, readyAt: 0, stunUntil: 0, dash: false, stun: false, lastHitBy: null, lastHitAt: 0 });
+    Object.assign(p, { x: sp.x, y: sp.y, alive: true, away: false, vx: 0, vy: 0, dashUntil: 0, readyAt: 0, stunUntil: 0, dashQueuedUntil: 0, dash: false, stun: false, lastHitBy: null, lastHitAt: 0 });
     p.f = p.x > SUMO_CX ? -1 : 1;
     this.ghostReady.delete(id);
     this.ctx.onChange();
@@ -512,14 +521,25 @@ export class SumoGame implements MiniGame {
       }
     } else if (action === 'dash') {
       const now = Date.now();
-      if (this.sub !== 'play' || !p.alive || now < p.readyAt || now < p.stunUntil) return;
-      p.dashUntil = now + SUMO.DASH_MS;
-      p.readyAt = now + SUMO.DASH_COOLDOWN_MS;
-      p.vx = p.lx * SUMO.DASH_SPEED + p.vx * 0.25;
-      p.vy = p.ly * SUMO.DASH_SPEED + p.vy * 0.25;
-      p.f = p.lx < 0 ? -1 : 1;
-      this.ctx.onChange();
+      if (this.sub !== 'play' || !p.alive) return;
+      const ready = Math.max(p.readyAt, p.stunUntil);
+      if (now < ready) {
+        // Kurz zu früh gedrückt (Rettungs-Rempler am Rand): merken statt verschlucken
+        if (ready - now <= DASH_BUFFER_MS) p.dashQueuedUntil = ready + 100;
+        return;
+      }
+      this.dash(p, now);
     }
+  }
+
+  private dash(p: P, now: number) {
+    p.dashQueuedUntil = 0;
+    p.dashUntil = now + SUMO.DASH_MS;
+    p.readyAt = now + SUMO.DASH_COOLDOWN_MS;
+    p.vx = p.lx * SUMO.DASH_SPEED + p.vx * 0.25;
+    p.vy = p.ly * SUMO.DASH_SPEED + p.vy * 0.25;
+    p.f = p.lx < 0 ? -1 : 1;
+    this.ctx.onChange();
   }
 
   playerDisconnected(id: string) {
