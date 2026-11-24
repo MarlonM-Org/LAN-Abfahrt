@@ -137,7 +137,8 @@ function injectCss() {
 const CSS = `
 html.wu #app { position: fixed; top: var(--wu-h, 34px); left: 0; right: 0; bottom: 0; transform: translateZ(0); overflow-y: auto; min-height: 0; margin: 0; }
 html.wu .spec-bar { display: none; }
-html.wu .pl-fab { top: calc(var(--wu-h, 34px) + 6px); }
+/* VIP-Knopf „n offline“ (players.ts) rutscht mit „Abbrechen“ unter die Leiste */
+html.wu { --pl-top-off: var(--wu-h, 34px); }
 .wu-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
   padding: max(4px, env(safe-area-inset-top, 0px)) max(14px, env(safe-area-inset-right, 0px)) 4px max(14px, env(safe-area-inset-left, 0px));

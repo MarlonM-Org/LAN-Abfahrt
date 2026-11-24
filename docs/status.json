@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-09T13:27+00:00",
+  "updated": "2026-11-09T13:35+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -569,6 +569,10 @@
     {
       "title": "Favoriten in der Arcade markieren (VIP + Laptop, pro Gerät im Browser gemerkt) (#111)",
       "status": "umgesetzt"
+    },
+    {
+      "title": "VIP-Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers → jetzt kompakt „n offline“ direkt neben „Abbrechen“, Kopfzeile macht Platz (auch Kart, Parcours, Aufwärmrunde) – PR #113 offen",
+      "status": "in Arbeit"
     }
   ]
 }
