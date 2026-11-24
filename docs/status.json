@@ -8,8 +8,20 @@
   "inProgress": [],
   "queue": [
     {
-      "area": "Spielbrett",
+      "area": "Lobby / Framing",
       "prio": 1,
+      "size": "S–M",
+      "kind": null,
+      "title": "Neues Framing: Minispiel-Sammlung mit Handy-Controllern statt „Urlaubs-Edition“ + Arcade-Lobby am TV",
+      "detail": "Marlon (24.11.): „Es ist keine Urlaubs-Edition mehr, sondern eine Minispiel-Sammlung mit Handy-Controllern. Das Framing weg. Arcade und Party sind der Standard, Date Night als Story framen. Die Startseite ist so ein Urlaubs-Haus – lieber was Arcade-Cooles, das ein paar der Minispiele zeigt, bisschen wie die Astro’s-Playroom-Lobby.“ – Stufe 1+2 (Texte, Handy-Reiter, Arcade-Halle am TV) in #120; offen: Spiel-Titel und frei laufende Figuren.",
+      "steps": [
+        "Stufe 3 · Spiel-Titel ohne Urlaubs-Vorsilbe prüfen (Urlaubsflieger, Urlaubs-Fangen, Urlaubs-Minigolf, „… im Ferienhaus“) – Entscheidung von Marlon, Feedback-Notizen nennen die alten Namen.",
+        "Stufe 4 · Lobby-Figuren laufen frei durch die Halle (à la Astro’s Playroom): Joystick am Handy bewegt die eigene Figur, vor einem Automaten stehen = Stimme für dieses Spiel."
+      ]
+    },
+    {
+      "area": "Spielbrett",
+      "prio": 2,
       "size": "XL",
       "kind": null,
       "title": "Party-Modus 3.0 – der „große Modus“ à la Mario Party / Lego Party",
@@ -36,11 +48,11 @@
         "Im Spiel: Hinweise als Icon + Pfeil (wie bei Wasserbomben #107), Ansagen über den Sprecher statt Textbanner, Ergebnis-Karten mit Zahl und Symbol statt Satz.",
         "Schutz vor Rückfall: Lint-Skript, das Texte in MINI_HOWTO, Bannern und Screens auf Länge prüft (z. B. max. 60 Zeichen) und im Typecheck/CI meckert."
       ],
-      "prio": 2
+      "prio": 3
     },
     {
       "area": "Handy",
-      "prio": 3,
+      "prio": 4,
       "size": "M",
       "kind": null,
       "title": "Usability-Pass Handy-UI: Knöpfe sichtbarer, einheitlich, leicht bedienbar",
@@ -48,7 +60,7 @@
     },
     {
       "area": "Neue Spiele",
-      "prio": 4,
+      "prio": 5,
       "size": "je S–M",
       "kind": null,
       "title": "Review-Phase 5: weitere neue Spiele",
@@ -69,7 +81,7 @@
       "kind": null,
       "title": "Highlights & Replays am TV (freigegeben)",
       "detail": "Der TV puffert die letzten 6 s an Snapshots (SnapBuffer gibt es schon, Auto-Fußball hat die Tor-Wiederholung bereits) und spielt K.O., letzten Treffer, Zieleinlauf oder Rauswurf in Zeitlupe nochmal ab – mit Banner, Sprecher und Zoom auf den Moment. Reihenfolge: Smash (K.O.), Bogen (letzter Treffer), Igel (Volltreffer/Selbsttreffer), Kart (Zieleinlauf, Überholen auf der Linie), Sumo (letzter Rauswurf), Wasserbomben, Bomben-Arena. Reine Client-Arbeit, der Server meldet nur den Moment über ctx.log(). Am Ende des Abends „Best of“: die 5 besten Momente nacheinander vor der Siegerehrung.",
-      "prio": 5
+      "prio": 6
     },
     {
       "area": "Handy",
@@ -77,7 +89,7 @@
       "kind": null,
       "title": "Onboarding für neue Gäste (freigegeben)",
       "detail": "Beim ersten Beitritt eines Geräts (localStorage leer) ein 60-s-Tutorial am Handy, visuell statt Text: Stick kreisen lassen, Knopf drücken, Handy kippen und schütteln (Sensor-Erlaubnis gleich mitnehmen), quer halten üben – jede Station mit Häkchen und Haptik; der TV zeigt, wer gerade übt. Überspringbar, über das Spieler-Menü jederzeit wieder aufrufbar. Zusammen mit dem Zoom-Check aus der Zoom-Karte.",
-      "prio": 6
+      "prio": 7
     },
     {
       "area": "Qualität",
@@ -85,7 +97,7 @@
       "kind": null,
       "title": "Lasttest 12 Handys + Netz-Robustheit (freigegeben)",
       "detail": "Bots über echtes WLAN statt localhost (zweiter Rechner oder Handys als Bot-Clients), 12 Spieler in Bomben-Arena, Smash, Kart, Igel und einer Party: Paketgrößen und -raten messen (Review-Werte als Vergleich: Arena ≈ 6 KB/Snapshot bei 20 Hz), Reconnect-Szenarien (Bildschirm aus, App-Wechsel, WLAN-Loch 2 s / 10 s / 60 s) automatisiert mit Playwright, CPU/Speicher des Servers über 2 Stunden; Ergebnis als Tabelle in docs/, gefundene Hänger als eigene Tickets.",
-      "prio": 7
+      "prio": 8
     },
     {
       "area": "Alle Spiele",
@@ -93,11 +105,11 @@
       "kind": null,
       "title": "Farbenblind-Modus in allen Ausführungen (freigegeben)",
       "detail": "Marlon: „gerne in allen Ausführungen“. Einstellung am Handy pro Spieler und am TV (VIP/Laptop): Deuteranopie (Rot-Grün, häufigste Form), Protanopie, Tritanopie (Blau-Gelb) und Hoher Kontrast/Graustufen. Umsetzung: (1) die 12 Spielerfarben bekommen je Modus eine geprüfte Alternativ-Palette (Abstand mit Simulations-Matrizen prüfen, Skript in scripts/), (2) Farbe nie allein: Spieler-Symbol (▲ ● ■ ◆ …) zusätzlich auf Ring, Namensschild, Spur, Fadenkreuz, Ball und HUD-Porträt, Teams mit Muster (Streifen/Punkte) statt nur Farbe, (3) Spiel-Signale (Rot = Gefahr, Grün = bereit) immer mit Symbol/Blinken, (4) TV-Vorschau zum Ausprobieren in der Lobby, (5) Playwright-Screenshots aller Szenen durch den Simulations-Filter als Abnahme.",
-      "prio": 8
+      "prio": 9
     },
     {
       "area": "Qualität",
-      "prio": 9,
+      "prio": 10,
       "size": "S–M",
       "kind": null,
       "title": "Noch unentschieden",
@@ -114,10 +126,15 @@
       "kind": null,
       "title": "Musik-Werkstatt: Nacharbeit nach dem Umbau",
       "detail": "Reste aus dem Umbau vom 24.11.: (1) TV-Musikmenü (client/host/musicMenu.ts) kennzeichnet Überschreibungen nicht – sie erscheinen als eigener Song mit dem Titel des Originals; (2) bei Szenen mit Stil oder Stille sind „Kopie & bearbeiten“/„Direkt bearbeiten“ gesperrt, bis man einen festen Song wählt – besser: Dropdown der Stil-Songs direkt anbieten; (3) ändert man in einer Überschreibung den Stil, rotiert sie trotzdem im Stil des Originals; (4) am TV-Bild nachmessen, dass die Überschreibung wirklich spielt. Später, nur falls gewünscht: Klang, Komponierhilfen, Tastatur-Spielen, Handy-Ansicht.",
-      "prio": 10
+      "prio": 11
     }
   ],
   "done": [
+    {
+      "title": "Neues Framing: Minispiel-Sammlung mit Handy-Controllern statt „Urlaubs-Edition“ – TV-Startseite als Arcade-Halle (Neon-Schild, Automaten blättern durch die Minispiele, Rampenlicht mit Titel), Handy-Lobby mit Arcade + Party als Haupt-Reiter, Date Night als „Story“, Arcade als Standardmodus, Party-Champion statt Urlaubs-Champion",
+      "pr": 120,
+      "date": "2026-11-24"
+    },
     {
       "title": "Kart-Rennen: GAS rastet ein (antippen = fährt von allein, BREMSE = aus), eigene große Knöpfe DRIFT und ITEM rechts, kein Hochrutschen mehr; Regelkarte und Bots angepasst",
       "pr": 121,
@@ -725,20 +742,8 @@
       "status": "offen"
     },
     {
-      "title": "Handy-Browser zoomt manchmal in den Controller rein → Zoom-Schutz (Gesten geblockt, Overlay „Zoom zurücksetzen“, Android-Vollbild); am echten iPhone noch zu prüfen",
-      "status": "umgesetzt"
-    },
-    {
       "title": "Knöpfe/Bedienelemente am Handy besser sichtbar und bedienbar (Abbrechen-Knopf im Spiel darf durchsichtig bleiben)",
       "status": "offen"
-    },
-    {
-      "title": "VIP am Laptop jederzeit wechseln → Spieler-Panel „👑 Zum VIP machen“",
-      "status": "umgesetzt"
-    },
-    {
-      "title": "Musik-Werkstatt zu unübersichtlich → Übersicht „Wo läuft was?“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt",
-      "status": "umgesetzt"
     },
     {
       "title": "VIP-Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers → kompakt „n offline“ neben „Abbrechen“ (#113)",
@@ -751,6 +756,22 @@
     {
       "title": "Freigegeben: Highlights & Replays, Onboarding für Gäste, Lasttest 12 Handys, Farbenblind-Modus in allen Ausführungen · gestrichen: Avatare aus Fotos",
       "status": "offen"
+    },
+    {
+      "title": "Kein Urlaubs-Framing mehr: Minispiel-Sammlung mit Handy-Controllern, Arcade + Party als Standard, Date Night als „Story“, TV-Startseite als Arcade-Halle statt Ferienhaus (à la Astro’s Playroom) (#120; offen: Spiel-Titel mit Urlaubs-Vorsilbe)",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Handy-Browser zoomt manchmal in den Controller rein → Zoom-Schutz (Gesten geblockt, Overlay „Zoom zurücksetzen“, Android-Vollbild); am echten iPhone noch zu prüfen",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "VIP am Laptop jederzeit wechseln → Spieler-Panel „👑 Zum VIP machen“",
+      "status": "umgesetzt"
+    },
+    {
+      "title": "Musik-Werkstatt zu unübersichtlich → Übersicht „Wo läuft was?“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt",
+      "status": "umgesetzt"
     }
   ]
 }

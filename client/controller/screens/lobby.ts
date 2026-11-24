@@ -120,7 +120,7 @@ export function buildEdit(onDone: () => void) {
 }
 
 export function buildLobby(vip: boolean, onEdit: () => void) {
-  const mode = store.state?.mode ?? 'party';
+  const mode = store.state?.mode ?? 'arcade';
   const root = el(`
     <h1>LAN-ABFAHRT</h1>
     <div class="row-center"></div>
@@ -153,13 +153,21 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
 
   if (vip) {
     menu.append(el(`<p>Du bist der VIP – du wählst, was gespielt wird.</p>`));
-    const tabs = el(`<div class="mode-tabs five"></div>`);
-    for (const [m, label] of [['party', 'Party'], ['arcade', 'Arcade'], ['turnier', 'Turnier'], ['drink', 'Trinken'], ['date', 'Date ♥']] as const) {
-      const b = el(`<button class="mode-tab ${m === mode ? 'active' : 'secondary'}">${label}</button>`).firstElementChild as HTMLButtonElement;
+    // Arcade und Party sind die Hauptmodi (groß), Turnier/Trinken/Story darunter
+    const main = el(`<div class="mode-tabs main"></div>`);
+    for (const [m, icon, label, sub] of [['arcade', '🕹️', 'Arcade', 'Spiel für Spiel'], ['party', '🎲', 'Party', 'Brett + Minispiele']] as const) {
+      const b = el(`<button class="mode-tab big ${m === mode ? 'active' : 'secondary'}"><span class="mt-icon">${icon}</span>${label}<small>${sub}</small></button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:mode', m));
-      q(tabs, '.mode-tabs').append(b);
+      q(main, '.mode-tabs').append(b);
     }
-    menu.append(tabs);
+    menu.append(main);
+    const more = el(`<div class="mode-tabs three more"></div>`);
+    for (const [m, label] of [['turnier', 'Turnier'], ['drink', 'Trinken'], ['date', 'Story ♥']] as const) {
+      const b = el(`<button class="mode-tab small ${m === mode ? 'active' : 'secondary'}">${label}</button>`).firstElementChild as HTMLButtonElement;
+      b.addEventListener('click', () => socket.emit('vip:mode', m));
+      q(more, '.mode-tabs').append(b);
+    }
+    menu.append(more);
   }
 
   const singles = (kinds: MiniKind[], title = 'Einzelspiel') => {
@@ -216,7 +224,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     }
     arcadeUpdate = turnierCustom(menu, gated);
   } else if (vip && mode === 'date') {
-    menu.append(el(`<h2>Date Night</h2><p>Für genau 2 Spieler – ihr spielt zusammen und sammelt Herzen.</p>`));
+    menu.append(el(`<h2>Story</h2><p>Eine Geschichte für genau 2 Spieler – ihr spielt sie zusammen durch und sammelt Herzen.</p>`));
     for (const v of DATE_VERSIONS) {
       const b = el(`<button class="date-btn">${v.title}<br/><small>${v.subtitle}</small></button>`).firstElementChild as HTMLButtonElement;
       b.addEventListener('click', () => socket.emit('vip:start', { mode: 'date', version: v.id }));
@@ -233,7 +241,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     gated.push({ btn: b, min: 2 });
     singles(DRINK_KINDS);
   } else if (vip) {
-    menu.append(el(`<h2>Party-Modus</h2><p>Spielbrett + Minispiele, Finale: Mord oder Verräter im Ferienhaus</p>`));
+    menu.append(el(`<h2>Party</h2><p>Spielbrett + nach jeder Runde ein Minispiel, Finale: Mord oder Verräter</p>`));
     // Gespeicherter Brettstand (data/party.json, z. B. nach einem Server-Neustart) → fortsetzen
     const saved = store.state?.partyResume;
     if (saved) {
@@ -262,7 +270,7 @@ export function buildLobby(vip: boolean, onEdit: () => void) {
     menu.append(longTog);
     singles(PARTY_KINDS);
   } else {
-    const label = mode === 'date' ? 'Date Night ♥' : mode === 'drink' ? 'Trinkspiel' : mode === 'turnier' ? 'Turnier' : 'Party-Abfahrt';
+    const label = mode === 'date' ? 'Story ♥' : mode === 'drink' ? 'Trinkspiel' : mode === 'turnier' ? 'Turnier' : 'Party';
     menu.append(el(`<div class="center"><h2>${label}</h2><p>${mode === 'turnier' ? 'Warte, bis der VIP eine Playlist startet ...' : 'Warte, bis der VIP ein Spiel startet ...'}</p></div>`));
   }
 

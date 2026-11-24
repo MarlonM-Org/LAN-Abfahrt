@@ -1,15 +1,15 @@
-# LAN-Abfahrt 🏖️
+# LAN-Abfahrt 🕹️
 
-Party-Spiel für unsere Freundesgruppe – im Stil von Mario Party / Jackbox:
+Minispiel-Sammlung für unsere Freundesgruppe – im Stil von Mario Party / Jackbox / Astro's Playroom:
 **Der Fernseher zeigt das Spiel, jedes Handy ist ein Controller.** Kein Controller, keine App nötig – QR-Code scannen und mitspielen.
 
 Aktueller Stand (v0.3):
 
-**Fünf Modi** (VIP wählt in der Lobby): **Party-Abfahrt** (Standard), **Arcade**, **Turnier**, **Trinkspiel** und **Date Night**.
+**Fünf Modi** (VIP wählt in der Lobby): **Arcade** (Standard) und **Party** sind die Hauptmodi, dazu **Turnier**, **Trinkspiel** und **Story** (Date Night für genau zwei).
 
 **Arcade:** Alle Spiele einzeln auswählbar – oder „Zufälliges Spiel“. Nach jeder Runde: „Nächstes Spiel (zufällig)“, „Nochmal“ oder „Spiel auswählen“. Jede Runde bringt Punkte nach Platzierung, gestreckt nach Spielerzahl (Erster 10, Letzter 1, dazwischen linear `round(10 · (n − Platz) / (n − 1))`; bei 2 Spielern 10/5; bei Gemeinschaftsspielen bekommen alle gleich viel), die pro Spielername dauerhaft in `data/arcade.json` gesammelt werden – als ewige Tabelle am Handy (nur mit den Spielern, die gerade da sind) samt den eigenen Punkten pro Spiel. Bots zählen nicht.
 
-**Startseite (TV-Lobby):** Zeigt in jedem Modus die Spieler, die gerade da sind (Figuren mit Namen, VIP mit Krone, Offline-Spieler grau). In Arcade und Turnier stehen nach dem ersten Spiel des Abends die Punkte von heute klein unter den Namen (Spitzenreiter golden). Das **Leaderboard des Abends** holt der VIP (Handy: „Auf dem TV zeigen“) bzw. der Laptop (`L`) auf den TV; es zeigt – wie im Ergebnis und am Handy – nur, wer noch in der Runde ist. Wer ganz weg ist (entfernt oder nach der Offline-Frist raus), verschwindet aus der Tabelle; seine Punkte bleiben gespeichert und sind wieder da, wenn er mit demselben Handy zurückkommt.
+**Startseite (TV-Lobby):** Eine Arcade-Halle: Neon-Schild, Automaten an der Rückwand, deren Bildschirme durch die Minispiele blättern (getestete zuerst, das Rampenlicht zeigt den Titel), davor die Spieler, die gerade da sind (Figuren mit Namen, VIP mit Krone, Offline-Spieler grau). In Arcade und Turnier stehen nach dem ersten Spiel des Abends die Punkte von heute klein unter den Namen (Spitzenreiter golden). Das **Leaderboard des Abends** holt der VIP (Handy: „Auf dem TV zeigen“) bzw. der Laptop (`L`) auf den TV; es zeigt – wie im Ergebnis und am Handy – nur, wer noch in der Runde ist. Wer ganz weg ist (entfernt oder nach der Offline-Frist raus), verschwindet aus der Tabelle; seine Punkte bleiben gespeichert und sind wieder da, wenn er mit demselben Handy zurückkommt.
 
 **Arcade sortieren:** Über den Kacheln (Handy-Arcade und Laptop-Auswahl `A`) schaltet man zwischen **Getestet zuerst** (Standard: oben „✅ Schon getestet“ = Spiele mit Feedback in `docs/status.json`, darunter „🆕 Noch nicht getestet“, je A–Z), **A–Z** und **Kategorien** (Action, Zielen & Werfen … wie bisher). **Favoriten:** Der VIP (☆ oben links an jeder Kachel) und der Laptop (☆ unten rechts oder Taste `F` auf der markierten Kachel) können Spiele als ⭐ Favorit merken – sie stehen in jeder Sortierung ganz oben unter „⭐ Favoriten“. Gemerkt wird nur im Browser des jeweiligen Geräts (localStorage, bleibt bis die Browserdaten gelöscht werden), nicht auf dem Server. Jedes Gerät merkt sich seine Wahl; der Server liest die Feedback-Liste aus `docs/status.json` (`server/reviewed.ts`, Änderungen kommen ohne Neustart an).
 
@@ -31,7 +31,7 @@ Aktueller Stand (v0.3):
   - **Duell „Teilen oder Klauen“** (⚔️-Felder): Wer dort landet, duelliert mit einem Mitspieler (meist dem Führenden) um einen Pott von **10 Münzen aus der Bank**. Beide wählen 10 s lang geheim am Handy (ohne Wahl: Teilen), der TV deckt die Karten nacheinander auf: beide teilen = je 5, einer klaut = er bekommt 10, beide klauen = nichts und je −3 Strafe. Die eigene Wahl kommt nur per `private` zurück, nie im `GameState`
   - Nach jeder Runde ein Minispiel (standardmäßig nur kurze und mittlere bis ca. 4 min, siehe `MINI_LENGTH` in `shared/games.ts`; der VIP-Schalter **„Lange Spiele“** neben der Rundenwahl nimmt auch Golf, Bowling & Co. dazu), Münzen nach Platzierung mit derselben Staffel wie in Arcade (bei 12 Spielern 10/9/8/7/6/5/5/4/3/2/1/1, der Startspieler wechselt jede Runde); Koop-Spiele zahlen allen dasselbe nach Ergebnis (Urlaubsflieger: Bali erreicht 8, je fehlender Etappe weniger, Absturz am Start 1, MVP +2; Grill-Chaos gemeinsam: 1/2/3 Sterne = 3/6/10 Münzen) – **Finale: Mord oder Verräter im Ferienhaus** (zufällig, ab 4 Spielern): Das Sieger-Team bekommt zusätzlich **2 Cocktails**
   - **Bonus-Cocktails** nach dem Finale, mit eigenem Reveal vor dem Endstand (je +1 Cocktail): **Minispiel-Star** (meiste Münzen aus Minispielen), **Pechvogel** (am öftesten auf Rot), **Wanderer** (die meisten Felder gelaufen). Bei Gleichstand bekommt den Cocktail, wer in der Wertung (Cocktails, dann Münzen) am weitesten hinten liegt – Aufholhilfe; steht auch das gleich, entscheidet die Startreihenfolge. Der TV nennt den Gleichstand auf der Karte
-  - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Urlaubs-Champion
+  - Wer am Ende die meisten Cocktails hat (bei Gleichstand: Münzen), ist Party-Champion
   - **Tageszeit:** Der TV taucht das Brett über den Abend in Morgenlicht, Mittag und Sonnenuntergang (letzte Runde); zum Finale wird es Nacht mit Mond, Sternen und Lichterkette am Ferienhaus
   - **Nachzügler** dürfen während der Party beitreten und steigen zur nächsten Brett-Runde am Start mit dem Median der Münzen ein
   - **Brettstand gespeichert:** Zu Beginn jeder Runde schreibt der Server `data/party.json` (Spieler, Positionen, Münzen, Cocktails, Items, Runde, Statistik; ältere Stände ohne Items laden weiterhin). Nach einem Server-Neustart (oder Abbruch) bietet die Lobby dem VIP **„Party fortsetzen?“** an – Spieler werden über ID bzw. Namen wiedererkannt. Testen: `npm run bots -- 8 --party --rounds=5`, Server neu starten, dann `npm run bots -- 8 --resume`
@@ -148,7 +148,7 @@ _Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) –
 | ⏰ Tick-Tack-Bumm |  | ab 2 | ↕ hochkant | kurz | – |
 | 👑 Kings Cup |  | ab 2 | ↕ hochkant | mittel | – |
 | 🎲 Mäxchen am Pool | à la Mäxchen | ab 2 | ↕ hochkant | lang | – |
-| **Date Night (zu zweit)** | | | | | |
+| **Story: Date Night (zu zweit)** | | | | | |
 | ⛰️ Der Abstieg |  | ab 1 | egal | kurz | – |
 | 💬 Das erste Gespräch |  | 1–2 | ↕ hochkant | kurz | – |
 | 🌯 Wraps mit Sriracha-Mayo |  | ab 1 | ↕ hochkant | kurz | – |
