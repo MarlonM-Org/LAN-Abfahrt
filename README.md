@@ -433,3 +433,5 @@ Alle Grafiken sind prozedurale Pixel-Art im Cozy-Farm-Look (`client/art/`) – k
 - [x] Sounds & Musik (8-Bit-Loops, Musik-Werkstatt mit Einsingen und MIDI-Import)
 
 Ausführliche Spiele-Ideen (Arena, Bewegungssensor, geheime Rollen, Physik …) nach Aufwand sortiert: **[ROADMAP.md](ROADMAP.md)**
+
+Aktuelle Roadmap mit Prioritäten: `docs/status.json` (Status-Seite). **Mitbauen:** erst claimen, dann bauen – Anleitung in **[docs/mitbauen.md](docs/mitbauen.md)**.
