@@ -1,73 +1,94 @@
-import type { MiniSnapshot, RhythmNote, RhythmState, SkipInfo } from '../shared/types';
-import { RHYTHM, RHYTHM_TOPICS } from '../shared/dategames';
-import { type MiniCtx, type MiniGame, Timers, asRecord, phaseTimer, shuffle } from './minigame';
+import type { MiniSnapshot, SkipInfo } from '../shared/types';
+import {
+  RH, RHYTHM_TOPICS, type RhMark, type RhNote, type RhythmPlayer, type RhythmState, MARK_CHARS, imTakt, kalAuswerten, kalPhase, raumVersatz, rhBeatMs, rhSong,
+  rhSongMs, rhythmusNoten, rhythmusPhrasen, tippWerten, trefferQuote, verpassteNoten, wettkampfWert,
+} from '../shared/rhythmus';
+import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, phaseTimer, shuffle } from './minigame';
+import { ladeVersatz, speichereVersatz } from './rhythmusVersatz';
+
+/** Warten auf „Bereit“: `null` = kein Limit – der VIP/Laptop kann starten */
+export const RHYTHM_READY_MS: number | null = null;
+
+const leer = (n: number): RhythmPlayer => ({
+  ready: false,
+  kal: { n: 0, wert: null, streu: 0, stabil: false },
+  perfect: 0,
+  good: 0,
+  miss: 0,
+  fehl: 0,
+  combo: 0,
+  best: 0,
+  marks: '.'.repeat(n),
+  last: null,
+});
 
 /**
- * Das erste Gespräch: Ein Rhythmusspiel. Abwechselnd "redet" einer (viele Noten),
- * der andere hört zu (wenige Noten, nicken). Bewertet wird direkt am Handy,
- * damit Netzwerk-Verzögerungen keine Rolle spielen.
+ * Das erste Gespräch: Rhythmusspiel à la Klavier-Kacheln zum Song vom TV.
+ *
+ * Ablauf: Soundcheck (`ready`: TV klickt, Handys tippen im Takt → Ton-Versatz des TVs, raumweit gespeichert) →
+ * Song (`play`) → `over`. In der Story (Date Night) gemeinsam: abwechselnd redet einer (Melodie), der andere nickt
+ * (Bassdrum), Herzen nach dem gemeinsamen Takt. Sonst Wettkampf: alle dieselbe Spur, Gewinner nach Trefferquote.
+ *
+ * Timing: Die Spuren rechnet jedes Gerät selbst aus dem Song aus (`shared/rhythmus.ts`). Das Handy schickt jeden
+ * Tipp mit seiner Songzeit (synchronisierte Uhr − Ton-Versatz − eigener Fein-Abgleich); gewertet wird hier mit
+ * derselben reinen Funktion wie am Handy – die Laufzeit Handy → Server spielt keine Rolle, nur für „verpasst“
+ * wartet der Server `NET_GRACE_MS` auf späte Tipps.
  */
 export class RhythmGame implements MiniGame {
   readonly kind = 'rhythm' as const;
   private state: RhythmState;
-  private judged = new Map<string, Set<number>>();
+  private song = rhSong();
   private timers = new Timers();
+  private charts = new Map<string, RhNote[]>();
+  private marks = new Map<string, Uint8Array>();
+  /** Soundcheck: Lage der letzten Tipps im Klick-Raster */
+  private phasen = new Map<string, number[]>();
+  /** In diesem Spiel neu gemessen (→ beim Start speichern) */
+  private neuGemessen = false;
   private seq = 0;
 
   constructor(
     private ids: string[],
     private ctx: MiniCtx,
   ) {
-    const beat = 60000 / RHYTHM.BPM;
-    const phraseBeats = 8;
+    const wettkampf = ctx.mode !== 'date';
+    const order = [...ids];
+    const stored = ladeVersatz();
     const topics = shuffle(RHYTHM_TOPICS);
-    const phrases: RhythmState['phrases'] = [];
-    const charts: Record<string, RhythmNote[]> = Object.fromEntries(ids.map((id) => [id, []]));
-
-    for (let p = 0; p < RHYTHM.BEATS / phraseBeats; p++) {
-      const speaker = ids[p % ids.length];
-      const from = RHYTHM.LEAD_IN + p * phraseBeats * beat;
-      phrases.push({ from, to: from + phraseBeats * beat, speaker, topic: topics[p % topics.length] });
-      for (const id of ids) {
-        const talking = id === speaker || ids.length === 1;
-        for (let b = 0; b < phraseBeats; b++) {
-          const t = from + b * beat;
-          if (talking) {
-            if (b === 7) continue; // Atempause
-            if (Math.random() < 0.8) charts[id].push({ t, lane: Math.random() < 0.5 ? 0 : 1 });
-            if (p > 0 && Math.random() < 0.22) charts[id].push({ t: t + beat / 2, lane: Math.random() < 0.5 ? 0 : 1 });
-          } else if (b % 4 === 0) {
-            charts[id].push({ t, lane: b === 0 ? 0 : 1 }); // Nicken
-          }
-        }
-      }
+    for (const id of ids) {
+      const chart = rhythmusNoten(order, id, wettkampf, this.song);
+      this.charts.set(id, chart);
+      this.marks.set(id, new Uint8Array(chart.length));
+      this.phasen.set(id, []);
     }
-    for (const id of ids) charts[id].sort((a, b) => a.t - b.t);
-
     this.state = {
       sub: 'ready',
+      wettkampf,
+      bpm: this.song.bpm,
+      kalAt: Date.now() + 600,
+      kalBeat: RH.KAL_BEAT_MS,
+      versatz: stored?.versatz ?? 0,
+      versatzQuelle: stored ? 'gespeichert' : 'keiner',
+      pflicht: false,
       startAt: 0,
-      ready: [],
+      duration: Math.round(rhSongMs(this.song)),
       playSeq: 0,
-      bpm: RHYTHM.BPM,
-      leadIn: RHYTHM.LEAD_IN,
-      duration: RHYTHM.LEAD_IN + RHYTHM.BEATS * beat + 800,
-      charts,
-      phrases,
-      score: Object.fromEntries(ids.map((id) => [id, 0])),
-      combo: Object.fromEntries(ids.map((id) => [id, 0])),
-      lastHit: {},
+      order,
+      players: Object.fromEntries(ids.map((id) => [id, leer(this.charts.get(id)!.length)])),
+      phrases: wettkampf || ids.length < 2 ? [] : rhythmusPhrasen(order, this.song).map((p, i) => ({ ...p, topic: topics[i % topics.length] })),
       sympathy: 50,
     };
-    for (const id of ids) this.judged.set(id, new Set());
-    // Falls jemand nicht "bereit" drückt: VIP startet über das Menü (oder nach READY_MS, falls gesetzt)
-    phaseTimer(this.timers, RHYTHM.READY_MS, () => this.play());
+    phaseTimer(this.timers, RHYTHM_READY_MS, () => this.play());
+  }
+
+  snapshot(): MiniSnapshot {
+    return { kind: 'rhythm', state: this.state };
   }
 
   skippable(): SkipInfo | null {
     const s = this.state;
     if (s.sub !== 'ready') return null;
-    const missing = this.ids.filter((p) => this.ctx.isConnected(p) && !s.ready.includes(p));
+    const missing = this.ids.filter((p) => this.ctx.isConnected(p) && !s.players[p].ready);
     return { label: missing.length === 1 ? 'Ohne Bereit-Knopf starten' : 'Los geht’s' };
   }
 
@@ -75,83 +96,213 @@ export class RhythmGame implements MiniGame {
     if (this.state.sub === 'ready') this.play();
   }
 
-  snapshot(): MiniSnapshot {
-    return { kind: 'rhythm', state: this.state };
+  /** VIP: „kalibrieren“ = neu einmessen, „next“ (Laptop: Enter) = wie Überspringen */
+  vipAction(action: string) {
+    if (action === 'kalibrieren') this.neuEinmessen();
+    else if (action === 'next') this.skip();
+  }
+
+  /** TV/Laptop: „kalibrieren“ (Taste K bzw. Knopf am TV) */
+  hostInput(action: string, _payload?: unknown) {
+    if (action === 'kalibrieren') this.neuEinmessen();
   }
 
   input(id: string, action: string, payload: unknown) {
     const s = this.state;
-    if (!this.ids.includes(id)) return;
-    if (action === 'ready' && s.sub === 'ready') {
-      if (!s.ready.includes(id)) s.ready.push(id);
-      if (this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => s.ready.includes(p))) this.play();
-      else this.ctx.onChange();
-    } else if (action === 'hit' && s.sub === 'play') {
-      const p = asRecord(payload);
-      const i = Number(p.i);
-      const q = Math.max(0, Math.min(2, Math.round(Number(p.q)))) as 0 | 1 | 2;
-      const judged = this.judged.get(id)!;
-      if (!Number.isInteger(i) || i < 0 || i >= s.charts[id].length || judged.has(i)) return;
-      judged.add(i);
-      s.score[id] += q;
-      s.combo[id] = q > 0 ? s.combo[id] + 1 : 0;
-      s.lastHit[id] = { q, seq: ++this.seq };
-      s.sympathy = this.sympathyNow();
-      this.ctx.onChange();
-    }
+    const p = s.players[id];
+    if (!p) return;
+    const d = asRecord(payload);
+    if (s.sub === 'ready') {
+      if (action === 'kal') this.kalTipp(id, Number(d.at));
+      else if (action === 'ready' && !p.ready) {
+        p.ready = true;
+        if (this.allReady()) this.play();
+        else this.ctx.onChange();
+      }
+    } else if (s.sub === 'play' && action === 'tipp') this.tipp(id, Number(d.l), Number(d.t));
   }
 
-  private sympathyNow() {
-    let got = 0;
-    let max = 0;
-    for (const id of this.ids) {
-      got += this.state.score[id];
-      max += this.judged.get(id)!.size * 2;
+  // ---------------------------------------------------------------- Soundcheck
+
+  private kalTipp(id: string, at: number) {
+    const s = this.state;
+    // Bots messen nichts (sie hören den TV nicht); Zeitstempel müssen ungefähr „jetzt“ sein
+    if (this.ctx.isBot?.(id) || !Number.isFinite(at) || Math.abs(at - Date.now()) > 3000) return;
+    const ph = this.phasen.get(id)!;
+    ph.push(kalPhase(at, s.kalAt, s.kalBeat));
+    if (ph.length > RH.KAL_N) ph.shift();
+    const r = kalAuswerten(ph, s.kalBeat);
+    s.players[id].kal = { n: ph.length, wert: r?.wert ?? null, streu: r?.streu ?? 0, stabil: !!r?.stabil };
+    const werte = this.ids.map((o) => s.players[o].kal).filter((k) => k.stabil && k.wert !== null).map((k) => k.wert!);
+    const v = raumVersatz(werte);
+    if (v !== null) {
+      s.versatz = v;
+      s.versatzQuelle = 'gemessen';
+      this.neuGemessen = true;
     }
-    return max ? Math.round((got / max) * 100) : 50;
+    this.ctx.onChange();
   }
+
+  /** Neu einmessen (VIP/Laptop) – mitten im Song: Song abbrechen, zurück zum Soundcheck */
+  private neuEinmessen() {
+    const s = this.state;
+    if (s.sub === 'over') return;
+    this.timers.clear();
+    if (s.sub === 'play') {
+      s.sub = 'ready';
+      s.startAt = 0;
+      for (const id of this.ids) this.marks.get(id)!.fill(0);
+      s.sympathy = 50;
+    }
+    for (const id of this.ids) {
+      this.phasen.set(id, []);
+      s.players[id] = leer(this.charts.get(id)!.length);
+    }
+    s.pflicht = true;
+    s.kalAt = Date.now() + 300;
+    phaseTimer(this.timers, RHYTHM_READY_MS, () => this.play());
+    this.ctx.onChange();
+  }
+
+  private allReady() {
+    const s = this.state;
+    const on = this.ids.filter((id) => this.ctx.isConnected(id));
+    return on.length > 0 && on.every((id) => s.players[id].ready);
+  }
+
+  // ---------------------------------------------------------------- Song
 
   private play() {
     const s = this.state;
     if (s.sub !== 'ready') return;
     this.timers.clear();
+    if (this.neuGemessen) {
+      speichereVersatz(s.versatz, this.ids.filter((id) => s.players[id].kal.stabil).length);
+      this.neuGemessen = false;
+    }
     s.sub = 'play';
     s.playSeq += 1;
-    // Kleiner Puffer, damit alle Geräte den Startzeitpunkt rechtzeitig kennen
-    s.startAt = Date.now() + 1500;
+    s.pflicht = false;
+    s.startAt = Date.now() + RH.START_BUFFER_MS + RH.COUNT_IN * rhBeatMs(this.song);
     this.ctx.onChange();
-    this.timers.later(s.duration + 3000, () => this.end());
+    this.timers.every(100, () => this.tick());
+    this.timers.later(s.startAt - Date.now() + s.duration + RH.END_MS + RH.NET_GRACE_MS, () => this.end());
+  }
+
+  /** Songzeit, wie die Handys sie sehen (Serverzeit − Start − Ton-Versatz) */
+  private songNow() {
+    return Date.now() - this.state.startAt - this.state.versatz;
+  }
+
+  private tipp(id: string, lane: number, t: number) {
+    if (!Number.isInteger(lane) || lane < 0 || lane >= RH.LANES || !Number.isFinite(t)) return;
+    const now = this.songNow();
+    // Zeitstempel aus der Zukunft (über Uhr-Ungenauigkeit + Fein-Abgleich hinaus) oder uralt → verwerfen
+    if (t > now + RH.FEIN_MAX + 300 || t < now - 5000) return;
+    const p = this.state.players[id];
+    const r = tippWerten(this.charts.get(id)!, this.marks.get(id)!, lane, t);
+    if (!r) {
+      p.fehl += 1;
+      p.combo = 0;
+    } else this.bewerte(id, r.i, r.mark);
+    this.ctx.onChange();
+  }
+
+  private bewerte(id: string, i: number, mark: Exclude<RhMark, 0>) {
+    const s = this.state;
+    const p = s.players[id];
+    this.marks.get(id)![i] = mark;
+    p.marks = p.marks.slice(0, i) + MARK_CHARS[mark] + p.marks.slice(i + 1);
+    if (mark === 3) p.perfect++;
+    else if (mark === 2) p.good++;
+    else p.miss++;
+    p.combo = mark > 1 ? p.combo + 1 : 0;
+    p.best = Math.max(p.best, p.combo);
+    p.last = { i, m: mark, seq: ++this.seq };
+    if (!s.wettkampf) {
+      let pf = 0;
+      let gd = 0;
+      let n = 0;
+      for (const o of this.ids) {
+        const q = s.players[o];
+        pf += q.perfect;
+        gd += q.good;
+        n += q.perfect + q.good + q.miss;
+      }
+      s.sympathy = Math.round(imTakt(pf, gd, n) * 100);
+    }
+  }
+
+  /** Verpasste Noten (Fenster + Fein-Abgleich + Netz-Puffer vorbei, kein Tipp kam) */
+  private tick() {
+    const t = this.songNow();
+    let changed = false;
+    for (const id of this.ids) {
+      for (const i of verpassteNoten(this.charts.get(id)!, this.marks.get(id)!, t, RH.FEIN_MAX + RH.NET_GRACE_MS)) {
+        this.bewerte(id, i, 1);
+        changed = true;
+      }
+    }
+    if (changed) this.ctx.onChange();
   }
 
   private end() {
     const s = this.state;
+    if (s.sub !== 'play') return;
+    this.timers.clear();
+    // Nie gemeldete Noten (Handy weg, Bildschirm aus) zählen als verpasst
+    for (const id of this.ids) this.marks.get(id)!.forEach((m, i) => !m && this.bewerte(id, i, 1));
     s.sub = 'over';
     this.ctx.onChange();
-    let got = 0;
-    let max = 0;
-    for (const id of this.ids) {
-      got += s.score[id];
-      max += s.charts[id].length * 2;
-    }
-    const ratio = max ? got / max : 0;
-    const hearts = Math.max(0, Math.min(10, Math.round(ratio * 10 + 0.5)));
-    this.timers.later(2500, () =>
+    this.timers.later(2500, () => this.finish());
+  }
+
+  private finish() {
+    const s = this.state;
+    const total = (id: string) => this.charts.get(id)!.length;
+    const quote = (id: string) => trefferQuote(s.players[id].perfect, s.players[id].good, total(id));
+    if (!s.wettkampf) {
+      let pf = 0;
+      let gd = 0;
+      let n = 0;
+      for (const id of this.ids) {
+        pf += s.players[id].perfect;
+        gd += s.players[id].good;
+        n += total(id);
+      }
+      const ratio = imTakt(pf, gd, n);
+      const hearts = Math.max(0, Math.min(10, Math.round(ratio * 10 + 0.5)));
       this.ctx.finish({
         groups: [this.ids],
-        details: Object.fromEntries(this.ids.map((id) => [id, `${Math.round((s.score[id] / Math.max(1, s.charts[id].length * 2)) * 100)}% im Takt`])),
+        details: Object.fromEntries(this.ids.map((id) => [id, `${Math.round(imTakt(s.players[id].perfect, s.players[id].good, total(id)) * 100)} % im Takt`])),
         subtitle: ratio > 0.75 ? 'Ihr redet, als würdet ihr euch ewig kennen.' : ratio > 0.45 ? 'Ein paar Pausen – aber das Lachen war echt.' : 'Ähm ... schönes Wetter heute, oder?',
         hearts: this.ctx.mode === 'date' ? hearts : undefined,
-      }),
-    );
+      });
+      return;
+    }
+    const groups = groupByScore(this.ids, (id) => wettkampfWert(s.players[id].perfect, s.players[id].good, total(id)));
+    const top = groups[0] ?? [];
+    const q = top.length ? quote(top[0]) : 0;
+    const flavor = q >= 90 ? 'Taktgefühl pur!' : q >= 70 ? 'Da springt der Funke über.' : q >= 45 ? 'Ein bisschen holprig – aber charmant.' : 'Ähm ... schönes Wetter heute, oder?';
+    const names = top.map((id) => this.ctx.nameOf(id)).join(' & ');
+    const subtitle = this.ids.length === 1 ? `${q} % Treffer – ${flavor}` : `${names} ${top.length > 1 ? 'treffen' : 'trifft'} ${q} % – ${flavor}`;
+    this.ctx.finish({
+      groups,
+      details: Object.fromEntries(this.ids.map((id) => [id, `${quote(id)} % Treffer`])),
+      subtitle,
+    });
   }
 
   playerDisconnected() {
-    // Partner weg, der andere ist schon bereit → nicht 25 s warten
+    // Der Letzte, auf den alle warten, ist weg → nicht ewig warten
     const s = this.state;
-    if (s.sub === 'ready' && s.ready.length && this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => s.ready.includes(p))) this.play();
+    if (s.sub === 'ready' && this.ids.some((id) => s.players[id].ready) && this.allReady()) this.play();
   }
 
   dispose() {
     this.timers.clear();
+    // Abgebrochen nach dem Soundcheck: die Messung trotzdem behalten
+    if (this.neuGemessen) speichereVersatz(this.state.versatz, this.ids.filter((id) => this.state.players[id].kal.stabil).length);
+    this.neuGemessen = false;
   }
 }
