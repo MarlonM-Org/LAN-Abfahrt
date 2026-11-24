@@ -428,18 +428,26 @@ export interface SupState {
 export interface TidyPlayer {
   x: number;
   y: number;
+  /** Blickrichtung = Richtung des Besens (rad, 0 = nach rechts, dreht weich zur Stick-Richtung) */
+  a: number;
   team: Team;
-  /** Blickrichtung (für die Figur) */
+  /** Figur nach links/rechts gespiegelt (folgt `a`, mit etwas Spiel, damit sie beim Hoch-/Runterlaufen nicht flattert) */
   dir: 1 | -1;
   moving: boolean;
+  /** Sprint läuft gerade */
+  dash?: boolean;
+  /** ms bis SPRINT wieder geht */
   dashLeft: number;
 }
 
 export interface TidyState {
   sub: 'countdown' | 'play' | 'over';
+  /** Serverzeit des Physik-Takts zu diesem Stand (TV interpoliert damit, `SnapBuffer`) */
+  t: number;
   endsIn: number;
   players: Record<string, TidyPlayer>;
-  items: { id: number; x: number; y: number; type: string }[];
+  /** Herumliegende Sachen – die Art steckt in der id (`tidyItemType()` in shared/games.ts) */
+  items: { id: number; x: number; y: number }[];
   baskets: { team: Team; x: number; y: number; r: number }[];
   score: Record<Team, number>;
   /** Kurzer Jubel, wenn ein Teil im Korb landet */

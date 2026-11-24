@@ -1,6 +1,7 @@
 import type { MiniSnapshot, SupBoard, SupState, Team, TidyPlayer, TidyState } from '../shared/types';
 import { SUP, TEAM_INFO_SAFE, TIDY } from './cgconst';
-import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle, splitTeams } from './minigame';
+import { tidyItemType } from '../shared/games';
+import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, shuffle, splitTeams } from './minigame';
 
 const TICK_MS = 50;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -199,17 +200,93 @@ interface Item {
   y: number;
   vx: number;
   vy: number;
-  type: string;
+}
+
+type TidyP = TidyPlayer & { sx: number; sy: number; dashUntil: number; dashReady: number };
+
+/** Lage eines Spielers für den Besen: Körpermitte (x, y) und Blickrichtung a */
+export interface TidyFrame {
+  x: number;
+  y: number;
+  a: number;
+}
+
+/** Weltpunkt in Spieler-Koordinaten: u = nach vorn (Blickrichtung), v = quer dazu */
+export function tidyLocal(f: TidyFrame, x: number, y: number) {
+  const c = Math.cos(f.a);
+  const s = Math.sin(f.a);
+  const dx = x - f.x;
+  const dy = y - f.y;
+  return { u: dx * c + dy * s, v: dy * c - dx * s };
+}
+
+function tidyWorld(f: TidyFrame, u: number, v: number) {
+  const c = Math.cos(f.a);
+  const s = Math.sin(f.a);
+  return { x: f.x + u * c - v * s, y: f.y + u * s + v * c };
+}
+
+/** Winkel `a` höchstens um `max` (rad) zur Richtung `ziel` drehen – auf dem kurzen Weg, Ergebnis in −π…π */
+export function tidyTurn(a: number, ziel: number, max: number) {
+  const d = Math.atan2(Math.sin(ziel - a), Math.cos(ziel - a));
+  const r = a + clamp(d, -max, max);
+  return Math.atan2(Math.sin(r), Math.cos(r));
+}
+
+/** So weit darf eine Sache seitlich über das Besenende ragen und wird trotzdem noch gerade geschoben */
+const TIDY_TIP = TIDY.BROOM_HALF + TIDY.ITEM_R * 0.6;
+
+/**
+ * Besen gegen eine Sache. Die Kante liegt quer vor dem Spieler bei u = BROOM_D (|v| ≤ BROOM_HALF), eine anliegende
+ * Sache sitzt bei u = BROOM_D + ITEM_R. Lag sie vorher vor der Kante und wäre jetzt dahinter, sitzt sie wieder genau
+ * vor der Kante – mit derselben Querlage wie vorher (Haftreibung). So bleibt sie beim Geradeauslaufen UND im Bogen auf
+ * der Geraden vor dem Besen, statt wie an einem runden Körper zur Seite wegzurutschen. Fegt das Besenende beim Drehen
+ * seitlich über eine Sache, landet sie ebenfalls vor der Kante. Zieht sich der Besen zurück, bleibt die Sache liegen.
+ * `alt`/`neu`: Spieler vor/nach dem Takt, (x0, y0) Sache vor dem Takt, (x1, y1) jetzt.
+ * @returns neue Lage (`carried` = vom Besen mitgenommen → bekommt dessen Tempo) oder null ohne Kontakt
+ */
+export function tidyBroomPush(alt: TidyFrame, neu: TidyFrame, x0: number, y0: number, x1: number, y1: number): { x: number; y: number; carried: boolean } | null {
+  const D = TIDY.BROOM_D;
+  const front = D + TIDY.ITEM_R;
+  const p1 = tidyLocal(neu, x1, y1);
+  if (p1.u >= front) return null;
+  const p0 = tidyLocal(alt, x0, y0);
+  if (p0.u >= D - 1.5 && Math.abs(p0.v) <= TIDY_TIP) return { ...tidyWorld(neu, front, p0.v), carried: true };
+  if (p1.u > D - TIDY.ITEM_R && Math.abs(p1.v) <= TIDY_TIP) return { ...tidyWorld(neu, front, p1.v), carried: false };
+  return null;
 }
 
 /**
- * Aufräumen im Ferienhaus: Zwei Teams schieben per Joystick herumliegende Sachen
- * in ihren Korb. Mit "Sprint" kann man kurz schneller laufen (und andere wegschubsen).
+ * Eigener Körper gegen eine Sache: kleines Quadrat, das sich mit dem Spieler dreht. Schiebt sie auf kürzestem Weg
+ * (senkrecht zu einer Kante) hinaus, ohne Schwung – der Körper schubst nichts mehr in alle Richtungen weg.
+ */
+export function tidyBodyPush(f: TidyFrame, x: number, y: number): { x: number; y: number } | null {
+  const H = TIDY.BODY_H + TIDY.ITEM_R;
+  const p = tidyLocal(f, x, y);
+  const du = H - Math.abs(p.u);
+  const dv = H - Math.abs(p.v);
+  if (du <= 0 || dv <= 0) return null;
+  return du < dv ? tidyWorld(f, p.u >= 0 ? H : -H, p.v) : tidyWorld(f, p.u, p.v >= 0 ? H : -H);
+}
+
+/** Ecken des Zimmers: Sachen rollen langsam heraus (sonst kommt man mit dem Besen nie mehr dahinter) */
+const TIDY_CORNER = 20;
+const TIDY_CORNER_PUSH = 90;
+
+const r1 = (v: number) => Math.round(v * 10) / 10;
+
+/**
+ * Aufräumen im Ferienhaus: Zwei Teams fegen herumliegende Sachen in ihren Korb. Jeder trägt einen Besen – eine gerade
+ * Kante quer vor sich, die sich weich und zügig zur Laufrichtung dreht; geschoben wird mit ihr (der Körper ist nur ein
+ * kleines Quadrat und schubst nichts weg). "Sprint": kurz schneller, die Sachen vor dem Besen fliegen geradeaus davon,
+ * andere Spieler werden weggeschubst. Physik mit 60 Hz, Snapshot jeden 2. Takt mit dessen Zeit `t` (TV interpoliert).
+ * Aufwärmrunde (`ctx.practice`): kein Zeitlimit, ist alles aufgeräumt, liegt neues Chaos herum.
  */
 export class TidyGame implements MiniGame {
   readonly kind = 'tidy' as const;
-  private players = new Map<string, TidyPlayer & { sx: number; sy: number; dashUntil: number; dashReady: number }>();
+  private players = new Map<string, TidyP>();
   private items: Item[] = [];
+  private nextItem = 0;
   private baskets: TidyState['baskets'];
   private score: Record<Team, number> = { A: 0, B: 0 };
   private lastScore: TidyState['lastScore'] = null;
@@ -217,6 +294,9 @@ export class TidyGame implements MiniGame {
   private sub: TidyState['sub'] = 'countdown';
   private deadline = Date.now() + TIDY.COUNTDOWN_MS;
   private timers = new Timers();
+  /** Zeit des letzten Physik-Takts (geht als `t` in den Snapshot) */
+  private tickAt = 0;
+  private ticks = 0;
 
   constructor(
     private ids: string[],
@@ -239,6 +319,8 @@ export class TidyGame implements MiniGame {
       this.players.set(id, {
         x: team === 'A' ? A.x + 60 : A.x + A.w - 60,
         y: A.y + (perTeam > 4 ? 20 : 30) + ((i >> 1) % Math.max(4, perTeam)) * gap,
+        // Besen zeigt zu Beginn in die Zimmermitte
+        a: team === 'A' ? 0 : Math.PI,
         team,
         dir: team === 'A' ? 1 : -1,
         moving: false,
@@ -249,47 +331,105 @@ export class TidyGame implements MiniGame {
         dashReady: 0,
       });
     });
-    for (let i = 0; i < TIDY.ITEMS; i++) {
-      this.items.push({
-        id: i,
-        x: A.x + 80 + Math.random() * (A.w - 160),
-        y: A.y + 14 + Math.random() * (A.h - 28),
-        vx: 0,
-        vy: 0,
-        type: TIDY.ITEM_TYPES[i % TIDY.ITEM_TYPES.length],
-      });
-    }
+    this.spawnItems();
     this.timers.later(TIDY.COUNTDOWN_MS, () => this.start());
+  }
+
+  private spawnItems() {
+    const A = TIDY.AREA;
+    for (let i = 0; i < TIDY.ITEMS; i++) {
+      this.items.push({ id: this.nextItem++, x: A.x + 80 + Math.random() * (A.w - 160), y: A.y + 14 + Math.random() * (A.h - 28), vx: 0, vy: 0 });
+    }
   }
 
   private start() {
     this.sub = 'play';
-    this.deadline = Date.now() + TIDY.TIME_MS;
+    this.deadline = this.ctx.practice ? 0 : Date.now() + TIDY.TIME_MS;
     let last = Date.now();
-    this.timers.every(TICK_MS, () => {
+    this.timers.every(TIDY.TICK_MS, () => {
       const now = Date.now();
-      this.tick(now, (now - last) / 1000);
+      this.tick(now, Math.min(0.05, (now - last) / 1000));
       last = now;
     });
     this.ctx.onChange();
   }
 
   private tick(now: number, dt: number) {
-    const A = TIDY.AREA;
-    // Spieler bewegen
-    for (const p of this.players.values()) {
-      const speed = now < p.dashUntil ? TIDY.DASH_SPEED : TIDY.SPEED;
+    this.tickAt = now;
+    const list = [...this.players.values()];
+    const before: TidyFrame[] = list.map(({ x, y, a }) => ({ x, y, a }));
+    // Spieler: Besen weich zur Stick-Richtung drehen, laufen in Stick-Richtung (die Steuerung bleibt direkt).
+    // Sprint ohne Stick: kurzer Ausfallschritt in Besen-Richtung.
+    for (const p of list) {
+      p.dash = now < p.dashUntil;
       const len = Math.hypot(p.sx, p.sy);
       p.moving = len > 0.15;
       if (p.moving) {
-        p.x = clamp(p.x + (p.sx / Math.max(1, len)) * speed * dt * Math.min(1, len), A.x + TIDY.PLAYER_R, A.x + A.w - TIDY.PLAYER_R);
-        p.y = clamp(p.y + (p.sy / Math.max(1, len)) * speed * dt * Math.min(1, len), A.y + TIDY.PLAYER_R, A.y + A.h - TIDY.PLAYER_R);
-        if (Math.abs(p.sx) > 0.2) p.dir = p.sx > 0 ? 1 : -1;
+        p.a = tidyTurn(p.a, Math.atan2(p.sy, p.sx), TIDY.TURN * dt);
+        const speed = (p.dash ? TIDY.DASH_SPEED : TIDY.SPEED) * Math.min(1, len);
+        p.x += (p.sx / len) * speed * dt;
+        p.y += (p.sy / len) * speed * dt;
+      } else if (p.dash) {
+        p.x += Math.cos(p.a) * TIDY.DASH_SPEED * dt;
+        p.y += Math.sin(p.a) * TIDY.DASH_SPEED * dt;
       }
+      const c = Math.cos(p.a);
+      if (c > 0.3) p.dir = 1;
+      else if (c < -0.3) p.dir = -1;
       p.dashLeft = Math.max(0, p.dashReady - now);
     }
-    // Spieler untereinander (Schubsen)
-    const list = [...this.players.values()];
+    this.pushPlayers(list);
+    for (const p of list) this.keepInside(p);
+    const after: TidyFrame[] = list.map(({ x, y, a }) => ({ x, y, a }));
+    // Sachen: gleiten (Reibung), dann Körper und Besen aller Spieler
+    const glide = Math.pow(0.02, dt);
+    for (const it of this.items) {
+      const x0 = it.x;
+      const y0 = it.y;
+      it.x += it.vx * dt;
+      it.y += it.vy * dt;
+      it.vx *= glide;
+      it.vy *= glide;
+      list.forEach((p, i) => {
+        const body = tidyBodyPush(after[i], it.x, it.y);
+        if (body) {
+          it.x = body.x;
+          it.y = body.y;
+          it.vx *= 0.5;
+          it.vy *= 0.5;
+        }
+        const hit = tidyBroomPush(before[i], after[i], x0, y0, it.x, it.y);
+        if (!hit) return;
+        it.x = hit.x;
+        it.y = hit.y;
+        if (!hit.carried) return;
+        if (p.dash) {
+          it.vx = Math.cos(p.a) * TIDY.DASH_SHOT;
+          it.vy = Math.sin(p.a) * TIDY.DASH_SHOT;
+        } else if (dt > 0) {
+          it.vx = ((hit.x - x0) / dt) * TIDY.CARRY_KEEP;
+          it.vy = ((hit.y - y0) / dt) * TIDY.CARRY_KEEP;
+        }
+      });
+    }
+    this.separateItems();
+    for (const it of this.items) this.keepItemInside(it, dt);
+    // Körbe
+    this.items = this.items.filter((it) => {
+      const b = this.baskets.find((bk) => Math.hypot(bk.x - it.x, bk.y - it.y) < bk.r - 2);
+      if (!b) return true;
+      this.score[b.team] += 1;
+      this.lastScore = { team: b.team, type: tidyItemType(it.id), seq: ++this.seq };
+      return false;
+    });
+    if (!this.items.length && this.ctx.practice) this.spawnItems();
+    if (!this.items.length || (this.deadline && now >= this.deadline)) return this.end();
+    if (++this.ticks % TIDY.SEND_EVERY === 0) this.ctx.onChange();
+  }
+
+  /** Spieler untereinander: Kreise, wer gerade sprintet, schubst stärker */
+  private pushPlayers(list: TidyP[]) {
+    const min = TIDY.PLAYER_R * 2;
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
         const a = list[i];
@@ -297,53 +437,86 @@ export class TidyGame implements MiniGame {
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const d = Math.hypot(dx, dy) || 1;
-        const min = TIDY.PLAYER_R * 2;
-        if (d < min) {
-          // Wer gerade sprintet, schubst stärker
-          const wa = now < a.dashUntil ? 0.2 : 1;
-          const wb = now < b.dashUntil ? 0.2 : 1;
-          const push = min - d;
-          a.x -= (dx / d) * push * (wa / (wa + wb));
-          a.y -= (dy / d) * push * (wa / (wa + wb));
-          b.x += (dx / d) * push * (wb / (wa + wb));
-          b.y += (dy / d) * push * (wb / (wa + wb));
-        }
+        if (d >= min) continue;
+        const wa = a.dash ? 0.2 : 1;
+        const wb = b.dash ? 0.2 : 1;
+        const push = min - d;
+        a.x -= (dx / d) * push * (wa / (wa + wb));
+        a.y -= (dy / d) * push * (wa / (wa + wb));
+        b.x += (dx / d) * push * (wb / (wa + wb));
+        b.y += (dy / d) * push * (wb / (wa + wb));
       }
     }
-    // Sachen schieben
-    for (const it of this.items) {
-      for (const p of this.players.values()) {
-        const dx = it.x - p.x;
-        const dy = it.y - p.y;
-        const d = Math.hypot(dx, dy) || 1;
-        const min = TIDY.PLAYER_R + TIDY.ITEM_R;
-        if (d < min) {
-          it.x = p.x + (dx / d) * min;
-          it.y = p.y + (dy / d) * min;
-          const speed = now < p.dashUntil ? TIDY.DASH_SPEED : TIDY.SPEED;
-          it.vx = (dx / d) * speed * 1.1;
-          it.vy = (dy / d) * speed * 1.1;
-        }
-      }
-      it.x += it.vx * dt;
-      it.y += it.vy * dt;
-      it.vx *= Math.pow(0.02, dt);
-      it.vy *= Math.pow(0.02, dt);
-      if (it.x < A.x + TIDY.ITEM_R || it.x > A.x + A.w - TIDY.ITEM_R) it.vx *= -0.5;
-      if (it.y < A.y + TIDY.ITEM_R || it.y > A.y + A.h - TIDY.ITEM_R) it.vy *= -0.5;
-      it.x = clamp(it.x, A.x + TIDY.ITEM_R, A.x + A.w - TIDY.ITEM_R);
-      it.y = clamp(it.y, A.y + TIDY.ITEM_R, A.y + A.h - TIDY.ITEM_R);
+  }
+
+  /**
+   * Spieler im Zimmer halten – den Besen auch: Vor der Kante bleibt an der Wand Platz für eine Sache (sonst säße sie
+   * halb unter dem Besen), die Besenenden stoßen nicht durch die Wand. Dreht man sich zur Wand, rückt man sanft ab.
+   */
+  private keepInside(p: TidyP) {
+    const A = TIDY.AREA;
+    const c = Math.cos(p.a);
+    const s = Math.sin(p.a);
+    const bx = p.x + c * TIDY.BROOM_D;
+    const by = p.y + s * TIDY.BROOM_D;
+    const B = TIDY.BROOM_HALF;
+    const pts: [number, number, number][] = [
+      [p.x, p.y, TIDY.PLAYER_R],
+      [bx, by, TIDY.ITEM_R * 2],
+      [bx - s * B, by + c * B, 1],
+      [bx + s * B, by - c * B, 1],
+    ];
+    let lx = 0;
+    let hx = 0;
+    let ly = 0;
+    let hy = 0;
+    for (const [x, y, m] of pts) {
+      lx = Math.max(lx, A.x + m - x);
+      hx = Math.min(hx, A.x + A.w - m - x);
+      ly = Math.max(ly, A.y + m - y);
+      hy = Math.min(hy, A.y + A.h - m - y);
     }
-    // Körbe
-    this.items = this.items.filter((it) => {
-      const b = this.baskets.find((bk) => Math.hypot(bk.x - it.x, bk.y - it.y) < bk.r - 2);
-      if (!b) return true;
-      this.score[b.team] += 1;
-      this.lastScore = { team: b.team, type: it.type, seq: ++this.seq };
-      return false;
-    });
-    if (!this.items.length || now >= this.deadline) this.end();
-    else this.ctx.onChange();
+    p.x += lx + hx;
+    p.y += ly + hy;
+  }
+
+  /** Sachen untereinander: nur auseinanderschieben (eine Reihe vor dem Besen schiebt sich gegenseitig mit) */
+  private separateItems() {
+    const min = TIDY.ITEM_R * 2;
+    const its = this.items;
+    for (let i = 0; i < its.length; i++) {
+      for (let j = i + 1; j < its.length; j++) {
+        const a = its[i];
+        const b = its[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        if (Math.abs(dx) >= min || Math.abs(dy) >= min) continue;
+        const d = Math.hypot(dx, dy);
+        if (d >= min) continue;
+        const nx = d > 0.001 ? dx / d : 1;
+        const ny = d > 0.001 ? dy / d : 0;
+        const push = (min - d) / 2;
+        a.x -= nx * push;
+        a.y -= ny * push;
+        b.x += nx * push;
+        b.y += ny * push;
+      }
+    }
+  }
+
+  private keepItemInside(it: Item, dt: number) {
+    const A = TIDY.AREA;
+    const R = TIDY.ITEM_R;
+    if (it.x < A.x + R || it.x > A.x + A.w - R) it.vx *= -0.3;
+    if (it.y < A.y + R || it.y > A.y + A.h - R) it.vy *= -0.3;
+    it.x = clamp(it.x, A.x + R, A.x + A.w - R);
+    it.y = clamp(it.y, A.y + R, A.y + A.h - R);
+    const cx = it.x - A.x < TIDY_CORNER ? 1 : A.x + A.w - it.x < TIDY_CORNER ? -1 : 0;
+    const cy = it.y - A.y < TIDY_CORNER ? 1 : A.y + A.h - it.y < TIDY_CORNER ? -1 : 0;
+    if (cx && cy) {
+      it.vx += cx * TIDY_CORNER_PUSH * dt;
+      it.vy += cy * TIDY_CORNER_PUSH * dt;
+    }
   }
 
   input(id: string, action: string, payload: unknown) {
@@ -353,12 +526,13 @@ export class TidyGame implements MiniGame {
       const pl = asRecord(payload);
       p.sx = clamp(Number(pl.x) || 0, -1, 1);
       p.sy = clamp(Number(pl.y) || 0, -1, 1);
-    } else if (action === 'dash' && this.sub === 'play') {
-      const now = Date.now();
-      if (now < p.dashReady) return;
-      p.dashUntil = now + TIDY.DASH_MS;
-      p.dashReady = now + TIDY.DASH_COOLDOWN;
-    }
+    } else if (action === 'dash' && this.sub === 'play') this.dash(p, Date.now());
+  }
+
+  private dash(p: TidyP, now: number) {
+    if (now < p.dashReady) return;
+    p.dashUntil = now + TIDY.DASH_MS;
+    p.dashReady = now + TIDY.DASH_COOLDOWN;
   }
 
   private end() {
@@ -384,11 +558,15 @@ export class TidyGame implements MiniGame {
       kind: 'tidy',
       state: {
         sub: this.sub,
-        endsIn: Math.max(0, this.deadline - Date.now()),
+        t: this.tickAt || Date.now(),
+        endsIn: endsIn(this.deadline),
         players: Object.fromEntries(
-          [...this.players.entries()].map(([id, { x, y, team, dir, moving, dashLeft }]) => [id, { x, y, team, dir, moving, dashLeft }]),
+          [...this.players.entries()].map(([id, p]) => [
+            id,
+            { x: r1(p.x), y: r1(p.y), a: Math.round(p.a * 100) / 100, team: p.team, dir: p.dir, moving: p.moving, ...(p.dash ? { dash: true } : {}), dashLeft: Math.ceil(p.dashLeft / 100) * 100 },
+          ]),
         ),
-        items: this.items.map(({ id, x, y, type }) => ({ id, x, y, type })),
+        items: this.items.map(({ id, x, y }) => ({ id, x: r1(x), y: r1(y) })),
         baskets: this.baskets,
         score: this.score,
         lastScore: this.lastScore,
@@ -403,5 +581,42 @@ export class TidyGame implements MiniGame {
 
   dispose() {
     this.timers.clear();
+  }
+
+  /** Nur für `scripts/test-aufraeumen.ts`: Spiel ohne Timer steuern (Uhr und Takte von außen) */
+  testApi() {
+    const g = this;
+    let t = Date.now();
+    return {
+      /** Spiel läuft sofort ohne Zeitlimit; Spieler an feste Plätze, Sachen (null = zufällige behalten) */
+      begin(at: Record<string, TidyFrame>, items: { x: number; y: number }[] | null) {
+        g.timers.clear();
+        g.sub = 'play';
+        g.deadline = 0;
+        for (const [id, p] of g.players) {
+          if (at[id]) Object.assign(p, at[id]);
+          p.sx = p.sy = 0;
+          p.dashUntil = p.dashReady = 0;
+        }
+        if (items) g.items = items.map((it, i) => ({ id: i, x: it.x, y: it.y, vx: 0, vy: 0 }));
+      },
+      stick: (id: string, x: number, y: number) => g.input(id, 'stick', { x, y }),
+      dash: (id: string) => g.dash(g.players.get(id)!, t),
+      /** n Takte à TICK_MS */
+      step(n = 1) {
+        for (let k = 0; k < n && g.sub === 'play'; k++) {
+          t += TIDY.TICK_MS;
+          g.tick(t, TIDY.TICK_MS / 1000);
+        }
+      },
+      player: (id: string) => g.players.get(id)!,
+      items: () => g.items,
+      score: () => g.score,
+      state: () => {
+        const s = g.snapshot();
+        return s.kind === 'tidy' ? s.state : null;
+      },
+      over: () => g.sub === 'over',
+    };
   }
 }

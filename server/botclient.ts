@@ -58,6 +58,7 @@ import { wolfrundeBot } from './wolfrundebot';
 import { balanceBot } from './balancebot';
 import { schaetzBot } from './schaetzbot';
 import { lexikonBot } from './lexikonbot';
+import { type TidyBotMem, tidyBot } from './tidybot';
 import { liederBot } from './liederbot';
 import { sektBot } from './sektbot';
 import { bandBot } from './bandbot';
@@ -118,6 +119,8 @@ export class Bot {
   priv: PrivateState = null;
   busy = new Set<string>();
   phasesSeen = new Set<string>();
+  /** Aufräumen: welche Sache der Bot gerade zum Korb schiebt */
+  private tidyMem: TidyBotMem = { target: null };
 
   leader: boolean;
   private human = HUMAN.normal;
@@ -1063,28 +1066,16 @@ export class Bot {
       }
     }
 
-    if (m.kind === 'tidy' && m.state.sub === 'play') {
-      const t = m.state;
-      const me2 = t.players[this.id];
-      const basket = t.baskets.find((bk) => bk.team === me2?.team) ?? t.baskets[0];
-      if (me2 && basket) {
-        this.once('tidy', async () => {
-          await sleep(90);
-          const item = [...t.items].sort((a, b) => Math.hypot(a.x - me2.x, a.y - me2.y) + Math.hypot(a.x - basket.x, a.y - basket.y) * 0.5 - (Math.hypot(b.x - me2.x, b.y - me2.y) + Math.hypot(b.x - basket.x, b.y - basket.y) * 0.5))[0];
-          if (!item) return this.send('stick', { x: 0, y: 0 });
-          const ux = basket.x - item.x;
-          const uy = basket.y - item.y;
-          const ul = Math.hypot(ux, uy) || 1;
-          const px = item.x - (ux / ul) * 13;
-          const py = item.y - (uy / ul) * 13;
-          const dx = px - me2.x;
-          const dy = py - me2.y;
-          const dl = Math.hypot(dx, dy);
-          if (dl > 5) this.send('stick', { x: dx / dl, y: dy / dl });
-          else this.send('stick', { x: ux / ul, y: uy / ul });
-          if (Math.random() < 0.02) this.send('dash');
-        });
-      }
+    if (m.kind === 'tidy' && m.state.sub === 'play' && m.state.players[this.id]) {
+      // Besen voran: hinter die Sache, dann zum Korb schieben (server/tidybot.ts) – mit frischem Stand nach der Reaktionszeit
+      this.once('tidy', async () => {
+        await sleep(90);
+        const cur = this.state?.mini?.kind === 'tidy' ? this.state.mini.state : null;
+        if (!cur || cur.sub !== 'play') return;
+        const mv = tidyBot(cur, this.id, this.tidyMem);
+        this.send('stick', { x: Math.round(mv.x * 100) / 100, y: Math.round(mv.y * 100) / 100 });
+        if (mv.dash) this.send('dash');
+      });
     }
 
     if (m.kind === 'flieger' && m.state.sub === 'fly') {

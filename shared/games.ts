@@ -38,7 +38,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   bomb: { title: 'Tick-Tack-Bumm', icon: '⏰', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 , orientation: 'portrait' },
   kingscup: { title: 'Kings Cup', icon: '👑', tagline: 'Karte ziehen, Regel befolgen – auf den König!', minPlayers: 2 , orientation: 'portrait' },
   sup: { title: 'SUP-Rennen', icon: '🏄', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 , orientation: 'portrait' },
-  tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Schiebt das Chaos in euren Korb – Joystick am Handy!', minPlayers: 1 , orientation: 'landscape' },
+  tidy: { title: 'Aufräumen!', icon: '🧺', tagline: 'Fegt das Chaos mit dem Besen in euren Korb!', minPlayers: 1 , orientation: 'landscape' },
   flieger: { title: 'Urlaubsflieger', icon: '✈️', inspiredBy: 'Spaceteam', tagline: 'Ruft euch die Anweisungen zu – sonst geht der Sprit aus!', minPlayers: 2 , orientation: 'portrait' },
   kurve: { title: 'Kurven-Duell', icon: '🌀', inspiredBy: '„Achtung, die Kurve!“', tagline: 'Links, rechts – und bloß keine Spur rammen!', minPlayers: 2 , orientation: 'landscape' },
   arena: { title: 'Bomben-Arena', icon: '💣', inspiredBy: 'Bomberman', tagline: 'Kokosnüsse legen, Sandburgen sprengen – wer bleibt trocken?', minPlayers: 2 , orientation: 'landscape' },
@@ -124,7 +124,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   bomb: { goal: 'Sagt einen Begriff zur Kategorie und gebt die Bombe weiter – bevor sie knallt!', controls: [{ icon: '🗣️', text: 'Begriff laut sagen' }, { icon: '💣', text: 'WEITERGEBEN!: Bombe abgeben' }, { icon: '💥', text: 'Knall bei dir = 3 Schlücke' }] },
   kingscup: { goal: 'Reihum Karte ziehen und die Regel befolgen – auf den König!', controls: [{ icon: '🃏', text: 'Du bist dran: Karte ziehen' }, { icon: '📺', text: 'Die Regel steht auf dem TV' }, { icon: '⚡', text: 'Knopf-Rennen: schnell sein!' }] },
   sup: { goal: 'Paddelt zu zweit ins Ziel – gleichmäßig, sonst kippt das Board!', controls: [{ icon: '🚣', text: 'LINKS / RECHTS: paddeln' }, { icon: '⚖️', text: 'Gleichmäßig – sonst PLATSCH' }, { icon: '🪨', text: 'Felsen und Quallen ausweichen' }] },
-  tidy: { goal: 'Schiebt das Chaos in den Korb eures Teams!', controls: [{ icon: '🕹️', text: 'Stick: laufen und schieben' }, { icon: '💨', text: 'SPRINT: kurz schneller' }, { icon: '🧺', text: 'Alles in euren Korb' }] },
+  tidy: { goal: 'Fegt das Chaos mit dem Besen in den Korb eures Teams!', controls: [{ icon: '🕹️', text: 'Stick: laufen, der Besen dreht mit' }, { icon: '🧹', text: 'Besen voran schieben – auch im Bogen' }, { icon: '💨', text: 'SPRINT: Sachen geradeaus schießen' }] },
   flieger: { goal: 'Ruft euch die Anweisungen zu – sie betreffen meist ein anderes Handy!', controls: [{ icon: '📣', text: 'Anweisung oben laut vorlesen' }, { icon: '🎛️', text: 'Eigene Knöpfe und Schalter' }, { icon: '⛽', text: 'Verpasst = weniger Sprit' }] },
   kurve: { goal: 'Zieht eure Spur und rammt keine Spur! Am Rand geht’s auf der anderen Seite weiter.', controls: [{ icon: '↩️', text: 'LINKS / RECHTS: halten = lenken' }, { icon: '⭐', text: 'Power-ups einsammeln' }, { icon: '🏆', text: 'Wer überlebt, punktet' }] },
   arena: { goal: 'Sprengt euch den Weg frei und erwischt die anderen – wer trocken bleibt, gewinnt.', controls: [{ icon: '🕹️', text: 'Stick: laufen' }, { icon: '💣', text: 'BOMBE: Kokosnuss legen' }, { icon: '🌊', text: 'Nach 60 s kommt die Flut' }] },
@@ -581,11 +581,26 @@ export const SUP = {
 };
 
 export const TIDY = {
+  /** Physik mit 60 Hz (kurze Wartezeit für Eingaben), Snapshot jeden 2. Takt (≈ 30 Hz, passt zur Bündelung im Raum) */
+  TICK_MS: 16,
+  SEND_EVERY: 2,
   SPEED: 78,
   DASH_SPEED: 150,
   DASH_MS: 450,
   DASH_COOLDOWN: 1800,
+  /** Sprint: Sachen vor dem Besen fliegen mit diesem Tempo geradeaus davon (px/s) */
+  DASH_SHOT: 175,
+  /** Spieler gegen Spieler (Kreis, Schubsen) */
   PLAYER_R: 7,
+  /** Eigener Körper gegen Sachen: kleines Quadrat (halbe Kantenlänge), dreht sich mit – schiebt nur sanft beiseite */
+  BODY_H: 4,
+  /** Besen: gerade Kante quer vor dem Spieler – Abstand der Kante vor der Körpermitte und halbe Breite (Figur ≈ 16 px) */
+  BROOM_D: 9,
+  BROOM_HALF: 11,
+  /** So schnell dreht der Besen zur Stick-Richtung (rad/s – 180° in ≈ 0,3 s) */
+  TURN: 10,
+  /** Geschobene Sachen behalten so viel vom Besen-Tempo und gleiten nach dem Stehenbleiben noch ein Stück */
+  CARRY_KEEP: 0.4,
   ITEM_R: 5,
   ITEMS: 26,
   TIME_MS: 60000,
@@ -593,6 +608,9 @@ export const TIDY = {
   AREA: { x: 22, y: 44, w: 436, h: 210 },
   ITEM_TYPES: ['shirt', 'sock', 'can', 'pizza', 'bottle', 'book', 'towel', 'cap'],
 };
+
+/** Art einer herumliegenden Sache – hängt nur an ihrer id (spart den Namen in jedem Snapshot) */
+export const tidyItemType = (id: number) => TIDY.ITEM_TYPES[id % TIDY.ITEM_TYPES.length];
 
 // ------------------------------------------------------------------ Urlaubsflieger
 
