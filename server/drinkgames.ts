@@ -1,5 +1,5 @@
-import type { BombState, HiloState, MiniSnapshot, NhieState, SkipInfo } from '../shared/types';
-import { BOMB, BOMB_CATEGORIES, HILO, NHIE } from '../shared/games';
+import type { BombState, MiniSnapshot, NhieState, SkipInfo } from '../shared/types';
+import { BOMB, BOMB_CATEGORIES, NHIE } from '../shared/games';
 import { type MiniCtx, type MiniGame, Timers, asRecord, endsIn, groupByScore, phaseTimer, shuffle, waitLabel } from './minigame';
 
 const zeroSips = (ids: string[]) => Object.fromEntries(ids.map((id) => [id, 0]));
@@ -98,105 +98,6 @@ export class NhieGame implements MiniGame {
   playerDisconnected() {
     // Haben alle anderen schon geantwortet, nicht auf den Timer warten
     if (this.state.sub === 'question' && this.answers.size && this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => this.answers.has(p))) this.reveal();
-  }
-  dispose() {
-    this.timers.clear();
-  }
-}
-
-// ================================================================== Höher oder Tiefer
-
-export class HiloGame implements MiniGame {
-  readonly kind = 'hilo' as const;
-  private state: HiloState;
-  private guesses = new Map<string, 'higher' | 'lower'>();
-  private deadline = 0;
-  private timers = new Timers();
-  private deck: number[] = [];
-
-  constructor(
-    private ids: string[],
-    private ctx: MiniCtx,
-  ) {
-    for (let s = 0; s < 4; s++) for (let v = 2; v <= 14; v++) this.deck.push(v);
-    this.deck = shuffle(this.deck);
-    this.state = { round: 0, rounds: HILO.ROUNDS, sub: 'guess', endsIn: 0, card: this.deck.pop()!, nextCard: null, guessed: [], guesses: null, roundSips: null, sips: zeroSips(ids) };
-    this.next();
-  }
-
-  private next() {
-    const s = this.state;
-    if (s.nextCard !== null) s.card = s.nextCard;
-    if (s.round >= s.rounds) {
-      s.sub = 'over';
-      this.ctx.onChange();
-      return this.timers.later(500, () => this.ctx.finish(sipResult(this.ids, s.sips, 'Die Karten waren gnadenlos.')));
-    }
-    s.round += 1;
-    s.sub = 'guess';
-    s.nextCard = null;
-    s.guessed = [];
-    s.guesses = null;
-    s.roundSips = null;
-    this.guesses.clear();
-    this.deadline = phaseTimer(this.timers, HILO.GUESS_MS, () => this.reveal());
-    this.ctx.onChange();
-  }
-
-  private reveal() {
-    const s = this.state;
-    this.timers.clear();
-    const next = this.deck.pop() ?? 2 + Math.floor(Math.random() * 13);
-    s.nextCard = next;
-    s.guesses = Object.fromEntries(this.guesses);
-    s.roundSips = {};
-    for (const id of this.ids) {
-      const g = this.guesses.get(id);
-      const right = next !== s.card && ((g === 'higher' && next > s.card) || (g === 'lower' && next < s.card));
-      // Gleiche Karte: alle trinken
-      if (!right) s.roundSips[id] = 1;
-    }
-    for (const [id, n] of Object.entries(s.roundSips)) s.sips[id] += n;
-    s.sub = 'reveal';
-    this.deadline = phaseTimer(this.timers, HILO.REVEAL_MS, () => this.next());
-    this.ctx.onChange();
-  }
-
-  skippable(): SkipInfo | null {
-    const s = this.state;
-    if (s.sub === 'guess') {
-      const missing = this.ids.filter((p) => this.ctx.isConnected(p) && !this.guesses.has(p));
-      return { label: waitLabel(this.ctx, missing, 'Tipp', 'Karte jetzt aufdecken') };
-    }
-    if (s.sub === 'reveal') return { label: 'Nächste Karte', info: true };
-    return null;
-  }
-
-  /** Wer nicht getippt hat, liegt daneben (wie bisher beim Ablauf der Zeit) */
-  skip() {
-    if (this.state.sub === 'guess') this.reveal();
-    else if (this.state.sub === 'reveal') {
-      this.timers.clear();
-      this.next();
-    }
-  }
-
-  input(id: string, action: string, payload: unknown) {
-    const s = this.state;
-    if (action !== 'guess' || s.sub !== 'guess' || !this.ids.includes(id)) return;
-    const g = asRecord(payload).dir === 'lower' ? 'lower' : 'higher';
-    this.guesses.set(id, g);
-    s.guessed = [...this.guesses.keys()];
-    if (this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => this.guesses.has(p))) this.reveal();
-    else this.ctx.onChange();
-  }
-
-  snapshot(): MiniSnapshot {
-    return { kind: 'hilo', state: { ...this.state, endsIn: endsIn(this.deadline) } };
-  }
-
-  playerDisconnected() {
-    if (this.state.sub === 'guess' && this.guesses.size && this.ids.filter((p) => this.ctx.isConnected(p)).every((p) => this.guesses.has(p))) this.reveal();
   }
   dispose() {
     this.timers.clear();

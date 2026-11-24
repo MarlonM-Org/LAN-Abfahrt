@@ -170,20 +170,10 @@ export interface NhieState {
   sips: Record<string, number>;
 }
 
-// ------------------------------------------------------------------ Trinkspiel: Höher oder Tiefer
+// ------------------------------------------------------------------ Trinkspiel: Busfahrer (MiniKind `hilo`)
 
-export interface HiloState {
-  round: number;
-  rounds: number;
-  sub: 'guess' | 'reveal' | 'over';
-  endsIn: number;
-  card: number;
-  nextCard: number | null;
-  guessed: string[];
-  guesses: Record<string, 'higher' | 'lower'> | null;
-  roundSips: Record<string, number> | null;
-  sips: Record<string, number>;
-}
+/** Zustand und Regeln in `shared/busfahrer.ts` */
+export type HiloState = import('./busfahrer').BusState;
 
 // ------------------------------------------------------------------ Trinkspiel: Tick-Tack-Bumm
 

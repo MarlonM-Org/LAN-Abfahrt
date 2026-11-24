@@ -1,5 +1,4 @@
-import type { BombState, HiloState, NhieState } from '../../../shared/types';
-import { cardLabel } from '../../../shared/games';
+import type { BombState, NhieState } from '../../../shared/types';
 import { type Screen, app, el, escapeHtml, message, nameOf, q, send, store, tapButton, timerText } from '../core';
 
 const sipText = (n: number) => (n === 1 ? '1 Schluck' : `${n} Schlücke`);
@@ -37,41 +36,6 @@ export function pickNhie(s: NhieState): Screen {
     return [`nh-r-${s.round}`, message(mine ? `Trink ${sipText(sips)}!` : 'Glück gehabt!', have.length === 1 ? `Nur ${nameOf(have[0])} – erzähl!` : `${have.length} haben es schon getan.`)];
   }
   return ['nh-over', message('Runde vorbei')];
-}
-
-// ------------------------------------------------------------------ Höher oder Tiefer
-
-export function pickHilo(s: HiloState): Screen {
-  const id = store.playerId!;
-  if (!(id in s.sips)) return ['spectate', message('Du schaust zu')];
-  if (s.sub === 'guess') {
-    if (s.guessed.includes(id)) return [`hl-wait-${s.round}`, message('Getippt!', 'Warte auf die anderen ...')];
-    return [`hl-g-${s.round}`, () => {
-      const root = el(`
-        <p>Karte ${s.round}/${s.rounds}<span class="timer"></span></p>
-        <div class="card-big">${cardLabel(s.card)}</div>
-        <p>Ist die nächste Karte höher oder tiefer?</p>
-        <button class="big-btn half drink-btn" data-d="higher">HÖHER ▲</button>
-        <button class="big-btn half" data-d="lower">TIEFER ▼</button>
-      `);
-      let sent = false;
-      root.querySelectorAll<HTMLButtonElement>('[data-d]').forEach((b) =>
-        tapButton(b, () => {
-          if (sent) return;
-          sent = true;
-          send('guess', { dir: b.dataset.d });
-        }),
-      );
-      app.append(root);
-      return () => (q(root, '.timer').textContent = timerText((sec) => ` · ${sec}s`));
-    }];
-  }
-  if (s.sub === 'reveal') {
-    const n = s.roundSips?.[id] ?? 0;
-    const same = s.nextCard === s.card;
-    return [`hl-r-${s.round}`, message(n ? `Trink ${sipText(n)}!` : 'Richtig!', `${cardLabel(s.card)} → ${cardLabel(s.nextCard ?? 0)}${same ? ' – gleich! Alle trinken.' : ''}`)];
-  }
-  return ['hl-over', message('Runde vorbei')];
 }
 
 // ------------------------------------------------------------------ Tick-Tack-Bumm

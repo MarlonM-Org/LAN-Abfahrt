@@ -34,7 +34,7 @@ export const MINI_INFO: Record<MiniKind, MiniInfo> = {
   wrap: { title: 'Wraps mit Sriracha-Mayo', icon: '🌯', tagline: 'Zutaten in der richtigen Reihenfolge greifen!', minPlayers: 1 , orientation: 'portrait' },
   stars: { title: 'Tanz unter den Sternen', icon: '✨', tagline: 'Verbindet die Sterne zu Sternbildern!', minPlayers: 1, maxPlayers: 2 , orientation: 'any' },
   nhie: { title: 'Ich hab noch nie ...', icon: '🙊', tagline: 'Wer es schon getan hat, trinkt!', minPlayers: 2 , orientation: 'portrait' },
-  hilo: { title: 'Höher oder Tiefer', icon: '🃏', tagline: 'Falsch geraten? Schluck!', minPlayers: 2 , orientation: 'portrait' },
+  hilo: { title: 'Busfahrer', icon: '🚌', tagline: 'Vier Karten, vier Fragen – falsch getippt? Schlucken!', minPlayers: 2 , orientation: 'portrait' },
   bomb: { title: 'Tick-Tack-Bumm', icon: '⏰', tagline: 'Begriff sagen, Bombe weitergeben!', minPlayers: 2 , orientation: 'portrait' },
   kingscup: { title: 'Kings Cup', icon: '👑', tagline: 'Karte ziehen, Regel befolgen – auf den König!', minPlayers: 2 , orientation: 'portrait' },
   sup: { title: 'SUP-Rennen', icon: '🏄', tagline: 'Zu zweit auf dem Board: einer links, einer rechts!', minPlayers: 1 , orientation: 'portrait' },
@@ -120,7 +120,7 @@ export const MINI_HOWTO: Record<MiniKind, { goal: string; controls: HowToControl
   wrap: { goal: 'Greift die Zutaten in der richtigen Reihenfolge vom Rad.', controls: [{ icon: '📺', text: 'Reihenfolge steht auf dem TV' }, { icon: '✋', text: 'GREIFEN!: wenn die Zutat oben ist' }] },
   stars: { goal: 'Verbindet die Sterne gemeinsam zu Sternbildern.', controls: [{ icon: '✨', text: 'Wischen: von Stern zu Stern' }, { icon: '📺', text: 'Vorlage auf dem TV' }] },
   nhie: { goal: 'Ich hab noch nie … – wer es schon getan hat, trinkt!', controls: [{ icon: '👆', text: '„Noch nie!“ oder „Hab ich schon!“' }, { icon: '🍻', text: 'Als Einziger? Doppelt trinken' }] },
-  hilo: { goal: 'Ist die nächste Karte höher oder tiefer? Falsch geraten = Schluck.', controls: [{ icon: '🃏', text: 'HÖHER / TIEFER: tippen' }, { icon: '🍻', text: 'Falsch geraten = trinken' }] },
+  hilo: { goal: 'Vier verdeckte Karten, alle tippen gleichzeitig – falsch bei Karte n = n Schlücke.', controls: [{ icon: '🃏', text: 'Rot/Schwarz · Höher/Tiefer/Gleich' }, { icon: '↔️', text: 'Dazwischen/Außerhalb · Symbol?' }, { icon: '🍻', text: 'Falsch: 1, 2, 3, 4 Schlücke' }] },
   bomb: { goal: 'Sagt einen Begriff zur Kategorie und gebt die Bombe weiter – bevor sie knallt!', controls: [{ icon: '🗣️', text: 'Begriff laut sagen' }, { icon: '💣', text: 'WEITERGEBEN!: Bombe abgeben' }, { icon: '💥', text: 'Knall bei dir = 3 Schlücke' }] },
   kingscup: { goal: 'Reihum Karte ziehen und die Regel befolgen – auf den König!', controls: [{ icon: '🃏', text: 'Du bist dran: Karte ziehen' }, { icon: '📺', text: 'Die Regel steht auf dem TV' }, { icon: '⚡', text: 'Knopf-Rennen: schnell sein!' }] },
   sup: { goal: 'Paddelt zu zweit ins Ziel – gleichmäßig, sonst kippt das Board!', controls: [{ icon: '🚣', text: 'LINKS / RECHTS: paddeln' }, { icon: '⚖️', text: 'Gleichmäßig – sonst PLATSCH' }, { icon: '🪨', text: 'Felsen und Quallen ausweichen' }] },
@@ -527,7 +527,6 @@ export const SPRINT_POINTS = [3, 2, 1];
  * geantwortet haben – oder wenn der VIP im Menü überspringt. Auflösungen schalten großzügig von selbst weiter.
  */
 export const NHIE = { ROUNDS: 6, QUESTION_MS: null as number | null, REVEAL_MS: 15000 };
-export const HILO = { ROUNDS: 7, GUESS_MS: null as number | null, REVEAL_MS: 12000 };
 /** Tick-Tack-Bumm: die Lunte ist Spielzeit (bleibt), nur die Pause nach dem Knall ist länger */
 export const BOMB = { ROUNDS: 3, MIN_FUSE_MS: 15000, MAX_FUSE_MS: 38000, BOOM_MS: 9000, SIPS: 3, MIN_HOLD_MS: 900 };
 

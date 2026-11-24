@@ -24,7 +24,8 @@
     "test:band": "tsx scripts/test-band.ts",
     "test:maler": "tsx scripts/test-maler.ts",
     "test:lexikon": "tsx scripts/test-lexikon.ts",
-    "test:aufraeumen": "tsx scripts/test-aufraeumen.ts"
+    "test:aufraeumen": "tsx scripts/test-aufraeumen.ts",
+    "test:busfahrer": "tsx scripts/test-busfahrer.ts"
   },
   "dependencies": {
     "@fontsource/press-start-2p": "^5.3.0",

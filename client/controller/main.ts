@@ -11,7 +11,8 @@ import { pickWwe } from './screens/wwe';
 import { pickSprint } from './screens/sprint';
 import { pickMurder } from './screens/murder';
 import { pickDescent, pickRhythm, pickStars, pickStory, pickWrap } from './screens/date';
-import { pickBomb, pickHilo, pickNhie } from './screens/drink';
+import { pickBomb, pickNhie } from './screens/drink';
+import { pickBusfahrer } from './screens/busfahrer';
 import { pickKingsCup } from './screens/kingscup';
 import { pickFlieger } from './screens/flieger';
 import { pickKurve } from './screens/kurve';
@@ -328,7 +329,7 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
     case 'nhie':
       return pickNhie(m.state);
     case 'hilo':
-      return pickHilo(m.state);
+      return pickBusfahrer(m.state);
     case 'bomb':
       return pickBomb(m.state);
     case 'kingscup':

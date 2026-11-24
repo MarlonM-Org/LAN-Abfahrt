@@ -24,7 +24,8 @@ import type {
 import { sanitizeLook } from '../shared/avatar';
 import { type BotSkill, asBotSkill, freePlayerColor } from '../shared/players';
 import { DEFAULT_NHIE, DEFAULT_QUESTIONS, DRINK_KINDS, MINI_INFO, PARTY_ROUND_OPTIONS, groupPlaces, isWarmupKind, placeCoins, teamLabel } from '../shared/games';
-import { BombGame, HiloGame, NhieGame } from './drinkgames';
+import { BombGame, NhieGame } from './drinkgames';
+import { BusfahrerGame } from './busfahrer';
 import { KingsCupGame } from './kingscup';
 import { Bot } from './botclient';
 import { SupGame, TidyGame } from './controllergames';
@@ -999,7 +1000,7 @@ export class Room {
       case 'nhie':
         return new NhieGame(ids, ctx, this.nhie.all, DEFAULT_NHIE);
       case 'hilo':
-        return new HiloGame(ids, ctx);
+        return new BusfahrerGame(ids, ctx);
       case 'bomb':
         return new BombGame(ids, ctx);
       case 'kingscup':

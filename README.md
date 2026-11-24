@@ -127,7 +127,7 @@ _Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) –
 | **Partyklassiker** | | | | | |
 | 🗳️ Wer würde eher ...? |  | ab 2 | ↕ hochkant | mittel | – |
 | 🙊 Ich hab noch nie ... |  | ab 2 | ↕ hochkant | mittel | – |
-| 🃏 Höher oder Tiefer |  | ab 2 | ↕ hochkant | kurz | – |
+| 🚌 Busfahrer |  | ab 2 | ↕ hochkant | kurz | – |
 | ⏰ Tick-Tack-Bumm |  | ab 2 | ↕ hochkant | kurz | – |
 | 👑 Kings Cup |  | ab 2 | ↕ hochkant | mittel | – |
 | 🖍️ Stille Post mit Bildern | à la Gartic Phone | ab 3 | ↕ hochkant | lang | – |
@@ -142,7 +142,7 @@ _Automatisch aus `shared/games.ts` erzeugt (`node scripts/readme-games.mjs`) –
 | **Trinkspiel** | | | | | |
 | 🗳️ Wer würde eher ...? |  | ab 2 | ↕ hochkant | mittel | – |
 | 🙊 Ich hab noch nie ... |  | ab 2 | ↕ hochkant | mittel | – |
-| 🃏 Höher oder Tiefer |  | ab 2 | ↕ hochkant | kurz | – |
+| 🚌 Busfahrer |  | ab 2 | ↕ hochkant | kurz | – |
 | ⏰ Tick-Tack-Bumm |  | ab 2 | ↕ hochkant | kurz | – |
 | 👑 Kings Cup |  | ab 2 | ↕ hochkant | mittel | – |
 | 🎲 Mäxchen am Pool | à la Mäxchen | ab 2 | ↕ hochkant | lang | – |
@@ -419,7 +419,8 @@ Vor jedem Versuch stellt sich der Spieler aufs Board und steht kurz ruhig – da
 ## Trinkspiel
 
 Partyklassiker reihum, ohne Punkte – gezählt werden nur Schlücke (Wasser zählt auch!):
-**Wer würde eher …?** (Meistgewählte trinken), **Ich hab noch nie …** (wer es schon getan hat, trinkt – als Einziger doppelt), **Höher oder Tiefer** (falsch geraten = Schluck), **Tick-Tack-Bumm** (Begriff zur Kategorie sagen, Bombe weitergeben – wer sie beim Knall hält, trinkt 3). 🎲 **Mäxchen am Pool** (Würfel-Bluff reihum, 2 Runden um den Tisch: Lüge erwischt oder falsch gezweifelt = 1 Schluck, bei Mäxchen 2).
+**Wer würde eher …?** (Meistgewählte trinken), **Ich hab noch nie …** (wer es schon getan hat, trinkt – als Einziger doppelt), **Busfahrer** (siehe unten), **Tick-Tack-Bumm** (Begriff zur Kategorie sagen, Bombe weitergeben – wer sie beim Knall hält, trinkt 3). 🎲 **Mäxchen am Pool** (Würfel-Bluff reihum, 2 Runden um den Tisch: Lüge erwischt oder falsch gezweifelt = 1 Schluck, bei Mäxchen 2).
+🚌 **Busfahrer** (ab 2 Spielern, hochkant; intern weiter `hilo`) – am TV sitzen alle in einem Doppeldecker, der durch die Landschaft ruckelt (oben und unten je 6 Fensterplätze, Sitz in der Spielerfarbe, vorne der Busfahrer mit Mütze); darüber liegen **vier verdeckte Karten**. Alle tippen gleichzeitig am Handy, aufgedeckt (mit Umdrehen und Sprecher) wird, sobald alle Verbundenen getippt haben oder der VIP aufdeckt – **kein Zeitlimit**. Wer dann nicht getippt hat, trinkt; wessen Handy weg ist, setzt die Karte aus. **Karte 1:** Rot oder Schwarz? (falsch = 1 Schluck) · **Karte 2:** höher, tiefer oder gleich wie Karte 1? (2) · **Karte 3:** dazwischen, außerhalb oder gleich – bezogen auf Karte 1 und 2, „gleich“ = gleicher Wert wie eine der beiden (3; liegt nichts dazwischen, z. B. zwei Neunen oder 7/8, gibt es nur außerhalb/gleich) · **Karte 4:** Hatten wir das Symbol (♥ ♦ ♣ ♠) schon? (4). Ass ist hoch (2 … 10, B 11, D 12, K 13, A 14), angeboten werden nur mögliche Tipps. Nach jeder Karte zeigt der TV, wer wie viel trinkt (Namen + Schlücke, im Bus hebt jeder Trinker seinen Krug), das Handy groß „Trink 2!“ bzw. „Sicher!“; am Ende „Endstation!“ mit allen Schlücken – wer die meisten hat, fährt den Bus. Wenig Schlücke = besser. Regeln als reine Funktionen in `shared/busfahrer.ts` (Fragen-Reihenfolge `BUS.FRAGEN`, Durchgänge mit frischem Stapel `BUS.DURCHGAENGE`, Standard 1). Testen: `npm run bots -- 4 --game=hilo`, ohne Browser `npm run test:busfahrer`.
 👑 **Kings Cup** (ab 2 Spielern) – Kartenring um den großen Becher auf dem TV; reihum (im Uhrzeigersinn) zieht der Aktive am Handy eine Karte, sie dreht sich auf dem TV mit Regel um: **2** du (Ziehender wählt, wer trinkt), **3** ich, **4** Boden / **7** Himmel / **König** Wikingerkönig (Knopf-Rennen BODEN / HIMMEL / RUDERN! mit Countdown und „JETZT!“, vom Server gestoppt – der Letzte trinkt), **5** Jungs / **6** Mädels (nur Anzeige), **8** Kumpel (Linie auf dem TV, trinkt einer, trinkt der andere mit; eine neue 8 ersetzt den alten Kumpel), **9** Reim / **10** Kategorie (Wort eintippen, reihum laut antworten, Ziehender drückt „Weiter“ oder „X hat verloren“), **Bube** Regel (bleibt in der Seitenleiste, max. 5), **Dame** Fragenmeister (Abzeichen bis zur nächsten Dame, „Bin reingefallen“-Knopf am Handy), **Ass** Wasserfall (Reihenfolge-Animation ab dem Ziehenden). In der Trinkspiel-Rotation 12 Karten (≈ 3 Minuten), einzeln gestartet das ganze Deck (52) – der VIP kann jederzeit beenden. Kein Zeitdruck außer bei den Knopf-Rennen: es geht weiter, wenn der Ziehende tippt – der VIP kann am Handy überspringen, Offline-Spieler werden automatisch übersprungen. Gezählt wird, wie oft jeder trinken musste (inkl. Kumpel). Testen: `npm run bots -- 4 --game=kingscup`.
 Eigene Fragen/Aussagen lassen sich in der Lobby hinzufügen (`data/`).
 
