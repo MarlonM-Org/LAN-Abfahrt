@@ -55,8 +55,9 @@ export const PARCOURS = {
   MAX_FALL: 330,
   WALL_SLIDE: 55,
   WIND_ACC: 1150,
-  COYOTE_MS: 100,
-  BUFFER_MS: 130,
+  /** Großzügig: Wer mit normaler Reaktionszeit kurz nach der Kante drückt, springt noch */
+  COYOTE_MS: 150,
+  BUFFER_MS: 180,
   /** Spieler-Hitbox (Ursprung = Füße, Mitte) */
   PW: 8,
   PH: 13,

@@ -1035,6 +1035,8 @@ export interface ParcoursRunner {
   afk: number;
   /** Wegen Untätigkeit ausgeschieden */
   zzz: boolean;
+  /** Selbst aufgegeben (Knopf „Aufgeben“) */
+  quit?: boolean;
   /** Verbindung weg (Gnadenfrist): eingefroren + unverwundbar, TV zeigt die Figur halbtransparent */
   away?: boolean;
 }
@@ -1051,6 +1053,8 @@ export interface ParcoursBuilder {
   afk: number;
   /** Wegen Untätigkeit übersprungen (kein Teil eingebaut) */
   skipped: boolean;
+  /** Selbst ausgesetzt (Knopf „Aussetzen“) */
+  pass?: boolean;
 }
 
 export interface ParcoursGain {
