@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-24T14:40+00:00",
+  "updated": "2026-11-24T15:10+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
@@ -116,20 +116,48 @@
       ]
     },
     {
+      "area": "Alle Spiele",
+      "size": "M",
+      "kind": null,
+      "title": "Highlights & Replays am TV (freigegeben)",
+      "detail": "Der TV puffert die letzten 6 s an Snapshots (SnapBuffer gibt es schon, Auto-Fußball hat die Tor-Wiederholung bereits) und spielt K.O., letzten Treffer, Zieleinlauf oder Rauswurf in Zeitlupe nochmal ab – mit Banner, Sprecher und Zoom auf den Moment. Reihenfolge: Smash (K.O.), Bogen (letzter Treffer), Igel (Volltreffer/Selbsttreffer), Kart (Zieleinlauf, Überholen auf der Linie), Sumo (letzter Rauswurf), Wasserbomben, Bomben-Arena. Reine Client-Arbeit, der Server meldet nur den Moment über ctx.log(). Am Ende des Abends „Best of“: die 5 besten Momente nacheinander vor der Siegerehrung.",
+      "prio": 9
+    },
+    {
+      "area": "Handy",
+      "size": "S",
+      "kind": null,
+      "title": "Onboarding für neue Gäste (freigegeben)",
+      "detail": "Beim ersten Beitritt eines Geräts (localStorage leer) ein 60-s-Tutorial am Handy, visuell statt Text: Stick kreisen lassen, Knopf drücken, Handy kippen und schütteln (Sensor-Erlaubnis gleich mitnehmen), quer halten üben – jede Station mit Häkchen und Haptik; der TV zeigt, wer gerade übt. Überspringbar, über das Spieler-Menü jederzeit wieder aufrufbar. Zusammen mit dem Zoom-Check aus der Zoom-Karte.",
+      "prio": 10
+    },
+    {
       "area": "Qualität",
-      "prio": 9,
       "size": "S–M",
       "kind": null,
-      "title": "Weitere Vorschläge fürs Token-Budget",
-      "detail": "Nicht von Marlon gefordert, aber lohnend – zum Freigeben oder Streichen:",
+      "title": "Lasttest 12 Handys + Netz-Robustheit (freigegeben)",
+      "detail": "Bots über echtes WLAN statt localhost (zweiter Rechner oder Handys als Bot-Clients), 12 Spieler in Bomben-Arena, Smash, Kart, Igel und einer Party: Paketgrößen und -raten messen (Review-Werte als Vergleich: Arena ≈ 6 KB/Snapshot bei 20 Hz), Reconnect-Szenarien (Bildschirm aus, App-Wechsel, WLAN-Loch 2 s / 10 s / 60 s) automatisiert mit Playwright, CPU/Speicher des Servers über 2 Stunden; Ergebnis als Tabelle in docs/, gefundene Hänger als eigene Tickets.",
+      "prio": 11
+    },
+    {
+      "area": "Alle Spiele",
+      "size": "M",
+      "kind": null,
+      "title": "Farbenblind-Modus in allen Ausführungen (freigegeben)",
+      "detail": "Marlon: „gerne in allen Ausführungen“. Einstellung am Handy pro Spieler und am TV (VIP/Laptop): Deuteranopie (Rot-Grün, häufigste Form), Protanopie, Tritanopie (Blau-Gelb) und Hoher Kontrast/Graustufen. Umsetzung: (1) die 12 Spielerfarben bekommen je Modus eine geprüfte Alternativ-Palette (Abstand mit Simulations-Matrizen prüfen, Skript in scripts/), (2) Farbe nie allein: Spieler-Symbol (▲ ● ■ ◆ …) zusätzlich auf Ring, Namensschild, Spur, Fadenkreuz, Ball und HUD-Porträt, Teams mit Muster (Streifen/Punkte) statt nur Farbe, (3) Spiel-Signale (Rot = Gefahr, Grün = bereit) immer mit Symbol/Blinken, (4) TV-Vorschau zum Ausprobieren in der Lobby, (5) Playwright-Screenshots aller Szenen durch den Simulations-Filter als Abnahme.",
+      "prio": 12
+    },
+    {
+      "area": "Qualität",
+      "prio": 13,
+      "size": "S–M",
+      "kind": null,
+      "title": "Noch unentschieden",
+      "detail": "Vorschläge ohne Entscheidung von Marlon:",
       "steps": [
-        "Highlights/Replays: TV puffert 6 s und zeigt K.O., Tor, letzten Treffer in Zeitlupe (Smash, Bogen, Igel, Kart; Autoball hat es schon) (M)",
-        "Echte Pixel-Avatare aus Fotos der Freunde (Foto → 16×16-Pixelkopf im Avatar-Editor) (M)",
-        "Onboarding für neue Gäste: 60-s-Tutorial am Handy (Stick, Knöpfe, Sensor testen) beim ersten Beitritt (S)",
-        "Lasttest 12 Handys + Netz-Robustheit: Bots über WLAN, Reconnect-Szenarien, Paketgrößen messen (S–M)",
-        "Barrierefreiheit: Farbenblind-Modus (Muster/Symbole statt nur Farbe), größere Schrift am Handy (S)",
         "Spieler-Profile: Statistik pro Person über alle Abende (Lieblingsspiel, Siege, Titel) am Handy (S–M)",
-        "Testrunde: 38 von 59 Spielen haben noch kein Feedback von Marlon – nach jedem Spieleabend Status-Seite pflegen"
+        "Testrunde: 42 von 63 Spielen haben noch kein Feedback von Marlon – nach jedem Spieleabend Status-Seite pflegen",
+        "Gestrichen (24.11.): Pixel-Avatare aus Fotos"
       ]
     }
   ],
@@ -732,6 +760,10 @@
     },
     {
       "title": "KI-Texte aufräumen: visuelle Erklärungen statt Text (die liest keiner) – z. B. die Texte kurz vor dem Spielstart",
+      "status": "offen"
+    },
+    {
+      "title": "Freigegeben: Highlights & Replays, Onboarding für Gäste, Lasttest 12 Handys, Farbenblind-Modus in allen Ausführungen · gestrichen: Avatare aus Fotos",
       "status": "offen"
     }
   ]
