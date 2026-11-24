@@ -19,7 +19,6 @@ import { GEIST, inCone, navTarget, roomCenter } from '../shared/geist';
 import { CONSTELLATIONS, DESCENT, DESCENT_OBSTACLES, WRAP_DISTRACTORS, WRAP_RECIPE } from '../shared/dategames';
 import { PROPS, VS, type PropType, baseRect, canStand, judgeSpot, nextWaypoint as verstWaypoint, overlap, pickTarget, zoneAt } from '../shared/verstecken';
 import { autopilot, getTrack } from '../shared/kart';
-import { WASSER, WASSER_BASE, WASSER_BLOCKERS, WASSER_HOSE, type WasserState, aimFor as wasserAimFor } from '../shared/wasser';
 import { grillBot } from './grillbot';
 import { spectatorBot } from './spectatorbot';
 import { umzugBot } from './umzugbot';
@@ -170,8 +169,6 @@ export class Bot {
   private kartDrift = false;
   /** Kurzzeitgedächtnis für die Smash-Arena */
   private sm = { shieldUntil: 0, lastJump: 0, lastA: 0, lastB: 0, stick: '', stickAt: 0 };
-  /** Wasserbomben-Schlacht: kleines Bot-Gedächtnis */
-  private ws = { nextThrow: 0, lastX: 0, lastY: 0, checkAt: 0, wanderUntil: 0, wx: 0, wy: 0, strafe: 1, strafeAt: 0 };
   /** Urlaubs-Fangen: Gedächtnis des Bots (nur, was auch auf dem TV zu sehen ist) */
   private fg: FangenMemory = { round: 0, seen: new Set(), goal: null, until: 0 };
   /** Sprüche-Duell: bereits erledigte Antworten/Abstimmungen */
@@ -686,68 +683,6 @@ export class Bot {
     }
   }
 
-  /** Wasserbomben-Schlacht: hinlaufen, Abstand halten, mit Streuung werfen, nachfüllen, fliehen */
-  private wasserStep(st: WasserState) {
-    const me = st.players[this.id];
-    if (!me) return;
-    if (st.sub !== 'play') return this.send('stick', { x: 0, y: 0 });
-    const now = Date.now();
-    const mem = this.ws;
-    const dist = (a: BotPoint, b: BotPoint) => Math.hypot(a.x - b.x, a.y - b.y);
-    const bases = me.t ? [WASSER_BASE[me.t]] : [WASSER_BASE.A, WASSER_BASE.B];
-    const nearest = (pts: BotPoint[]) => pts.reduce((a, b) => (dist(me, a) <= dist(me, b) ? a : b));
-    const enemies = Object.entries(st.players).filter(([id, p]) => id !== this.id && (st.ffa || p.t !== me.t));
-    const targets = enemies.filter(([, p]) => p.s === 'ok').map(([, p]) => p);
-    const target = targets.length ? targets.reduce((a, b) => (dist(me, a) <= dist(me, b) ? a : b)) : null;
-    let goal: BotPoint | null = null;
-
-    if (me.s === 'drying') return this.send('stick', { x: 0, y: 0 });
-    if (me.s === 'soaked') goal = nearest(bases.map((b) => b.towel));
-    else if (me.w > 75 && target && dist(me, target) < 140) goal = nearest(bases.map((b) => b.bucket));
-    else if (me.a === 0 && me.pi === 0) {
-      const bucket = nearest(bases.map((b) => b.bucket));
-      goal = dist(me, WASSER_HOSE) < dist(me, bucket) * 1.3 ? WASSER_HOSE : bucket;
-    } else if (st.pistol && me.pi === 0 && dist(me, st.pistol) < 110) goal = st.pistol;
-    else if (target) {
-      const d = dist(me, target);
-      const want = me.pi > 0 ? 34 : 90;
-      if (now > mem.strafeAt) {
-        mem.strafe = Math.random() < 0.5 ? 1 : -1;
-        mem.strafeAt = now + rand(1200, 2600);
-      }
-      if (d > want + 15) goal = target;
-      else if (d < want - 25) goal = { x: me.x + ((me.x - target.x) / d) * 30, y: me.y + ((me.y - target.y) / d) * 30 };
-      else goal = { x: me.x + (-(target.y - me.y) / d) * 25 * mem.strafe, y: me.y + ((target.x - me.x) / d) * 25 * mem.strafe };
-      // Werfen (mit Streuung) bzw. spritzen
-      if (me.pi > 0) {
-        if (d < WASSER.PISTOL_RANGE + 8) this.send('aim', { x: (target.x - me.x) / d, y: (target.y - me.y) / d });
-      } else if (me.a > 0 && d < WASSER.RANGE * 0.95 && now > mem.nextThrow) {
-        mem.nextThrow = now + rand(900, 1800);
-        // Streuung in Pixeln, dann über die Wurfkurve (wenig Stick = kurz) zurück in einen Stick-Ausschlag
-        const v = wasserAimFor(target.x - me.x + rand(-12, 12), target.y - me.y + rand(-12, 12));
-        const aim = { x: Math.round(v.x * 100) / 100, y: Math.round(v.y * 100) / 100 };
-        this.send('aim', aim);
-        setTimeout(() => this.send('throw', aim), rand(250, 450));
-      }
-    } else goal = nearest(bases.map((b) => b.bucket));
-
-    // Festgefahren? Kurz zufällig laufen
-    if (now > mem.checkAt) {
-      const moved = Math.hypot(me.x - mem.lastX, me.y - mem.lastY);
-      if (goal && moved < 3 && dist(me, goal) > 12) {
-        const a = Math.random() * Math.PI * 2;
-        mem.wx = Math.cos(a);
-        mem.wy = Math.sin(a);
-        mem.wanderUntil = now + 600;
-      }
-      mem.lastX = me.x;
-      mem.lastY = me.y;
-      mem.checkAt = now + 1000;
-    }
-    if (now < mem.wanderUntil) return this.send('stick', { x: mem.wx, y: mem.wy });
-    this.send('stick', goal ? steer(me, goal) : { x: 0, y: 0 });
-  }
-
   react(s: GameState) {
     if (!this.id) return;
     if (s.phase === 'lobby') this.boardSeen.clear();
@@ -834,7 +769,7 @@ export class Bot {
         this.socket.emit('story:next');
       });
     }
-    // Würfelfenster: alle gleichzeitig – meist nach 1–5 s, ab und zu verpennt ein Bot (dann würfelt der Server am Ende)
+    // Würfeln: alle gleichzeitig – meist nach 1–5 s, ab und zu lässt sich ein Bot Zeit (kein Zeitlimit: das Brett wartet)
     if (s.phase === 'board' && s.board?.sub === 'roll' && s.board.order.includes(this.id) && !(this.id in s.board.rolls)) {
       const key = `roll-${s.board.round}`;
       if (!this.boardSeen.has(key)) {
@@ -842,15 +777,13 @@ export class Bot {
         // Item vor dem Würfeln einsetzen (Doppelwürfel, Klau, Taxi) – meistens; das Taxi ersetzt den Wurf
         const item = s.board.items?.[this.id];
         const useIt = !!item && ITEM_INFO[item].active && Math.random() < 0.8;
-        if (Math.random() > 0.1) {
-          setTimeout(() => {
-            if (useIt) {
-              this.socket.emit('board:item');
-              this.opts.log?.(`${this.name} setzt ${ITEM_INFO[item!].title} ein`);
-            }
-            if (!useIt || item !== 'taxi') this.socket.emit('board:roll');
-          }, rand(1000, 5000));
-        }
+        setTimeout(() => {
+          if (useIt) {
+            this.socket.emit('board:item');
+            this.opts.log?.(`${this.name} setzt ${ITEM_INFO[item!].title} ein`);
+          }
+          if (!useIt || item !== 'taxi') this.socket.emit('board:roll');
+        }, Math.random() < 0.1 ? rand(6000, 12000) : rand(1000, 5000));
       }
     }
     // Entscheidungen am Brett: Cocktail immer kaufen, im Laden meist etwas kaufen, an der Gabelung zur Bar (wenn sie dort steht)
@@ -1311,14 +1244,6 @@ export class Bot {
       this.once('umzug', async () => {
         umzugBot(this, st);
         await sleep(rand(80, 120));
-      });
-    }
-
-    if (m.kind === 'wasser') {
-      const st = m.state;
-      this.once('wasser', async () => {
-        this.wasserStep(st);
-        await sleep(110);
       });
     }
 
@@ -2310,37 +2235,6 @@ export function smashThink(bot: SmashBrainHost & { id: string }, mem: { shieldUn
       btn('b', sgn, 0);
     }
   }
-}
-
-export interface BotPoint {
-  x: number;
-  y: number;
-}
-
-/** Läuft um Hecken/Pool herum: wählt die freie Richtung, die dem Ziel am nächsten kommt */
-function steer(from: BotPoint, goal: BotPoint): BotPoint {
-  const d = Math.hypot(goal.x - from.x, goal.y - from.y);
-  if (d < 3) return { x: 0, y: 0 };
-  const R = WASSER.PLAYER_R + 2;
-  const blocked = (x: number, y: number) => WASSER_BLOCKERS.some((r) => x > r.x - R && x < r.x + r.w + R && y > r.y - R && y < r.y + r.h + R);
-  let best = { x: 0, y: 0 };
-  let bestScore = Infinity;
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    const ux = Math.cos(a);
-    const uy = Math.sin(a);
-    const look = Math.min(12, d);
-    if (blocked(from.x + ux * look, from.y + uy * look) || blocked(from.x + ux * 5, from.y + uy * 5)) continue;
-    const nx = from.x + ux * 12;
-    const ny = from.y + uy * 12;
-    const score = Math.hypot(goal.x - nx, goal.y - ny);
-    if (score < bestScore) {
-      bestScore = score;
-      best = { x: ux, y: uy };
-    }
-  }
-  const slow = d < 12 ? Math.max(0.3, d / 12) : 1;
-  return { x: Math.round(best.x * slow * 100) / 100, y: Math.round(best.y * slow * 100) / 100 };
 }
 
 /** Ein paar zufällige Kritzel-Striche für Stille Post */

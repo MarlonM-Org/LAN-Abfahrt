@@ -578,6 +578,48 @@ export class SumoGame implements MiniGame {
     };
   }
 
+  /** Nur für `scripts/test-physik.ts`: Spiel ohne Timer steuern (Uhr und Ticks von außen) */
+  testApi() {
+    const g = this;
+    let t = Date.now();
+    return {
+      /** Runde läuft sofort, Steg ganz; Spieler an feste Plätze */
+      begin(at: Record<string, { x: number; y: number }>) {
+        g.timers.clear();
+        g.sub = 'play';
+        g.playStart = t;
+        g.nextBreakAt = Infinity;
+        g.tiles = [...'#'.repeat(SUMO.COLS * SUMO.ROWS)] as SumoTile[];
+        for (const [id, p] of g.players) {
+          const pos = at[id];
+          p.alive = !!pos;
+          if (pos) {
+            p.x = pos.x;
+            p.y = pos.y;
+          }
+          p.vx = p.vy = p.sx = p.sy = 0;
+          p.dashUntil = p.readyAt = p.stunUntil = p.dashQueuedUntil = 0;
+        }
+      },
+      player: (id: string) => g.players.get(id)!,
+      /** Rempler in Richtung (dx, dy) */
+      dash(id: string, dx: number, dy: number) {
+        const p = g.players.get(id)!;
+        const l = Math.hypot(dx, dy) || 1;
+        p.lx = dx / l;
+        p.ly = dy / l;
+        g.dash(p, t);
+      },
+      /** n Ticks à TICK_MS */
+      step(n = 1) {
+        for (let k = 0; k < n; k++) {
+          t += SUMO.TICK_MS;
+          g.tick(t, SUMO.TICK_MS / 1000);
+        }
+      },
+    };
+  }
+
   dispose() {
     this.timers.clear();
   }

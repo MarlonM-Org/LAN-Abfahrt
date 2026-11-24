@@ -2,6 +2,7 @@ import Matter from 'matter-js';
 import type { MiniSnapshot } from '../shared/types';
 import { KOFFER, KOFFER_BAG, KOFFER_ITEMS, type KofferActive, type KofferCar, kofferCellOffsets, kofferCellsInside, kofferSnapX } from '../shared/koffer';
 import { type MiniCtx, type MiniGame, Timers, asRecord, groupByScore, shuffle } from './minigame';
+import { ruhig, stapelSchritt, stapelTraegheitSetzen } from './stapelphysik';
 
 const { Bodies, Body, Composite, Engine } = Matter;
 
@@ -96,6 +97,8 @@ interface Car {
   lost: number;
   lostSeq: number;
   full: boolean;
+  /** Seit wann der Kofferraum bis unters Dach gepackt ist, aber noch etwas wackelt (0 = nicht) */
+  waitSince: number;
 }
 
 /** Kompound-Körper aus quadratischen Zellen (Schwerpunkt = (x, y)) */
@@ -103,7 +106,8 @@ function makeBody(item: number, x: number, y: number, angle: number): Matter.Bod
   const parts = kofferCellOffsets(item, 0).map((o) => Bodies.rectangle(x + o.x, y + o.y, B, B));
   const body = Body.create({ parts, friction: 1, frictionStatic: 4, restitution: 0, frictionAir: 0.03, slop: 0.03 });
   Body.setDensity(body, 0.001 * KOFFER_ITEMS[item].density);
-  Body.setInertia(body, body.inertia * 4);
+  // Richtige Trägheit mit Steiner-Anteil (stapelphysik.ts) – sonst schaukeln sich lange Teile auf und schieben den Stapel weg
+  stapelTraegheitSetzen(body);
   Body.setAngle(body, angle);
   // Länger wach bleiben als beim Wackelturm: ein Teil, das hinten über die Ladekante hängt, kippt
   // langsam an – es soll dabei nicht „einschlafen“, sondern wirklich rausfallen.
@@ -127,6 +131,8 @@ export class KofferGame implements MiniGame {
   private order: [number, number][] = [];
   private timers = new Timers();
   private allFullAt = 0;
+  /** Uhr für Spawn/Lock-Delay (in Tests ersetzbar) */
+  private clock = () => Date.now();
 
   constructor(
     private ids: string[],
@@ -165,6 +171,7 @@ export class KofferGame implements MiniGame {
         lost: 0,
         lostSeq: 0,
         full: false,
+        waitSince: 0,
       });
     });
     this.timers.later(KOFFER.COUNTDOWN_MS, () => this.start());
@@ -199,13 +206,25 @@ export class KofferGame implements MiniGame {
     for (const car of this.cars) {
       for (let i = 0; i < steps; i++) {
         if (this.sub === 'play') this.moveActive(car, now);
-        Engine.update(car.engine, STEP_MS);
+        stapelSchritt(car.engine, STEP_MS);
       }
       this.cleanup(car);
       this.measure(car);
       if (this.sub !== 'play') continue;
       if (car.active) car.active.ghost = this.ghost(car, car.active);
-      if (!car.active && now >= car.spawnAt) this.spawn(car);
+      if (!car.active && now >= car.spawnAt) {
+        // Bis unters Dach gepackt und alles liegt ruhig → nichts mehr oben nachliefern (Marlon 24.11.)
+        const dach = this.dachStand(car);
+        if (dach === 'frei') {
+          car.waitSince = 0;
+          this.spawn(car);
+        } else {
+          // Wackelt noch etwas, kurz abwarten (es könnte nachgeben) – höchstens 2 s, dann gilt es als voll
+          if (dach === 'wartet' && !car.waitSince) car.waitSince = now;
+          car.full = dach === 'voll' || now - car.waitSince >= 2000;
+          car.spawnAt = now + 250;
+        }
+      }
     }
     // Alle Kofferräume bis oben voll → nicht unnötig warten
     if (this.sub === 'play' && this.cars.every((c) => c.full && !c.active)) {
@@ -244,7 +263,7 @@ export class KofferGame implements MiniGame {
     }
     car.full = x === null;
     if (x === null) {
-      car.spawnAt = Date.now() + 500;
+      car.spawnAt = this.clock() + 500;
       return;
     }
     car.seqIdx++;
@@ -393,7 +412,7 @@ export class KofferGame implements MiniGame {
     car.bodies.push(body);
     car.meta.set(body.id, [a.id, a.item, a.v]);
     car.active = null;
-    car.spawnAt = Date.now() + 200;
+    car.spawnAt = this.clock() + 200;
   }
 
   private shift(car: Car, a: Active, dir: number, now: number) {
@@ -457,6 +476,51 @@ export class KofferGame implements MiniGame {
   private topY(car: Car) {
     let top = 0;
     for (const b of car.bodies) if (b.position.x < W + B) top = Math.min(top, b.bounds.min.y);
+    return top;
+  }
+
+  /**
+   * Ist unter der Dachlinie noch Platz? Gemessen wird die Oberkante des Gepäcks in jeder Halbblock-Spalte des
+   * Kofferraums (Lehne bis Ladekante). Platz heißt: eine Lücke, in die das kleinste Teil (Schuhkarton) ganz unter
+   * die Dachlinie passt – 2 Blöcke breit und 1 hoch oder hochkant 1 breit und 2 hoch. Sonst ist der Kofferraum
+   * voll, sobald nichts mehr wackelt (`wartet`, solange sich noch etwas bewegt – es könnte ja noch nachgeben).
+   */
+  private dachStand(car: Car): 'frei' | 'wartet' | 'voll' {
+    const roof = KOFFER.ROOF * B;
+    const cols = Math.round(W / STEP);
+    const free: number[] = [];
+    for (let c = 0; c < cols; c++) free.push(roof - this.surfaceAt(car, (c + 0.5) * STEP));
+    const run = (width: number, height: number) => {
+      let n = 0;
+      for (const f of free) {
+        n = f >= height ? n + 1 : 0;
+        if (n >= width) return true;
+      }
+      return false;
+    };
+    const cell = B / STEP;
+    if (run(2 * cell, 0.9 * B) || run(cell, 1.9 * B)) return 'frei';
+    return car.bodies.every((b) => ruhig(b, 0.15, 0.006)) ? 'voll' : 'wartet';
+  }
+
+  /** Oberkante des Gepäcks (Höhe über dem Boden) an der Stelle x – höchster Schnittpunkt einer Senkrechten mit allen Zellen */
+  private surfaceAt(car: Car, x: number): number {
+    let top = 0;
+    for (const b of car.bodies) {
+      if (b.bounds.max.x < x || b.bounds.min.x > x) continue;
+      for (const part of b.parts.length > 1 ? b.parts.slice(1) : b.parts) {
+        const vs = part.vertices;
+        for (let i = 0; i < vs.length; i++) {
+          const v1 = vs[i];
+          const v2 = vs[(i + 1) % vs.length];
+          const lo = Math.min(v1.x, v2.x);
+          const hi = Math.max(v1.x, v2.x);
+          if (x < lo - 1e-6 || x > hi + 1e-6) continue;
+          const y = hi - lo < 1e-6 ? Math.min(v1.y, v2.y) : v1.y + ((x - v1.x) * (v2.y - v1.y)) / (v2.x - v1.x);
+          top = Math.max(top, -y);
+        }
+      }
+    }
     return top;
   }
 
@@ -570,6 +634,61 @@ export class KofferGame implements MiniGame {
       };
     });
     return { kind: 'koffer', state: { sub: this.sub, endsIn: Math.max(0, this.deadline - now), cars } };
+  }
+
+  /** Nur für `scripts/test-physik.ts`: Spiel ohne Timer steuern (Uhr und Physik-Schritte von außen) */
+  testApi() {
+    const g = this;
+    let t = Date.now();
+    g.clock = () => t;
+    return {
+      /** Spiel läuft, ohne Zeitlimit und ohne automatisch erscheinende Teile */
+      begin() {
+        g.timers.clear();
+        g.sub = 'play';
+        g.deadline = Infinity;
+        for (const c of g.cars) {
+          c.active = null;
+          c.spawnAt = Infinity;
+        }
+      },
+      car: (i: number) => g.cars[i],
+      /** Liegendes Teil (Physik-y nach unten, x/y = Schwerpunkt); `vy` = Aufprallgeschwindigkeit */
+      place(i: number, item: number, x: number, y: number, rot: number, vy = 0) {
+        const car = g.cars[i];
+        const body = makeBody(item, x, y, (rot * Math.PI) / 2);
+        if (vy) Body.setVelocity(body, { x: 0, y: vy });
+        Composite.add(car.engine.world, body);
+        car.bodies.push(body);
+        car.meta.set(body.id, [++g.seq, item, 0]);
+        return body;
+      },
+      /** Teil wie im Spiel steuern: über x erscheinen lassen, mit ▼ fallen lassen, bis es liegt */
+      drop(i: number, item: number, x: number, rot: number) {
+        const car = g.cars[i];
+        car.active = g.makeActive(++g.seq, item, 0, x, -(KOFFER.VIEW_TOP - 1.5) * B, rot, car.owners[0]);
+        car.fast = true;
+        for (let k = 0; k < 600 && car.active; k++) {
+          t += STEP_MS;
+          g.tick(t, 1);
+        }
+        car.fast = false;
+        car.spawnAt = Infinity;
+        return car.bodies.at(-1)!;
+      },
+      /** Ab jetzt wieder Teile nachliefern wie im Spiel */
+      autoSpawn(i: number) {
+        g.cars[i].spawnAt = t;
+      },
+      /** Ein Physik-Schritt (1/60 s) */
+      step(n = 1) {
+        for (let k = 0; k < n; k++) {
+          t += STEP_MS;
+          g.tick(t, 1);
+        }
+      },
+      dachStand: (i: number) => g.dachStand(g.cars[i]),
+    };
   }
 
   playerDisconnected(id: string) {

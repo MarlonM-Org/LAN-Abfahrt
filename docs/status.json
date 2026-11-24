@@ -1,11 +1,20 @@
 {
-  "updated": "2026-11-24T19:45+00:00",
+  "updated": "2026-11-24T21:00+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
+  "inProgress": [
+    {
+      "type": "in Arbeit · Claude",
+      "kind": null,
+      "title": "Marlons Feedback vom 24.11.: Party ohne Zeitlimit, Wasserbomben-Schlacht raus, Sumo-Rempler, Kofferpacken voll, Stapelphysik",
+      "detail": "Fertig gebaut und getestet (npm run test:physik, Bot-Party), wartet auf PR/Merge. Spielbrett: Würfeln, Bar, Laden, Gabelung und Duell ohne Countdown – der Server entscheidet nur noch für Handys, die weg sind, oder per VIP-Überspringen. Wasserbomben-Schlacht komplett entfernt. Sumo: Rempler stößt ≈ 90 statt ≈ 55 px weit. Kofferpacken: bis unters Dach gepackt + alles ruhig → kein neues Teil, VOLL. Stapelphysik (Kofferpacken, Wackelturm) in server/stapelphysik.ts: Trägheit mit Steiner-Anteil, 120 Hz, kein Einschlafen beim Kippen – abgestützte Stapel verrutschen nicht mehr (vorher 75 bzw. 363 von 597 Teilen im Kofferraum, 112 von 289 im Wackelturm).",
+      "branch": "claude/optimistic-johnson-korj2c",
+      "since": "2026-11-24"
+    }
+  ],
   "queue": [
     {
       "area": "Lobby / Framing",
@@ -580,8 +589,8 @@
       "notes": "„Nur 4 Sekunden zum Platzieren“: jeder Tipp auf den Joystick baute das Teil sofort ein → behoben, nur noch PLATZIEREN baut ein (#112) · vorher: kein Zeitlimit (AFK nach 60 s), alles quer, bis 12 Läufer (#43)"
     },
     "turm": {
-      "status": "umgesetzt",
-      "notes": "Kanten-Raster, Landevorschau, seitlich unter Überhänge schieben, Lock-Delay"
+      "status": "in Arbeit",
+      "notes": "„Physik anpassen, Blöcke verschieben sich unten komisch“ (24.11.) → gemeinsame Stapelphysik mit Kofferpacken: abgestützte Türme verrutschen auch nach ▼ nicht mehr, Hochkant-Surfbrett steht, Überhänge kippen statt schräg einzuschlafen (Branch claude/optimistic-johnson-korj2c) · vorher: Kanten-Raster, Landevorschau, seitlich unter Überhänge schieben, Lock-Delay"
     },
     "bowling": {
       "status": "umgesetzt",
@@ -616,8 +625,8 @@
       "notes": "Joystick absolut statt Links/Rechts aus Autosicht, Hüpfer weg, große Knöpfe rechts; Kippen-Steuerung entfällt hier (#99) · vorher: Tor-Wiederholung, Tick 30 Hz (#83)"
     },
     "sumo": {
-      "status": "umgesetzt",
-      "notes": "Zu wenig Wirkung beim Treffer, man fällt oft selbst runter → Stoß 36 → 53 px, Sprint 65 → 49 px mit Abbremsen (#98) · vorher: Finale-Zoom, Zeitlupe (#84)"
+      "status": "in Arbeit",
+      "notes": "„Man sollte ein bisschen mehr rempeln können – der Gegner soll weiter zurückgestoßen werden“ (24.11.) → Stoß ≈ 55 → 90 px (5–6 Planken), frontal ≈ 100 px, Anlaufen schubst stärker (Branch claude/optimistic-johnson-korj2c) · vorher: Zu wenig Wirkung beim Treffer, man fällt oft selbst runter → Stoß 36 → 53 px, Sprint 65 → 49 px mit Abbremsen (#98) · vorher: Finale-Zoom, Zeitlupe (#84)"
     },
     "kugel": {
       "status": "umgesetzt",
@@ -639,10 +648,6 @@
       "status": "umgesetzt",
       "notes": "Hängenbleiben an Ecken/Kreuzungen behoben (Ursache: Abbiege-Regel ab 22° Stick-Schräge ließ die Figur zittern); Feld 17×9 (2) · 19×11 (3–4) · 23×11 (5–6) · 23×13 (7–8) · 25×13 (9–12) (#101)"
     },
-    "wasser": {
-      "status": "umgesetzt",
-      "notes": "Modus unklar (Trocknen, Auffüllen, Deckung) → Schilder, Deckungs-Schild + „GEBLOCKT!“, Sonnen-Dampf, Legende, Aufwärmrunde mit Tour, Handy-Hinweise mit Pfeilen (#107) · vorher: feineres Zielen, Hintragen zum Handtuch (#100)"
-    },
     "volley": {
       "status": "umgesetzt",
       "notes": "Rüberziehen von links nach rechts blieb links hängen → Richtung folgt dem Daumen; Ball 12 → 20 px am TV, Feld 468 → 368 px, Landepunkt-Ring (#103)"
@@ -650,6 +655,10 @@
     "golf": {
       "status": "umgesetzt",
       "notes": "Quer, Ball-Kollision (angestoßen eingelocht zählt), VIP „Nächstes Loch“ (Schläge + 2, mind. Par + 1, max. 7), Sensor-Knopf mit iPhone-Erlaubnis; „Du spielst gar nicht“ vermutlich: Server puttete schon nach ~5 s Handy-weg für dich → jetzt 20 s + Hinweis (#104)"
+    },
+    "koffer": {
+      "status": "in Arbeit",
+      "notes": "„Oben kommen weiter Sachen, obwohl die Reihe ruhig an der Dachlinie liegt“ → bis unters Dach gepackt + alles ruhig = VOLL, kein neues Teil; „Tetris-Blöcke verschieben sich unten komisch“ → Stapelphysik repariert (Trägheit mit Steiner-Anteil, 120 Hz, kein Einschlafen beim Kippen) (24.11., Branch claude/optimistic-johnson-korj2c)"
     }
   },
   "general": [
@@ -772,6 +781,14 @@
     {
       "title": "Musik-Werkstatt zu unübersichtlich → Übersicht „Wo läuft was?“, Kopie/Direkt bearbeiten/Original wiederherstellen, Speichern wirkt sofort, Editor entrümpelt",
       "status": "umgesetzt"
+    },
+    {
+      "title": "Party-Modus: Zeitlimit lässt Spieler automatisch handeln („mega nervig, man will sich Zeit lassen“) → Würfeln, Bar, Laden, Gabelung, Duell ohne Countdown; nur für Handys, die weg sind, oder per VIP entscheidet der Server",
+      "status": "in Arbeit"
+    },
+    {
+      "title": "Wasserbomben-Schlacht: „Prämisse falsch – Punkte nur fürs komplett Nassmachen, aber man trifft sich niemals“ → Spiel komplett entfernt",
+      "status": "in Arbeit"
     }
   ]
 }

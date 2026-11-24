@@ -1,6 +1,5 @@
 import type { PropType } from './verstecken';
 
-import type { WasserState } from './wasser';
 import type { GrillState } from './grill';
 import type { DartsState } from './darts';
 import type { AfbState } from './autoball';
@@ -69,7 +68,6 @@ export type MiniKind =
   | 'turm'
   | 'igel'
   | 'smash'
-  | 'wasser'
   | 'stillepost'
   | 'fangen'
   | 'geist'
@@ -2115,8 +2113,6 @@ export interface BoardAsk {
   seq: number;
   playerId: string;
   kind: 'bar' | 'shop' | 'fork';
-  /** Restzeit in ms (Stand beim Senden, ~1×/s aktualisiert) */
-  ms: number;
   /** bar: Preis des Cocktails */
   price?: number;
   /** shop: Angebot */
@@ -2136,8 +2132,6 @@ export interface BoardDuel {
   pot: number;
   /** choose = beide wählen geheim, reveal = TV deckt auf, done = Münzen verteilt */
   sub: 'choose' | 'reveal' | 'done';
-  /** Restzeit der Wahl in ms */
-  ms: number;
   /** Wer schon gewählt hat (ohne Inhalt) */
   chosen: string[];
   /** Ab `reveal`: die Karten */
@@ -2187,10 +2181,8 @@ export interface BoardState {
   ask: BoardAsk | null;
   /** Laufendes Duell „Teilen oder Klauen“ */
   duel: BoardDuel | null;
-  /** Würfelfenster: Augenzahl pro Spieler, der schon gewürfelt hat (selbst oder automatisch) */
+  /** Würfeln: Augenzahl pro Spieler, der schon gewürfelt hat (selbst oder – Handy weg, VIP – vom Server) */
   rolls: Record<string, number>;
-  /** Restzeit des Würfelfensters in ms (Stand beim Senden, wird ~1×/s aktualisiert; 0 außerhalb) */
-  rollMs: number;
   /** Endspurt: blaue/rote Felder zählen doppelt */
   double: boolean;
   /** Tageszeit für den TV: 0 = Morgen, ~0.8 = Sonnenuntergang (letzte Runde), 1 = Nacht (Finale, Bonus) */
@@ -2286,7 +2278,6 @@ export type MiniSnapshot =
   | { kind: 'turm'; state: TurmState }
   | { kind: 'igel'; state: IgelState }
   | { kind: 'smash'; state: SmashState }
-  | { kind: 'wasser'; state: WasserState }
   | { kind: 'stillepost'; state: StillepostState }
   | { kind: 'fangen'; state: FangenState }
   | { kind: 'geist'; state: GeistState }

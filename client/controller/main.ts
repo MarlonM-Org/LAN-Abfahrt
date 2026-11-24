@@ -27,7 +27,6 @@ import { onKartRerender, pickKart } from './screens/kart';
 import { pickTurm } from './screens/turm';
 import { pickIgel } from './screens/igel';
 import { pickSmash } from './screens/smash';
-import { pickWasser } from './screens/wasser';
 import { pickStillepost } from './screens/stillepost';
 import { pickFangen } from './screens/fangen';
 import { pickSpion } from './screens/spion';
@@ -364,8 +363,6 @@ function pickMini(m: MiniSnapshot, vip: boolean): Screen {
       return pickIgel(m.state);
     case 'smash':
       return pickSmash(m.state);
-    case 'wasser':
-      return pickWasser(m.state);
     case 'stillepost':
       return pickStillepost(m.state, vip);
     case 'fangen':

@@ -10,6 +10,7 @@ Lokales Party-Spiel: TV-Ansicht (Phaser) + Handys als Controller (Browser), verb
 - `npm run online` – Build + Server + Cloudflare-Quick-Tunnel (`server/online.ts`), Freunde spielen über `https://….trycloudflare.com` mit; feste Adresse per `ONLINE_URL`
 - `npm run bots -- 4 --game=murder` – Testspieler; `--party` für eine komplette Party (zum Testen neuer Features immer einmal durchlaufen lassen)
 - `npm run test:records` – Tests ohne Browser für die ewigen Bestleistungen der Board-Spiele (`server/records.ts`)
+- `npm run test:physik` – Tests ohne Browser für die Physik: Kofferpacken + Wackelturm (abgestützte Stapel bleiben liegen, auch bei Aufprall; Hochkant-Teile stehen; Überhänge kippen; Kofferraum bis unters Dach → kein neues Teil) und Sumo-Rempler-Weite. Stapelphysik gemeinsam in `server/stapelphysik.ts` (Trägheit mit Steiner-Anteil, 2 Unterschritte, kein Einschlafen beim Kippen) – neue Stapelspiele nutzen sie
 - `npm run test:lieder` – Tests ohne Browser für Guess the Song (Genres/Runden, Dateien → Genre, Deezer-Trefferwahl, kompletter Rundenablauf)
 - `npm run test:wolfrunde` – Tests ohne Browser für Werwolf mit Erzähler (Stapel-Regeln, Geheimhaltung: TV ohne Karten, jeder nur seine, Erzähler alle; Dieb, Totenkopf, Ergebnis)
 - `npm run test:band` – Tests ohne Browser für die Strand-Band (jede Instrumentenspur jedes Songs spielbar und hörbar im Song, Besetzung, Ablauf mit Groove und Band-Bonus)

@@ -44,7 +44,6 @@ import { SessionBoard } from './session';
 import { ARCADE_COOP_POINTS, ARCADE_RANDOM, COCKTAIL_PRICE, TURNIER_CUSTOM, TURNIER_KINDS, TURNIER_PLAYLISTS, arcadePoints, fitsPlayers, seriesLabel } from '../shared/games';
 import { KART_TRACKS } from '../shared/kart';
 import { clockTimeOfDay } from '../shared/daytime';
-import { WasserGame } from './wasser';
 import { GrillGame } from './grill';
 import { FangenGame } from './fangen';
 import { DATE_VERSIONS, HEARTS_PER_CHAPTER } from '../shared/dates';
@@ -1035,8 +1034,6 @@ export class Room {
         return new IgelGame(ids, ctx);
       case 'smash':
         return new SmashGame(ids, ctx);
-      case 'wasser':
-        return new WasserGame(ids, ctx);
       case 'stillepost':
         return new StillepostGame(ids, ctx, this.posts.all);
       case 'fangen':

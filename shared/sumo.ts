@@ -32,7 +32,7 @@ export const SUMO = {
   /** Reibung (1/s) – Endgeschwindigkeit ≈ ACCEL / FRICTION */
   FRICTION: 6,
   /** Reibung, während man weggeschubst wurde (rutscht weiter) */
-  FRICTION_HIT: 3.4,
+  FRICTION_HIT: 2.8,
   DASH_SPEED: 210,
   /** Reibung (1/s) während des Sprints */
   DASH_FRICTION: 1.2,
@@ -41,16 +41,20 @@ export const SUMO = {
   /** Abbremsen am Ende eines Sprints ohne Treffer (Faktor auf die Geschwindigkeit) – weniger Überschießen */
   DASH_BRAKE: 0.5,
   DASH_COOLDOWN_MS: 1300,
-  /** Stoß, den ein Rempler beim Gegner auslöst (Getroffene fliegen ≈ 53 px, also weiter als der Sprint selbst) */
-  KNOCK: 220,
-  /** Faktor, wenn der Getroffene selbst gerade rempelt (Frontalzusammenstoß) */
-  KNOCK_DASHING: 1.5,
+  /**
+   * Stoß, den ein Rempler beim Gegner auslöst: Getroffene fliegen ≈ 90 px (5–6 Planken), fast doppelt so weit
+   * wie der Sprint selbst (Marlon 24.11.: „Der soll weiter zurückgestoßen werden“; vorher 220 → ≈ 55 px).
+   * Geprüft in `npm run test:physik`.
+   */
+  KNOCK: 320,
+  /** Faktor, wenn der Getroffene selbst gerade rempelt (Frontalzusammenstoß: beide fliegen ≈ 100 px) */
+  KNOCK_DASHING: 1.25,
   /** Was dem Rempler nach einem Treffer an Tempo bleibt (der Schwung geht in den Getroffenen) */
   KNOCK_RECOIL: 0.2,
-  /** Kurze Kontrollsperre nach einem Treffer */
-  STUN_MS: 380,
+  /** Kurze Kontrollsperre nach einem Treffer (so lange rutscht man mit FRICTION_HIT weiter) */
+  STUN_MS: 450,
   /** Normales Anrempeln ohne Dash: kleiner Abpraller */
-  BUMP: 40,
+  BUMP: 55,
   /** Schubser zählt als „ins Wasser geschubst“, wenn der Sturz so kurz danach passiert */
   CREDIT_MS: 3500,
   WIN_ROUNDS: 2,

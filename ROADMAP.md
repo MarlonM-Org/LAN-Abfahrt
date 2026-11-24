@@ -55,7 +55,7 @@ Legende: 👥 Spielerzahl · 📱 Rolle des Handys · ⭐ Favorit
   👥 2–12 · 📱 Steuerkreuz + Bombe
 - [ ] **Bogen-Arena** *(Vorbild: TowerFall)* – Ein Treffer und man ist raus, Pfeile müssen aufgesammelt werden.
   👥 2–8 · 📱 Joystick + Schuss + Sprung
-- [ ] **Wasserbomben-/Schneeballschlacht** – Teams, Deckung, Nachladen am Brunnen.
+- ~~**Wasserbomben-/Schneeballschlacht**~~ – gebaut und am 24.11.2026 wieder entfernt. Marlon: „Man kriegt nur Punkte, wenn man jemanden komplett nass macht, aber man trifft sich niemals – die ganze Prämisse ist falsch.“ Nicht neu bauen.
   👥 2–12 · 📱 Joystick + Wurf
 
 ### Sport mit Bewegungssensor (Wii-Gefühl)
