@@ -1113,6 +1113,8 @@ export interface KartCar {
   bm: number;
   /** Dieser Spieler sieht seine Verfolger-Ansicht auf dem eigenen Handy (statt im TV-Splitscreen) */
   phoneView: boolean;
+  /** Gas eingerastet (einmal GAS angetippt, BREMSE löst es wieder) */
+  auto: boolean;
   /** Verbindung weg: Geist ohne Kollision (TV halbtransparent) */
   ghost?: boolean;
 }

@@ -1212,7 +1212,9 @@ export class Bot {
           // Driften in Kurven (mit Hysterese, damit die Ladung nicht verloren geht), bremsen nur wenn's eng wird
           if (!this.kartDrift && Math.abs(ap.steer) > 0.55 && speed > 50 && !car.offroad) this.kartDrift = Math.random() < 0.6;
           else if (this.kartDrift && (Math.abs(ap.steer) < 0.2 || speed < 30)) this.kartDrift = false;
-          this.send('steer', { x: Math.round(steer * 100) / 100, gas: true, brake: ap.brake && !this.kartDrift && Math.random() < 0.5, drift: this.kartDrift });
+          // Gas rastet ein: einmal antippen (gas true → false), BREMSE löst es – danach neu antippen
+          const brake = ap.brake && !this.kartDrift && Math.random() < 0.5;
+          this.send('steer', { x: Math.round(steer * 100) / 100, gas: !car.auto && !brake, brake, drift: this.kartDrift });
           if (car.item) {
             if (!this.kartItemAt) this.kartItemAt = Date.now() + rand(600, 3500);
             if (Date.now() >= this.kartItemAt) {

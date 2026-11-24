@@ -12,8 +12,9 @@ import { haptic } from '../haptic';
 /**
  * Kart-Rennen am Handy (quer halten):
  *   links  – schwebender Stick (Daumen irgendwo aufsetzen, nach links/rechts schieben) oder Kipp-Lenkung
- *   rechts – GAS (groß, unten rechts), BREMSE daneben (im Stand rückwärts), DRIFT direkt über GAS
- *            (Daumen von GAS nach oben rutschen lassen; DRIFT gibt mit Gas), ITEM oben rechts
+ *   rechts – DRIFT (groß, unten rechts) und ITEM darüber, GAS links neben DRIFT, BREMSE über GAS.
+ *            GAS rastet ein: einmal antippen = fährt von allein (Knopf leuchtet), BREMSE löst es wieder
+ *            (bremst, im Stand rückwärts). So bleibt der rechte Daumen frei für DRIFT und ITEM.
  * Ansicht „Handy“: das Handy rendert seine eigene Verfolger-Ansicht (Mode 7) hinter den Knöpfen.
  * Ansicht „TV“: der TV zeigt den Splitscreen, das Handy nur Platz/Runde/Item.
  * Bis 4 Spieler wählt jeder selbst (Knopf oben in der Mitte, gespeichert für die nächsten Rennen) – das Umschalten
@@ -109,7 +110,6 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       <div class="k3-viewnote">📱 Ab 5 Spielern fährt jeder am Handy</div>
       <div class="k3-top">
         ${canTilt ? `<button class="k3-small k3-tilt">${mode === 'tilt' ? 'STICK' : 'KIPPEN'}</button>` : '<span></span>'}
-        <button class="k3-item" disabled><canvas width="16" height="16"></canvas><small>ITEM</small></button>
       </div>
       <div class="k3-left">
         ${
@@ -120,16 +120,17 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       </div>
       <div class="k3-right">
         <div class="k3-btn k3-drift" data-b="drift">DRIFT<small>halten + lenken</small></div>
-        <div class="k3-btn k3-brake" data-b="brake">BREMSE<small>im Stand: zurück</small></div>
-        <div class="k3-btn k3-gas" data-b="gas">GAS</div>
+        <div class="k3-btn k3-brake" data-b="brake">BREMSE<small>Gas aus</small></div>
+        <div class="k3-btn k3-gas" data-b="gas"><span class="k3-gas-l">GAS</span><small>antippen</small></div>
+        <button class="k3-item" disabled><canvas width="16" height="16"></canvas><small>ITEM</small></button>
       </div>
       <div class="k3-intro hidden">
         <h2>So fährst du</h2>
         <div class="k3-intro-grid">
           <div><b>◀ ▶</b> Links: Daumen schieben = lenken${canTilt ? ' – oder KIPPEN antippen und das Handy wie ein Lenkrad drehen' : ''}</div>
-          <div><b>GAS</b> gedrückt halten – <b>BREMSE</b> bremst, im Stand geht's rückwärts</div>
-          <div><b>DRIFT</b>: Daumen von GAS nach oben rutschen + lenken → Funken blau → orange → loslassen = Mini-Turbo!</div>
-          <div><b>ITEM</b> oben rechts antippen</div>
+          <div><b>GAS</b> einmal antippen = fährt von allein – <b>BREMSE</b> macht das Gas aus (im Stand rückwärts)</div>
+          <div><b>DRIFT</b> halten + lenken → Funken blau → orange → loslassen = Mini-Turbo!</div>
+          <div><b>ITEM</b> über DRIFT antippen</div>
         </div>
         <p>Tippen zum Weiter</p>
       </div>
@@ -144,6 +145,14 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   // ---- Eingaben
   const inp: KartInput = { steer: 0, gas: false, brake: false, drift: false };
   let last = { steer: 9, gas: false, brake: false, drift: false, t: 0 };
+  /**
+   * Gas eingerastet – lokal gespiegelt (gleiche Regel wie der Server: GAS-Flanke setzt, BREMSE löscht), damit
+   * Knopf und Vorhersage sofort reagieren; nach `autoSyncAt` gilt wieder der Server-Stand (`KartCar.auto`).
+   */
+  let autoGas = false;
+  let autoSyncAt = 0;
+  /** Eingabe für die Vorhersage: wie am Server inp.gas || eingerastet */
+  const predInp: KartInput = { steer: 0, gas: false, brake: false, drift: false };
   const push = (force = false) => {
     const now = performance.now();
     const boolChanged = inp.gas !== last.gas || inp.brake !== last.brake || inp.drift !== last.drift;
@@ -250,10 +259,30 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     }
     return best;
   };
+  const gasLabel = q(root, '.k3-gas-l');
+  const gasHint = q(root, '.k3-gas small');
+  const showAuto = () => {
+    btns.gas.classList.toggle('auto', autoGas);
+    rootEl.classList.toggle('k3-auto', autoGas);
+    const l = autoGas ? 'GAS\u00a0●' : 'GAS';
+    if (gasLabel.textContent !== l) gasLabel.textContent = l;
+    const h = autoGas ? 'läuft' : 'antippen';
+    if (gasHint.textContent !== h) gasHint.textContent = h;
+  };
+  const setAuto = (on: boolean, feel = true) => {
+    if (on === autoGas) return;
+    autoGas = on;
+    autoSyncAt = performance.now() + 700;
+    if (feel) vibrate(on ? [12, 30, 12] : 20);
+    showAuto();
+  };
   const fingers = new Map<number, Btn | null>();
   const applyButtons = () => {
     const down = new Set<Btn>();
     for (const b of fingers.values()) if (b) down.add(b);
+    // Gas rastet ein (wie `KartGame.latchGas`): BREMSE löst, GAS-Flanke – oder GAS gehalten beim Loslassen der BREMSE – rastet ein
+    if (down.has('brake')) setAuto(false);
+    else if (down.has('gas') && (!inp.gas || inp.brake)) setAuto(true);
     let changed = false;
     for (const b of Object.keys(btns) as Btn[]) {
       const on = down.has(b);
@@ -286,13 +315,14 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   right.addEventListener('pointerup', release);
   right.addEventListener('pointercancel', release);
   // Handy gedreht / Ausrichtungs-Overlay eingeblendet: gehaltene Knöpfe und Lenkung loslassen
+  // Eingerastetes Gas löst sich dabei auch (`auto: false`)
   onInputReset(right, () => {
     fingers.clear();
     applyButtons();
-    if (inp.steer) {
-      inp.steer = 0;
-      push(true);
-    }
+    inp.steer = 0;
+    setAuto(false, false);
+    send('steer', { x: 0, gas: false, brake: false, drift: false, auto: false });
+    last = { steer: 0, gas: false, brake: false, drift: false, t: performance.now() };
   });
   window.addEventListener('resize', measure);
   /** Aufräumen, wenn der Screen ersetzt wurde (Fensterlistener) */
@@ -302,6 +332,8 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
   const itemBtn = q<HTMLButtonElement>(root, '.k3-item');
   itemBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
+    // Liegt in der rechten Knopf-Zone – nicht als GAS/BREMSE/DRIFT-Finger zählen
+    e.stopPropagation();
     if (itemBtn.disabled) return;
     send('item');
     vibrate(25);
@@ -446,7 +478,11 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     }
     push();
     // Vorhersage + Haptik
-    const fired = world.predict(inp, dt);
+    predInp.steer = inp.steer;
+    predInp.gas = inp.gas || autoGas;
+    predInp.brake = inp.brake;
+    predInp.drift = inp.drift;
+    const fired = world.predict(predInp, dt);
     const own = world.ownPhys;
     if (own) {
       const charged = own.driftDir !== 0 && own.driftCharge >= KART.DRIFT_CHARGE_S;
@@ -481,6 +517,11 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
     if (!st || !c) return;
     const n = Object.keys(st.karts).length;
     setPhoneView(effectiveView(st));
+    // Eingerastetes Gas: nach dem eigenen Tippen kurz dem lokalen Stand trauen, dann gilt der Server
+    if (performance.now() > autoSyncAt && !!c.auto !== autoGas) {
+      autoGas = !!c.auto;
+      showAuto();
+    }
     // Umschalter nur, wenn es TV-Splitscreen gibt (≤ 4 Spieler); sonst einmal kurz der Hinweis im Countdown
     rootEl.classList.toggle('k3-nosplit', !st.splitOk);
     rootEl.classList.toggle('k3-racing', st.sub !== 'countdown');
@@ -525,7 +566,9 @@ function buildDrive(mode: 'tilt' | 'touch', rerender: () => void) {
       st.sub === 'countdown'
         ? mode === 'tilt'
           ? 'Handy gerade halten – links tippen setzt die Mitte'
-          : 'Gleich geht’s los – GAS gedrückt halten!'
+          : autoGas
+            ? 'Gas ist drin – gleich geht’s los!'
+            : 'Gleich geht’s los – GAS antippen!'
         : c.spin > 0
           ? 'Uiii – du drehst dich!'
           : charged
