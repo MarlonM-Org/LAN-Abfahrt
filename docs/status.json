@@ -1,19 +1,11 @@
 {
-  "updated": "2026-11-24T15:10+00:00",
+  "updated": "2026-11-24T15:40+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [
-    {
-      "type": "liegen geblieben",
-      "kind": null,
-      "title": "Startseite: Spielerliste statt Leaderboard",
-      "detail": "2 Commits vom 9.11. ohne PR (Tabellen nur mit Anwesenden). Prüfen, ob noch gewollt, dann PR oder Branch löschen. Ebenso claude/practical-wozniak-2dsd2e (5.11., UX-Durchgang + „Kart-Lenkung weicher“) – vermutlich von späteren PRs überholt.",
-      "branch": "claude/great-euler-wxt4pe"
-    }
-  ],
+  "inProgress": [],
   "queue": [
     {
       "area": "Spielbrett",
@@ -77,8 +69,22 @@
       "detail": "Marlon: Der durchsichtige Abbrechen-Knopf oben ist im Spiel okay, aber allgemein sollen Knöpfe und Bedienelemente besser sichtbar und nutzbar werden. Vorgehen: Bestandsaufnahme aller Screens (Screenshots per Playwright in iPhone-Größe), dann Styleguide in style.css: Mindestgröße 48 px, Kontrast ≥ 4,5:1, klare Primär/Sekundär/Gefahr-Knöpfe, gedrückt-Zustand + Haptik überall, Abbrechen/Zurück außerhalb des Spiels als deutlicher Knopf, Lobby/VIP-Menü/Ergebnis zuerst; Spiel-Screens behalten die zurückhaltende Kopfzeile."
     },
     {
+      "area": "Qualität",
+      "size": "S–M",
+      "kind": null,
+      "title": "UX-Branch vom 5.11.: Rosinen picken, Rest verwerfen (entschieden)",
+      "detail": "Branch claude/practical-wozniak-2dsd2e (2 Commits, 33 Dateien) nicht wholesale mergen – Auto-Fußball ist seit #99 anders gelöst, die Umbenennungen (Entenjagd, Wort-Bombe, Cockpit-Chaos, Unsichtbar-Fangen) widersprechen der „à la“-Regel, die Kart-Lenkung kollidiert mit dem Einrast-Gas. Einzeln gegen main prüfen und frisch übernehmen, danach Branch löschen.",
+      "steps": [
+        "Übernehmen: Parcours-Sprunghilfe (kurzer Tipp springt, Coyote 150 ms, Puffer 180 ms, „Aufgeben“/„Aussetzen“), Verräter-Türen-Hilfe, Sumo-Rempler-Puffer, Sprung-Puffer in Bogen und Smash während Dash/Angriff.",
+        "Übernehmen: Bot-Stärke leicht/normal/profi (VIP-Knopf, --skill) mit menschlicher Reaktionszeit, Flunkyball-Wurf per Schwung/Wischen und Schütteln, Abstieg über Hindernis klettern, Paddel-Duell-Bojen.",
+        "Übernehmen: Handy quer – iOS-Schriftvergrößerung aus, Infospalte skaliert automatisch, Igel-Minikarte in schmalen Spalten (prüfen, ob #45/#79 das schon abdecken).",
+        "Verwerfen: Auto-Fußball-Stick, Kart-Lenkkennlinie, Spiel-Umbenennungen, Status-Dateien."
+      ],
+      "prio": 6
+    },
+    {
       "area": "Laptop",
-      "prio": 6,
+      "prio": 7,
       "size": "S",
       "kind": null,
       "title": "VIP am Laptop jederzeit wechseln",
@@ -86,7 +92,7 @@
     },
     {
       "area": "Musik",
-      "prio": 7,
+      "prio": 8,
       "size": "M",
       "kind": null,
       "title": "Musik-Werkstatt (/musik.html) aufräumen: Übersicht, Kopie, Bearbeiten, Speichern",
@@ -100,7 +106,7 @@
     },
     {
       "area": "Neue Spiele",
-      "prio": 8,
+      "prio": 9,
       "size": "je S–M",
       "kind": null,
       "title": "Review-Phase 5: weitere neue Spiele",
@@ -121,7 +127,7 @@
       "kind": null,
       "title": "Highlights & Replays am TV (freigegeben)",
       "detail": "Der TV puffert die letzten 6 s an Snapshots (SnapBuffer gibt es schon, Auto-Fußball hat die Tor-Wiederholung bereits) und spielt K.O., letzten Treffer, Zieleinlauf oder Rauswurf in Zeitlupe nochmal ab – mit Banner, Sprecher und Zoom auf den Moment. Reihenfolge: Smash (K.O.), Bogen (letzter Treffer), Igel (Volltreffer/Selbsttreffer), Kart (Zieleinlauf, Überholen auf der Linie), Sumo (letzter Rauswurf), Wasserbomben, Bomben-Arena. Reine Client-Arbeit, der Server meldet nur den Moment über ctx.log(). Am Ende des Abends „Best of“: die 5 besten Momente nacheinander vor der Siegerehrung.",
-      "prio": 9
+      "prio": 10
     },
     {
       "area": "Handy",
@@ -129,7 +135,7 @@
       "kind": null,
       "title": "Onboarding für neue Gäste (freigegeben)",
       "detail": "Beim ersten Beitritt eines Geräts (localStorage leer) ein 60-s-Tutorial am Handy, visuell statt Text: Stick kreisen lassen, Knopf drücken, Handy kippen und schütteln (Sensor-Erlaubnis gleich mitnehmen), quer halten üben – jede Station mit Häkchen und Haptik; der TV zeigt, wer gerade übt. Überspringbar, über das Spieler-Menü jederzeit wieder aufrufbar. Zusammen mit dem Zoom-Check aus der Zoom-Karte.",
-      "prio": 10
+      "prio": 11
     },
     {
       "area": "Qualität",
@@ -137,7 +143,7 @@
       "kind": null,
       "title": "Lasttest 12 Handys + Netz-Robustheit (freigegeben)",
       "detail": "Bots über echtes WLAN statt localhost (zweiter Rechner oder Handys als Bot-Clients), 12 Spieler in Bomben-Arena, Smash, Kart, Igel und einer Party: Paketgrößen und -raten messen (Review-Werte als Vergleich: Arena ≈ 6 KB/Snapshot bei 20 Hz), Reconnect-Szenarien (Bildschirm aus, App-Wechsel, WLAN-Loch 2 s / 10 s / 60 s) automatisiert mit Playwright, CPU/Speicher des Servers über 2 Stunden; Ergebnis als Tabelle in docs/, gefundene Hänger als eigene Tickets.",
-      "prio": 11
+      "prio": 12
     },
     {
       "area": "Alle Spiele",
@@ -145,11 +151,11 @@
       "kind": null,
       "title": "Farbenblind-Modus in allen Ausführungen (freigegeben)",
       "detail": "Marlon: „gerne in allen Ausführungen“. Einstellung am Handy pro Spieler und am TV (VIP/Laptop): Deuteranopie (Rot-Grün, häufigste Form), Protanopie, Tritanopie (Blau-Gelb) und Hoher Kontrast/Graustufen. Umsetzung: (1) die 12 Spielerfarben bekommen je Modus eine geprüfte Alternativ-Palette (Abstand mit Simulations-Matrizen prüfen, Skript in scripts/), (2) Farbe nie allein: Spieler-Symbol (▲ ● ■ ◆ …) zusätzlich auf Ring, Namensschild, Spur, Fadenkreuz, Ball und HUD-Porträt, Teams mit Muster (Streifen/Punkte) statt nur Farbe, (3) Spiel-Signale (Rot = Gefahr, Grün = bereit) immer mit Symbol/Blinken, (4) TV-Vorschau zum Ausprobieren in der Lobby, (5) Playwright-Screenshots aller Szenen durch den Simulations-Filter als Abnahme.",
-      "prio": 12
+      "prio": 13
     },
     {
       "area": "Qualität",
-      "prio": 13,
+      "prio": 14,
       "size": "S–M",
       "kind": null,
       "title": "Noch unentschieden",
@@ -162,6 +168,11 @@
     }
   ],
   "done": [
+    {
+      "title": "Startseite: TV-Lobby zeigt die anwesenden Spieler (Figur, VIP-Krone, offline grau) statt Leaderboard; Arcade/Turnier mit Tagespunkten unter den Namen; Tabellen nur mit Anwesenden, Punkte bleiben bei Rückkehr erhalten (lag seit 9.11. auf Branch)",
+      "pr": null,
+      "date": "2026-11-24"
+    },
     {
       "title": "Neue Spiele: Sektkorken (Schütteln, PLOPP!, fürs Brett), Montagsmaler live (à la skribbl.io), Strand-Band (jedes Handy ein Instrument), Lügen-Lexikon (à la Fibbage, 200 Einträge) + Igel-Krieg mit größerer Insel ab 6 Spielern – lagen seit 9.11. fertig auf Branch, jetzt gemergt",
       "pr": 114,
