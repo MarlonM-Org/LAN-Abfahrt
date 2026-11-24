@@ -1,12 +1,136 @@
 {
-  "updated": "2026-11-09T13:27+00:00",
+  "updated": "2026-11-24T12:30+00:00",
   "artifact": "https://claude.ai/artifact/8XRwB1H3bsUUTV5g9dAtmi (slug 3cefa65c-7b4d-4434-a343-b15cb2c458b5)",
   "analysis": {
     "title": "Spiel-Review (Tiefenanalyse, 5.11.)",
     "url": "https://claude.ai/artifact/76ucbosiWoyLfWBYx2VBK1"
   },
-  "inProgress": [],
-  "queue": [],
+  "inProgress": [
+    {
+      "type": "fertig – PR fehlt",
+      "kind": "sekt",
+      "title": "4 neue Spiele + große Igel-Insel liegen fertig auf einem Branch",
+      "detail": "Sektkorken (Schütteln, PLOPP!, fürs Brett), Montagsmaler live (à la skribbl.io), Strand-Band (jedes Handy ein Instrument), Lügen-Lexikon (à la Fibbage, 200 Einträge) und Igel-Krieg mit größerer Insel ab 6 Spielern. 21 Commits, 50 Dateien, lässt sich konfliktfrei auf main mergen (Stand 24.11.). Nächster Schritt: typecheck + Bot-Party laufen lassen, PR aufmachen, mergen.",
+      "branch": "claude/nifty-hawking-cmp17d"
+    },
+    {
+      "type": "PR offen",
+      "kind": null,
+      "title": "VIP-Knopf „n offline“ neben „Abbrechen“ statt über der Kopfzeile",
+      "detail": "Der Knopf „Spieler (n offline)“ verdeckte in Quer-Spielen den Kopf des Controllers. PR #113 seit 9.11. offen, wartet auf Merge.",
+      "branch": "claude/brave-brahmagupta-cfmvq4 · PR #113"
+    },
+    {
+      "type": "liegen geblieben",
+      "kind": null,
+      "title": "Startseite: Spielerliste statt Leaderboard",
+      "detail": "2 Commits vom 9.11. ohne PR (Tabellen nur mit Anwesenden). Prüfen, ob noch gewollt, dann PR oder Branch löschen. Ebenso claude/practical-wozniak-2dsd2e (5.11., UX-Durchgang + „Kart-Lenkung weicher“) – vermutlich von späteren PRs überholt.",
+      "branch": "claude/great-euler-wxt4pe"
+    }
+  ],
+  "queue": [
+    {
+      "area": "Spielbrett",
+      "prio": 1,
+      "size": "XL",
+      "kind": null,
+      "title": "Party-Modus 3.0 – der „große Modus“ à la Mario Party / Lego Party",
+      "detail": "Es gibt schon ein Spielbrett „Ferienhaus“ (Party-Abfahrt in der Lobby: 3/5/8 Runden, gleichzeitig würfeln, Münzen/Cocktails, Bar, Strandladen mit 4 Items, Gabelung, Duell „Teilen oder Klauen“, nach jeder Runde ein Minispiel, Finale Mord/Verräter, Bonus-Cocktails, Tageszeit, Nachzügler, Fortsetzen). Marlon möchte daraus einen richtig großen Abend-Modus machen, 2D reicht (wie Auto-Fußball). Ausbaustufen unten – Reihenfolge und Details klären wir mit Marlon (Fragen siehe Chat).",
+      "steps": [
+        "Stufe 1 · Mehr Minispiele aufs Brett: Kurzformen für Wackelturm (90 s, Höhe zählt – Marlons Wunsch), Igel-Krieg („Kurz-Igel“: 60 HP, Flut nach 2 min), Kofferpacken (60 s), Minigolf (3 Löcher); dazu Minispiel-Pool wählbar statt nur „Lange Spiele“: Alle / Action / Kopf & Bauch / Favoriten / Getestete, plus Spiele-Roulette mit 3 Vorschlägen und Handy-Abstimmung (à la Lego Party).",
+        "Stufe 2 · Mehrere Bretter als Themenwelten: Ferienhaus (jetzt), Strandpromenade/Hafen, Berghütte am Rhein – je eigener Wege-Graph (BOARD_FIELDS verallgemeinern), eigene Ereignisse und Deko, Brett-Wahl in der Lobby, Brett-Rotation über den Abend.",
+        "Stufe 3 · Brett-Mechaniken: Blitz-Events direkt auf dem Feld (30-s-Minispiel für alle, z. B. Sektkorken/Schütteln), Showdown-Feld (Duell 1 gegen 1 im Kurz-Minispiel um Cocktail), Strandladen auf 6–8 Items (Fernglas = nächste Felder sehen, Sandsturm = alle anderen 2 zurück, Doppelcocktail), Rutschen/Fähre als Teleport, Überhol-Bonus, Bank-Zinsen für Sparer.",
+        "Stufe 4 · Präsentation: Brett-Kamera folgt der Figur beim Laufen (Zoom + Schwenk), Zwischenstand-Zeremonie nach jeder Runde (Podest-Reveal mit Sprecher), großes Finale mit Rangliste-Countdown, Moderator-Sprüche, Figuren laufen animiert über die Felder.",
+        "Stufe 5 · Formate: Kurzparty (≈ 20 min: 3 Runden, nur kurze Spiele), Team-Party (feste 2er-Teams über den ganzen Abend, Teams nach Feldfarbe gibt es schon), Saison über mehrere Abende (Saison-Tabelle neben der ewigen Tabelle), Handicap für Nachzügler/Neulinge."
+      ]
+    },
+    {
+      "area": "Spiel",
+      "prio": 2,
+      "size": "M–L",
+      "kind": "kart",
+      "title": "Kart-Rennen gründlich überarbeiten („gerade noch ziemlich ass“)",
+      "detail": "Marlons Urteil vom 24.11.: Kart ist aktuell schlecht spielbar. Konkrete Punkte stehen noch aus (Fragen im Chat). Verdachtsmomente aus dem Spiel-Review: zu komplex für Neue (TV/Handy-Umschalter, Drift über GAS hochrutschen), Handy-Ansicht zieht den Blick vom TV weg, Mode-7-Lesbarkeit, Lenkgefühl/Kipplenkung, 8 s Countdown, KI-/Item-Balance. Vorgehen: erst eine Diagnose-Session mit Marlon (was genau stört: Steuerung, Grafik, Tempo, Übersicht, Items?), dann Fix-Paket. Hinweis: Auf dem alten Branch claude/practical-wozniak-2dsd2e (5.11.) gab es schon einmal „Kart-Lenkung weicher“ – nie gemergt.",
+      "steps": [
+        "Steuerung: Lenken wie Auto-Fußball (Joystick absolut oder klassisch links/rechts?), Drift auf eigenen Knopf, Gas automatisch optional („Auto-Gas“ wie Mario Kart Auto-Beschleunigung).",
+        "Ansicht: Standard = alle auf dem TV (Draufsicht/Micro-Machines-Variante ab 5 Spielern statt Handy-Rendering?), Handy nur als Minikarte.",
+        "Spielgefühl: Strecken breiter, Kollisionen weicher, Items sichtbar/erklärt, Rubber-Banding, kürzerer Countdown, bessere Kamera.",
+        "Zuschauer: Fertige Fahrer werden Tribünen-Zuschauer und werfen 2 Bananen (Review-Vorschlag); Grand-Prix „Nochmal“ über 3 Strecken mit Gesamtwertung."
+      ]
+    },
+    {
+      "area": "Handy",
+      "prio": 3,
+      "size": "S",
+      "kind": null,
+      "title": "Handy-Browser zoomt manchmal rein (Controller unbrauchbar)",
+      "detail": "Trotz user-scalable=no zoomt iOS Safari bei Doppeltipp/Pinch (Zwei-Daumen-Steuerung!) rein. Maßnahmen: touch-action: none auf allen Spielflächen und body während eines Spiels, gesturestart/gesturechange + Doppeltipp per preventDefault blocken, Standalone-PWA („Zum Home-Bildschirm“, manifest.json, display: standalone – dort gibt es kein Zoom und keine Adressleiste), Notfall-Knopf „Ansicht zurücksetzen“ im VIP-/Spieler-Menü, Hinweis in der Lobby. Testen auf iPhone und Android Chrome."
+    },
+    {
+      "area": "Handy",
+      "prio": 4,
+      "size": "M",
+      "kind": null,
+      "title": "Usability-Pass Handy-UI: Knöpfe sichtbarer, einheitlich, leicht bedienbar",
+      "detail": "Marlon: Der durchsichtige Abbrechen-Knopf oben ist im Spiel okay, aber allgemein sollen Knöpfe und Bedienelemente besser sichtbar und nutzbar werden. Vorgehen: Bestandsaufnahme aller Screens (Screenshots per Playwright in iPhone-Größe), dann Styleguide in style.css: Mindestgröße 48 px, Kontrast ≥ 4,5:1, klare Primär/Sekundär/Gefahr-Knöpfe, gedrückt-Zustand + Haptik überall, Abbrechen/Zurück außerhalb des Spiels als deutlicher Knopf, Lobby/VIP-Menü/Ergebnis zuerst; Spiel-Screens behalten die zurückhaltende Kopfzeile."
+    },
+    {
+      "area": "Laptop",
+      "prio": 5,
+      "size": "S",
+      "kind": null,
+      "title": "VIP am Laptop jederzeit wechseln",
+      "detail": "Im Spieler-Panel (Taste P / Knopf „Spieler“ am TV) pro Spieler „👑 Zum VIP machen“, nur für isLaptop()-Verbindungen (nie über den Tunnel). Server: host:vip <id> → Room setzt VIP um, informiert alle (meta), Handy des neuen VIP zeigt sofort die VIP-Knöpfe, altes Handy verliert sie; auch mitten im Spiel und wenn der alte VIP offline ist. Bonus: VIP am Handy freiwillig übergeben."
+    },
+    {
+      "area": "Musik",
+      "prio": 6,
+      "size": "M",
+      "kind": null,
+      "title": "Musik-Werkstatt (/musik.html) ausbauen – Anforderungen noch mit Marlon aufnehmen",
+      "detail": "Heute: Piano-Roll für Melodie/Bass/Begleitung, Schlagzeug-Raster (Kick/Snare/HiHat), BPM/Swing/1–32 Takte, Undo, Vorlagen, Einsingen (Tonhöhenerkennung), MIDI-Import/Export, Szenen-Zuordnung. Marlon findet das noch zu roh. Vor der Umsetzung Anforderungen sammeln (Fragen im Chat).",
+      "steps": [
+        "Klang: mehr Kanäle (2. Melodie/Pad), Effekte (Arpeggio, Vibrato, Echo, Filter), Wellenform-Presets/Instrumente mit Namen, Mixer mit Lautstärke pro Kanal und Master.",
+        "Komponieren: Pattern/Abschnitte (Intro/A/B/Outro) statt einer langen Rolle, Akkord-Hilfe (Akkordfolge → Begleitung generieren), Schlagzeug-Vorlagen, Zufalls-Variation, Noten-Länge per Raster-Wahl (1/8, 1/16, Triolen).",
+        "Bedienung: Tastatur spielen (Computer-Tasten als Klaviatur, Live-Aufnahme), Zoom/Scrollen der Rolle, Mobile-Ansicht fürs Handy, Hilfe-Overlay.",
+        "Integration: Live-Vorschau am TV, Playlist pro Szene, Lautstärke/Fade pro Szene, Teilen/Importieren von Songs als Datei, Song-Bibliothek mit Suche und Tags."
+      ]
+    },
+    {
+      "area": "Neue Spiele",
+      "prio": 7,
+      "size": "je S–M",
+      "kind": null,
+      "title": "Review-Phase 5: weitere neue Spiele",
+      "detail": "Von den 12 Review-Vorschlägen sind 4 gemergt (Wer war’s?, Funkfrequenz, Schätzkönig, Mäxchen) und 4 fertig auf Branch (Sektkorken, Montagsmaler live, Strand-Band, Lügen-Lexikon – siehe „In Arbeit“). Noch offen:",
+      "steps": [
+        "Geheimcode am Pool – Team-Wortspiel, Handy als geheimer Lageplan, à la Codenames (M)",
+        "Kofferbombe entschärfen – asymmetrisches Koop-Rätsel, à la Keep Talking (M)",
+        "Drachenboot – Team-Paddeln mit Sensor, 60–90 s (S–M)",
+        "Flohmarkt-Auktion – Bieten mit geheimen Werten, à la Kuhhandel (S–M)",
+        "Strandkorb-Scharade – Begriff am Handy über der Stirn, Kippen = erraten/überspringen, Teams, à la Heads Up (S)",
+        "Urlaubs-Wahnsinn – 5-Sekunden-Mikrospiele am Handy, alle gleichzeitig, 3 Leben, à la WarioWare (M)",
+        "Aus ROADMAP.md: Sonnencreme-Kartoffel, Badezimmer-Rennen"
+      ]
+    },
+    {
+      "area": "Qualität",
+      "prio": 8,
+      "size": "S–M",
+      "kind": null,
+      "title": "Weitere Vorschläge fürs Token-Budget",
+      "detail": "Nicht von Marlon gefordert, aber lohnend – zum Freigeben oder Streichen:",
+      "steps": [
+        "Highlights/Replays: TV puffert 6 s und zeigt K.O., Tor, letzten Treffer in Zeitlupe (Smash, Bogen, Igel, Kart; Autoball hat es schon) (M)",
+        "Echte Pixel-Avatare aus Fotos der Freunde (Foto → 16×16-Pixelkopf im Avatar-Editor) (M)",
+        "Onboarding für neue Gäste: 60-s-Tutorial am Handy (Stick, Knöpfe, Sensor testen) beim ersten Beitritt (S)",
+        "Lasttest 12 Handys + Netz-Robustheit: Bots über WLAN, Reconnect-Szenarien, Paketgrößen messen (S–M)",
+        "Barrierefreiheit: Farbenblind-Modus (Muster/Symbole statt nur Farbe), größere Schrift am Handy (S)",
+        "Spieler-Profile: Statistik pro Person über alle Abende (Lieblingsspiel, Siege, Titel) am Handy (S–M)",
+        "Testrunde: 38 von 59 Spielen haben noch kein Feedback von Marlon – nach jedem Spieleabend Status-Seite pflegen"
+      ]
+    }
+  ],
   "done": [
     {
       "title": "Fallen-Parcours: Teil wird nicht mehr beim ersten Joystick-Tipp eingebaut (der ganze Platzier-Bildschirm wirkte als PLATZIEREN-Knopf) – jetzt baut nur der grüne Knopf ein, grau wenn's dort nicht passt",
@@ -401,8 +525,8 @@
   ],
   "feedback": {
     "kart": {
-      "status": "umgesetzt",
-      "notes": "Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone repariert · TV-Regie in der Draufsicht: Zweikämpfe, Zielfoto (#84) · Rückansicht: Haare statt Gesicht, Glatze glatt (#87)"
+      "status": "offen",
+      "notes": "Marlon (24.11.): „Mario Kart ist gerade noch ziemlich ass“ – Details offen, Überarbeitung in der Warteschlange · vorher umgesetzt: Handy-Ansicht pro Spieler, Gas/Rückwärts, Joystick, Drift, KIPPEN aufs iPhone (#14), TV-Regie (#84), Rückansicht (#87)"
     },
     "enten": {
       "status": "positiv",
@@ -426,7 +550,7 @@
     },
     "igel": {
       "status": "umgesetzt",
-      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) – größere Insel offen"
+      "notes": "Stufe S+M: Wind driftet, Zugzeit/HP nach Spielerzahl, Kamera, „Alle gleichzeitig“ ab 7, 12 Waffen, Kisten, Teams, quer (#45, #46, #68) · Stufe L: Seil, Schirm, Schaufel, Themenkarten, Schuss des Abends (#89) · größere Insel ab 6 Spielern fertig auf Branch claude/nifty-hawking-cmp17d (PR fehlt)"
     },
     "ttt": {
       "status": "umgesetzt",
@@ -569,6 +693,26 @@
     {
       "title": "Favoriten in der Arcade markieren (VIP + Laptop, pro Gerät im Browser gemerkt) (#111)",
       "status": "umgesetzt"
+    },
+    {
+      "title": "Größerer Party-Modus à la Mario Party / Lego Party (Ausbaustufen des Spielbretts, eigene Minispiele wie Wackelturm aufs Brett)",
+      "status": "offen"
+    },
+    {
+      "title": "Handy-Browser zoomt manchmal in den Controller rein",
+      "status": "offen"
+    },
+    {
+      "title": "Knöpfe/Bedienelemente am Handy besser sichtbar und bedienbar (Abbrechen-Knopf im Spiel darf durchsichtig bleiben)",
+      "status": "offen"
+    },
+    {
+      "title": "VIP am Laptop jederzeit wechseln können",
+      "status": "offen"
+    },
+    {
+      "title": "Musik-Werkstatt ausbauen – Anforderungen noch aufnehmen",
+      "status": "offen"
     }
   ]
 }
